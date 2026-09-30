@@ -8,7 +8,7 @@
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
+            android:screenOrientation="sensorPortrait"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
             <meta-data android:name="android.app.lib_name" android:value="zehra" />
             <intent-filter>

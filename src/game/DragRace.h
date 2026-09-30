@@ -40,6 +40,7 @@ struct LaneState {
     const VehicleDef* car = nullptr;
     TimeSlip slip;
     bool staged = false, left = false;   // stage isigini terk etti mi
+    bool armed = false;                  // stage'de debriyaja (DCT/otomatikte frene) basti: kalkis kontrolu oyuncuda
     double leaveTime = -1;               // yaris saatinde (s)
     // Vites gecisi durumu
     double shiftT = -1; int shiftTarget = 0;
@@ -68,6 +69,7 @@ public:
     int winner() const { return winner_; }                   // -1 belirsiz, 0 oyuncu, 1 rakip
     std::vector<std::string> drainEvents() { auto v = std::move(events_); events_.clear(); return v; }
     void skipBurnout();                                      // burnout'tan stage'e gec
+    void setPlayerAutopilot(bool on) { autopilot_ = on; }    // oyuncu serdini yapay zeka surer (tanitim / test)
     TreeType tree() const { return tree_; }
 
 private:
@@ -84,6 +86,7 @@ private:
     double clock_ = 0.0, acc_ = 0.0, phaseT_ = 0.0, treeStart_ = -1.0, treeDelay_ = 1.0;
     int winner_ = -1;
     int prevPaddle_ = 0;
+    bool autopilot_ = false;
     uint32_t rng_;
     std::vector<std::string> events_;
 };

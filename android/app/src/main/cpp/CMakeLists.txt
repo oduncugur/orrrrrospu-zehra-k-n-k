@@ -9,7 +9,10 @@ target_include_directories(native_app_glue PUBLIC ${ANDROID_NDK}/sources/android
 
 add_library(zehra SHARED
     android_main.cpp
-    ${ZK_ROOT}/src/app/GarageApp.cpp
+    ${ZK_ROOT}/src/app/App.cpp
+    ${ZK_ROOT}/src/app/Renderer.cpp
+    ${ZK_ROOT}/src/app/GarageScreen.cpp
+    ${ZK_ROOT}/src/app/DragScreen.cpp
     ${ZK_ROOT}/src/app/GLApi.cpp
     ${ZK_ROOT}/src/sim/WheelSimulation.cpp
     ${ZK_ROOT}/src/sim/PowertrainCore.cpp

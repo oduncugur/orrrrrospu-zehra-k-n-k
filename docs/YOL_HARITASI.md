@@ -8,7 +8,7 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 | 1 | Tekerlek/lastik, güç aktarma, arıza çekirdeği; 0-400 m konsol simülasyonu | ✅ |
 | 2 | 324 araç / 280 motor / 127 şanzıman kataloğu, prosedürel ses, süspansiyon + yol | ✅ |
 | 2.5 | Grafik istemci iskeleti (Android + Windows + Linux), garaj ekranı, CI + indirme linki | ✅ |
-| **3** | **Oynanabilir drag yarışı (yan mod / yatay ekran)** | ⏳ sıradaki |
+| **3** | **Oynanabilir drag yarışı (yan mod / yatay ekran)** | ⏳ ara taslak oynanabilir, cila sürüyor |
 | 4 | Kariyer ve ekonomi: para, garaj, parça/tuning, swap, dyno, kayıt | |
 | 5 | Dik mod: 3D spline yol, jiroskop direksiyon, trafik, virajlar, yanal lastik modeli | |
 | 6 | Isı, arıza ve yakıt sistemleri; şehirlerarası maraton, benzinlik, polis, çekici | |
@@ -29,3 +29,14 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
    (devir, vites, hız, vites ışığı, zamanlar).
 7. Ses: oyuncu motoru yük altında, rakip motor uzaklığa göre kısık.
 8. Android'de yarışta yatay, garajda dikey ekran yönü.
+
+### Faz 3 durum (ara taslak)
+- [x] 1. `VehicleSim` + regresyon testi (9 senaryo byte byte aynı)
+- [x] 2. Yarış akışı, kırmızı ışık, stall, aks kırılması (`tests/drag_race_test`)
+- [x] 3. Zaman fişi: RT, 60 ft, 330 ft, 1/8 + hız, 1000 ft, 1/4 + trap
+- [x] 4. Kontroller: analog debriyaj/gaz, fren, H-desen kol, pedallar, klavye (masaüstünde betikli testle doğrulandı)
+- [x] 5. Yapay zekâ rakip
+- [x] 6. Görüntü: 640x360 yan görünüm, paralaks, ağaç, duman, egzoz alevi, HUD, sonuç ekranı
+- [x] 7. Ses: iki motor, rakip uzaklığa göre kısık
+- [ ] 8. Android ekran yönü: kodlandı, cihazda doğrulanmadı
+- [ ] Cila: lastik sesi, haptik, burnout su havuzu, ağaç tipi seçimi, çoklu yarış / tur

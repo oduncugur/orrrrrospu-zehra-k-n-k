@@ -65,14 +65,15 @@ void DragRace::advance(double realDt, const PlayerControls& pc) {
     LaneState& P = lanes_[0];
     PowertrainCore& pt = P.sim->powertrain();
     const Gearbox box = P.sim->gearboxType();
-    // ---- vites istekleri (kare basina bir kez) ----
-    if (box == Gearbox::HPattern && pc.requestedGear >= 0 && pc.requestedGear != pt.gear()) {
+    // ---- vites istekleri (kare basina bir kez; otopilotta oyuncu girdisi yok sayilir) ----
+    if (autopilot_) { P.grind = false; }
+    else if (box == Gearbox::HPattern && pc.requestedGear >= 0 && pc.requestedGear != pt.gear()) {
         const int g = std::min(pc.requestedGear, pt.gearCount());
-        if (pc.clutch >= 0.55) { pt.setGear(g); P.grind = false; }
+        if (pc.clutch >= 0.55 || g == 0) { pt.setGear(g); P.grind = false; }   // bosa almak debriyajsiz da olur
         else if (!P.grind) { P.grind = true; events_.push_back("DISLI CITIRTISI! Vites icin debriyaja bas"); }
     }
-    if (pc.requestedGear < 0) P.grind = false;
-    if ((box == Gearbox::Dogbox || box == Gearbox::DCT) && pc.paddle != 0 && prevPaddle_ == 0) {
+    if (pc.requestedGear < 0 || pc.requestedGear == pt.gear()) P.grind = false;
+    if (!autopilot_ && (box == Gearbox::Dogbox || box == Gearbox::DCT) && pc.paddle != 0 && prevPaddle_ == 0) {
         const int g = std::clamp(pt.gear() + pc.paddle, 1, pt.gearCount());
         if (g != pt.gear()) { pt.setGear(g); P.shiftT = 0.0; }
     }
@@ -113,6 +114,13 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
         in.held = holding;
     } else {
         in.held = clutch > kClutchHold && beforeLeave && phase_ != RacePhase::Run;
+    }
+    // Stage/agac: oyuncu debriyaja (DCT/otomatikte frene) ilk kez basana kadar arac frende tutulur ve motor
+    // bosta kalir; boylece stage'e girerken rolantide surunup haksiz kirmizi isik yakilmaz.
+    if ((phase_ == RacePhase::Staging || phase_ == RacePhase::Tree) && beforeLeave) {
+        const bool autoBox = box == Gearbox::DCT || box == Gearbox::TorqueConverter;
+        if (autoBox ? pc.brake > 0.5 : pc.clutch > kClutchHold) L.armed = true;
+        if (!L.armed) { clutch = 1.0; in.held = true; }
     }
     if (phase_ == RacePhase::Burnout) in.held = true;          // line-lock: on frenler kilitli
     in.brake = pc.brake * (in.held ? 0.0 : 1.0);
@@ -197,7 +205,7 @@ void DragRace::timing(LaneState& L, int idx) {
 
 void DragRace::stepPhysics(const PlayerControls& pc) {
     // ---- faz gecisleri ----
-    if (phase_ == RacePhase::Burnout && phaseT_ > 20.0) skipBurnout();
+    if (phase_ == RacePhase::Burnout && (phaseT_ > 20.0 || (autopilot_ && phaseT_ > 1.5))) skipBurnout();
     if (phase_ == RacePhase::Staging && phaseT_ > 1.0) {
         for (auto& L : lanes_) L.staged = true;
         events_.push_back("PRE-STAGE / STAGE - Agac basliyor");
@@ -212,7 +220,7 @@ void DragRace::stepPhysics(const PlayerControls& pc) {
     for (int i = 0; i < 2; ++i) {
         LaneState& L = lanes_[i];
         VehicleInputs in;
-        if (i == 0) playerDrive(L, pc, in); else aiDrive(L, in);
+        if (i == 0 && !autopilot_) playerDrive(L, pc, in); else aiDrive(L, in);
         L.sim->step(kStep, in);
         timing(L, i);
         if (!L.slip.broke && (L.sim->failure().snapped(0) || L.sim->failure().snapped(1))) {

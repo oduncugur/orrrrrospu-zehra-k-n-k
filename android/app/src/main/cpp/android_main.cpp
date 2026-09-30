@@ -1,6 +1,8 @@
-// ZEHRA KINIK - Android platform katmani (NativeActivity): EGL/GLES3 baglami, AAudio, dokunmatik girdi.
-// Oyun/cizim mantigi platformdan bagimsiz GarageApp'tedir (masaustu ile ortak).
-#include "app/GarageApp.h"
+// ZEHRA KINIK - Android platform katmani (NativeActivity): EGL/GLES3 baglami, AAudio, dokunmatik girdi,
+// ekran yonu (JNI) ve geri tusu. Oyun/cizim mantigi platformdan bagimsiz App'tedir (masaustu ile ortak).
+#include "app/App.h"
+
+#include <jni.h>
 
 #include <EGL/egl.h>
 #include <aaudio/AAudio.h>
@@ -15,14 +17,14 @@ namespace {
 
 struct Platform {
     android_app* app = nullptr;
-    GarageApp game;
+    App game;
     EGLDisplay dpy = EGL_NO_DISPLAY; EGLSurface surf = EGL_NO_SURFACE; EGLContext ctx = EGL_NO_CONTEXT;
     AAudioStream* stream = nullptr;
     bool running = false;
 };
 
 aaudio_data_callback_result_t audioCb(AAudioStream*, void* user, void* data, int32_t frames) {
-    static_cast<GarageApp*>(user)->renderAudio(static_cast<float*>(data), frames);
+    static_cast<App*>(user)->renderAudio(static_cast<float*>(data), frames);
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 
@@ -32,7 +34,7 @@ void startAudio(Platform& p) {
     if (AAudio_createStreamBuilder(&b) != AAUDIO_OK) return;
     AAudioStreamBuilder_setFormat(b, AAUDIO_FORMAT_PCM_FLOAT);
     AAudioStreamBuilder_setChannelCount(b, 1);
-    AAudioStreamBuilder_setSampleRate(b, GarageApp::kSampleRate);
+    AAudioStreamBuilder_setSampleRate(b, App::kSampleRate);
     AAudioStreamBuilder_setPerformanceMode(b, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
     AAudioStreamBuilder_setDataCallback(b, audioCb, &p.game);
     if (AAudioStreamBuilder_openStream(b, &p.stream) == AAUDIO_OK) AAudioStream_requestStart(p.stream);
@@ -75,8 +77,28 @@ void termEGL(Platform& p) {
     p.dpy = EGL_NO_DISPLAY; p.surf = EGL_NO_SURFACE; p.ctx = EGL_NO_CONTEXT;
 }
 
+// Activity.setRequestedOrientation: 6 = SENSOR_LANDSCAPE, 7 = SENSOR_PORTRAIT
+void requestOrientation(android_app* app, bool landscape) {
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
+    jobject activity = app->activity->clazz;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID mid = env->GetMethodID(cls, "setRequestedOrientation", "(I)V");
+    if (mid) env->CallVoidMethod(activity, mid, landscape ? 6 : 7);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls);
+    vm->DetachCurrentThread();
+}
+
 int32_t onInput(android_app* app, AInputEvent* ev) {
     Platform& p = *static_cast<Platform*>(app->userData);
+    if (AInputEvent_getType(ev) == AINPUT_EVENT_TYPE_KEY) {
+        if (AKeyEvent_getKeyCode(ev) != AKEYCODE_BACK) return 0;
+        if (!p.game.landscape()) return 0;                          // garajda: varsayilan (uygulamadan cik)
+        if (AKeyEvent_getAction(ev) == AKEY_EVENT_ACTION_UP) p.game.key(Key::Back, true);
+        return 1;
+    }
     if (AInputEvent_getType(ev) != AINPUT_EVENT_TYPE_MOTION) return 0;
     const int32_t action = AMotionEvent_getAction(ev);
     const int32_t act = action & AMOTION_EVENT_ACTION_MASK;
@@ -134,6 +156,8 @@ void android_main(android_app* app) {
     app->userData = &p;
     app->onAppCmd = onCmd;
     app->onInputEvent = onInput;
+    p.game.onOrientation = [app](bool landscape) { requestOrientation(app, landscape); };
+    requestOrientation(app, p.game.landscape());
     auto last = std::chrono::steady_clock::now();
 
     while (true) {

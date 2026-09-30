@@ -31,7 +31,8 @@ inline bool zkLoadGL(void* (*)(const char*)) { return true; }
     X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer) X(PFNGLVIEWPORTPROC, glViewport)                    \
     X(PFNGLCLEARCOLORPROC, glClearColor) X(PFNGLCLEARPROC, glClear) X(PFNGLENABLEPROC, glEnable)               \
     X(PFNGLDISABLEPROC, glDisable) X(PFNGLDRAWARRAYSPROC, glDrawArrays) X(PFNGLACTIVETEXTUREPROC, glActiveTexture) \
-    X(PFNGLREADPIXELSPROC, glReadPixels) X(PFNGLPIXELSTOREIPROC, glPixelStorei)
+    X(PFNGLREADPIXELSPROC, glReadPixels) X(PFNGLPIXELSTOREIPROC, glPixelStorei)                             \
+    X(PFNGLUNIFORM2FPROC, glUniform2f) X(PFNGLBLENDFUNCPROC, glBlendFunc)
 
 // Isim cakismasini onlemek icin (opengl32 / libGL disa aktarimlari) zk_ onekli isaretciler
 #define ZK_GL_DECLARE(type, name) extern type zk_##name;
@@ -75,6 +76,8 @@ ZK_GL_FUNCS(ZK_GL_DECLARE)
 #define glActiveTexture zk_glActiveTexture
 #define glReadPixels zk_glReadPixels
 #define glPixelStorei zk_glPixelStorei
+#define glUniform2f zk_glUniform2f
+#define glBlendFunc zk_glBlendFunc
 
 bool zkLoadGL(void* (*getProc)(const char*));
 #endif

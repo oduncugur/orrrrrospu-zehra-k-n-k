@@ -85,6 +85,14 @@ int main() {
         CHECK(r.lane(0).slip.reaction < 0, "reaksiyon negatif");
         CHECK(r.winner() == 1, "kirmizi isik yakan kaybeder");
     }
+    std::printf("[2b] Stage'de hic dokunmayan oyuncu surunmez, kirmizi isik yakmaz\n");
+    {
+        DragRace r(5, 5, TreeType::Sportsman, 42, false);
+        PlayerControls idle; idle.clutch = 0.0; idle.throttle = 0.0;    // debriyaj birakili, 1. vites
+        for (int i = 0; i < 60 * 10 && !(r.treeLights() & 8); ++i) r.advance(1.0 / 60.0, idle);
+        std::printf("    yesil yandiginda (t=%.2f s) mesafe %.4f m, kirmizi=%d\n", r.clock(), r.lane(0).sim->distance(), (int)r.lane(0).slip.redLight);
+        CHECK((r.treeLights() & 8) && !r.lane(0).slip.redLight && r.lane(0).sim->distance() < 0.01, "yesile kadar arac yerinde tutuldu");
+    }
     std::printf("[3] Debriyajsiz vites -> dis citirtisi, vites girmez\n");
     {
         DragRace r(5, 5, TreeType::Sportsman, 42, false);
