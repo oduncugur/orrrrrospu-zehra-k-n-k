@@ -24,7 +24,8 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/Career.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
-    ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp)
+    ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp
+    ${ZK_ROOT}/src/audio/TireAudio.cpp)
 target_include_directories(zehra PRIVATE ${ZK_ROOT}/src)
 target_compile_features(zehra PRIVATE cxx_std_17)
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")

@@ -1,6 +1,7 @@
 // Kariyer / ekonomi / kayit testleri
 #include "game/Career.h"
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -111,6 +112,22 @@ int main() {
         h.money = 50000; h.buyCar(5);
         const long m = h.money;
         CHECK(h.sellCurrent() && h.money > m && h.cars.size() == 1, "ikinci arac satildi, para geldi");
+    }
+    std::printf("[H] Hasar ve tamir\n");
+    {
+        Career c = Career::newGame();
+        c.recordDamage(true, 0.4, false);
+        CHECK(c.car().damaged() && !c.car().raceable(), "kirik aks: yarisamaz");
+        const long cost = c.repairCost();
+        std::printf("    tamir bedeli $%ld\n", cost);
+        CHECK(cost > 0, "tamir ucretli");
+        Career d; CHECK(Career::parse(c.serialize(), d) && d.car().axleBroken && std::fabs(d.car().engineWear - 0.4) < 1e-3, "hasar kayitta korunur");
+        c.money = cost - 1; std::string why;
+        CHECK(!c.repairCurrent(&why) && c.car().axleBroken, "para yetmezse tamir yok");
+        c.money = cost + 10;
+        CHECK(c.repairCurrent(&why) && !c.car().damaged() && c.money == 10, "tamir: hasar sifir, para dustu");
+        c.recordDamage(false, 0.1, true);
+        CHECK(!c.car().raceable() && c.car().engineWear == 1.0, "sarmis yatak: motor revizyonu gerekir");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;

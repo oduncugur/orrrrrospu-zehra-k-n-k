@@ -216,7 +216,13 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
   Test ctest'e kapali (CMakeLists'te yorum satiri); gecince acilacak.
 - Hata ayiklama: `/tmp` altindaki iz araclari kalici degil; test dosyasina `ZK_TRACE` ciktisi eklenerek yeniden uretilebilir.
 
-## Kullanici geri bildirimi (oncelikli, kalan islerle birlikte yapilacak)
+## Kullanici geri bildirimi — YAPILDI (ara taslak, oyun icinde kulakla onay bekliyor)
+- Lastik: `src/audio/TireAudio` (tonal stick-slip + burnout hirlamasi), ornek `ornekler/ses_lastik_burnout_ciglik_v3.wav`.
+- Turbo: islik ~7x guclu, blow-off valf, turbo kiti takili NA araclarda da calisir (`setTurboKit`). Ornek `ses_078/089_turbo_v3.wav`.
+- PC tus yardimi: garaj + drag ekrani (Android'de gizli).
+- Tamir: `OwnedCar::axleBroken/engineWear`, kayitta `dmg=` satiri, garajda TAMIR butonu, career_test [H].
+
+### Ilk not (arsiv)
 1. Lastik patinaj sesi "ruzgar" gibi: squeal su an gurultu+rezonator. Duzeltme: slip hizina bagli stick-slip
    titresim (tonal 400-1200 Hz, harmonikli, kaymaya gore frekans/genlik), gurultu payi azaltilacak. Burnout icin ayri "yanma" dokusu.
 2. PC'de tuslar ekranda yazmiyor: menu/yaris ekraninda klavye yardim paneli (W/S gaz-fren, Space debriyaj, 1-6/N, E/Q, Esc) + ayarlar sayfasi.

@@ -15,6 +15,11 @@ struct OwnedCar {
     int  races = 0, wins = 0;
     double bestEt = 0.0;          // en iyi 1/4 mil (0 = yok)
     int  paidParts = 0;           // takilan parcalara odenen toplam (satista kismi geri donus)
+    // Kalici hasar (yarislar arasi tasinir; tamir edilene kadar kalir)
+    bool   axleBroken = false;    // kirik aks: yarisamaz
+    double engineWear = 0.0;      // 0..1 krank yatagi hasari; 1 = yatak sarmis, motor revizyonu sart
+    bool damaged() const { return axleBroken || engineWear > 0.02; }
+    bool raceable() const { return !axleBroken && engineWear < 1.0; }
 };
 
 // Parca kategorileri ve seviyeleri (dukkan). Her secenek Tune'da tek bir alani degistirir.
@@ -58,6 +63,9 @@ struct Career {
     bool sellCurrent(std::string* why = nullptr);
     bool buyPart(PartCat c, int level, std::string* why = nullptr);
     void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr);
+    void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun);   // yaris sonu
+    long repairCost() const;                                                    // secili arac
+    bool repairCurrent(std::string* why = nullptr);
 
     std::string serialize() const;
     static bool parse(const std::string& text, Career& out);   // bozuk/eksik veride false

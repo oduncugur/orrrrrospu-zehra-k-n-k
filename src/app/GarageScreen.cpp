@@ -110,6 +110,9 @@ void GarageScreen::render(Renderer& r) {
     if (pt_->vtecActive()) r.text(196, 424, "VTEC", 3, {1.0f, 0.2f, 0.2f});
     std::snprintf(b, sizeof b, "YAG %.1f BAR", pt_->oilPressureBar());
     r.text(8, 452, b, 1, {0.7f, 0.8f, 0.7f});
+#ifndef __ANDROID__
+    r.text(112, 452, "PC: W DEVIR  < > ARAC  ENTER YARIS", 1, {0.55f, 0.75f, 1.0f});
+#endif
 
     // Garajdaki araclar
     button(r, kPrev, "<", kUiBtn, 3);
@@ -117,7 +120,14 @@ void GarageScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "ARAC %d/%zu", c.current + 1, c.cars.size());
     r.textCentered((kPrev.x1 + kNext.x0) / 2, 482, b, 2, {1, 1, 1});
 
-    button(r, kRace, "YARIS >", kUiOrange, 3);
+    if (c.car().damaged()) {
+        std::snprintf(b, sizeof b, "TAMIR $%ld", c.repairCost());
+        button(r, kRace, b, Color{0.75f, 0.15f, 0.12f}, 2);
+        std::string d = "HASAR:";
+        if (c.car().axleBroken) d += " AKS KIRIK";
+        if (c.car().engineWear > 0.02) { char e[32]; std::snprintf(e, sizeof e, " MOTOR YATAK %%%d", (int)(c.car().engineWear * 100 + 0.5)); d += e; }
+        r.text(8, 462, d, 1, {1.0f, 0.35f, 0.3f});
+    } else button(r, kRace, "YARIS >", kUiOrange, 3);
     r.rect(kTree.x0, kTree.y0, kTree.x1, kTree.y1, kUiBtn);
     r.textCentered(kTree.cx(), kTree.y0 + 10, "AGAC", 1, kUiDim);
     r.textCentered(kTree.cx(), kTree.y0 + 24, app_.treePro ? "PRO .4" : "SPT .5", 2, kUiGold);
@@ -144,11 +154,22 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     if (kPrev.hit(x, y)) select(app_.career.current - 1);
     else if (kNext.hit(x, y)) select(app_.career.current + 1);
     else if (kTree.hit(x, y)) { app_.treePro = !app_.treePro; app_.saveCareer(); }
-    else if (kRace.hit(x, y)) app_.goCareerRace();
+    else if (kRace.hit(x, y)) raceOrRepair();
     else if (kParts.hit(x, y)) app_.goParts();
     else if (kGallery.hit(x, y)) app_.goGallery();
     else if (kDyno.hit(x, y)) app_.goDyno();
 }
+// Hasarli arac yarisamaz: once tamir. Hafif motor asinmasi yarisa engel degil ama buton tamir teklif eder;
+// ikinci basista (tamir parasi yoksa) yine de yarisa girilir.
+void GarageScreen::raceOrRepair() {
+    Career& c = app_.career;
+    if (!c.car().damaged()) { app_.goCareerRace(); return; }
+    std::string why;
+    if (c.repairCurrent(&why)) { app_.saveCareer(); refreshEngine(); msg_ = "TAMIR EDILDI"; msgT_ = 2.0; return; }
+    if (c.car().raceable()) { app_.goCareerRace(); return; }
+    msg_ = why + " - YARISAMAZ"; msgT_ = 2.5;
+}
+
 void GarageScreen::pointerMove(int id, float, float y) {
     if (id == throttlePtr_) throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);
 }
@@ -159,7 +180,7 @@ void GarageScreen::key(Key k, bool down) {
     if (!down) return;
     if (k == Key::Left) select(app_.career.current - 1);
     else if (k == Key::Right) select(app_.career.current + 1);
-    else if (k == Key::Enter) app_.goCareerRace();
+    else if (k == Key::Enter) raceOrRepair();
 }
 
 } // namespace zk

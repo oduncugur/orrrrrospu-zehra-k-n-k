@@ -37,8 +37,8 @@ DragScreen::DragScreen(App& app, int playerCar, int opponentCar, const Tune* pla
     carIds_[0] = playerCar; carIds_[1] = opponentCar;
     if (playerTune) { tunes_[0] = *playerTune; hasTune_[0] = true; }
     if (opponentTune) { tunes_[1] = *opponentTune; hasTune_[1] = true; }
-    app_.setVoice(0, findVehicle(playerCar));
-    app_.setVoice(1, findVehicle(opponentCar));
+    app_.setVoice(0, findVehicle(playerCar), hasTune_[0] && tunes_[0].turbo > 0);
+    app_.setVoice(1, findVehicle(opponentCar), hasTune_[1] && tunes_[1].turbo > 0);
     restart();
 }
 
@@ -193,6 +193,8 @@ void DragScreen::update(double dt) {
         const bool won = race_->winner() == 0;
         const TimeSlip& s = race_->lane(0).slip;
         app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_);
+        const VehicleSim& ps = *race_->lane(0).sim;
+        app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun());
         app_.saveCareer();
     }
 
@@ -482,6 +484,9 @@ void DragScreen::drawHud(Renderer& r) {
     std::snprintf(b, sizeof b, "YAG %.1f BAR  BALATA %.0fC  LASTIK %.0fC", pt.oilPressureBar(), pt.clutchTempC(),
                   P.sim->wheel(P.sim->drivenLeft()).tempC());
     r.text(136, 336, b, 1, {0.6f, 0.65f, 0.6f});
+#ifndef __ANDROID__
+    r.text(136, 349, "W GAZ  S FREN  BOSLUK DEBR  1-6/N  E/Q  ESC", 1, {0.55f, 0.75f, 1.0f});
+#endif
     // Fren
     r.rect(kBrake[0], kBrake[1], kBrake[2], kBrake[3], pc_.brake > 0 ? Color{0.8f, 0.15f, 0.15f} : Color{0.3f, 0.12f, 0.12f});
     r.textCentered((kBrake[0] + kBrake[2]) / 2, 304, "FREN", 2, {1, 1, 1});

@@ -31,6 +31,7 @@ class ProceduralEngineAudio {
 public:
     ProceduralEngineAudio(const VehicleDef& v, int sampleRate = 44100);
     void setInput(const EngineAudioInput& in) { in_ = in; }
+    void setTurboKit(bool on) { turboKit_ = on; }   // sonradan takilan turbo kiti (NA motor)
     void render(float* out, int n);
     std::string signature() const;   // sesin parametrik ozeti (debug)
 
@@ -48,6 +49,8 @@ private:
 
     VehicleDef v_; EngineDef e_;
     int    fs_;
+    bool   turboKit_ = false;
+    double bovAmp_ = 0.0, bovT_ = -1.0, bovHp_ = 0.0, bovPrev_ = 0.0;
     double cycleDeg_ = 720.0;
     std::vector<Event> events_;
     int    banks_ = 1;

@@ -231,6 +231,33 @@ uint32_t fnv1a(const std::string& s) {
 }
 } // namespace
 
+void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun) {
+    OwnedCar& c = car();
+    c.axleBroken = c.axleBroken || axleBroke;
+    c.engineWear = bearingSpun ? 1.0 : std::clamp(c.engineWear + std::max(0.0, bearingDamage), 0.0, 1.0);
+}
+
+long Career::repairCost() const {
+    const OwnedCar& c = car();
+    const VehicleDef& v = *findVehicle(c.carId);
+    long cost = 0;
+    // Aks: takili seviyenin parca fiyati (stok aks icin 1. seviye fiyatinin yarisi) + iscilik
+    if (c.axleBroken) cost += std::max(150L, (long)(c.tune.axles > 0 ? partPrice(PartCat::Axles, c.tune.axles, v)
+                                                                       : partPrice(PartCat::Axles, 1, v) / 2)) + 120;
+    // Motor: yatak degisimi; tam sarmada (1.0) krank taslama + revizyon ~ arac fiyatinin %18'i
+    if (c.engineWear > 0.02) cost += (long)(250 + carPrice(v) * 0.18 * c.engineWear);
+    return cost;
+}
+
+bool Career::repairCurrent(std::string* why) {
+    const long cost = repairCost();
+    if (cost <= 0) { if (why) *why = "HASAR YOK"; return false; }
+    if (money < cost) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= cost;
+    car().axleBroken = false; car().engineWear = 0.0;
+    return true;
+}
+
 std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
@@ -243,6 +270,7 @@ std::string Career::serialize() const {
                       c.wins, c.bestEt, c.paidParts, (int)t.tires, t.psi, t.clutch, t.axles, (int)t.diff, t.finalDrive,
                       t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
         o << buf;
+        if (c.damaged()) { std::snprintf(buf, sizeof buf, "dmg=%d;%.4f\n", c.axleBroken ? 1 : 0, c.engineWear); o << buf; }
     }
     const std::string body = o.str();
     char cs[32]; std::snprintf(cs, sizeof cs, "checksum=%08x\n", fnv1a(body));
@@ -272,6 +300,12 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "wins") c.wins = std::max(0, std::atoi(v.c_str()));
         else if (k == "earnings") c.earnings = std::max(0L, std::atol(v.c_str()));
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
+        else if (k == "dmg" && !c.cars.empty()) {          // onceki araca ait hasar
+            int ax = 0; double ew = 0;
+            if (std::sscanf(v.c_str(), "%d;%lf", &ax, &ew) != 2) return false;
+            c.cars.back().axleBroken = ax != 0;
+            c.cars.back().engineWear = std::clamp(ew, 0.0, 1.0);
+        }
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
             if (std::sscanf(v.c_str(), "%d;%d;%d;%lf;%d;%d;%lf;%d;%d;%d;%lf;%d;%d;%d;%d;%d;%d;%d", &oc.carId, &oc.races, &oc.wins,

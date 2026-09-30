@@ -107,7 +107,7 @@ void ProceduralEngineAudio::render(float* out, int n) {
     const double dt = 1.0 / fs_;
     const bool rotary = e_.layout == Layout::Rotary2 || e_.layout == Layout::Rotary3 || e_.layout == Layout::Rotary4;
     const bool raceCam = v_.exhaust == Exhaust::StraightPipe || e_.induction == Induction::ITB;
-    const bool turbo = e_.induction == Induction::Turbo || e_.induction == Induction::TwinTurbo;
+    const bool turbo = turboKit_ || e_.induction == Induction::Turbo || e_.induction == Induction::TwinTurbo;
     const bool sc = e_.induction == Induction::Supercharger;
     const bool dogbox = gearboxTable()[v_.gearbox].type == Gearbox::Dogbox;
     const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.12 : v_.exhaust == Exhaust::Sport ? 0.05 : 0.015;
@@ -220,7 +220,18 @@ void ProceduralEngineAudio::render(float* out, int n) {
             const double f = std::min(0.9, 2.0 * std::sin(kPi * fw * dt));
             tbLow_ += f * tbBand_;
             tbBand_ += f * (nLp_ - tbLow_ - 0.08 * tbBand_);
-            sig += spool_ * spool_ * (0.012 * tbBand_ + 0.008 * std::sin(2 * kPi * whPhase_));
+            // Islik: kompresor kanat gecis frekansi (dar bant gurultu + ton), emme hisirtisi (genis bant)
+            sig += spool_ * spool_ * (0.07 * tbBand_ + 0.035 * std::sin(2 * kPi * whPhase_)) + 0.03 * spool_ * thr * nLp_;
+            // Blow-off valf: gaz kesilince basincli hava bosalir ("pssht"), yuksek geciren gurultu
+            if (prevThr_ > 0.5 && thr < 0.2 && spool_ > 0.3 && bovT_ < 0.0) { bovT_ = 0.0; bovAmp_ = spool_; }
+            if (bovT_ >= 0.0) {
+                bovT_ += dt;
+                const double n = noise();
+                bovHp_ = n - bovPrev_; bovPrev_ = n;
+                const double env = bovAmp_ * std::min(1.0, bovT_ / 0.01) * std::exp(-bovT_ / 0.18);
+                sig += 0.22 * env * bovHp_;
+                if (bovT_ > 0.8) bovT_ = -1.0;
+            }
             if (prevThr_ > 0.6 && thr < 0.2 && spool_ > 0.4) flutterT_ = 0.0;   // kompresor surge
             if (flutterT_ >= 0.0) {
                 flutterT_ += dt;

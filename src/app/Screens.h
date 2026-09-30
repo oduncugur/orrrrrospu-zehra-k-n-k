@@ -22,6 +22,7 @@ public:
     void key(Key k, bool down) override;
 
 private:
+    void raceOrRepair();
     void select(int ownedIndex);
     void refreshEngine();
     App& app_;
