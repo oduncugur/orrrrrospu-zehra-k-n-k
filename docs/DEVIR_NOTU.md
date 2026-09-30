@@ -171,7 +171,7 @@ Son güncelleme (424c879): aks boyutlandırması değişti; 9 vakada hareket ver
 
 ## 7. Faz 5 planı (arşiv — adımların hepsi ara taslak olarak kodda, bkz. sondaki güncellemeler)
 
-Kalan Faz 5 cilası: oyuncu-rakip temasının fiziği, kaster/toe/amortisör ayarları,
+Kalan Faz 5 cilası: kaster/toe/amortisör ayarları,
 akış modunda ekonomi dengesi. Ardından Faz 6.
 
 **Adım 1 — Düzlemsel dinamik (fizik, test önce):** `VehicleSimConfig`'e `planar` bayrağı; `false` iken mevcut 1B yol
@@ -287,3 +287,13 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - Test `road_test` [6]: egim siniri, sureklilik, duz baslangic, virajlar degismedi, %8 inis bosta hizlanma
   (3.23 m/s; surtunmesiz 3.91), duzde hareket yok.
 - Not: test surucusu (oyuncu-YZ) sollamadigi icin dag yolunda yavas trafige takilip bitiremeyebilir; test bunu sart kosmaz.
+- CI (a40a3da): Windows + Linux + **Android APK derlendi** (ayarlar/FPS siniri Android kodu dahil); cihazda denenmedi.
+
+## Guncelleme — 2026-10-01: Oyuncu-rakip temasi (gercek carpisma)
+- `src/game/Contact`: iki yonlu kutu (OBB) ayirici eksen testi -> gecme derinligi + normal; temas noktasi
+  (digerinin icindeki koseler); kutleyle orantili konum ayirma; normal impuls (esneklik 0.25) + Coulomb
+  surtunme (0.4); yaw ataleti dahil. `VehicleSim::applyImpulse/worldVelocity/mass/yawInertia`.
+- `RoadSession`: eski "yana it + %3 hiz kes" yerine `resolveContact`. Mesaj: TEMAS / SERT TEMAS (> 6 m/s).
+- Test `contact_test` (ctest `arac_temasi`): arkadan carpmada momentum korunur, enerji artmaz, ayrilma e x 10 m/s,
+  agir arac az hiz degistirir, donme yok; yan surtmede yanal itme + iki aracta yaw; ayni hizda yan yana: yalniz ayirma.
+- Trafik araclari kinematik kalir (carpinca yeniden dogar); onlara impuls yok.

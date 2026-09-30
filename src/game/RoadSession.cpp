@@ -1,4 +1,5 @@
 #include "RoadSession.h"
+#include "game/Contact.h"
 #include "garage/VehicleCatalog.h"
 
 #include <algorithm>
@@ -170,18 +171,17 @@ void RoadSession::update(double dt, const RoadControls& in) {
     rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
     collide(*rival_, false);
-    // Oyuncu-rakip temasi: govdeler ic ice girerse yana itilir, ikisi de biraz hiz kaybeder
+    // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h)
     {
-        const double dx = rival_->sim().posX() - player_->sim().posX(), dy = rival_->sim().posY() - player_->sim().posY();
-        const double h = player_->sim().heading(), c = std::cos(h), sn = std::sin(h);
-        const double lon = dx * c + dy * sn, lat = -dx * sn + dy * c;
-        if (std::fabs(lon) < 4.2 && std::fabs(lat) < 1.8) {
-            const double push = (1.85 - std::fabs(lat)) * 0.5 * (lat >= 0 ? 1.0 : -1.0);
-            player_->nudge(-push * -sn, -push * c);
-            rival_->nudge(push * -sn, push * c);
-            if (!touching_) { player_->bump(0.97); rival_->bump(0.97); msgs_.push_back("TEMAS!"); crashEv_ = true; }
-            touching_ = true;
-        } else touching_ = false;
+        const VehicleDef* pv = findVehicle(playerCar_);
+        const VehicleDef* rv = findVehicle(rivalCar_);
+        const ContactResult c = resolveContact({&player_->sim(), 0.5 * pv->lengthM, 0.5 * pv->widthM},
+                                               {&rival_->sim(), 0.5 * rv->lengthM, 0.5 * rv->widthM});
+        if (c.touching && !touching_ && c.closingSpeed > 0.5) {
+            msgs_.push_back(c.closingSpeed > 6.0 ? "SERT TEMAS!" : "TEMAS!");
+            crashEv_ = true;
+        }
+        touching_ = c.touching;
     }
     if (phase_ == Phase::Run || phase_ == Phase::Finished) raceT_ += (phase_ == Phase::Run) ? dt : 0.0;
     const double goal = startS_ + raceLength();

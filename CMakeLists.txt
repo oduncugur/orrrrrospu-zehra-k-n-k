@@ -23,6 +23,7 @@ add_library(zk_sim STATIC
   src/game/RoadSession.cpp
   src/game/Settings.cpp
   src/game/FlowScore.cpp
+  src/game/Contact.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp
@@ -80,3 +81,6 @@ add_test(NAME ayarlar COMMAND settings_test)
 add_executable(flow_test tests/flow_test.cpp)
 target_link_libraries(flow_test PRIVATE zk_sim)
 add_test(NAME otoban_akisi COMMAND flow_test)
+add_executable(contact_test tests/contact_test.cpp)
+target_link_libraries(contact_test PRIVATE zk_sim)
+add_test(NAME arac_temasi COMMAND contact_test)

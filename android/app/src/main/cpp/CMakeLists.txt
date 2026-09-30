@@ -29,6 +29,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/RoadSession.cpp
     ${ZK_ROOT}/src/game/Settings.cpp
     ${ZK_ROOT}/src/game/FlowScore.cpp
+    ${ZK_ROOT}/src/game/Contact.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp

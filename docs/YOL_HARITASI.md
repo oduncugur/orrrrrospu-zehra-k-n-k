@@ -82,7 +82,8 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 - [x] 5. Görüntü: arkadan perspektif kamera, PS1 tarzı yol/ağaç/direk, trafik, HUD
 - [x] 6. Otoban akışı: yakın geçiş (karşı şerit 2x), kombo, hız, karşı şerit, apex; çarpışma cezası (`tests/flow_test`)
 - [x] Ek: yol yarışı (YZ rakip) ve 3 km dağ yolu; kariyer ödülü
-- [ ] Oyuncu-rakip teması gerçek çarpışma fiziği değil (basit itme); akış ekonomisi oyun testiyle ayarlanmadı
+- [x] Oyuncu-rakip teması: yönlü kutu + impuls (kütle, yaw ataleti, sürtünme) (`tests/contact_test`)
+- [ ] Akış ekonomisi oyun testiyle ayarlanmadı; trafik araçları kinematik (çarpınca yeniden doğar)
 
 ## Genel: Ayarlar (yapıldı)
 - [x] FPS sınırı (ölçüldü: 30/60/144 hedefe ±%0.5), dikey eşitleme (sürücü reddederse yazılımla ekran hızına sınır),

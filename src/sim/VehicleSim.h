@@ -71,6 +71,21 @@ public:
     const WheelSimulation& wheel(int i) const { return w_[i]; }
     // Aci yolda arac kurtarma: konum/yon ayarla, hizlar sifir
     void nudge(double dx, double dy) { X_ += dx; Y_ += dy; }
+    // Carpisma (duzlemsel): dunya eksenlerinde hiz, kutle, yaw ataleti ve dunya impulsu (rx, ry: temas noktasi - agirlik merkezi)
+    void worldVelocity(double& vx, double& vy) const {
+        const double c = std::cos(psi_), s = std::sin(psi_);
+        vx = vx_ * c - vy_ * s; vy = vx_ * s + vy_ * c;
+    }
+    double mass() const { return vl_.mass; }
+    double yawInertia() const { return Iz_; }
+    void applyImpulse(double jx, double jy, double rx, double ry) {
+        const double c = std::cos(psi_), s = std::sin(psi_), m = vl_.mass;
+        vx_ += (jx * c + jy * s) / m;
+        vy_ += (-jx * s + jy * c) / m;
+        r_ += (rx * jy - ry * jx) / Iz_;
+        if (vx_ < 0.0) vx_ = 0.0;                     // geri vites yok (planar adimla ayni kural)
+        V_ = vx_;
+    }
     void scaleVelocity(double f) { vx_ *= f; vy_ *= f; r_ *= f; V_ = vx_; }   // carpisma: hiz kaybi
     void resetPose(double x, double y, double psi) { X_ = x; Y_ = y; psi_ = psi; vx_ = vy_ = r_ = 0.0; V_ = 0.0; }
     void setSurfaceMu(double mu) { for (auto& w : w_) w.setSurfaceMu(mu); }   // asfalt 1.0, cim/toprak ~0.55
