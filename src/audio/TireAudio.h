@@ -20,7 +20,7 @@ private:
     int fs_;
     Res m_[kModes];
     double ph_ = 0, jit_ = 0, amJ_ = 0, env_ = 0, burn_ = 0, lastF_ = -1;
-    double r1_ = 0, r2_ = 0, rb_ = 0, flut_ = 0;
+    double r1_ = 0, r2_ = 0, rb_ = 0, flut_ = 0, hs_ = 0, hs2_ = 0, crackEnv_ = 0;
     uint32_t rng_ = 0x1234567u;
     double rnd();
 };
