@@ -1,0 +1,76 @@
+name: Derleme
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: Windows + Linux (konsol)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Araclar
+        run: sudo apt-get update -q && sudo apt-get install -y -q g++-mingw-w64-x86-64-posix zip
+      - name: Derle
+        run: |
+          LIB="src/sim/WheelSimulation.cpp src/sim/PowertrainCore.cpp src/sim/DrivetrainFailure.cpp src/sim/Suspension.cpp src/garage/VehicleCatalog.cpp src/garage/LowPolyModel.cpp src/audio/ProceduralEngineAudio.cpp"
+          mkdir -p out/linux out/win
+          for p in main:zehra_sim garage_main:zehra_garage; do
+            src=${p%%:*}; bin=${p##*:}
+            g++ -std=c++17 -O2 -static -Isrc src/$src.cpp $LIB -o out/linux/$bin
+            x86_64-w64-mingw32-g++-posix -std=c++17 -O2 -static -Isrc src/$src.cpp $LIB -o out/win/$bin.exe
+          done
+          ./out/linux/zehra_sim --no-burnout | tail -5
+          (cd out/win && zip -q ../ZehraKinik_Windows_x64.zip *)
+          (cd out/linux && zip -q ../ZehraKinik_Linux_x64.zip *)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masaustu
+          path: out/*.zip
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: APK derle
+        run: |
+          export ZK_NDK_VERSION=$(basename "$ANDROID_NDK_LATEST_HOME")
+          echo "NDK: $ZK_NDK_VERSION"
+          gradle -p android assembleDebug --no-daemon --stacktrace
+          mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk out/ZehraKinik.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/ZehraKinik.apk
+
+  release:
+    name: Indirme linki (latest-build)
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Surumu guncelle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release delete latest-build --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
+          gh release create latest-build dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "Zehra Kinik - son derleme" \
+            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Masaustu: konsol programlari."

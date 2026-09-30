@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.zehrakinik.game'
+    compileSdk 34
+    // CI: GitHub runner'daki en guncel NDK (ZK_NDK_VERSION); yerelde AGP varsayilani
+    if (System.getenv('ZK_NDK_VERSION')) { ndkVersion System.getenv('ZK_NDK_VERSION') }
+
+    defaultConfig {
+        applicationId 'com.zehrakinik.game'
+        minSdk 26            // AAudio
+        targetSdk 34
+        versionCode 2
+        versionName '0.2-garaj'
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17 -O2'
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+    externalNativeBuild {
+        cmake { path 'src/main/cpp/CMakeLists.txt' }
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+}
