@@ -14,6 +14,9 @@
 #include <cstring>
 #include <string>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 using namespace zk;
 
@@ -30,7 +33,11 @@ static void printRow(const VehicleDef& v, bool dev) {
 static bool ensureDir(const std::string& d) {
     struct stat st{};
     if (stat(d.c_str(), &st) == 0) return S_ISDIR(st.st_mode);
+#ifdef _WIN32
+    return _mkdir(d.c_str()) == 0;
+#else
     return mkdir(d.c_str(), 0755) == 0;
+#endif
 }
 
 static void exportCar(const VehicleDef& v, const std::string& dir, bool wav, bool obj) {
