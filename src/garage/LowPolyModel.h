@@ -10,7 +10,7 @@ namespace zk {
 
 struct Vertex { float x, y, z; };        // x: ileri, y: sol, z: yukari (m)
 struct Tri    { int a, b, c; int material; };
-enum Material { MatPaint = 0, MatGlass, MatTire, MatRim, MatLight, MatTail, MatTrim, MatCount };
+enum Material { MatPaint = 0, MatGlass, MatTire, MatRim, MatLight, MatTail, MatTrim, MatDark, MatPlate, MatChrome, MatIndicator, MatCount };
 
 struct LowPolyMesh {
     std::vector<Vertex> verts;
@@ -19,6 +19,8 @@ struct LowPolyMesh {
 };
 
 LowPolyMesh buildVehicleMesh(const VehicleDef& v);
+// Malzeme rengi (0..1); boya icin mesh'in paintRGB'si kullanilir. OBJ/MTL ve oyun ayni tabloyu kullanir.
+void materialColor(int material, unsigned paintRGB, float out[3]);
 bool writeObj(const LowPolyMesh& m, const std::string& objPath, const std::string& mtlName, const std::string& title);
 bool writeMtl(const LowPolyMesh& m, const std::string& mtlPath);
 

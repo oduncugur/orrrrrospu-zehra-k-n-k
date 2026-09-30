@@ -272,9 +272,6 @@ void GarageApp::uploadMesh() {
     const VehicleDef& v = vehicleCatalog()[carIdx_];
     if (meshCarId_ == v.id) return;
     const LowPolyMesh m = buildVehicleMesh(v);
-    static const float matCol[MatCount][3] = {{0, 0, 0}, {0.08f, 0.1f, 0.14f}, {0.05f, 0.05f, 0.05f}, {0.7f, 0.7f, 0.72f},
-                                              {1.0f, 0.97f, 0.85f}, {0.75f, 0.05f, 0.05f}, {0.12f, 0.12f, 0.12f}};
-    const float paint[3] = {((m.paintRGB >> 16) & 255) / 255.f, ((m.paintRGB >> 8) & 255) / 255.f, (m.paintRGB & 255) / 255.f};
     std::vector<float> buf;
     for (const Tri& t : m.tris) {
         const Vertex* p[3] = {&m.verts[t.a], &m.verts[t.b], &m.verts[t.c]};
@@ -286,7 +283,7 @@ void GarageApp::uploadMesh() {
         float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
         const float l = std::sqrt(nx * nx + ny * ny + nz * nz) + 1e-9f; nx /= l; ny /= l; nz /= l;
         if (ny < -0.2f) { nx = -nx; ny = -ny; nz = -nz; }     // cift yuzlu: asagi bakan normali cevir
-        const float* c = t.material == MatPaint ? paint : matCol[t.material];
+        float c[3]; materialColor(t.material, m.paintRGB, c);
         for (int k = 0; k < 3; ++k) buf.insert(buf.end(), {g[k][0], g[k][1], g[k][2], nx, ny, nz, c[0], c[1], c[2]});
     }
     glBindBuffer(GL_ARRAY_BUFFER, vbo3d_);
