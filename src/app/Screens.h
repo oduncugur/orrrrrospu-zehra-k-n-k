@@ -2,6 +2,7 @@
 #pragma once
 #include "app/App.h"
 #include "game/DragRace.h"
+#include "game/RoadPath.h"
 #include "sim/PowertrainCore.h"
 
 #include <memory>
@@ -130,6 +131,37 @@ private:
     double redline_ = 7000, idle_ = 850, maxNm_ = 1, maxHp_ = 1, peakHp_ = 0, peakHpRpm_ = 0, peakNm_ = 0, peakNmRpm_ = 0;
     double stockPeakHp_ = 0;
     double pullRpm_ = -1;          // cekis sirasinda devir (-1 = yok)
+};
+
+// Acik yol (serbest surus): dikey 360x640, arkadan takip kamerasi, duzlemsel dinamik.
+// Surus yardimi: otomatik debriyaj (kalkis + vites), otomatik vites (E/Q ile manuele gecer).
+class RoadScreen : public Screen {
+public:
+    RoadScreen(App& app, int carId, const Tune* tune);
+    bool landscape() const override { return false; }
+    void update(double dt) override;
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void pointerMove(int id, float x, float y) override;
+    void pointerUp(int id) override;
+    void key(Key k, bool down) override;
+
+private:
+    void driverAssist(double dt);
+    void recover();
+    App& app_;
+    int carId_;
+    Tune tune_; bool hasTune_ = false;
+    RoadPath road_;
+    std::unique_ptr<VehicleSim> sim_;
+    int hint_ = 0; double s_ = 0, lat_ = 0;
+    double steer_ = 0, thr_ = 0, brake_ = 0;
+    bool kL_ = false, kR_ = false, kT_ = false, kB_ = false;
+    int tL_ = -1, tR_ = -1, tG_ = -1, tB_ = -1;
+    double launchPedal_ = 1.0; bool launching_ = true;
+    double shiftT_ = -1, sinceShift_ = 0; int target_ = 1; bool manual_ = false, assist_ = true, autopilot_ = false;
+    double acc_ = 0, camPsi_ = 0, topSpeed_ = 0, offT_ = 0;
+    std::string msg_; double msgT_ = 0;
 };
 
 } // namespace zk

@@ -18,6 +18,7 @@ add_library(zk_sim STATIC
   src/sim/VehicleSim.cpp
   src/game/DragRace.cpp
   src/game/Career.cpp
+  src/game/RoadPath.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp
@@ -35,7 +36,7 @@ target_link_libraries(zehra_garage PRIVATE zk_sim)
 find_package(SDL3 CONFIG QUIET)
 if(SDL3_FOUND)
   add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp
-                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/GLApi.cpp)
+                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/RoadScreen.cpp src/app/GLApi.cpp)
   target_include_directories(zehra_game PRIVATE src third_party/khronos)
   if(TARGET SDL3::SDL3-static)
     target_link_libraries(zehra_game PRIVATE zk_sim SDL3::SDL3-static)

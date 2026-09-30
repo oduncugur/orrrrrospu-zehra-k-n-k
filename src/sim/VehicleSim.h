@@ -68,11 +68,15 @@ public:
     double fuelKg() const { return fuelKg_; }
     double hapticIntensity() const { return haptic_; }
     const WheelSimulation& wheel(int i) const { return w_[i]; }
+    // Aci yolda arac kurtarma: konum/yon ayarla, hizlar sifir
+    void resetPose(double x, double y, double psi) { X_ = x; Y_ = y; psi_ = psi; vx_ = vy_ = r_ = 0.0; V_ = 0.0; }
+    void setSurfaceMu(double mu) { for (auto& w : w_) w.setSurfaceMu(mu); }   // asfalt 1.0, cim/toprak ~0.55
     int drivenLeft() const { return dL_; }
     int drivenRight() const { return dL_ + 1; }
     const DrivetrainFailure& failure() const { return *fail_; }
     std::vector<std::string> drainFailureEvents() { return fail_->drainEvents(); }
     const Suspension& suspension() const { return *susp_; }
+    const VehicleLoad& vehicleLoad() const { return vl_; }
 
     // Kurulum bilgisi
     const EngineSpec& engineSpec() const { return eng_; }

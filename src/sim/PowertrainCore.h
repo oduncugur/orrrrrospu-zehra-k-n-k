@@ -54,6 +54,7 @@ public:
     PowertrainCore(const EngineSpec& e, const ClutchSpec& c, const DiffSpec& d, const GearboxSpec& g);
 
     void setThrottle(double pedal)      { throttlePedal_ = pedal; }
+    double throttle() const             { return throttlePedal_; }
     void setClutchPedal(double pedal)   { clutchPedal_ = pedal; } // 0 = birakili (kavrali), 1 = basili
     void setGear(int g)                 { gear_ = g; }            // 0 = bos, 1..N
     void setTwoStep(bool armed, double rpm) { twoStep_ = armed; twoStepRpm_ = rpm; }

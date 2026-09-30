@@ -1,0 +1,76 @@
+#include "RoadPath.h"
+
+#include <algorithm>
+#include <cmath>
+
+namespace zk {
+
+namespace {
+struct Rng {
+    uint32_t s;
+    double uni() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s & 0xFFFFFF) / double(0x1000000); }
+    double range(double a, double b) { return a + (b - a) * uni(); }
+};
+}
+
+RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfWidth) : halfWidth_(halfWidth) {
+    Rng r{seed ? seed : 1u};
+    // Egrilik programi: [duzluk][giris klotoidi][sabit yay][cikis klotoidi] tekrarlari
+    struct Seg { double len, k0, k1; };
+    std::vector<Seg> prog;
+    prog.push_back({200.0, 0.0, 0.0});                           // baslangic duzlugu
+    double total = 200.0;
+    while (total < lengthM) {
+        const double straight = r.range(40.0, 5.0 * minRadius);
+        const double R = r.range(minRadius, 4.0 * minRadius);
+        const double k = (r.uni() < 0.5 ? 1.0 : -1.0) / R;
+        const double arc = r.range(0.15, 1.4) * R;               // 9-80 derece donus
+        const double trans = std::clamp(0.25 * R, 20.0, 90.0);   // klotoid: egrilik dogrusal degisir
+        prog.push_back({straight, 0.0, 0.0});
+        prog.push_back({trans, 0.0, k});
+        prog.push_back({arc, k, k});
+        prog.push_back({trans, k, 0.0});
+        total += straight + 2 * trans + arc;
+    }
+    double x = 0, y = 0, h = 0, s = 0;
+    pts_.push_back({x, y, h, 0.0, 0.0});
+    for (const Seg& g : prog) {
+        const int n = std::max(1, (int)std::round(g.len / kStep));
+        for (int i = 0; i < n; ++i) {
+            const double k = g.k0 + (g.k1 - g.k0) * (i + 0.5) / n;
+            const double hm = h + 0.5 * k * kStep;               // orta nokta integrasyonu
+            x += kStep * std::cos(hm); y += kStep * std::sin(hm); h += k * kStep; s += kStep;
+            pts_.push_back({x, y, h, k, s});
+            if (s >= lengthM) break;
+        }
+        if (s >= lengthM) break;
+    }
+}
+
+RoadPoint RoadPath::at(double s) const {
+    s = std::clamp(s, 0.0, length());
+    const int i = std::min((int)(s / kStep), (int)pts_.size() - 2);
+    const double f = (s - pts_[i].s) / kStep;
+    const RoadPoint &a = pts_[i], &b = pts_[i + 1];
+    return {a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.heading + (b.heading - a.heading) * f,
+            a.curvature + (b.curvature - a.curvature) * f, s};
+}
+
+void RoadPath::project(double x, double y, int& hint, double& s, double& lateral) const {
+    const int n = (int)pts_.size();
+    int best = std::clamp(hint, 0, n - 1);
+    double bd = 1e300;
+    const int lo = std::max(0, best - 60), hi = std::min(n - 1, best + 60);
+    for (int i = lo; i <= hi; ++i) {
+        const double dx = x - pts_[i].x, dy = y - pts_[i].y, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = i; }
+    }
+    hint = best;
+    // En yakin noktanin teget dogrusu uzerine izdusum
+    const RoadPoint& p = pts_[best];
+    const double c = std::cos(p.heading), sn = std::sin(p.heading), dx = x - p.x, dy = y - p.y;
+    s = std::clamp(p.s + dx * c + dy * sn, 0.0, length());
+    lateral = -dx * sn + dy * c;
+}
+
+} // namespace zk

@@ -14,6 +14,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/GarageScreen.cpp
     ${ZK_ROOT}/src/app/DragScreen.cpp
     ${ZK_ROOT}/src/app/MenuScreens.cpp
+    ${ZK_ROOT}/src/app/RoadScreen.cpp
     ${ZK_ROOT}/src/app/GLApi.cpp
     ${ZK_ROOT}/src/sim/WheelSimulation.cpp
     ${ZK_ROOT}/src/sim/PowertrainCore.cpp
@@ -22,6 +23,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/sim/VehicleSim.cpp
     ${ZK_ROOT}/src/game/DragRace.cpp
     ${ZK_ROOT}/src/game/Career.cpp
+    ${ZK_ROOT}/src/game/RoadPath.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp

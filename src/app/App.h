@@ -69,6 +69,7 @@ public:
     void goParts();
     void goGallery();
     void goDyno();
+    void goRoad();                                // acik yol (serbest surus)
     Career career;
     void saveCareer();
     int  selectedCar = 5;                       // serbest mod / test icin

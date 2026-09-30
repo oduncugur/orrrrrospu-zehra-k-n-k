@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         static const struct { const char* n; Key k; } names[] = {
             {"Throttle", Key::Throttle}, {"Brake", Key::Brake}, {"Clutch", Key::Clutch}, {"ShiftUp", Key::ShiftUp},
             {"ShiftDown", Key::ShiftDown}, {"Gear0", Key::Gear0}, {"Gear1", Key::Gear1}, {"Gear2", Key::Gear2},
-            {"Gear3", Key::Gear3}, {"Gear4", Key::Gear4}, {"Gear5", Key::Gear5}, {"Gear6", Key::Gear6}, {"Enter", Key::Enter}};
+            {"Gear3", Key::Gear3}, {"Gear4", Key::Gear4}, {"Gear5", Key::Gear5}, {"Gear6", Key::Gear6}, {"Enter", Key::Enter}, {"Left", Key::Left}, {"Right", Key::Right}};
         std::string all = ks;
         size_t pos = 0;
         while (pos < all.size()) {
@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
         const std::string n = ss;
         if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
+        else if (n == "road") game.goRoad();
     }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;

@@ -50,6 +50,10 @@ void App::goCareerRace() {
 void App::goParts() { setScreen(std::make_unique<PartsScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
+void App::goRoad() {
+    const OwnedCar& oc = career.car();
+    setScreen(std::make_unique<RoadScreen>(*this, oc.carId, &oc.tune));
+}
 
 void App::update(double dt) {
     if (pending_) {
