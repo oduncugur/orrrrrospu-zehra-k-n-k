@@ -215,3 +215,12 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
   once doyuyor (arka kayma acisi on'un ~2 kati). [4] RWD tam gaz govde kaymasi 4.4 deg (hedef >8).
   Test ctest'e kapali (CMakeLists'te yorum satiri); gecince acilacak.
 - Hata ayiklama: `/tmp` altindaki iz araclari kalici degil; test dosyasina `ZK_TRACE` ciktisi eklenerek yeniden uretilebilir.
+
+## Kullanici geri bildirimi (oncelikli, kalan islerle birlikte yapilacak)
+1. Lastik patinaj sesi "ruzgar" gibi: squeal su an gurultu+rezonator. Duzeltme: slip hizina bagli stick-slip
+   titresim (tonal 400-1200 Hz, harmonikli, kaymaya gore frekans/genlik), gurultu payi azaltilacak. Burnout icin ayri "yanma" dokusu.
+2. PC'de tuslar ekranda yazmiyor: menu/yaris ekraninda klavye yardim paneli (W/S gaz-fren, Space debriyaj, 1-6/N, E/Q, Esc) + ayarlar sayfasi.
+3. Hasarli parca tamiri yok: aks kirilmasi / yatak hasari / debriyaj yanmasi kariyerde kalici olmali;
+   garajda "Tamir" (parca fiyatina gore ucret), kayit dosyasina hasar durumu eklenmeli.
+4. Turbo sesi duyulmuyor: turbo whistle/flutter kazanci ve boost'a baglanmasi kontrol edilecek (oyun icinde turbolu aracla test;
+   ProceduralEngineAudio turbo katmani oyun mikserinde susturuluyor olabilir).
