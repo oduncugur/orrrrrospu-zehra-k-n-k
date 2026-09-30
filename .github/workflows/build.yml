@@ -10,22 +10,37 @@ permissions:
 
 jobs:
   desktop:
-    name: Windows + Linux (konsol)
+    name: Windows + Linux (grafik oyun + konsol araclari)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Araclar
-        run: sudo apt-get update -q && sudo apt-get install -y -q g++-mingw-w64-x86-64-posix zip
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix zip \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev \
+            libasound2-dev libpulse-dev libgl-dev libegl-dev
+      - name: SDL3 (statik, Linux + Windows)
+        run: |
+          git clone -q --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL /tmp/SDL || \
+            git clone -q --depth 1 https://github.com/libsdl-org/SDL /tmp/SDL
+          cd /tmp/SDL
+          COMMON="-DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF"
+          cmake -B build-linux $COMMON -DSDL_WAYLAND=OFF -DCMAKE_INSTALL_PREFIX=/tmp/sdl3-linux
+          cmake --build build-linux -j4 && cmake --install build-linux
+          cmake -B build-win $COMMON -DCMAKE_TOOLCHAIN_FILE=build-scripts/cmake-toolchain-mingw64-x86_64.cmake -DCMAKE_INSTALL_PREFIX=/tmp/sdl3-win
+          cmake --build build-win -j4 && cmake --install build-win
       - name: Derle
         run: |
-          LIB="src/sim/WheelSimulation.cpp src/sim/PowertrainCore.cpp src/sim/DrivetrainFailure.cpp src/sim/Suspension.cpp src/garage/VehicleCatalog.cpp src/garage/LowPolyModel.cpp src/audio/ProceduralEngineAudio.cpp"
+          cmake -B build-linux -DCMAKE_PREFIX_PATH=/tmp/sdl3-linux
+          cmake --build build-linux -j4
+          cmake -B build-win -DCMAKE_TOOLCHAIN_FILE=/tmp/SDL/build-scripts/cmake-toolchain-mingw64-x86_64.cmake -DCMAKE_PREFIX_PATH=/tmp/sdl3-win
+          cmake --build build-win -j4
+          ./build-linux/zehra_sim --no-burnout | tail -3
           mkdir -p out/linux out/win
-          for p in main:zehra_sim garage_main:zehra_garage; do
-            src=${p%%:*}; bin=${p##*:}
-            g++ -std=c++17 -O2 -static -Isrc src/$src.cpp $LIB -o out/linux/$bin
-            x86_64-w64-mingw32-g++-posix -std=c++17 -O2 -static -Isrc src/$src.cpp $LIB -o out/win/$bin.exe
-          done
-          ./out/linux/zehra_sim --no-burnout | tail -5
+          cp build-linux/zehra_game build-linux/zehra_sim build-linux/zehra_garage out/linux/
+          cp build-win/zehra_game.exe build-win/zehra_sim.exe build-win/zehra_garage.exe out/win/
+          cp README.md out/linux/ && cp README.md out/win/
           (cd out/win && zip -q ../ZehraKinik_Windows_x64.zip *)
           (cd out/linux && zip -q ../ZehraKinik_Linux_x64.zip *)
       - uses: actions/upload-artifact@v4
@@ -73,4 +88,4 @@ jobs:
           gh release delete latest-build --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
           gh release create latest-build dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
             --title "Zehra Kinik - son derleme" \
-            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Masaustu: konsol programlari."
+            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Windows/Linux: zehra_game (grafik garaj + motor sesi), zehra_sim ve zehra_garage (konsol araclari)."

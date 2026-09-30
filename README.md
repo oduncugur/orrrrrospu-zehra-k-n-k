@@ -78,3 +78,19 @@ Araç başına ~180 vertex / ~300 üçgen. OBJ+MTL olarak dışa aktarılır.
   anlık `F_z` olarak verilir — havadaki tekerlek çekiş üretemez.
 - Yol: ISO 8608 pürüzlülük sınıfı (A–H) + kasis, çukur, rögar, dilatasyon derzi, arnavut kaldırımı, tümsek.
   Hazır profiller: `drag`, `otoban`, `sehir`, `koy`, `dag`. Deterministik tohum (rollback netcode için).
+
+## Grafik istemci (Android + Windows + Linux)
+
+**İndir (her push'ta otomatik güncellenir):** https://github.com/oduncugur/orrrrrospu-zehra-k-n-k/releases/tag/latest-build
+- `ZehraKinik.apk`: Android (arm64, armv7, x86_64; Android 8.0+). Kurulumda "bilinmeyen kaynaklara izin ver" gerekir.
+- `ZehraKinik_Windows_x64.zip` / `ZehraKinik_Linux_x64.zip`: `zehra_game` (grafik) + konsol araçları.
+
+Şu anki sürüm **garaj + motor sesi testi**dir: 360x640 sanal tamponda piksel-keskin PS1 tarzı dönen araç,
+324 araç arasında gezinme, analog gaz kızağı, boşta devirlenen motor (VTEC, devir kesici, yağ basıncı, yakıt)
+ve gerçek zamanlı prosedürel motor sesi. Oyun mantığı `src/app/GarageApp` içinde platformdan bağımsızdır;
+`android/…/android_main.cpp` (NativeActivity + EGL + AAudio) ve `src/desktop_main.cpp` (SDL3 + OpenGL 3.3)
+yalnızca pencere, ses ve girdi sağlar.
+
+Masaüstü kontroller: fare ile sağdaki kızak = gaz; YUKARI/W/BOŞLUK = gaz; SOL/SAĞ = araç; PAGE UP/DOWN = 10'ar araç.
+
+Yerel masaüstü derlemesi: SDL3'ü kurup `cmake -B build -DCMAKE_PREFIX_PATH=<sdl3-kurulumu> && cmake --build build`.
