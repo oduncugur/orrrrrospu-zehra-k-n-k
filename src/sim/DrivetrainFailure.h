@@ -12,6 +12,7 @@ struct AxleSpec {
     double tauUltMPa    = 900.0;  // kopma
     static AxleSpec Stock()    { return {"Stok SAE 1045 (induksiyon sertlestirilmis)", 27.0, 470.0, 600.0}; }
     static AxleSpec Chromoly() { return {}; }
+    static AxleSpec Race()     { return {"Yaris 300M", 27.0, 900.0, 1050.0}; }
 };
 
 struct LubeSpec {

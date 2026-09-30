@@ -1,7 +1,7 @@
 === ZEHRA KINIK :: Guc Aktarma Simulasyonu ===
 Arac #227: Bozkurt Aygir S5 GT (2015) | Muscle RWD | 1775 kg | 435 HP
 Motor: FC50 V8 crossplane NA | CR 11.50:1 (conta 0.70 mm) | Yakit: 100+ Yaris
-Sanziman: H-Manuel, 6 vites, son disli 3.73 | Aks: Krom-Molibden 4340 37.5 mm
+Sanziman: H-Manuel, 6 vites, son disli 3.73 | Aks: Krom-Molibden 4340 45.2 mm
 Karter: ISLAK (4.5 L, kritik 1.05 g) | Slick 16.0 PSI | Depo 8 L (6.0 kg)
 Diferansiyel: 1.5-Way plaka LSD (45/60 rampa) | I_w=0.585 kg*m^2
 Suspansiyon: 1.40 Hz on / 1.54 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: sehir (ISO 8608 sinif C, 101 ayrik ozellik)
@@ -17,15 +17,15 @@ Suspansiyon: 1.40 Hz on / 1.54 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: se
 
   t[s]    x[m]   km/h  G   RPM     wL     wR   kapL  VTEC yakit_g  LastL  LastR  tauL   yag
   0.00     0.0    0.0  1  4125    0.0    0.0  0.000   off    58.5   54.0   54.0     0  3.48
-  1.00     1.8   13.3  1  6223   47.7   47.7  2.649   off    69.8   57.2   57.4   103  4.79
-  2.00     7.9   31.7  1  5969   45.8   45.8  0.518   off    79.9   59.3   59.5   148  4.63
+  1.00     1.8   13.3  1  6223   47.7   47.7  2.649   off    69.8   57.2   57.4    59  4.79
+  2.00     7.9   31.7  1  5969   45.8   45.8  0.518   off    79.9   59.3   59.5    84  4.63
   [  2.922 s] Vites 2 (7500 rpm)
   3.00    20.3   54.0  2  7500   51.2   51.3  0.000   off    96.2   59.3   59.6     1  5.50
   [  3.192 s] Vites 3 (7500 rpm)
-  4.00    36.9   69.1  3  4216   69.9   70.0  0.051   off   110.4   59.9   60.4   144  3.54
-  5.00    58.9   88.6  3  5405   89.7   89.7  0.057   off   134.1   59.0   59.4   140  4.28
+  4.00    36.9   69.1  3  4216   69.9   70.0  0.051   off   110.4   59.9   60.4    82  3.54
+  5.00    58.9   88.6  3  5405   89.7   89.7  0.057   off   134.1   59.0   59.4    80  4.28
   [  5.637 s] 0-100 km/h: 5.637 s
-  6.00    85.9  106.1  3  6416  106.5  106.5  0.047   off   160.8   57.8   58.2   129  4.91
+  6.00    85.9  106.1  3  6416  106.5  106.5  0.047   off   160.8   57.8   58.2    73  4.91
   [  6.148 s] Takoza vurdu (bottoming): on sol
   [  6.177 s] Tekerlek havalandi: on sol @ 91 m
   [  6.181 s] Tekerlek havalandi: on sag @ 91 m
@@ -35,23 +35,23 @@ Suspansiyon: 1.40 Hz on / 1.54 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: se
   [  6.304 s] Tekerlek havalandi: arka sol @ 95 m
   [  6.309 s] Tekerlek havalandi: on sol @ 95 m
   [  6.408 s] Vites 4 (7499 rpm)
-  7.00   117.0  117.9  4  5535  117.6  117.6  0.034   off   181.3   56.5   57.0   116  4.36
+  7.00   117.0  117.9  4  5535  117.6  117.6  0.034   off   181.3   56.5   57.0    66  4.36
   [  7.653 s] Tekerlek havalandi: on sol @ 139 m
   [  7.732 s] Tekerlek havalandi: arka sol @ 141 m
-  8.00   151.6  131.2  4  6147  130.7  130.6  0.047   off   207.8   55.0   55.4    93  4.74
-  9.00   189.8  143.5  4  6685  142.1  142.1  0.041   off   235.7   53.3   53.7    95  5.08
- 10.00   231.2  154.7  4  7180  152.6  152.6  0.032   off   264.6   51.7   52.1    82  5.39
+  8.00   151.6  131.2  4  6147  130.7  130.6  0.047   off   207.8   55.0   55.4    53  4.74
+  9.00   189.8  143.5  4  6685  142.1  142.1  0.041   off   235.7   53.3   53.7    54  5.08
+ 10.00   231.2  154.7  4  7180  152.6  152.6  0.032   off   264.6   51.7   52.1    47  5.39
   [ 10.219 s] Vites 5 (7499 rpm)
   [ 10.474 s] Tekerlek havalandi: on sag @ 251 m
   [ 10.475 s] Tekerlek havalandi: on sol @ 251 m
- 11.00   275.0  162.0  5  5695  159.7  159.7  0.044   off   285.2   50.1   50.4    78  4.46
- 12.00   321.2  170.7  5  6000  168.3  168.3  0.033   off   311.7   48.5   48.8    80  4.65
- 13.00   369.8  178.9  5  6274  176.0  176.0  0.042   off   338.8   46.9   47.2    75  4.82
+ 11.00   275.0  162.0  5  5695  159.7  159.7  0.044   off   285.2   50.1   50.4    45  4.46
+ 12.00   321.2  170.7  5  6000  168.3  168.3  0.033   off   311.7   48.5   48.8    46  4.65
+ 13.00   369.8  178.9  5  6274  176.0  176.0  0.042   off   338.8   46.9   47.2    43  4.82
 
 === 400 m (1/4 mil) BITIS ===
   60 ft :  2.863 s | 100 m :  6.482 s | 201 m (1/8):  9.283 s | 1000 ft: 11.650 s
   0-100 km/h:  5.637 s | 400 m ET: 13.600 s | Trap: 183.6 km/h | Tepe ivme: 0.88 g
-  Kosuda yakilan yakit: 297.0 g (toplam 355.5 g) | Balata 152 C | En yuksek aks gerilmesi 439 MPa
+  Kosuda yakilan yakit: 297.0 g (toplam 355.5 g) | Balata 152 C | En yuksek aks gerilmesi 251 MPa
 
   [ 13.600 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
  14.00   419.9  175.1  5  7142    0.0    0.0 -0.990   off   356.8   48.1   48.0     0  5.36
@@ -60,8 +60,8 @@ Suspansiyon: 1.40 Hz on / 1.54 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: se
  17.00   535.7  101.2  5  2748    0.0    0.0 -0.983   off   356.8   70.0   71.5     0  2.62
  18.00   560.1   74.7  5  1778    0.0    0.0 -0.977   off   356.8   74.3   76.0     0  2.01
   [ 18.937 s] Kilitlenmeyi fark etti: fren gevsetildi
- 19.00   577.0   48.1  5   966   60.4   63.4 -0.102   off   357.0   76.9   79.0     3  1.50
- 20.00   588.1   31.5  5   849   29.6   29.8 -0.014   off   357.3   75.7   77.7     2  1.43
+ 19.00   577.0   48.1  5   966   60.4   63.4 -0.102   off   357.0   76.9   79.0     2  1.50
+ 20.00   588.1   31.5  5   849   29.6   29.8 -0.014   off   357.3   75.7   77.7     1  1.43
  21.00   594.5   14.8  5   849   13.9   13.9 -0.015   off   357.5   74.9   76.9     0  1.43
 
 === DURUS / HASAR RAPORU ===
@@ -73,5 +73,5 @@ Suspansiyon: 1.40 Hz on / 1.54 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: se
   Suspansiyon: havalanma sayisi FL/FR/RL/RR = 5/5/5/5 | takoz = 3/2/1/1
   Tepe lastik yuku FL/FR/RL/RR = 16340/15654/11500/10543 N
   >> Telefon titresimi: flat-spot her turda 6% siddetle vuruyor
-  Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 439 MPa
+  Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 251 MPa
   Motor yataklari: hasar %0  | Motor: calisiyor

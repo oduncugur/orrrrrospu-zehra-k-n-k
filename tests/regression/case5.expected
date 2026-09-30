@@ -1,7 +1,7 @@
 === ZEHRA KINIK :: Guc Aktarma Simulasyonu ===
 Arac #89: Pleiad Yildiz Sti GRB (2008) | Rally AWD | 1580 kg | 300 HP
 Motor: PE25R Boxer4 Turbo | CR 11.50:1 (conta 0.70 mm) | Yakit: 100+ Yaris
-Sanziman: H-Manuel, 6 vites, son disli 3.90 | Aks: Krom-Molibden 4340 29.2 mm
+Sanziman: H-Manuel, 6 vites, son disli 3.90 | Aks: Krom-Molibden 4340 35.2 mm
 Karter: ISLAK (4.5 L, kritik 1.05 g) | Slick 16.0 PSI | Depo 8 L (6.0 kg)
 Diferansiyel: 1.5-Way plaka LSD (45/60 rampa) | I_w=0.585 kg*m^2
 Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: otoban (ISO 8608 sinif B, 112 ayrik ozellik)
@@ -18,28 +18,28 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ot
   t[s]    x[m]   km/h  G   RPM     wL     wR   kapL  VTEC yakit_g  LastL  LastR  tauL   yag
   0.00     0.0    0.0  1  3850    0.0    0.0  0.000   off    42.5   53.9   53.9     0  3.31
   [  0.466 s] Vites 2 (6999 rpm)
-  1.00     2.4   18.4  2  5501   18.3   18.1  0.046   off    57.2   53.8   53.9   229  4.34
-  2.00    11.4   45.6  2  3986   44.5   44.7  0.027   off    72.7   53.3   53.4   200  3.39
-  3.00    27.3   68.3  2  5935   66.6   66.7  0.022   off    90.3   52.5   52.5   176  4.61
+  1.00     2.4   18.4  2  5501   18.3   18.1  0.046   off    57.2   53.8   53.9   131  4.34
+  2.00    11.4   45.6  2  3986   44.5   44.7  0.027   off    72.7   53.3   53.4   114  3.39
+  3.00    27.3   68.3  2  5935   66.6   66.7  0.022   off    90.3   52.5   52.5   100  4.61
   [  3.613 s] Vites 3 (6999 rpm)
-  4.00    48.5   83.2  3  5324   80.8   80.5  0.023   off   105.1   51.5   51.5   138  4.23
-  5.00    73.9   98.9  3  6315   95.9   96.2  0.016   off   124.4   50.2   50.3   131  4.85
+  4.00    48.5   83.2  3  5324   80.8   80.5  0.023   off   105.1   51.5   51.5    79  4.23
+  5.00    73.9   98.9  3  6315   95.9   96.2  0.016   off   124.4   50.2   50.3    75  4.85
   [  5.075 s] 0-100 km/h: 5.075 s
   [  5.639 s] Vites 4 (6999 rpm)
-  6.00   103.0  109.4  4  5311  105.1  105.5  0.019   off   139.1   49.0   49.0   110  4.22
-  7.00   135.0  121.2  4  5901  117.4  117.3  0.013   off   158.0   47.6   47.6   110  4.59
-  8.00   170.2  132.1  4  6390  127.2  126.8  0.011   off   177.7   46.3   46.3    89  4.89
+  6.00   103.0  109.4  4  5311  105.1  105.5  0.019   off   139.1   49.0   49.0    63  4.22
+  7.00   135.0  121.2  4  5901  117.4  117.3  0.013   off   158.0   47.6   47.6    63  4.59
+  8.00   170.2  132.1  4  6390  127.2  126.8  0.011   off   177.7   46.3   46.3    51  4.89
   [  8.916 s] Vites 5 (6999 rpm)
-  9.00   208.2  139.4  5  7000  133.6  133.9 -0.002   off   193.6   44.9   44.9     2  5.28
- 10.00   248.0  147.5  5  5131  141.6  141.5  0.010   off   210.2   43.6   43.6    75  4.11
- 11.00   290.1  155.1  5  5414  150.1  149.9  0.008   off   228.5   42.4   42.4    79  4.28
- 12.00   334.2  162.5  5  5641  155.4  155.8  0.012   off   247.2   41.1   41.2    82  4.43
- 13.00   380.3  169.4  5  5893  162.7  162.1  0.010   off   266.5   40.0   40.0    75  4.58
+  9.00   208.2  139.4  5  7000  133.6  133.9 -0.002   off   193.6   44.9   44.9     1  5.28
+ 10.00   248.0  147.5  5  5131  141.6  141.5  0.010   off   210.2   43.6   43.6    43  4.11
+ 11.00   290.1  155.1  5  5414  150.1  149.9  0.008   off   228.5   42.4   42.4    45  4.28
+ 12.00   334.2  162.5  5  5641  155.4  155.8  0.012   off   247.2   41.1   41.2    47  4.43
+ 13.00   380.3  169.4  5  5893  162.7  162.1  0.010   off   266.5   40.0   40.0    43  4.58
 
 === 400 m (1/4 mil) BITIS ===
   60 ft :  2.482 s | 100 m :  5.921 s | 201 m (1/8):  8.819 s | 1000 ft: 11.339 s
   0-100 km/h:  5.075 s | 400 m ET: 13.416 s | Trap: 172.2 km/h | Tepe ivme: 1.03 g
-  Kosuda yakilan yakit: 232.2 g (toplam 274.7 g) | Balata 127 C | En yuksek aks gerilmesi 564 MPa
+  Kosuda yakilan yakit: 232.2 g (toplam 274.7 g) | Balata 127 C | En yuksek aks gerilmesi 322 MPa
 
   [ 13.416 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
   [ 13.870 s] Takoza vurdu (bottoming): on sag
@@ -72,5 +72,5 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ot
   Suspansiyon: havalanma sayisi FL/FR/RL/RR = 3/4/5/4 | takoz = 5/5/4/4
   Tepe lastik yuku FL/FR/RL/RR = 31237/30686/17408/17696 N
   >> Telefon titresimi: flat-spot her turda 4% siddetle vuruyor
-  Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 564 MPa
+  Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 322 MPa
   Motor yataklari: hasar %5  | Motor: calisiyor

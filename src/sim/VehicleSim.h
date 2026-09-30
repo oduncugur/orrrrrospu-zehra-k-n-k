@@ -6,6 +6,7 @@
 #include "sim/DrivetrainFailure.h"
 #include "sim/PowertrainCore.h"
 #include "sim/Suspension.h"
+#include "sim/Tune.h"
 #include "sim/WheelSimulation.h"
 
 #include <memory>
@@ -23,6 +24,7 @@ struct VehicleSimConfig {
     bool   plenum = false;                      // yalnizca referans arac
     std::string road = "drag";
     bool   laneAsymmetry = true;                // sol iz daha az lastik kaplamali (LSD davranisini gosterir)
+    const Tune* tune = nullptr;                 // nullptr: Faz 1 drag kurulumu (slick, krom-moly, 1.5-way)
 };
 
 struct VehicleInputs {
@@ -68,6 +70,7 @@ public:
     double defaultLaunchRpm() const;
     double shiftRpm() const { return eng_.redlineRpm - 250.0; }
     double baseMassKg() const { return baseMass_; }
+    double axleDiameterMm() const { return fail_->axle().diameterMm; }
     double rideFreqHz() const { return fRide_; }
     const RoadProfile& road() const { return *road_; }
     const VehicleSimConfig& config() const { return cfg_; }

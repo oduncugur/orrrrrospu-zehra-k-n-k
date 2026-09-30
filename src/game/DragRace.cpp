@@ -13,15 +13,18 @@ constexpr double k60 = 18.288, k330 = 100.584, k660 = 201.168, k1000 = 304.8;
 std::string fmt(const char* f, double a) { char b[96]; std::snprintf(b, sizeof b, f, a); return b; }
 } // namespace
 
-DragRace::DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout)
+DragRace::DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout,
+                   const Tune* playerTune, const Tune* opponentTune)
     : tree_(tree), phase_(withBurnout ? RacePhase::Burnout : RacePhase::Staging), rng_(seed * 2654435761u + 7u) {
     lanes_.resize(2);
     const int ids[2] = {playerCarId, opponentCarId};
+    const Tune* tunes[2] = {playerTune, opponentTune};
     for (int i = 0; i < 2; ++i) {
         LaneState& L = lanes_[i];
         L.car = findVehicle(ids[i]);
         VehicleSimConfig cfg;
         cfg.car = L.car;
+        if (tunes[i]) { tunes_[i] = *tunes[i]; cfg.tune = &tunes_[i]; }
         cfg.road = "drag";
         cfg.fuelLiters = 8.0;
         L.sim = std::make_unique<VehicleSim>(cfg);

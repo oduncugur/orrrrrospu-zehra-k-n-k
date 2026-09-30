@@ -56,7 +56,8 @@ public:
     static constexpr double kQuarterMile = 402.336;
     static constexpr double kStep = 5e-5;   // 20 kHz (olculdu: 10 us referansina gore teker titresimi +%8)
 
-    DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout);
+    DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout,
+             const Tune* playerTune = nullptr, const Tune* opponentTune = nullptr);
 
     // Gercek zamanli ilerleme (platform her karede cagirir). Fizik sabit adimla ilerler.
     void advance(double realDt, const PlayerControls& pc);
@@ -81,6 +82,7 @@ private:
     uint32_t rnd();
 
     std::vector<LaneState> lanes_;
+    Tune tunes_[2];                      // parca durumu (VehicleSim isaretci tutar; omur yaris kadar)
     TreeType tree_;
     RacePhase phase_;
     double clock_ = 0.0, acc_ = 0.0, phaseT_ = 0.0, treeStart_ = -1.0, treeDelay_ = 1.0;

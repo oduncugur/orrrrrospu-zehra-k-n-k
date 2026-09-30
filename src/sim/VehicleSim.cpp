@@ -4,48 +4,114 @@
 
 namespace zk {
 
+namespace {
+// Parca etkileri icin tork egrisi carpani (rpm'e bagli olabilir: turbo kiti spool)
+void scaleCurves(EngineSpec& e, double (*f)(double rpm, const void*), const void* ctx) {
+    for (auto* c : {&e.lowCam, &e.highCam}) for (auto& pr : *c) pr.second *= f(pr.first, ctx);
+}
+struct TurboCtx { double full, spoolStart, spoolFull; };
+double turboMul(double rpm, const void* c) {
+    const TurboCtx& t = *static_cast<const TurboCtx*>(c);
+    const double x = std::clamp((rpm - t.spoolStart) / (t.spoolFull - t.spoolStart), 0.0, 1.0);
+    return 1.0 + (t.full - 1.0) * x * x * (3 - 2 * x);
+}
+double constMul(double, const void* c) { return *static_cast<const double*>(c); }
+double curveMax(const EngineSpec& e) {
+    double m = 0.0;
+    for (auto* c : {&e.lowCam, &e.highCam}) for (auto& pr : *c) m = std::max(m, pr.second);
+    return m;
+}
+} // namespace
+
 VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     const VehicleDef* car = cfg.car;
+    const Tune* tune = cfg.tune;
+    if (tune) { cfg_.drySump = tune->drySump; cfg_.fuel = tune->fuel; }
     eng_ = car ? buildEngineSpec(*car) : EngineSpec::K20Default();
     gbx_ = car ? buildGearbox(*car) : GearboxSpec{};
-    eng_.gasketMm = cfg.gasketMm; eng_.fuel = cfg.fuel;
+    eng_.gasketMm = cfg_.gasketMm; eng_.fuel = cfg_.fuel;
     if (!car) {
         eng_.valvetrain = cfg.valvetrain;
         if (cfg.plenum) { eng_.intake = IntakeType::Plenum; eng_.name = "K20A (Plenum, 16V i-VTEC)"; }
     }
-    double Tmax = 0.0;
-    for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) Tmax = std::max(Tmax, pr.second);
+    const double TmaxFactory = curveMax(eng_);          // aks capi fabrika torkuna gore boyutlanir
+    DiffSpec diff;
+    if (tune) {
+        // ---- parcalar ----
+        const EngineDef* ed = car ? &engineTable()[car->engine] : nullptr;
+        const bool forced = ed && (ed->induction == Induction::Turbo || ed->induction == Induction::TwinTurbo ||
+                                   ed->induction == Induction::Supercharger);
+        double mul = (1.0 + 0.03 * tune->intake) * (1.0 + 0.03 * tune->exhaust) *
+                     (1.0 + tune->ecu * ((forced || tune->turbo) ? 0.12 : 0.05));
+        scaleCurves(eng_, constMul, &mul);
+        if (tune->turbo > 0) {
+            const double baseBoost = ed ? ed->boostBar : 0.0, add = 0.6 * tune->turbo;
+            TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (0.32 + 0.08 * tune->turbo),
+                       eng_.redlineRpm * (0.55 + 0.07 * tune->turbo)};
+            scaleCurves(eng_, turboMul, &t);
+        }
+        if (tune->finalDrive > 0.0) gbx_.finalDrive = tune->finalDrive;
+        switch (tune->diff) {
+        case DiffType::Open: diff.preload = 0.0; diff.plateFactor = 0.0; break;
+        case DiffType::OneAndHalfWay: break;                                   // 45/60 rampa (varsayilan)
+        case DiffType::TwoWay: diff.rampDecelDeg = 45.0; diff.preload = 80.0; break;
+        // Spool (kaynakli): tam kilide yakin; 2500 Nm, 50 us adimda sayisal kararlilik siniri icinde
+        case DiffType::Spool: diff.preload = 2500.0; diff.plateFactor = 1.0; break;
+        }
+    }
+    double Tmax = curveMax(eng_);
     ClutchSpec clutch;
     if (car) clutch.maxTorque = Tmax * 1.7;          // sokak baskisi: motor torkunun ~1.7 kati
-    pt_ = std::make_unique<PowertrainCore>(eng_, clutch, DiffSpec{}, gbx_);
+    if (tune) { static const double cm[4] = {1.0, 1.3, 1.6, 2.0}; clutch.maxTorque *= cm[std::clamp(tune->clutch, 0, 3)]; }
+    pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[car->gearbox].type : Gearbox::HPattern;
     // Cekis dagitimi: AWD'de merkez dagitim %40 on / %60 arka (sabit oranli)
     frontShare_ = drive_ == Drive::FWD ? 1.0 : drive_ == Drive::RWD ? 0.0 : 0.40;
     dL_ = drive_ == Drive::RWD ? 2 : 0;
-    // Aks capi: fabrika muhendisligi, 1. viteste tepe motor torkunda stok kopma gerilmesinin ~%55'i
-    AxleSpec axle = cfg.stockAxles ? AxleSpec::Stock() : AxleSpec::Chromoly();
+    // Aks capi (fabrika muhendisligi): stok debriyajin aktarabilecegi en yuksek torkta (1.7 x FABRIKA tepe
+    // torku, 1. vites) stok celigin kopma dayanimimin %75'i. Stok arac stok kalkista saglam kalir; guc ve
+    // debriyaj yukseltildikce stok aksin kirilma riski gercekci bicimde dogar.
+    const int axleLevel = tune ? std::clamp(tune->axles, 0, 2) : (cfg.stockAxles ? 0 : 1);
+    AxleSpec axle = axleLevel == 2 ? AxleSpec::Race() : axleLevel == 1 ? AxleSpec::Chromoly() : AxleSpec::Stock();
     if (car) {
-        const double G1 = gbx_.ratios.front() * gbx_.finalDrive;
-        const double perSide = Tmax * G1 * gbx_.efficiency * 0.5 * std::max(frontShare_, 1.0 - frontShare_);
-        axle.diameterMm = std::cbrt(16.0 * perSide / (3.14159265 * 0.55 * AxleSpec::Stock().tauUltMPa * 1e6)) * 1000.0;
+        const GearboxSpec factory = buildGearbox(*car);
+        const double G1 = factory.ratios.front() * factory.finalDrive;
+        const double perSide = 1.7 * TmaxFactory * G1 * factory.efficiency * 0.5 * std::max(frontShare_, 1.0 - frontShare_);
+        const double dStock = std::cbrt(16.0 * perSide / (3.14159265 * 0.75 * AxleSpec::Stock().tauUltMPa * 1e6)) * 1000.0;
+        axle.diameterMm = dStock * (axleLevel == 2 ? 1.25 : axleLevel == 1 ? 1.12 : 1.0);   // yukseltme akslari kalindir
     }
-    fail_ = std::make_unique<DrivetrainFailure>(axle, LubeSpec{cfg.drySump, cfg.oilLiters, 3.0});
+    fail_ = std::make_unique<DrivetrainFailure>(axle, LubeSpec{cfg_.drySump, cfg.oilLiters, 3.0});
 
-    TireParams slick;                           // tahrikli aks: yapiskan drag slick, dovme jant
-    TireParams skinny; skinny.muPeak = 1.0; skinny.wheelMass = 9.0; skinny.B = 10.0; // serbest aks: ince "skinny"
     const double ambient = 25.0;
     const bool fDriven = frontShare_ > 0.0, rDriven = frontShare_ < 1.0;
-    for (int i = 0; i < 4; ++i) {
-        const bool d = i < 2 ? fDriven : rDriven;
-        w_.emplace_back(d ? slick : skinny, d ? cfg.slickPsi : 32.0, d ? 55.0 : 30.0, ambient);
+    if (!tune) {
+        TireParams slick;                           // tahrikli aks: yapiskan drag slick, dovme jant
+        TireParams skinny; skinny.muPeak = 1.0; skinny.wheelMass = 9.0; skinny.B = 10.0; // serbest aks: ince "skinny"
+        for (int i = 0; i < 4; ++i) {
+            const bool d = i < 2 ? fDriven : rDriven;
+            w_.emplace_back(d ? slick : skinny, d ? cfg.slickPsi : 32.0, d ? 55.0 : 30.0, ambient);
+        }
+    } else {
+        // Lastik tipi: sokak / yari-slick / drag slick (tahrikli aks); serbest aks sokak lastigi
+        TireParams street; street.muPeak = 1.05; street.B = 10.0; street.wheelMass = 16.0;
+        TireParams semi;   semi.muPeak = 1.25;   semi.B = 11.0;   semi.wheelMass = 15.0;
+        TireParams slick;  // 1.45, dovme jant
+        const TireParams* dt = tune->tires == TireType::DragSlick ? &slick : tune->tires == TireType::SemiSlick ? &semi : &street;
+        const double defPsi = tune->tires == TireType::DragSlick ? 16.0 : tune->tires == TireType::SemiSlick ? 26.0 : 32.0;
+        const double defTemp = tune->tires == TireType::DragSlick ? 55.0 : tune->tires == TireType::SemiSlick ? 45.0 : 35.0;
+        for (int i = 0; i < 4; ++i) {
+            const bool d = i < 2 ? fDriven : rDriven;
+            if (d) w_.emplace_back(*dt, tune->psi > 0 ? tune->psi : defPsi, defTemp, ambient);
+            else   w_.emplace_back(street, 32.0, 30.0, ambient);
+        }
     }
     if (cfg.laneAsymmetry) w_[dL_].setSurfaceMu(0.96);
 
-    fuelDensity_ = (cfg.fuel == FuelType::E85) ? 0.785 : 0.745;
-    baseMass_ = (car ? car->massKg : 1080.0) + 75.0;      // kuru arac + surucu
+    fuelDensity_ = (cfg_.fuel == FuelType::E85) ? 0.785 : 0.745;
+    baseMass_ = (car ? car->massKg : 1080.0) + 75.0 - (tune ? Tune::weightKg(tune->weight) : 0);   // kuru arac + surucu - hafifletme
     fuelKg_ = cfg.fuelLiters * fuelDensity_;
-    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg.drySump ? 0.012 : 0.0);
+    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0);
     vl_ = VehicleLoad{baseMass_ + fuelKg_, car ? car->wheelbaseM : 2.62, car ? car->widthM * 0.85 : 1.50, hCoG,
                       car ? car->frontWeight : 0.62};
     // Suspansiyon: kasa tipine gore dogal frekans (Hz); yaris araclari sert
