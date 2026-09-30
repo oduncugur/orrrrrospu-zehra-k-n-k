@@ -108,6 +108,8 @@ void GarageScreen::render(Renderer& r) {
     r.textCentered((kTree[0] + kTree[2]) / 2, kTree[1] + 10, "AGAC", 1, {0.7f, 0.7f, 0.75f});
     r.textCentered((kTree[0] + kTree[2]) / 2, kTree[1] + 24, app_.treePro ? "PRO .4" : "SPT .5", 2, {1, 0.85f, 0.3f});
     r.text(8, 550, "ARAC SEC", 2, {0.6f, 0.6f, 0.65f});
+    std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps());
+    r.text(300, 8, b, 1, {0.45f, 0.5f, 0.45f});
     for (const Btn& bt : kBtns) {
         r.rect(bt.x0, bt.y0, bt.x1, bt.y1, {0.2f, 0.22f, 0.28f});
         r.textCentered((bt.x0 + bt.x1) / 2, bt.y0 + 22, bt.label, 3, {1, 1, 1});

@@ -389,6 +389,8 @@ void DragScreen::drawHud(Renderer& r) {
     };
     laneLine(P, 64, "SEN  ", {1, 1, 1});
     laneLine(O, 400, "RAKIP", {1.0f, 0.75f, 0.55f});
+    std::snprintf(b, sizeof b, "%2.0fFPS %4.1fMS", app_.fps(), app_.updateMs());
+    r.text(548, 16, b, 1, {0.45f, 0.5f, 0.45f});
 
     // ---- buyuk agac (orta ust) ----
     {

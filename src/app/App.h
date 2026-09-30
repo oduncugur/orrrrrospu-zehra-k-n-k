@@ -54,6 +54,9 @@ public:
     std::function<void(int, int)> onHaptic;
     void haptic(int ms, int amplitude) { if (onHaptic) onHaptic(ms, amplitude); }
     bool treePro = false;                         // agac tipi (garajda secilir)
+    // Performans olcumu (ekranda kucuk gosterge): kare hizi ve kare basina guncelleme (fizik) suresi
+    double fps() const { return fps_; }
+    double updateMs() const { return updMs_; }
     bool landscape() const { return screen_ && screen_->landscape(); }
 
     // Ekranlar icin
@@ -81,6 +84,7 @@ private:
     std::mutex audioLock_;
     Voice voices_[2];
     std::vector<float> mix_;
+    double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 
 } // namespace zk

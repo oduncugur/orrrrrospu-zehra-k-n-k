@@ -3,6 +3,7 @@
 #include "Screens.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -30,7 +31,12 @@ void App::update(double dt) {
         screen_ = std::move(pending_);
         if (onOrientation) onOrientation(screen_->landscape());
     }
+    const auto t0 = std::chrono::steady_clock::now();
     screen_->update(std::min(dt, 0.1));
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    updMs_ += (ms - updMs_) * 0.05;                          // yumusatilmis
+    fpsAcc_ += dt; ++fpsFrames_;
+    if (fpsAcc_ >= 0.5) { fps_ = fpsFrames_ / fpsAcc_; fpsAcc_ = 0; fpsFrames_ = 0; }
 }
 
 void App::render() {
