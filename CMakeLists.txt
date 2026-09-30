@@ -19,6 +19,7 @@ add_library(zk_sim STATIC
   src/game/DragRace.cpp
   src/game/Career.cpp
   src/game/RoadPath.cpp
+  src/game/RoadCar.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp
@@ -67,3 +68,6 @@ add_executable(planar_test tests/planar_test.cpp)
 target_link_libraries(planar_test PRIVATE zk_sim)
 target_include_directories(planar_test PRIVATE src)
 add_test(NAME duzlemsel_dinamik COMMAND planar_test)
+add_executable(road_test tests/road_test.cpp)
+target_link_libraries(road_test PRIVATE zk_sim)
+add_test(NAME acik_yol COMMAND road_test)

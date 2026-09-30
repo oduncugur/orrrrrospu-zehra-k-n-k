@@ -24,6 +24,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/DragRace.cpp
     ${ZK_ROOT}/src/game/Career.cpp
     ${ZK_ROOT}/src/game/RoadPath.cpp
+    ${ZK_ROOT}/src/game/RoadCar.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp

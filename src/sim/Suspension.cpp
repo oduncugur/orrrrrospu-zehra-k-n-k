@@ -75,6 +75,7 @@ RoadProfile RoadProfile::preset(const std::string& name) {
         r.common_.clear(); r.left_.clear(); r.right_.clear();
         return r;
     }
+    if (name == "acikyol") return RoadProfile('A', 5);          // acik yol: iyi asfalt, ozel engel yok (engeller yol haritasindan gelecek)
     if (name == "otoban") {                                       // sehirlerarasi: B sinifi + kopru derzleri
         RoadProfile r('B', 7);
         for (double x = 60; x < 5000; x += 45) r.addFeature({RoadFeatureType::ExpansionJoint, x, 0.05, 0.012, 0});
