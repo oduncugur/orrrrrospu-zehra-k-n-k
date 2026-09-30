@@ -76,7 +76,7 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 
 ### Faz 5 durum (ara taslak)
 - [x] 1. Düzlemsel dinamik: yanal Pacejka, çekiş elipsi, yaw; 1B drag fiziği regresyonla korunuyor (`tests/planar_test`)
-- [ ] 2. Yol: klotoidli viraj, şerit, kenar, izdüşüm var (`tests/road_test`); **eğim yok**
+- [x] 2. Yol: klotoidli viraj, şerit, kenar, izdüşüm, yükseklik/eğim (şehirlerarası ≤%5, dağ ≤%9) (`tests/road_test` [6])
 - [x] 3. Trafik: şerit takibi, IDM fren/takip, çarpışma
 - [x] 4. Kontrol: Android ivmeölçer eğimi (hassasiyet ayarlı), klavye, dokunmatik
 - [x] 5. Görüntü: arkadan perspektif kamera, PS1 tarzı yol/ağaç/direk, trafik, HUD

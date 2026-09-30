@@ -13,7 +13,7 @@ struct Rng {
 };
 }
 
-RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfWidth) : halfWidth_(halfWidth) {
+RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfWidth, double maxGrade) : halfWidth_(halfWidth) {
     Rng r{seed ? seed : 1u};
     // Egrilik programi: [duzluk][giris klotoidi][sabit yay][cikis klotoidi] tekrarlari
     struct Seg { double len, k0, k1; };
@@ -45,6 +45,25 @@ RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfW
         }
         if (s >= lengthM) break;
     }
+    if (maxGrade <= 0.0) return;
+    // Yukseklik: uc sinusun toplami olarak egim (yumusak tepe/cukur), ayri tohum (viraj programi ayni kalir).
+    // Baslangic duzlugu (ilk 150 m) duz, 150-450 m arasi yumusakca girer.
+    Rng e{(seed ? seed : 1u) * 2654435761u + 12345u};
+    const double wl0 = minRadius < 50 ? 250.0 : 600.0, wl1 = minRadius < 50 ? 1000.0 : 2400.0;
+    double L[3], A[3], P[3];
+    for (int k = 0; k < 3; ++k) { L[k] = e.range(wl0, wl1); A[k] = maxGrade * e.range(0.45, 0.6); P[k] = e.range(0.0, 6.2831853); }
+    auto grade = [&](double ss) {
+        const double u = std::clamp((ss - 150.0) / 300.0, 0.0, 1.0), ramp = u * u * (3.0 - 2.0 * u);
+        double g = 0;
+        for (int k = 0; k < 3; ++k) g += A[k] * std::sin(6.2831853 * ss / L[k] + P[k]);
+        return ramp * maxGrade * std::tanh(g / maxGrade);        // sinira yumusak doyum: uzun sabit yokuslar
+    };
+    double z = 0;
+    for (size_t i = 0; i < pts_.size(); ++i) {
+        const double g = grade(pts_[i].s);
+        if (i > 0) z += 0.5 * (g + pts_[i - 1].grade) * (pts_[i].s - pts_[i - 1].s);
+        pts_[i].grade = g; pts_[i].z = z;
+    }
 }
 
 RoadPoint RoadPath::at(double s) const {
@@ -53,7 +72,7 @@ RoadPoint RoadPath::at(double s) const {
     const double f = (s - pts_[i].s) / kStep;
     const RoadPoint &a = pts_[i], &b = pts_[i + 1];
     return {a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.heading + (b.heading - a.heading) * f,
-            a.curvature + (b.curvature - a.curvature) * f, s};
+            a.curvature + (b.curvature - a.curvature) * f, s, a.z + (b.z - a.z) * f, a.grade + (b.grade - a.grade) * f};
 }
 
 void RoadPath::project(double x, double y, int& hint, double& s, double& lateral) const {

@@ -147,11 +147,13 @@ void RoadScreen::render(Renderer& r) {
     const double ps = Pc.s();
     const double X = sim.posX(), Y = sim.posY();
     const double cp = std::cos(camPsi_), sp = std::sin(camPsi_);
-    // Kamera: arabanin 7.5 m arkasi, 2.7 m yukari; 5 m ilerisine bakar
+    // Kamera: arabanin 7.5 m arkasi, 2.7 m yukari; 5 m ilerisine bakar (yol yuksekligini izler)
+    const double zCar = Pc.elevation(), zBack = R.at(ps - 7.5).z, zFront = R.at(ps + 5.0).z;
     const Mat4 proj = matPerspective(1.05f, (float)W / H, 0.3f, 900.0f);
-    const Mat4 view = matLookAt((float)(X - 7.5 * cp), 2.7f, (float)-(Y - 7.5 * sp), (float)(X + 5 * cp), 0.8f, (float)-(Y + 5 * sp));
+    const Mat4 view = matLookAt((float)(X - 7.5 * cp), (float)(std::max(zBack, zCar) + 2.7), (float)-(Y - 7.5 * sp),
+                                (float)(X + 5 * cp), (float)(zFront + 0.8), (float)-(Y + 5 * sp));
     const Mat4 vp = matMul(proj, view);
-    const Proj hz = project(vp, X + 3000 * cp, Y + 3000 * sp, 0.0, W, H);
+    const Proj hz = project(vp, X + 3000 * cp, Y + 3000 * sp, zCar, W, H);
     const float horizon = hz.ok ? std::clamp(hz.y, 0.0f, (float)H) : H * 0.35f;
     const bool mtn = ses_->kind() == RoadSession::Kind::Touge;
     r.rect(0, horizon, W, H, mtn ? Color{0.2f, 0.36f, 0.2f} : Color{0.36f, 0.55f, 0.28f});
@@ -168,13 +170,20 @@ void RoadScreen::render(Renderer& r) {
     const auto& P = R.points();
     auto edge = [&](int i, double off) {
         const RoadPoint& p = P[i];
-        return project(vp, p.x - off * std::sin(p.heading), p.y + off * std::cos(p.heading), 0.0, W, H);
+        return project(vp, p.x - off * std::sin(p.heading), p.y + off * std::cos(p.heading), p.z, W, H);
     };
     for (int i = i1; i >= i0; --i) {
         const int j = i + 1;
         const Proj aL = edge(i, hw + 1.0), aR = edge(i, -hw - 1.0), bL = edge(j, hw + 1.0), bR = edge(j, -hw - 1.0);
         if (!aL.ok || !aR.ok || !bL.ok || !bR.ok) continue;
         const bool band = ((i / 3) & 1) != 0;
+        // Arazi: yol yuksekligini izleyen 60 m'lik cim seritleri (tepede yol havada kalmasin)
+        {
+            const Color grass = mtn ? Color{0.2f, 0.36f, 0.2f} : Color{0.36f, 0.55f, 0.28f};
+            const Proj gL0 = edge(i, hw + 60.0), gL1 = edge(j, hw + 60.0), gR0 = edge(i, -hw - 60.0), gR1 = edge(j, -hw - 60.0);
+            if (gL0.ok && gL1.ok) { r.tri(gL0.x, gL0.y, aL.x, aL.y, bL.x, bL.y, grass); r.tri(gL0.x, gL0.y, bL.x, bL.y, gL1.x, gL1.y, grass); }
+            if (gR0.ok && gR1.ok) { r.tri(aR.x, aR.y, gR0.x, gR0.y, gR1.x, gR1.y, grass); r.tri(aR.x, aR.y, gR1.x, gR1.y, bR.x, bR.y, grass); }
+        }
         // banket (kirmizi/beyaz kaldirim)
         const Color curb = touge ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
                                  : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f});
@@ -211,10 +220,10 @@ void RoadScreen::render(Renderer& r) {
             const RoadPoint q = R.at(fs), q2 = R.at(fs + 1.5);
             for (int k = 0; k < 10; ++k) {
                 const double o0 = -hw + k * (2 * hw / 10), o1 = o0 + 2 * hw / 10;
-                const Proj a = project(vp, q.x - o0 * std::sin(q.heading), q.y + o0 * std::cos(q.heading), 0.02, W, H);
-                const Proj bq = project(vp, q.x - o1 * std::sin(q.heading), q.y + o1 * std::cos(q.heading), 0.02, W, H);
-                const Proj c2 = project(vp, q2.x - o1 * std::sin(q2.heading), q2.y + o1 * std::cos(q2.heading), 0.02, W, H);
-                const Proj d2 = project(vp, q2.x - o0 * std::sin(q2.heading), q2.y + o0 * std::cos(q2.heading), 0.02, W, H);
+                const Proj a = project(vp, q.x - o0 * std::sin(q.heading), q.y + o0 * std::cos(q.heading), q.z + 0.02, W, H);
+                const Proj bq = project(vp, q.x - o1 * std::sin(q.heading), q.y + o1 * std::cos(q.heading), q.z + 0.02, W, H);
+                const Proj c2 = project(vp, q2.x - o1 * std::sin(q2.heading), q2.y + o1 * std::cos(q2.heading), q2.z + 0.02, W, H);
+                const Proj d2 = project(vp, q2.x - o0 * std::sin(q2.heading), q2.y + o0 * std::cos(q2.heading), q2.z + 0.02, W, H);
                 if (!a.ok || !bq.ok || !c2.ok || !d2.ok) continue;
                 const Color cc = (k & 1) ? Color{1, 1, 1} : Color{0.05f, 0.05f, 0.05f};
                 r.tri(a.x, a.y, bq.x, bq.y, c2.x, c2.y, cc); r.tri(a.x, a.y, c2.x, c2.y, d2.x, d2.y, cc);
@@ -223,25 +232,31 @@ void RoadScreen::render(Renderer& r) {
     }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu
-    struct Obj { double d, x, y, psi, heave; int id; };
+    // z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim (burun yukari +)
+    struct Obj { double d, x, y, psi, z, pitch; int id; };
+    auto carModel = [](double x, double y, double z, double psi, double pitch) {
+        return matMul(matMul(matTranslate((float)x, (float)z, (float)-y), matRotY((float)psi)), matRotZ((float)std::atan(pitch)));
+    };
     std::vector<Obj> objs;
     for (const TrafficCar& t : ses_->traffic()) {
         if (t.s < ps - 12 || t.s > ps + 320) continue;
-        Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId; o.heave = 0;
+        const RoadPoint q = R.at(t.s);
+        Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
+        o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
         o.d = (o.x - X) * cp + (o.y - Y) * sp; objs.push_back(o);
     }
     if (RoadCar* rv = ses_->rival()) {
         const VehicleSim& rs = rv->sim();
-        Obj o{0, rs.posX(), rs.posY(), rs.heading(), rs.suspension().heave(), ses_->rivalCarId()};
+        Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId()};
         o.d = (o.x - X) * cp + (o.y - Y) * sp;
         if (o.d > -8 && o.d < 320) objs.push_back(o);
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
         if (o.d < -3.0) continue;                                  // kameraya cok yakin (goruntuyu kaplar)
-        r.drawCar(o.id, 0, 0, W, H, proj, view, matMul(matTranslate((float)o.x, (float)o.heave, (float)-o.y), matRotY((float)o.psi)));
+        r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch));
     }
-    r.drawCar(carId_, 0, 0, W, H, proj, view, matMul(matTranslate((float)X, (float)sim.suspension().heave(), (float)-Y), matRotY((float)sim.heading())));
+    r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()));
 
     // HUD
     const PowertrainCore& pt = const_cast<VehicleSim&>(sim).powertrain();
@@ -286,7 +301,8 @@ void RoadScreen::render(Renderer& r) {
         std::snprintf(b, sizeof b, "%.1f S", ses_->raceTime());
         r.text(8, 64, b, 2, {1, 1, 1});
     } else {
-        std::snprintf(b, sizeof b, "%.2f KM  %.2f G  KAYMA %2.0f", ps / 1000.0, std::fabs(sim.lateralAccel()) / 9.81, std::fabs(sim.bodySlipAngle()) * 57.3);
+        std::snprintf(b, sizeof b, "%.2f KM  %.2f G  KAYMA %2.0f  EGIM %+.0f%%", ps / 1000.0, std::fabs(sim.lateralAccel()) / 9.81,
+                      std::fabs(sim.bodySlipAngle()) * 57.3, sim.grade() * 100.0);
         r.text(8, 46, b, 1, {0.75f, 0.8f, 0.9f});
     }
     if (Pc.offRoad()) r.textCentered(W / 2.0f, 86, "YOL DISI", 2, {1.0f, 0.4f, 0.2f});

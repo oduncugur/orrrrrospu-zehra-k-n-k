@@ -171,7 +171,7 @@ Son güncelleme (424c879): aks boyutlandırması değişti; 9 vakada hareket ver
 
 ## 7. Faz 5 planı (arşiv — adımların hepsi ara taslak olarak kodda, bkz. sondaki güncellemeler)
 
-Kalan Faz 5 cilası: yol eğimi (şu an düz), oyuncu-rakip temasının fiziği, kaster/toe/amortisör ayarları,
+Kalan Faz 5 cilası: oyuncu-rakip temasının fiziği, kaster/toe/amortisör ayarları,
 akış modunda ekonomi dengesi. Ardından Faz 6.
 
 **Adım 1 — Düzlemsel dinamik (fizik, test önce):** `VehicleSimConfig`'e `planar` bayrağı; `false` iken mevcut 1B yol
@@ -276,3 +276,14 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
   viraj tepesinden (apex) >= 0.45 g yanal ivmeyle gecis. Carpisma: -1000 + kombo sifir; yol disi kombo bitirir.
 - Kariyer: odul skor/20 (en fazla $4000), rekor kirilirsa +%50; `Career::bestFlow` kayitta (`flow=` satiri).
 - Denge oyun testiyle ayarlanmadi (ara taslak).
+
+## Guncelleme — 2026-10-01: Yol egimi
+- `RoadPoint::z/grade`; `RoadPath(..., maxGrade)`: uc sinus toplami + tanh doyumu (uzun sabit yokuslar),
+  ayri tohum (viraj programi birebir ayni), ilk 150 m duz. Sehirlerarasi %5, dag yolu %9.
+- `VehicleSim::setGrade` (yalniz duzlemsel mod): vx'e -g sin(theta); lastik kuvveti yuk aktariminda kalir.
+  Drag 1B fizigi degismedi (regresyon 9/9 ayni). `RoadCar` her kare yol egimini arac yonune izdusurur.
+- Cizim: kamera/yol/agac/bitis/araclar yukseklikte, araclar egime gore burun yukari/asagi; yol kenarinda
+  yuksekligi izleyen 60 m cim seridi (tepede yol havada kalmaz). Serbest surus HUD'unda EGIM %.
+- Test `road_test` [6]: egim siniri, sureklilik, duz baslangic, virajlar degismedi, %8 inis bosta hizlanma
+  (3.23 m/s; surtunmesiz 3.91), duzde hareket yok.
+- Not: test surucusu (oyuncu-YZ) sollamadigi icin dag yolunda yavas trafige takilip bitiremeyebilir; test bunu sart kosmaz.

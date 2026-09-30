@@ -79,6 +79,10 @@ void RoadCar::update(double dt, const RoadControls& c) {
     const double v = sim_->speed();
     driverAssist(dt, c.throttle);
     sim_->setSurfaceMu(offRoad() ? 0.55 : 1.0);                       // cim/toprak
+    {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)
+        const RoadPoint p = road_.at(s_);
+        sim_->setGrade(p.grade * std::cos(sim_->heading() - p.heading));
+    }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
     if (assist && v > 3.0) {
         // ESP benzeri: arka kayarsa otomatik karsi direksiyon + gaz kesme

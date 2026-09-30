@@ -25,6 +25,7 @@ public:
     const VehicleSim& sim() const { return *sim_; }
     double s() const { return s_; }
     double lateral() const { return lat_; }
+    double elevation() const { return road_.at(s_).z; }      // yol yuksekligi (cizim)
     bool offRoad() const { return std::fabs(lat_) > road_.halfWidth() + 1.5; }   // banket (1.5 m) asfalt sayilir
     double tireSlipSpeed() const;          // ses icin
 

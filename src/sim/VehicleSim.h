@@ -9,6 +9,7 @@
 #include "sim/Tune.h"
 #include "sim/WheelSimulation.h"
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -73,6 +74,9 @@ public:
     void scaleVelocity(double f) { vx_ *= f; vy_ *= f; r_ *= f; V_ = vx_; }   // carpisma: hiz kaybi
     void resetPose(double x, double y, double psi) { X_ = x; Y_ = y; psi_ = psi; vx_ = vy_ = r_ = 0.0; V_ = 0.0; }
     void setSurfaceMu(double mu) { for (auto& w : w_) w.setSurfaceMu(mu); }   // asfalt 1.0, cim/toprak ~0.55
+    // Yol egimi arac burnu yonunde (dz/ds, yokus yukari +); yalnizca duzlemsel modda (drag 1B fizigi duz kalir)
+    void setGrade(double g) { grade_ = std::clamp(g, -0.3, 0.3); }
+    double grade() const { return grade_; }
     int drivenLeft() const { return dL_; }
     int drivenRight() const { return dL_ + 1; }
     const DrivetrainFailure& failure() const { return *fail_; }
@@ -109,7 +113,7 @@ private:
     VehicleLoad vl_{};
     double baseMass_ = 0, fuelDensity_ = 0.745, fuelKg_ = 0, CdA_ = 0.68, brakeTotal_ = 7000, fRide_ = 1.6;
     double V_ = 0, dist_ = 0, axRaw_ = 0, axF_ = 0, haptic_ = 0;
-    double X_ = 0, Y_ = 0, psi_ = 0, vx_ = 0, vy_ = 0, r_ = 0, ayRaw_ = 0, Iz_ = 1500;
+    double X_ = 0, Y_ = 0, psi_ = 0, vx_ = 0, vy_ = 0, r_ = 0, ayRaw_ = 0, Iz_ = 1500, grade_ = 0;
     int suspCounter_ = 0;
     bool wasAir_[4] = {false, false, false, false}, wasStop_[4] = {false, false, false, false};
     std::vector<SuspEvent> suspEvents_;

@@ -267,7 +267,10 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
     else {
         const double m = vl_.mass;
         axRaw_ = Fx / m; ayRaw_ = Fy / m;                                      // hissedilen ivme (suspansiyon, yag)
-        vx_ += (axRaw_ + r_ * vy_) * dt;
+        // Yer cekiminin yol boyunca bileseni: g sin(atan(egim)). Lastik kuvvetinden gelen axRaw_ yukte kalir
+        // (yokusta duran aracta arkaya yuk aktarimi dogru cikar).
+        const double gAlong = 9.81 * grade_ / std::sqrt(1.0 + grade_ * grade_);
+        vx_ += (axRaw_ - gAlong + r_ * vy_) * dt;
         vy_ += (ayRaw_ - r_ * vx_) * dt;
         r_ += Mz / Iz_ * dt;
         if (vx_ < 0.0) vx_ = 0.0;                                              // geri vites yok

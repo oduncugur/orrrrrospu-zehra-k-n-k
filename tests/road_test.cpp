@@ -88,9 +88,45 @@ int main() {
             if (rs.player().takeRecovered()) ++recov;
             t0 += 1.0 / 60.0;
         }
-        std::printf("    en dar viraj R=%.0f m | oyuncu %.1f s, rakip %.1f s, kurtarma %d\n", minR, rs.playerTime(), rs.rivalTime(), recov);
+        std::printf("    en dar viraj R=%.0f m | oyuncu %.1f s (%.0f m), rakip %.1f s, kurtarma %d\n", minR, rs.playerTime(),
+                    rs.player().s(), rs.rivalTime(), recov);
         CHECK(minR < 40.0, "dag yolu gercekten dar virajli");
         CHECK(rs.rivalTime() > 0 && rs.rivalTime() < 250.0, "rakip dag yolunu bitirdi");
+    }
+    std::printf("[6] Yol egimi (yukseklik profili)\n");
+    {
+        const RoadPath flat(20250930u, 20000.0, 90.0);
+        const RoadPath hilly(20250930u, 20000.0, 90.0, 3.6, 0.05);
+        double maxG = 0, zMin = 0, zMax = 0, maxStep = 0, maxDiff = 0;
+        bool startFlat = true;
+        const auto& P = hilly.points();
+        for (size_t i = 0; i < P.size(); ++i) {
+            maxG = std::max(maxG, std::fabs(P[i].grade));
+            zMin = std::min(zMin, P[i].z); zMax = std::max(zMax, P[i].z);
+            if (P[i].s < 150.0 && (P[i].z != 0.0 || P[i].grade != 0.0)) startFlat = false;
+            if (i) maxStep = std::max(maxStep, std::fabs(P[i].z - P[i - 1].z));
+            maxDiff = std::max(maxDiff, std::hypot(P[i].x - flat.points()[i].x, P[i].y - flat.points()[i].y));
+        }
+        std::printf("    en dik %%%.1f, yukseklik %.0f..%.0f m\n", maxG * 100, zMin, zMax);
+        CHECK(maxG <= 0.05 + 1e-9 && maxG > 0.03, "egim sinirda (%5) ve gercekten var");
+        CHECK(zMax - zMin > 10.0, "tepe/cukur farki > 10 m");
+        CHECK(startFlat, "baslangic duzlugu duz (geri sayim yokusta olmaz)");
+        CHECK(maxStep <= 0.05 * RoadPath::kStep + 1e-6, "yukseklik surekli (adim basina <= egim x 2 m)");
+        CHECK(maxDiff == 0.0, "egim viraj programini degistirmez");
+        // Fizik: bosta (vites 0), frensiz; yokus asagi hizlanir, duzde durur
+        auto roll = [](double grade) {
+            VehicleSimConfig c; c.car = findVehicle(5); c.planar = true; c.road = "acikyol"; c.laneAsymmetry = false;
+            Tune t; c.tune = &t;
+            VehicleSim s(c);
+            s.powertrain().setGear(0);
+            s.setGrade(grade);
+            for (int i = 0; i < 5 * 20000; ++i) s.step(5e-5, VehicleInputs{});
+            return s.speed();
+        };
+        const double vDown = roll(-0.08), vFlat = roll(0.0);
+        std::printf("    5 s bosta: %%8 inis %.2f m/s (surtunmesiz %.2f), duz %.2f m/s\n", vDown, 9.81 * 0.08 / std::sqrt(1.0064) * 5, vFlat);
+        CHECK(vDown > 2.8 && vDown < 3.95, "yokus asagi yer cekimiyle hizlanir (yuvarlanma direnci kadar eksik)");
+        CHECK(vFlat < 0.05, "duzde kendiliginden hareket yok");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
