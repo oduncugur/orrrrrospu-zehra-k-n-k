@@ -48,10 +48,15 @@ jobs:
           cp README.md out/linux/ && cp README.md out/win/
           (cd out/win && zip -q ../ZehraKinik_Windows_x64.zip *)
           (cd out/linux && zip -q ../ZehraKinik_Linux_x64.zip *)
+          cp build-win/zehra_game.exe out/ZehraKinik.exe
+          cp build-linux/zehra_game out/ZehraKinik_Linux
       - uses: actions/upload-artifact@v4
         with:
           name: masaustu
-          path: out/*.zip
+          path: |
+            out/*.zip
+            out/ZehraKinik.exe
+            out/ZehraKinik_Linux
 
   android:
     name: Android APK
@@ -93,4 +98,4 @@ jobs:
           gh release delete latest-build --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
           gh release create latest-build dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
             --title "Zehra Kinik - son derleme" \
-            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Windows/Linux: zehra_game (grafik garaj + motor sesi), zehra_sim ve zehra_garage (konsol araclari)."
+            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Windows: ZehraKinik.exe (tek dosya, zip gerekmez; SmartScreen uyarisinda 'Yine de calistir'). Linux: ZehraKinik_Linux (chmod +x). Zip'lerde oyun + zehra_game, zehra_sim ve zehra_garage (konsol araclari)."
