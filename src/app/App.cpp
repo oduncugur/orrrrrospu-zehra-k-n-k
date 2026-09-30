@@ -13,6 +13,8 @@ App::App(const std::string& saveDir) {
     if (!saveDir.empty()) {
         savePath_ = saveDir;
         if (savePath_.back() != '/' && savePath_.back() != '\\') savePath_ += '/';
+        settingsPath_ = savePath_ + "ayarlar.cfg";
+        settings = Settings::load(settingsPath_);
         savePath_ += "kariyer.zks";
         bool corrupt = false;
         career = Career::loadOrNew(savePath_, &corrupt);
@@ -22,6 +24,7 @@ App::App(const std::string& saveDir) {
     }
     treePro = career.treePro;
     selectedCar = career.car().carId;
+    applySettings();
     setScreen(std::make_unique<GarageScreen>(*this));
 }
 
@@ -30,6 +33,19 @@ void App::saveCareer() {
     if (!savePath_.empty()) career.save(savePath_);
 }
 App::~App() = default;
+
+void App::applySettings() {
+    const float master = settings.masterVol / 100.0f;
+    engineVol_ = master * settings.engineVol / 100.0f;
+    tireVol_ = master * settings.tireVol / 100.0f;
+    renderer_.integerScale = settings.integerScale;
+}
+void App::saveSettings() { if (!settingsPath_.empty()) settings.save(settingsPath_); }
+
+void App::haptic(int ms, int amplitude) {
+    if (!onHaptic || settings.haptics <= 0) return;
+    onHaptic(ms, std::clamp(amplitude * settings.haptics / 100, 1, 255));
+}
 
 bool App::initGraphics() { return renderer_.init(); }
 void App::shutdownGraphics() { renderer_.shutdown(); }
@@ -52,6 +68,7 @@ void App::goCareerRace() {
 void App::goParts() { setScreen(std::make_unique<PartsScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
+void App::goSettings() { setScreen(std::make_unique<SettingsScreen>(*this)); }
 void App::goRoad() {
     const OwnedCar& oc = career.car();
     setScreen(std::make_unique<RoadScreen>(*this, oc.carId, &oc.tune));
@@ -108,6 +125,7 @@ void App::renderAudio(float* out, int frames) {
     std::memset(out, 0, sizeof(float) * frames);
     if (!audioLock_.try_lock()) return;           // ses thread'i asla beklemez
     if ((int)mix_.size() < frames) mix_.resize(frames);
+    const float engVol = engineVol_.load(), tireVol = tireVol_.load();
     for (Voice& v : voices_) {
         if (!v.synth) continue;
         EngineAudioInput in;
@@ -115,14 +133,14 @@ void App::renderAudio(float* out, int frames) {
         in.boost = -1.0;
         v.synth->setInput(in);
         v.synth->render(mix_.data(), frames);
-        const float g = v.gain.load() * 0.8f;
+        const float g = v.gain.load() * 0.8f * engVol;
         for (int i = 0; i < frames; ++i) out[i] += mix_[i] * g;
     }
     // Lastik sesi (TireAudio: tonal stick-slip ciglik + burnout hirlamasi)
     for (Voice& v : voices_) {
         const double slip = v.slip.load();
-        if (v.tireAudio.silent(slip)) continue;
-        v.tireAudio.render(out, frames, slip, v.gain.load());
+        if (v.tireAudio.silent(slip) || tireVol <= 0.0f) continue;
+        v.tireAudio.render(out, frames, slip, v.gain.load() * tireVol);
     }
     audioLock_.unlock();
     for (int i = 0; i < frames; ++i) out[i] = std::clamp(out[i], -1.0f, 1.0f);

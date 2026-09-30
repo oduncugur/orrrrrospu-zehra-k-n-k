@@ -33,6 +33,7 @@ public:
     void toVirtual(int screenW, int screenH, float px, float py, float& x, float& y) const;
     int  vw() const { return vw_; }
     int  vh() const { return vh_; }
+    bool integerScale = false;         // ekrana tam sayi katla olcekle (piksel-keskin; kenarlarda bant kalabilir)
 
     // 2D (sanal piksel, sol ust orijin). flush2D cagrilana kadar biriktirilir.
     void rect(float x0, float y0, float x1, float y1, Color c);
@@ -48,6 +49,7 @@ public:
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model);
 
 private:
+    float scaleFor(int screenW, int screenH) const;
     struct Mesh { unsigned vao = 0, vbo = 0; int count = 0; };
     const Mesh& mesh(int carId);
     std::vector<float> batch_;   // x y r g b a

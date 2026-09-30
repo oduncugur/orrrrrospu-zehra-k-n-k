@@ -133,6 +133,28 @@ private:
     double pullRpm_ = -1;          // cekis sirasinda devir (-1 = yok)
 };
 
+// Ayarlar: dikey. Goruntu (FPS siniri, dikey esitleme, gosterge, tam ekran, olcek), ses, kontrol, birim.
+// Her degisiklik aninda uygulanir ve ayarlar.cfg'ye yazilir.
+class SettingsScreen : public Screen {
+public:
+    explicit SettingsScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+    enum class Item { FpsCap, VSync, ShowFps, Fullscreen, IntScale, Master, Engine, Tire,
+                      Haptics, Tilt, TiltSens, Assist, Gears, Speed, Tree };
+private:
+    struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi
+    void change(Item it, int dir);                     // dir: +1 / -1; 0 = dongusel ileri
+    std::string value(Item it) const;
+    App& app_;
+    std::vector<Row> rows_;
+    int sel_ = 0;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Acik yol: dikey 360x640, arkadan takip kamerasi, duzlemsel dinamik. Once mod secimi (serbest / yol yarisi).
 class RoadScreen : public Screen {
 public:
@@ -148,12 +170,15 @@ public:
 private:
     void start(RoadSession::Mode m, RoadSession::Kind kind = RoadSession::Kind::Highway);
     void finishRace();
+    void toggleAssist();
+    void toggleGears();
+    void toggleTilt();
     void flash(const std::string& m, double t = 1.8) { msg_ = m; msgT_ = t; }
     App& app_;
     int carId_;
     Tune tune_;
     std::unique_ptr<RoadSession> ses_;
-    bool menu_ = true, rewarded_ = false;
+    bool menu_ = true, rewarded_ = false, record_ = false;
     long prize_ = 0;
     double steer_ = 0, thr_ = 0, brake_ = 0;
     bool kL_ = false, kR_ = false, kT_ = false, kB_ = false;

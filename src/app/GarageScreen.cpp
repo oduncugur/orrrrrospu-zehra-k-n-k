@@ -11,7 +11,7 @@ namespace zk {
 
 namespace {
 const Rect kPrev{8, 470, 60, 508}, kNext{214, 470, 266, 508};
-const Rect kRace{8, 516, 128, 562}, kRoad{132, 516, 188, 562}, kTree{192, 516, 266, 562};
+const Rect kRace{8, 516, 128, 562}, kRoad{132, 516, 188, 562}, kSettings{192, 516, 266, 562};
 const Rect kParts{8, 570, 90, 632}, kGallery{96, 570, 178, 632}, kDyno{184, 570, 266, 632};
 const float kSl[4] = {292, 380, 352, 632};
 
@@ -80,8 +80,10 @@ void GarageScreen::render(Renderer& r) {
     char b[128];
     std::snprintf(b, sizeof b, "YARIS %d  GAL %d", c.races, c.wins);
     r.text(352 - r.textWidth(b, 1), 32, b, 1, kUiDim);
-    std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps());
-    r.text(352 - r.textWidth(b, 1), 44, b, 1, {0.45f, 0.5f, 0.45f});
+    if (app_.settings.showFps) {
+        std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps());
+        r.text(352 - r.textWidth(b, 1), 44, b, 1, {0.45f, 0.5f, 0.45f});
+    }
 
     const float L = (float)v.lengthM;
     const Mat4 proj = matPerspective(0.75f, 360.0f / 230.0f, 0.1f, 50.0f);
@@ -130,9 +132,10 @@ void GarageScreen::render(Renderer& r) {
         r.text(8, 462, d, 1, {1.0f, 0.35f, 0.3f});
     } else button(r, kRace, "YARIS >", kUiOrange, 2);
     button(r, kRoad, "YOL", Color{0.15f, 0.45f, 0.7f}, 2);
-    r.rect(kTree.x0, kTree.y0, kTree.x1, kTree.y1, kUiBtn);
-    r.textCentered(kTree.cx(), kTree.y0 + 10, "AGAC", 1, kUiDim);
-    r.textCentered(kTree.cx(), kTree.y0 + 24, app_.treePro ? "PRO .4" : "SPT .5", 2, kUiGold);
+    button(r, kSettings, "AYAR", kUiBtn, 2);
+#ifndef __ANDROID__
+    r.textCentered(kSettings.cx(), kSettings.y1 - 13, "(O)", 1, {0.55f, 0.75f, 1.0f});
+#endif
     button(r, kParts, "PARCA", kUiBtn, 2);
     button(r, kGallery, "GALERI", kUiBtn, 2);
     button(r, kDyno, "DYNO", kUiBtn, 2);
@@ -158,7 +161,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     }
     if (kPrev.hit(x, y)) select(app_.career.current - 1);
     else if (kNext.hit(x, y)) select(app_.career.current + 1);
-    else if (kTree.hit(x, y)) { app_.treePro = !app_.treePro; app_.saveCareer(); }
+    else if (kSettings.hit(x, y)) app_.goSettings();
     else if (kRace.hit(x, y)) raceOrRepair();
     else if (kRoad.hit(x, y)) { if (app_.career.car().raceable()) app_.goRoad(); else { msg_ = "ARAC HASARLI - TAMIR"; msgT_ = 2.0; } }
     else if (kParts.hit(x, y)) app_.goParts();
@@ -188,6 +191,7 @@ void GarageScreen::key(Key k, bool down) {
     else if (k == Key::Right) select(app_.career.current + 1);
     else if (k == Key::Enter) raceOrRepair();
     else if (k == Key::PageUp && app_.career.car().raceable()) app_.goRoad();
+    else if (k == Key::Settings) app_.goSettings();
 }
 
 } // namespace zk

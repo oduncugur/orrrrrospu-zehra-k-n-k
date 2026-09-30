@@ -21,6 +21,8 @@ add_library(zk_sim STATIC
   src/game/RoadPath.cpp
   src/game/RoadCar.cpp
   src/game/RoadSession.cpp
+  src/game/Settings.cpp
+  src/game/FlowScore.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp
@@ -38,7 +40,7 @@ target_link_libraries(zehra_garage PRIVATE zk_sim)
 find_package(SDL3 CONFIG QUIET)
 if(SDL3_FOUND)
   add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp
-                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/RoadScreen.cpp src/app/GLApi.cpp)
+                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/GLApi.cpp)
   target_include_directories(zehra_game PRIVATE src third_party/khronos)
   if(TARGET SDL3::SDL3-static)
     target_link_libraries(zehra_game PRIVATE zk_sim SDL3::SDL3-static)
@@ -72,3 +74,9 @@ add_test(NAME duzlemsel_dinamik COMMAND planar_test)
 add_executable(road_test tests/road_test.cpp)
 target_link_libraries(road_test PRIVATE zk_sim)
 add_test(NAME acik_yol COMMAND road_test)
+add_executable(settings_test tests/settings_test.cpp)
+target_link_libraries(settings_test PRIVATE zk_sim)
+add_test(NAME ayarlar COMMAND settings_test)
+add_executable(flow_test tests/flow_test.cpp)
+target_link_libraries(flow_test PRIVATE zk_sim)
+add_test(NAME otoban_akisi COMMAND flow_test)

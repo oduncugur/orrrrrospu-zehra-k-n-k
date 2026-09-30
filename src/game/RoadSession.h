@@ -1,9 +1,11 @@
 // ZEHRA KINIK - Acik yol oturumu: oyuncu + (yarista) YZ rakip + trafik + carpisma + yaris kurallari.
 // Ekrandan bagimsiz (headless test edilir); RoadScreen yalniz girdi ve cizim yapar.
 #pragma once
+#include "game/FlowScore.h"
 #include "game/RoadCar.h"
 #include "game/RoadPath.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -11,11 +13,14 @@
 
 namespace zk {
 
-struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; };   // v0: istenen hiz
+// v0: istenen hiz; uid: her yeniden doguste yeni (skor takibi icin kimlik)
+struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; };
 
 class RoadSession {
 public:
-    enum class Mode { Free, Race };
+    // Free: serbest surus; Race: YZ rakiple yol yarisi; Flow: otoban akisi (sureli skor: yakin gecis, hiz, apex)
+    enum class Mode { Free, Race, Flow };
+    static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
     double raceLength() const { return kind_ == Kind::Touge ? 3000.0 : 4000.0; }   // m
@@ -49,6 +54,9 @@ public:
     double rivalTime() const { return finishT_[1]; }
     double gapMeters() const { return rival_ ? player_->s() - rival_->s() : 0.0; }   // + onde
     int    collisions() const { return collisions_; }
+    // Akis modu
+    const FlowScorer* flow() const { return flow_.get(); }
+    double flowTimeLeft() const { return std::max(0.0, kFlowTime - raceT_); }
 
     std::vector<std::string> drainMessages() { auto m = std::move(msgs_); msgs_.clear(); return m; }
     bool takeCrash() { const bool c = crashEv_; crashEv_ = false; return c; }
@@ -63,6 +71,8 @@ private:
     Phase phase_ = Phase::Run;
     RoadPath road_;
     std::unique_ptr<RoadCar> player_, rival_;
+    std::unique_ptr<FlowScorer> flow_;
+    int nextUid_ = 1;
     int playerCar_, rivalCar_;
     std::vector<TrafficCar> traffic_;
     uint32_t rng_;

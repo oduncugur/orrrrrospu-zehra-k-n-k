@@ -241,6 +241,17 @@ void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun
     c.engineWear = bearingSpun ? 1.0 : std::clamp(c.engineWear + std::max(0.0, bearingDamage), 0.0, 1.0);
 }
 
+long Career::recordFlow(long score, bool* newRecord) {
+    score = std::max(0L, score);
+    const bool rec = score > bestFlow && score > 0;
+    long prize = std::min(score / 20, kFlowPrizeCap);
+    if (rec) { prize += prize / 2; bestFlow = score; }
+    prize = prize / 10 * 10;
+    money += prize; earnings += prize;
+    if (newRecord) *newRecord = rec;
+    return prize;
+}
+
 long Career::repairCost() const {
     const OwnedCar& c = car();
     const VehicleDef& v = *findVehicle(c.carId);
@@ -266,7 +277,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\n";
     char buf[256];
     for (const OwnedCar& c : cars) {
         const Tune& t = c.tune;
@@ -304,6 +315,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "wins") c.wins = std::max(0, std::atoi(v.c_str()));
         else if (k == "earnings") c.earnings = std::max(0L, std::atol(v.c_str()));
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
+        else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
         else if (k == "streak") {
             if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;
             c.sameOppWins = std::clamp(c.sameOppWins, 0, 100);

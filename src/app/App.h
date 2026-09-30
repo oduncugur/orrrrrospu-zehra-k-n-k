@@ -5,7 +5,9 @@
 #include "audio/ProceduralEngineAudio.h"
 #include "audio/TireAudio.h"
 #include "game/Career.h"
+#include "game/Settings.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -16,7 +18,7 @@
 namespace zk {
 
 enum class Key { Throttle, Brake, Clutch, ShiftUp, ShiftDown, Gear0, Gear1, Gear2, Gear3, Gear4, Gear5, Gear6,
-                 Left, Right, PageUp, PageDown, Enter, Back };
+                 Left, Right, PageUp, PageDown, Enter, Back, Settings };
 
 class App;
 
@@ -55,13 +57,29 @@ public:
     // Platform geri cagrilari: ekran yonu (true = yatay), titresim (sure ms, siddet 1..255)
     std::function<void(bool)> onOrientation;
     std::function<void(int, int)> onHaptic;
-    void haptic(int ms, int amplitude) { if (onHaptic) onHaptic(ms, amplitude); }
+    void haptic(int ms, int amplitude);           // ayarlardaki titresim gucuyle olceklenir (0 = kapali)
     // Egim (ivmeolcer) direksiyonu: platform yazar (-1 sag .. +1 sol); yoksa tiltAvailable=false
     void setTilt(float t) { tilt_ = t; tiltAvailable = true; }
     float tilt() const { return tilt_; }
-    bool tiltAvailable = false, tiltSteer = true;
-    bool treePro = false;
-    std::string startupMsg;                       // acilista garajda bir kez gosterilir                         // agac tipi (garajda secilir)
+    bool tiltAvailable = false;
+    bool treePro = false;                         // agac tipi (ayarlarda secilir, kariyer kaydinda saklanir)
+    std::string startupMsg;                       // acilista garajda bir kez gosterilir
+
+    // Ayarlar: ekran degistirir, sonra applySettings() (ses/olcek hemen) + saveSettings().
+    // Dikey esitleme, tam ekran ve FPS siniri platform katmaninca her karede okunur.
+    Settings settings;
+    void applySettings();
+    void saveSettings();
+    const std::string& settingsPath() const { return settingsPath_; }
+    // Platform yazar: dikey esitleme istendi ama surucu uygulamiyor -> yazilimla ekran hizina sinirla
+    bool  vsyncUnavailable = false;
+    float displayHz = 60.0f;
+    // Kare suresi hedefi (ns, 0 = sinirsiz): FPS siniri ve gerekirse yazilim dikey esitlemesi
+    long long framePeriodNs() const {
+        long long p = settings.frameNs();
+        if (vsyncUnavailable && displayHz > 1.0f) p = std::max(p, (long long)(1e9 / displayHz));
+        return p;
+    }
     // Performans olcumu (ekranda kucuk gosterge): kare hizi ve kare basina guncelleme (fizik) suresi
     double fps() const { return fps_; }
     double updateMs() const { return updMs_; }
@@ -75,6 +93,7 @@ public:
     void goGallery();
     void goDyno();
     void goRoad();                                // acik yol (serbest surus)
+    void goSettings();
     Career career;
     void saveCareer();
     int  selectedCar = 5;                       // serbest mod / test icin
@@ -84,6 +103,7 @@ public:
 
 private:
     std::atomic<float> tilt_{0.0f};
+    std::atomic<float> engineVol_{1.0f}, tireVol_{1.0f};   // ses thread'i okur (ana ses x kanal)
     struct Voice {
         std::unique_ptr<ProceduralEngineAudio> synth;
         std::atomic<float> rpm{900}, thr{0}, gain{1};
@@ -99,7 +119,7 @@ private:
     int sw_ = 1, sh_ = 1;
     std::mutex audioLock_;
     Voice voices_[2];
-    std::string savePath_;
+    std::string savePath_, settingsPath_;
     uint32_t raceSeed_ = 1;
     std::vector<float> mix_;
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;

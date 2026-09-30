@@ -195,7 +195,7 @@ void Renderer::present(int sw, int sh) {
     glViewport(0, 0, sw, sh);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    const float sc = std::min((float)sw / vw_, (float)sh / vh_);
+    const float sc = scaleFor(sw, sh);
     const int w = (int)(vw_ * sc), h = (int)(vh_ * sc);
     glViewport((sw - w) / 2, (sh - h) / 2, w, h);
     glDisable(GL_DEPTH_TEST);
@@ -208,8 +208,13 @@ void Renderer::present(int sw, int sh) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y) const {
+float Renderer::scaleFor(int sw, int sh) const {
     const float sc = std::min((float)sw / vw_, (float)sh / vh_);
+    return integerScale && sc >= 1.0f ? std::floor(sc) : sc;   // pencere sanal tampondan kucukse kesirli kalir
+}
+
+void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y) const {
+    const float sc = scaleFor(sw, sh);
     const float w = vw_ * sc, h = vh_ * sc;
     x = (px - (sw - w) * 0.5f) / sc; y = (py - (sh - h) * 0.5f) / sc;
 }

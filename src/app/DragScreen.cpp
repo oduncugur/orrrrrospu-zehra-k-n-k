@@ -396,16 +396,19 @@ void DragScreen::drawHud(Renderer& r) {
     r.rect(0, 0, 640, kWorldTop, {0.07f, 0.07f, 0.09f, 0.95f});
     auto laneLine = [&](const LaneState& L, float x, const char* who, Color c) {
         const double et = L.left ? (L.slip.finished ? L.slip.quarter : race_->clock() - L.leaveTime) : -1;
-        std::snprintf(b, sizeof b, "%s RT %s ET %s %3.0f KM/H", who, L.left ? sec(L.slip.reaction).c_str() : "--.---",
-                      sec(et).c_str(), L.sim->speed() * 3.6);
+        const Settings& st = app_.settings;
+        std::snprintf(b, sizeof b, "%s RT %s ET %s %3.0f %s", who, L.left ? sec(L.slip.reaction).c_str() : "--.---",
+                      sec(et).c_str(), L.sim->speed() * st.speedFactor(), st.speedUnit());
         r.text(x, 4, b, 1, c);
         std::snprintf(b, sizeof b, "%s", up(L.car->model).substr(0, 22).c_str());
         r.text(x, 16, b, 1, {0.65f, 0.65f, 0.7f});
     };
     laneLine(P, 64, "SEN  ", {1, 1, 1});
     laneLine(O, 400, "RAKIP", {1.0f, 0.75f, 0.55f});
-    std::snprintf(b, sizeof b, "%2.0fFPS %4.1fMS", app_.fps(), app_.updateMs());
-    r.text(548, 16, b, 1, {0.45f, 0.5f, 0.45f});
+    if (app_.settings.showFps) {
+        std::snprintf(b, sizeof b, "%2.0fFPS %4.1fMS", app_.fps(), app_.updateMs());
+        r.text(548, 16, b, 1, {0.45f, 0.5f, 0.45f});
+    }
 
     // ---- buyuk agac (orta ust) ----
     {
@@ -471,7 +474,7 @@ void DragScreen::drawHud(Renderer& r) {
     std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
     r.text(136, 296, b, 2, pt.limiterHit() ? kAmber : Color{1, 1, 1});
     if (pt.vtecActive()) r.text(268, 296, "VTEC", 2, kRed);
-    std::snprintf(b, sizeof b, "%3.0f KM/H", P.sim->speed() * 3.6);
+    std::snprintf(b, sizeof b, "%3.0f %s", P.sim->speed() * app_.settings.speedFactor(), app_.settings.speedUnit());
     r.text(320, 296, b, 2, {1, 1, 1});
     // Talimat
     const char* hint = "";
@@ -529,12 +532,13 @@ void DragScreen::drawResults(Renderer& r) {
         r.text(236, y, a, 2, {1, 1, 1});
         r.text(376, y, o, 2, {1, 1, 1});
     };
-    auto kmh = [](double v) { char b[16]; std::snprintf(b, sizeof b, "%6.1f", v); return std::string(b); };
+    const double unitK = app_.settings.speedFactor() / 3.6;          // km/h -> secili birim
+    auto kmh = [unitK](double v) { char b[16]; std::snprintf(b, sizeof b, "%6.1f", v * unitK); return std::string(b); };
     row(0, "RT", P.slip.redLight ? "KIRMIZI" : sec(P.slip.reaction), O.slip.redLight ? "KIRMIZI" : sec(O.slip.reaction));
     row(1, "60 FT", sec(P.slip.sixtyFt), sec(O.slip.sixtyFt));
     row(2, "330 FT", sec(P.slip.t330), sec(O.slip.t330));
     row(3, "1/8", sec(P.slip.eighth), sec(O.slip.eighth));
-    row(4, "1/8 KMH", kmh(P.slip.eighthKmh), kmh(O.slip.eighthKmh));
+    row(4, app_.settings.mph ? "1/8 MPH" : "1/8 KMH", kmh(P.slip.eighthKmh), kmh(O.slip.eighthKmh));
     row(5, "1000 FT", sec(P.slip.t1000), sec(O.slip.t1000));
     row(6, "1/4 ET", sec(P.slip.quarter), sec(O.slip.quarter));
     row(7, "TRAP", kmh(P.slip.trapKmh), kmh(O.slip.trapKmh));

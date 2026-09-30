@@ -1,6 +1,6 @@
 # ZEHRA KINIK — Devir Notu
 
-> Güncelleme: 2026-09-30 · Dal: `claude/tender-fermat-7w0r3w` · Son commit: `df267d0` (Faz 4 adım 3)
+> Güncelleme: 2026-10-01 · Dal: `claude/tender-fermat-7w0r3w` · Yerel Windows oturumu (ayarlar + otoban akışı)
 > Bu not, projeyi devralan kişinin (ya da yeni bir oturumun) sıfırdan durumu anlayıp kaldığı yerden
 > devam edebilmesi için yazıldı. Ürün şartnamesi: ilk mesajdaki "ZEHRA KINIK" spesifikasyonu (Bölüm 1–9).
 
@@ -15,7 +15,8 @@
 | 2.5 | Grafik istemci iskeleti (Android + Windows + Linux), CI + indirme linki | ✅ bitti |
 | 3 | Oynanabilir drag yarışı (yatay ekran) | ⏳ **ara taslak**, oynanabilir |
 | 4 | Kariyer: para, garaj, parça dükkânı, galeri, dyno, kayıt | ⏳ **ara taslak**, oynanabilir |
-| 5 | Dik mod: viraj fiziği, jiroskop, trafik, 3D yol | ⏭ **sıradaki** (ölçütler yazıldı, kod yok) |
+| 5 | Açık yol: viraj fiziği, eğim direksiyonu, trafik, yol yarışı, dağ yolu, otoban akışı | ⏳ **ara taslak**, 6 ölçütün hepsi kodda |
+| — | Ayarlar ekranı (FPS sınırı, dikey eşitleme, ses, titreşim, eğim, birim) | ✅ yerelde doğrulandı |
 | 6–9 | Isı/arıza/yakıt/maraton, multiplayer, görsel cila, ses/haptik cilası | başlanmadı |
 
 Ayrıntılı ölçütler ve onay kutuları: [`docs/YOL_HARITASI.md`](YOL_HARITASI.md).
@@ -82,7 +83,8 @@ Alt katman üst katmanı include etmez. Oyun mantığı platform koduna yazılma
 ```sh
 # Konsol araçları + testler (bağımlılık yok)
 cmake -B build && cmake --build build -j8
-ctest --test-dir build --output-on-failure       # 4 grup: fizik_regresyon, drag_yarisi, parca_etkileri, kariyer_kayit
+ctest --test-dir build --output-on-failure       # fizik_regresyon, drag_yarisi, parca_etkileri, kariyer_kayit,
+                                                 # duzlemsel_dinamik, acik_yol, ayarlar, otoban_akisi
 
 # Grafik oyun: SDL3 gerekir (statik derleyip gösterin)
 git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL
@@ -93,7 +95,12 @@ cmake -B build -DCMAKE_PREFIX_PATH=$HOME/sdl3 && cmake --build build -j8 && ./bu
 # Windows çapraz derleme: aynı adımlar, -DCMAKE_TOOLCHAIN_FILE=SDL/build-scripts/cmake-toolchain-mingw64-x86_64.cmake
 ```
 
-- **Android** yerelde derlenmiyor: bu bulut ortamında `dl.google.com` ağ politikasıyla engelli (SDK/NDK inemiyor).
+- **Yerel Windows (kullanıcının PC'si)**: WinLibs GCC 16.2 + CMake (winget). Kullanıcı klasörü yolunda boşluk
+  olduğu için MinGW bağlayıcısı bozulur; çözüm: `C:\zkgcc` bağlantısı (junction) + PATH'te `C:\zkgcc\bin` +
+  `CC/CXX=C:\zkgcc\bin\gcc.exe/g++.exe` + **`GCC_EXEC_PREFIX=C:/zkgcc/lib/gcc/`** (junction tek başına yetmez).
+  SDL3: `C:\zkgcc_deps\sdl3` → `cmake -B build -G Ninja -DCMAKE_PREFIX_PATH=C:\zkgcc_deps\sdl3`.
+  Regresyon betiği Git Bash ile: `bash tests/run_regression.sh build/zehra_sim.exe` (Windows'ta da byte byte aynı).
+- **Android** yerelde derlenmiyor: bulut ortamında `dl.google.com` ağ politikasıyla engelli (SDK/NDK inemiyor).
   APK **GitHub Actions**'ta derleniyor (`.github/workflows/build.yml`, runner'da SDK/NDK hazır).
   Yerelde yalnızca stub başlıklarla sözdizimi denetimi yapıldı (JDK `jni.h` ile `AttachCurrentThread(JNIEnv**)`
   imza uyarısı çıkar; NDK'da doğrudur).
@@ -108,13 +115,15 @@ cmake -B build -DCMAKE_PREFIX_PATH=$HOME/sdl3 && cmake --build build -j8 && ./bu
 | `--throttle-frames=M` | ilk M kare gaz basılı |
 | `--car-offset=K` | serbest modda araç = 5+K |
 | `ZK_SAVE_DIR=dir` | kayıt klasörü (testlerde geçici klasör kullanın) |
-| `ZK_START_SCREEN=parts\|gallery\|dyno\|race` | doğrudan ekranla başla (`race` = kariyer yarışı) |
+| `ZK_START_SCREEN=parts\|gallery\|dyno\|race\|road\|settings` | doğrudan ekranla başla (`race` = kariyer yarışı) |
+| `ZK_ROAD_MODE=free\|race\|touge\|flow` | açık yolda modu doğrudan başlat (`flow` = otoban akışı) |
+| `--run-seconds=N` | gerçek zamanlı N s çalış, ortalama FPS'i stdout'a yaz, çık (FPS sınırı ölçümü) |
 | `ZK_START_DRAG=1` [+ `ZK_AUTOPILOT=1`] | serbest drag yarışı (oyuncu şeridini yapay zekâ sürer) |
 | `ZK_KEYS="t:Tuş:1/0,..."` | zamanlı tuş betiği (Throttle, Clutch, Brake, Gear0..6, ShiftUp/Down, Enter) |
 | `SDL_AUDIO_DRIVER=dummy` | ses cihazı olmayan ortamda |
 
 Klavye: W/↑ gaz, S/↓ fren, Boşluk/Shift debriyaj (analog rampa), 1–6/N vites, E/Q vites ±,
-←/→ araç, Enter yarış/stage/tekrar, Esc geri/çıkış.
+←/→ (A/D) araç / direksiyon, Enter yarış/stage/tekrar, O/F1 ayarlar, F11 tam ekran, Esc geri/çıkış.
 
 ### Regresyon testi
 `tests/run_regression.sh build/zehra_sim` — 9 `zehra_sim` senaryosunun çıktısı referansla **byte byte** aynı olmalı.
@@ -160,7 +169,10 @@ Son güncelleme (424c879): aks boyutlandırması değişti; 9 vakada hareket ver
 
 ---
 
-## 7. Sıradaki iş: Faz 5 (dik mod) — önerilen plan
+## 7. Faz 5 planı (arşiv — adımların hepsi ara taslak olarak kodda, bkz. sondaki güncellemeler)
+
+Kalan Faz 5 cilası: yol eğimi (şu an düz), oyuncu-rakip temasının fiziği, kaster/toe/amortisör ayarları,
+akış modunda ekonomi dengesi. Ardından Faz 6.
 
 **Adım 1 — Düzlemsel dinamik (fizik, test önce):** `VehicleSimConfig`'e `planar` bayrağı; `false` iken mevcut 1B yol
 (regresyon birebir kalmalı). `true` iken durum: X, Y, ψ, vx, vy, r. Her tekerlek için gövde hızından
@@ -241,5 +253,26 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - `RoadCar` (oyuncu+YZ ortak), `RoadSession` (serbest / 4 km yol yarisi, trafik, carpisma, geri sayim, sonuc). Ekran: mod menusu.
 - Yarista odul `Career::recordRace` ile (ayni rakip azalmasi gecerli), motor asinmasi kaydedilir.
 - Test: `road_test` (ctest `acik_yol`): 3 aracla 6 km kurtarmasiz + trafikli yaris. `ZK_ROAD_MODE=race ZK_AUTOPILOT=1`.
-- Bilinen: planar skidpad sokak 0.80 g sinirda; oyuncu-rakip temasi basit itme; trafik araclari sabit hizli (fren yok);
+- Bilinen: planar skidpad sokak 0.80 g sinirda; oyuncu-rakip temasi basit itme;
   YZ oyuncuyu sollarken karsi seridi kontrol eder ama agresif degil.
+- Sonradan (c9b8ad5, da725e1): trafik IDM ile fren/takip yapar; 3 km dag yolu (touge) yarisi; Android'de
+  ivmeolcer egimiyle direksiyon. e904844: `araclar/yerele_aktar.bat` (bulut oturumunu yerel PC'ye aktarir).
+
+## Guncelleme — 2026-10-01: Ayarlar + Faz 5 olcut 6 (otoban akisi)
+**Ayarlar** (`src/game/Settings`, `src/app/SettingsScreen.cpp`, `src/app/FramePacer.h`, ctest `ayarlar`):
+- Garajda AYAR dugmesi (eski AGAC dugmesinin yeri; agac tipi artik ayarlarda) / masaustunde O veya F1.
+- GORUNTU: FPS siniri (30/45/60/75/90/120/144/165/240/sinirsiz), dikey esitleme (kapali/acik/adaptif),
+  FPS gostergesi, tam ekran (F11, yalniz masaustu), olcekleme (sigdir / tam sayi piksel-keskin).
+  SES: ana / motor / lastik. KONTROL: titresim gucu + egim direksiyonu + egim hassasiyeti (yalniz Android),
+  surus yardimi ve vites modu varsayilani (yolda degistirilince de kaydedilir). OYUN: km/h-mph, drag agaci.
+- `ayarlar.cfg` kariyer kaydindan ayri, elle duzenlenebilir metin; gecersiz deger en yakin gecerliye cekilir, atomik yazim.
+- FPS siniri: son tarih tabanli `FramePacer` (masaustu `SDL_DelayPrecise`, Android `sleep_for`). Olculen:
+  30→30.1, 60→60.0, 144→143.5 FPS. Bu PC'nin AMD surucusu dikey esitlemeyi yok sayiyor (swap interval 0 kaliyor):
+  oyun bunu algilar, yazilimla ekran yenileme hizina sinirlar (olculen 60.0) ve ayarlarda "YAZILIM" gosterir.
+**Otoban akisi** (`src/game/FlowScore`, `RoadSession::Mode::Flow`, ctest `otoban_akisi`):
+- 120 s, yogun trafik (24 arac, oyuncunun yakininda yeniden dogar), 3 s geri sayim.
+- Skor: yakin gecis (govdeler arasi < 1 m, >= 60 km/h; yakinlik ve hizla artar, karsidan gelen 2x),
+  kombo (4 s icinde ardisik gecis, en fazla X5), 90 km/h ustu hiz puani, karsi seritte gitme puani,
+  viraj tepesinden (apex) >= 0.45 g yanal ivmeyle gecis. Carpisma: -1000 + kombo sifir; yol disi kombo bitirir.
+- Kariyer: odul skor/20 (en fazla $4000), rekor kirilirsa +%50; `Career::bestFlow` kayitta (`flow=` satiri).
+- Denge oyun testiyle ayarlanmadi (ara taslak).

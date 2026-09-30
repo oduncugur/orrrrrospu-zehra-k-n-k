@@ -1,6 +1,7 @@
 // ZEHRA KINIK - Android platform katmani (NativeActivity): EGL/GLES3 baglami, AAudio, dokunmatik girdi,
 // ekran yonu (JNI) ve geri tusu. Oyun/cizim mantigi platformdan bagimsiz App'tedir (masaustu ile ortak).
 #include "app/App.h"
+#include "app/FramePacer.h"
 
 #include <jni.h>
 
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <thread>
 
 using namespace zk;
 
@@ -29,7 +31,16 @@ struct Platform {
     ASensorEventQueue* sensorQ = nullptr;
     float tiltLp = 0.0f;
     bool running = false;
+    int swapInterval = -99;          // uygulanan dikey esitleme (-99: henuz yok; yeni EGL yuzeyinde yeniden)
 };
+
+// Dikey esitleme: 0 kapali, 1 acik; uyarlamali GLES'te yok -> acik
+void applySwapInterval(Platform& p) {
+    const int want = p.game->settings.vsync == VSync::Off ? 0 : 1;
+    if (want == p.swapInterval || p.dpy == EGL_NO_DISPLAY) return;
+    eglSwapInterval(p.dpy, want);
+    p.swapInterval = want;
+}
 
 aaudio_data_callback_result_t audioCb(AAudioStream*, void* user, void* data, int32_t frames) {
     static_cast<App*>(user)->renderAudio(static_cast<float*>(data), frames);
@@ -83,6 +94,7 @@ void termEGL(Platform& p) {
         eglTerminate(p.dpy);
     }
     p.dpy = EGL_NO_DISPLAY; p.surf = EGL_NO_SURFACE; p.ctx = EGL_NO_CONTEXT;
+    p.swapInterval = -99;
 }
 
 // Ana thread icin JNI onbellegi (android_main thread'i bir kez baglanir)
@@ -233,6 +245,8 @@ void android_main(android_app* app) {
         if (p.accel) p.sensorQ = ASensorManager_createEventQueue(p.sensorMgr, app->looper, LOOPER_ID_USER, nullptr, nullptr);
     }
     auto last = std::chrono::steady_clock::now();
+    const auto t0 = last;
+    FramePacer pacer;
 
     while (true) {
         int events = 0;
@@ -260,6 +274,11 @@ void android_main(android_app* app) {
         if (!p.running) continue;
         p.game->update(dt);
         p.game->render();
+        applySwapInterval(p);
         eglSwapBuffers(p.dpy, p.surf);
+        // FPS siniri (ayarlar): pil ve isinma icin
+        const int64_t nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
+        const int64_t waitNs = pacer.wait(nowNs, p.game->framePeriodNs());
+        if (waitNs > 0) std::this_thread::sleep_for(std::chrono::nanoseconds(waitNs));
     }
 }

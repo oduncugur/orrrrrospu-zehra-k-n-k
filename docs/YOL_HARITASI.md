@@ -73,3 +73,18 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 4. Kontrol: Android jiroskop/ivmeölçer eğimi = direksiyon; masaüstünde klavye; dokunmatik gaz/fren.
 5. Görüntü: arkadan perspektif kamera, PS1 tarzı yol ve çevre, trafik araçları, HUD.
 6. Mod: otoban akışı (skor: yakın geçiş, hız, apex), çarpışmada ceza.
+
+### Faz 5 durum (ara taslak)
+- [x] 1. Düzlemsel dinamik: yanal Pacejka, çekiş elipsi, yaw; 1B drag fiziği regresyonla korunuyor (`tests/planar_test`)
+- [ ] 2. Yol: klotoidli viraj, şerit, kenar, izdüşüm var (`tests/road_test`); **eğim yok**
+- [x] 3. Trafik: şerit takibi, IDM fren/takip, çarpışma
+- [x] 4. Kontrol: Android ivmeölçer eğimi (hassasiyet ayarlı), klavye, dokunmatik
+- [x] 5. Görüntü: arkadan perspektif kamera, PS1 tarzı yol/ağaç/direk, trafik, HUD
+- [x] 6. Otoban akışı: yakın geçiş (karşı şerit 2x), kombo, hız, karşı şerit, apex; çarpışma cezası (`tests/flow_test`)
+- [x] Ek: yol yarışı (YZ rakip) ve 3 km dağ yolu; kariyer ödülü
+- [ ] Oyuncu-rakip teması gerçek çarpışma fiziği değil (basit itme); akış ekonomisi oyun testiyle ayarlanmadı
+
+## Genel: Ayarlar (yapıldı)
+- [x] FPS sınırı (ölçüldü: 30/60/144 hedefe ±%0.5), dikey eşitleme (sürücü reddederse yazılımla ekran hızına sınır),
+  FPS göstergesi, tam ekran, tam sayı ölçek, ses kanalları, titreşim, eğim, sürüş yardımı/vites varsayılanı,
+  km/h-mph, drag ağacı (`tests/settings_test`)

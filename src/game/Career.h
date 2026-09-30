@@ -54,6 +54,7 @@ struct Career {
     long earnings = 0;
     bool treePro = false;
     int  lastOppId = 0, sameOppWins = 0;   // ayni rakibi tekrar tekrar yenme (odul azalir, para kasma engeli)
+    long bestFlow = 0;                     // otoban akisi en iyi skoru
 
     static Career newGame();
     OwnedCar& car() { return cars[current]; }
@@ -65,6 +66,9 @@ struct Career {
     bool buyPart(PartCat c, int level, std::string* why = nullptr);
     void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr);
     void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun);   // yaris sonu
+    // Otoban akisi sonu: odul = skor / 20 (en fazla kFlowPrizeCap); rekor kirilirsa +%50. Donus: odul
+    static constexpr long kFlowPrizeCap = 4000;
+    long recordFlow(long score, bool* newRecord = nullptr);
     long repairCost() const;                                                    // secili arac
     bool repairCurrent(std::string* why = nullptr);
 
