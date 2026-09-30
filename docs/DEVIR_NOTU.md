@@ -230,3 +230,9 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
    garajda "Tamir" (parca fiyatina gore ucret), kayit dosyasina hasar durumu eklenmeli.
 4. Turbo sesi duyulmuyor: turbo whistle/flutter kazanci ve boost'a baglanmasi kontrol edilecek (oyun icinde turbolu aracla test;
    ProceduralEngineAudio turbo katmani oyun mikserinde susturuluyor olabilir).
+
+## Guncelleme — Faz 5 adim 2 (ara taslak)
+- Planar testler 5/5 geciyor (ctest `duzlemsel_dinamik` acik). Ey=-0.5, yari-slick 4 teker.
+- Acik yol: `src/game/RoadPath`, `src/app/RoadScreen.cpp`. Garajda YOL butonu / PgUp. Test: `ZK_START_SCREEN=road ZK_AUTOPILOT=1 ZK_ROAD_LOG=1`.
+- Siradaki: trafik araclari, yol tipleri (otoban/sehirlerarasi/dag-touge), yol disi engeller/carpisma,
+  jiroskop direksiyon (Android), yarisma modu (rakip + kontrol noktasi), kariyer odulu.
