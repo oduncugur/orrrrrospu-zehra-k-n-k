@@ -11,16 +11,21 @@
 
 namespace zk {
 
-struct TrafficCar { int carId; double s, lane, v; bool oncoming; };
+struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; };   // v0: istenen hiz
 
 class RoadSession {
 public:
     enum class Mode { Free, Race };
     enum class Phase { Countdown, Run, Finished };
-    static constexpr double kRaceLength = 4000.0;    // m
-    static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8)
+    enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
+    double raceLength() const { return kind_ == Kind::Touge ? 3000.0 : 4000.0; }   // m
+    static constexpr double kStartS = 20.0;
+    static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8); dag yolunda lane()
+    double lane() const { return kind_ == Kind::Touge ? 1.5 : kLane; }
 
-    RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed);
+    RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed,
+                Kind kind = Kind::Highway);
+    Kind kind() const { return kind_; }
 
     void update(double dt, const RoadControls& player);
 
@@ -54,6 +59,7 @@ private:
     RoadControls rivalControls();
 
     Mode mode_;
+    Kind kind_;
     Phase phase_ = Phase::Run;
     RoadPath road_;
     std::unique_ptr<RoadCar> player_, rival_;

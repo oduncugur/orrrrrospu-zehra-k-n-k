@@ -59,6 +59,39 @@ int main() {
         CHECK(rs.playerTime() > 0.0 ? rs.playerWon() == (rs.rivalTime() <= 0 || rs.playerTime() < rs.rivalTime()) : !rs.playerWon(),
               "sonuc tutarli (bitiremeyen oyuncu kaybeder)");
     }
+    std::printf("[4] Trafik fren yapar: oyuncu karsi seritte durur, gelen araclar carpmamali\n");
+    {
+        Tune t;
+        RoadSession rs(RoadSession::Mode::Free, 5, &t, 0, nullptr, 5u);
+        int braked = 0, hitWhileStopped = 0;
+        for (int i = 0; i < 60 * 150; ++i) {
+            RoadControls c = rs.player().aiControls(+RoadSession::kLane, 0.5, 8.0);
+            if (i > 60 * 12) { c.throttle = 0; c.brake = 1.0; }
+            rs.update(1.0 / 60.0, c);
+            for (const TrafficCar& tc : rs.traffic()) if (tc.oncoming && tc.braking) { ++braked; break; }
+            if (rs.takeCrash() && i > 60 * 24) ++hitWhileStopped;   // oyuncu durduktan sonra ona carpan var mi
+        }
+        std::printf("    durmus oyuncuya carpma %d (toplam %d), fren yapilan kare %d\n", hitWhileStopped, rs.collisions(), braked);
+        CHECK(hitWhileStopped == 0 && braked > 0, "gelen trafik duran araca carpmadan durdu");
+    }
+    std::printf("[5] Dag yolu (touge) 3 km yaris (#5 vs #78)\n");
+    {
+        Tune t;
+        RoadSession rs(RoadSession::Mode::Race, 5, &t, 78, &t, 9u, RoadSession::Kind::Touge);
+        double minR = 1e9; for (const auto& p : rs.road().points()) if (std::fabs(p.curvature) > 1e-6) minR = std::min(minR, 1.0 / std::fabs(p.curvature));
+        double t0 = 0; int recov = 0;
+        while (rs.phase() != RoadSession::Phase::Finished && t0 < 400.0) {
+            double cap = 1e9;
+            for (const TrafficCar& tc : rs.traffic())
+                if (!tc.oncoming && tc.s > rs.player().s() && tc.s - rs.player().s() < 30.0) cap = std::min(cap, tc.v);
+            rs.update(1.0 / 60.0, rs.player().aiControls(-rs.lane(), 0.55, cap));
+            if (rs.player().takeRecovered()) ++recov;
+            t0 += 1.0 / 60.0;
+        }
+        std::printf("    en dar viraj R=%.0f m | oyuncu %.1f s, rakip %.1f s, kurtarma %d\n", minR, rs.playerTime(), rs.rivalTime(), recov);
+        CHECK(minR < 40.0, "dag yolu gercekten dar virajli");
+        CHECK(rs.rivalTime() > 0 && rs.rivalTime() < 250.0, "rakip dag yolunu bitirdi");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

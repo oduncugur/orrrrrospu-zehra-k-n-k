@@ -146,7 +146,7 @@ public:
     void key(Key k, bool down) override;
 
 private:
-    void start(RoadSession::Mode m);
+    void start(RoadSession::Mode m, RoadSession::Kind kind = RoadSession::Kind::Highway);
     void finishRace();
     void flash(const std::string& m, double t = 1.8) { msg_ = m; msgT_ = t; }
     App& app_;

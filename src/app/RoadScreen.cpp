@@ -12,7 +12,7 @@
 namespace zk {
 
 namespace {
-const Rect kFree{40, 250, 320, 320}, kRace{40, 340, 320, 410};
+const Rect kFree{40, 220, 320, 280}, kRace{40, 296, 320, 356}, kTouge{40, 372, 320, 432};
 const Rect kSteerL{4, 524, 84, 636}, kSteerR{88, 524, 168, 636}, kBrakeB{188, 548, 262, 636}, kGas{268, 524, 356, 636};
 
 struct Proj { float x, y, w; bool ok; };
@@ -33,21 +33,24 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     app_.setVoice(0, findVehicle(carId), tune_.turbo > 0);
     app_.setVoice(1, nullptr);
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
-    if (const char* m = std::getenv("ZK_ROAD_MODE")) start(std::string(m) == "race" ? RoadSession::Mode::Race : RoadSession::Mode::Free);
+    if (const char* m = std::getenv("ZK_ROAD_MODE")) {
+        const std::string n = m;
+        start(n == "free" ? RoadSession::Mode::Free : RoadSession::Mode::Race, n == "touge" ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
+    }
     else if (autopilot_) start(RoadSession::Mode::Free);
 }
 
-void RoadScreen::start(RoadSession::Mode m) {
+void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
     if (m == RoadSession::Mode::Race) {
         const Opponent o = pickOpponent(carId_, tune_, (uint32_t)(app_.career.races * 7919 + 17));
         rival = o.carId; rt = o.tune;
         app_.setVoice(1, findVehicle(rival), rt.turbo > 0);
     }
-    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, (uint32_t)(app_.career.races + 1) * 2654435761u);
+    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, (uint32_t)(app_.career.races + 1) * 2654435761u, kind);
     camPsi_ = ses_->player().sim().heading();
     menu_ = false; rewarded_ = false; prize_ = 0; finT_ = 0;
-    flash(m == RoadSession::Mode::Race ? "YOL YARISI 4 KM - ARA TASLAK" : "SERBEST SURUS - ARA TASLAK", 2.5);
+    flash(m == RoadSession::Mode::Free ? "SERBEST SURUS - ARA TASLAK" : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM - ARA TASLAK" : "YOL YARISI 4 KM - ARA TASLAK", 2.5);
 }
 
 void RoadScreen::finishRace() {
@@ -77,7 +80,7 @@ void RoadScreen::update(double dt) {
         double cap = 1e9;
         for (const TrafficCar& t : ses_->traffic())
             if (!t.oncoming && t.s > P.s() && t.s - P.s() < 40.0) cap = std::min(cap, t.v);
-        c = P.aiControls(-RoadSession::kLane, 0.55, cap);
+        c = P.aiControls(-ses_->lane(), 0.55, cap);
     }
     ses_->update(dt, c);
     for (auto& m : ses_->drainMessages()) flash(m);
@@ -112,9 +115,10 @@ void RoadScreen::render(Renderer& r) {
         r.textCentered(W / 2.0f, 170, "ARA TASLAK", 1, {0.6f, 0.6f, 0.65f});
         button(r, kFree, "SERBEST SURUS", Color{0.15f, 0.45f, 0.7f}, 2);
         button(r, kRace, "YOL YARISI 4 KM", kUiOrange, 2);
-        r.textCentered(W / 2.0f, 430, "RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
+        button(r, kTouge, "DAG YOLU 3 KM", Color{0.55f, 0.2f, 0.6f}, 2);
+        r.textCentered(W / 2.0f, 448, "YARISLAR: RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
 #ifndef __ANDROID__
-        r.textCentered(W / 2.0f, 470, "BOSLUK: SERBEST  ENTER: YARIS  ESC: GARAJ", 1, {0.55f, 0.75f, 1.0f});
+        r.textCentered(W / 2.0f, 470, "BOSLUK SERBEST ENTER YARIS PGUP DAG ESC", 1, {0.55f, 0.75f, 1.0f});
 #endif
         r.flush2D();
         return;
@@ -131,11 +135,16 @@ void RoadScreen::render(Renderer& r) {
     const Mat4 vp = matMul(proj, view);
     const Proj hz = project(vp, X + 3000 * cp, Y + 3000 * sp, 0.0, W, H);
     const float horizon = hz.ok ? std::clamp(hz.y, 0.0f, (float)H) : H * 0.35f;
-    r.gradientV(0, 0, W, horizon, {0.30f, 0.45f, 0.85f}, {0.85f, 0.70f, 0.55f});
+    const bool mtn = ses_->kind() == RoadSession::Kind::Touge;
+    r.rect(0, horizon, W, H, mtn ? Color{0.2f, 0.36f, 0.2f} : Color{0.36f, 0.55f, 0.28f});
+    r.gradientV(0, 0, W, horizon, mtn ? Color{0.18f, 0.2f, 0.42f} : Color{0.30f, 0.45f, 0.85f}, mtn ? Color{0.95f, 0.55f, 0.35f} : Color{0.85f, 0.70f, 0.55f});
+    if (mtn)   // uzak daglar (siluet)
+        for (int k = 0; k < 7; ++k) { const float x0 = k * 60.0f - 20.0f, hh = 40.0f + 30.0f * hashf(k + 3); r.tri(x0, horizon, x0 + 90, horizon, x0 + 45, horizon - hh, {0.25f, 0.24f, 0.36f}); }
     r.rect(0, horizon, W, horizon + 3, {0.35f, 0.42f, 0.38f});
 
     // Yol seritleri: uzaktan yakina (ressam algoritmasi)
     const double hw = R.halfWidth();
+    const bool touge = ses_->kind() == RoadSession::Kind::Touge;
     const int i0 = std::max(0, (int)((ps - 8.0) / RoadPath::kStep)), n = (int)R.points().size();
     const int i1 = std::min(n - 2, i0 + 160);
     const auto& P = R.points();
@@ -149,7 +158,8 @@ void RoadScreen::render(Renderer& r) {
         if (!aL.ok || !aR.ok || !bL.ok || !bR.ok) continue;
         const bool band = ((i / 3) & 1) != 0;
         // banket (kirmizi/beyaz kaldirim)
-        const Color curb = band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f};
+        const Color curb = touge ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
+                                 : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f});
         r.tri(aL.x, aL.y, aR.x, aR.y, bR.x, bR.y, curb); r.tri(aL.x, aL.y, bR.x, bR.y, bL.x, bL.y, curb);
         const Proj cL = edge(i, hw), cR = edge(i, -hw), dL = edge(j, hw), dR = edge(j, -hw);
         const Color asp = band ? Color{0.30f, 0.30f, 0.32f} : Color{0.27f, 0.27f, 0.29f};
@@ -162,7 +172,7 @@ void RoadScreen::render(Renderer& r) {
         if (i % 8 == 0) {
             for (int side = -1; side <= 1; side += 2) {
                 const float h = hashf(i * 2 + (side > 0));
-                if (h < 0.35f) continue;
+                if (h < (touge ? 0.08f : 0.35f)) continue;             // dag yolunda sik orman
                 const Proj b = edge(i, side * (hw + 5.0 + 20.0 * hashf(i * 7 + side)));
                 if (!b.ok) continue;
                 const float sc = 360.0f / b.w;                     // metre -> piksel (yaklasik)
@@ -178,7 +188,7 @@ void RoadScreen::render(Renderer& r) {
     }
     // Bitis cizgisi (yarista)
     if (ses_->mode() == RoadSession::Mode::Race) {
-        const double fs = 20.0 + RoadSession::kRaceLength;
+        const double fs = RoadSession::kStartS + ses_->raceLength();
         if (fs > ps - 5 && fs < ps + 300) {
             const RoadPoint q = R.at(fs), q2 = R.at(fs + 1.5);
             for (int k = 0; k < 10; ++k) {
@@ -231,7 +241,7 @@ void RoadScreen::render(Renderer& r) {
     r.text(236, 30, b, 1, {1, 1, 1});
     r.text(236, 46, Pc.assist ? "YARDIM ACIK" : "YARDIM KAPALI", 1, Pc.assist ? Color{0.4f, 0.9f, 0.5f} : Color{1.0f, 0.5f, 0.3f});
     if (ses_->mode() == RoadSession::Mode::Race) {
-        const double left = std::max(0.0, 20.0 + RoadSession::kRaceLength - ps);
+        const double left = std::max(0.0, RoadSession::kStartS + ses_->raceLength() - ps);
         const double gap = ses_->gapMeters();
         std::snprintf(b, sizeof b, "%s  KALAN %.2f KM  %+.0f M", gap >= 0 ? "1." : "2.", left / 1000.0, gap);
         r.text(8, 46, b, 1, gap >= 0 ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.6f, 0.3f});
@@ -274,6 +284,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
     if (menu_ || !ses_) {
         if (kFree.hit(x, y)) start(RoadSession::Mode::Free);
         else if (kRace.hit(x, y)) start(RoadSession::Mode::Race);
+        else if (kTouge.hit(x, y)) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         return;
     }
     if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { app_.goGarage(); return; }
@@ -299,6 +310,7 @@ void RoadScreen::key(Key k, bool down) {
         if (!down) return;
         if (k == Key::Clutch) start(RoadSession::Mode::Free);
         else if (k == Key::Enter) start(RoadSession::Mode::Race);
+        else if (k == Key::PageUp) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         else if (k == Key::Back) app_.goGarage();
         return;
     }
