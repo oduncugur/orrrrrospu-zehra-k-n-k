@@ -62,3 +62,14 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 - [x] 5. Yarış ödülü + performansa göre rakip eşleştirme (yapay zekâ parça setiyle)
 - [ ] Denge: ödül/fiyat ekonomisi oyun testiyle ayarlanacak; aynı rakibe tekrar yarışta ödül azalması
 - [ ] Frankenstein motor swap (Faz 3.5 şartnamesi: blok + kapak) — Faz 6 motor atölyesiyle birlikte
+
+## Faz 5 — Dik mod (viraj, jiroskop, trafik): bitti ölçütleri
+1. Düzlemsel araç dinamiği: yanal Pacejka (kayma açısı), çekiş elipsi, yaw; drag modunun 1B fiziği birebir
+   korunur (regresyon). Testler: düz çizgide 1B ile uyum, sabit yarıçaplı skidpad'de yanal ivme lastik
+   sınırında (sokak ~0.85-1.0 g), FWD'de gaz altında understeer, RWD'de gazla oversteer/spin, düşük hızda
+   sayısal kararlılık.
+2. Yol: 3D spline (viraj + eğim), şeritler, kenar; pozisyon/şerit sorgusu.
+3. Trafik: şerit takip eden araçlar, basit çarpışma.
+4. Kontrol: Android jiroskop/ivmeölçer eğimi = direksiyon; masaüstünde klavye; dokunmatik gaz/fren.
+5. Görüntü: arkadan perspektif kamera, PS1 tarzı yol ve çevre, trafik araçları, HUD.
+6. Mod: otoban akışı (skor: yakın geçiş, hız, apex), çarpışmada ceza.
