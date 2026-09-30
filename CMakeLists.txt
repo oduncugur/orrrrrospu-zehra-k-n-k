@@ -16,6 +16,7 @@ add_library(zk_sim STATIC
   src/sim/DrivetrainFailure.cpp
   src/sim/Suspension.cpp
   src/sim/VehicleSim.cpp
+  src/game/DragRace.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp)
@@ -46,3 +47,7 @@ endif()
 # Testler: ctest --test-dir build
 enable_testing()
 add_test(NAME fizik_regresyon COMMAND ${CMAKE_SOURCE_DIR}/tests/run_regression.sh $<TARGET_FILE:zehra_sim>)
+add_executable(drag_race_test tests/drag_race_test.cpp)
+target_link_libraries(drag_race_test PRIVATE zk_sim)
+target_include_directories(drag_race_test PRIVATE src)
+add_test(NAME drag_yarisi COMMAND drag_race_test)

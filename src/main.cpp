@@ -22,7 +22,7 @@ struct Options {
     double launchRpm = -1.0, dumpTime = 0.12; // launchRpm < 0: otomatik
     int car = 0;
     std::string road = "drag";
-    double oilL = 4.5, psi = 16.0, fuelL = 8.0, gasket = 0.70, logInterval = 1.0;
+    double oilL = 4.5, psi = 16.0, fuelL = 8.0, gasket = 0.70, logInterval = 1.0, dt = 1e-5;
     FuelType fuel = FuelType::Race100;
     Valvetrain vt = Valvetrain::V16;
     std::string csv;
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         else if (!std::strncmp(a, "--road=", 7))   o.road = a + 7;
         else if (argVal(a, "--oil", o.oilL) || argVal(a, "--psi", o.psi) || argVal(a, "--fuel-liters", o.fuelL) ||
                  argVal(a, "--gasket", o.gasket) || argVal(a, "--log", o.logInterval) ||
-                 argVal(a, "--launch-rpm", o.launchRpm) || argVal(a, "--dump", o.dumpTime)) {}
+                 argVal(a, "--dt", o.dt) || argVal(a, "--launch-rpm", o.launchRpm) || argVal(a, "--dump", o.dumpTime)) {}
         else { std::fprintf(stderr, "Bilinmeyen secenek: %s\n", a); usage(); return 1; }
     }
 
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
     // ---------------- Faz makinesi ----------------
     enum Phase { BURNOUT, SETTLE, STAGE, RUN, BRAKE, DONE } phase = o.burnout ? BURNOUT : STAGE;
-    const double dt = 1e-5;                     // 100 kHz alt adim (debriyaj/LSD sertligi icin)
+    const double dt = o.dt;                     // vars. 100 kHz alt adim (debriyaj/LSD sertligi icin)
     double t = 0.0, phaseT = 0.0;
     double tLaunch = -1.0, nextLog = 0.0, nextCsv = 0.0;
     double shiftT = -1.0; bool brakeHard = true;
