@@ -15,6 +15,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/sim/PowertrainCore.cpp
     ${ZK_ROOT}/src/sim/DrivetrainFailure.cpp
     ${ZK_ROOT}/src/sim/Suspension.cpp
+    ${ZK_ROOT}/src/sim/VehicleSim.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp)

@@ -1,0 +1,36 @@
+=== ZEHRA KINIK :: Guc Aktarma Simulasyonu ===
+Motor: K20A (ITB, 16V i-VTEC) | CR 11.50:1 (conta 0.70 mm) | Yakit: 100+ Yaris
+Sanziman: H-Manuel, 6 vites, son disli 4.76 | Aks: Stok SAE 1045 (induksiyon sertlestirilmis) 27.0 mm
+Karter: ISLAK (4.5 L, kritik 1.05 g) | Slick 16.0 PSI | Depo 8 L (6.0 kg)
+Diferansiyel: 1.5-Way plaka LSD (45/60 rampa) | I_w=0.585 kg*m^2
+Suspansiyon: 1.60 Hz on / 1.76 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: drag (ISO 8608 sinif A, 0 ayrik ozellik)
+
+  [  0.422 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
+  [  5.000 s] Burnout bitti, on lastikler 63/63 C
+  [  5.000 s] VTEC kapandi (dusuk kam @6000 rpm)
+  [  5.500 s] Stage isiklari yandi. 2-Step 6500 RPM aktif.
+  [  5.581 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
+  [  7.500 s] AGAC: amber 1
+  [  8.000 s] AGAC: amber 2
+  [  8.500 s] AGAC: amber 3
+  [  9.000 s] AGAC: *** YESIL ***
+
+>>> KALKIS! Tepki suresi 0.050 s, debriyaj 6499 RPM'de tokatlandi
+
+  t[s]    x[m]   km/h  G   RPM     wL     wR   kapL  VTEC yakit_g  LastL  LastR  tauL   yag
+  0.00     0.0    0.0  1  6500    0.0    0.0 -0.000    ON    33.5   63.3   63.7     0  4.96
+  [  0.070 s] !!! SAG AKS KIRILDI (Stok SAE 1045 (induksiyon sertlestirilmis), tau=600 MPa > 600 MPa)
+  [  0.070 s] Aks kirik: arac yuruyemez. Cekici/romork cagrildi, krom-moly aks sart!
+  [  0.070 s] !!! SOL AKS KIRILDI (Stok SAE 1045 (induksiyon sertlestirilmis), tau=666 MPa > 600 MPa)
+  [  0.070 s] VTEC kapandi (dusuk kam @7373 rpm)
+
+=== DURUS / HASAR RAPORU ===
+  Toplam mesafe 0.0 m | Toplam yakit 34.5 g | Kalan depo 5.93 kg
+  On Sol  :  63.3 C, 16.0 PSI, flat-spot 0.00 mm, haptik vuruntu 0 kez
+  On Sag  :  63.7 C, 16.0 PSI, flat-spot 0.00 mm, haptik vuruntu 0 kez
+  Arka Sol:  29.8 C, 32.0 PSI, flat-spot 0.00 mm, haptik vuruntu 0 kez
+  Arka Sag:  29.8 C, 32.0 PSI, flat-spot 0.00 mm, haptik vuruntu 0 kez
+  Suspansiyon: havalanma sayisi FL/FR/RL/RR = 0/0/0/0 | takoz = 0/0/0/0
+  Tepe lastik yuku FL/FR/RL/RR = 3533/3545/2391/2391 N
+  Akslar: sol KIRIK (burulma 0.2 deg), sag KIRIK (burulma 0.2 deg), tepe tau 667 MPa
+  Motor yataklari: hasar %0  | Motor: calisiyor

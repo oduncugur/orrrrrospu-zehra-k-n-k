@@ -4,6 +4,7 @@
 #include "sim/DrivetrainFailure.h"
 #include "sim/PowertrainCore.h"
 #include "sim/Suspension.h"
+#include "sim/VehicleSim.h"
 #include "sim/WheelSimulation.h"
 
 #include <algorithm>
@@ -86,84 +87,36 @@ int main(int argc, char** argv) {
     // ---------------- Arac kurulumu ----------------
     const VehicleDef* car = o.car ? findVehicle(o.car) : nullptr;
     if (o.car && !car) { std::fprintf(stderr, "Katalogda arac yok: %d\n", o.car); return 1; }
-    EngineSpec eng = car ? buildEngineSpec(*car) : EngineSpec::K20Default();
-    GearboxSpec gbx = car ? buildGearbox(*car) : GearboxSpec{};
-    eng.gasketMm = o.gasket; eng.fuel = o.fuel;
-    if (!car) { eng.valvetrain = o.vt; if (o.plenum) { eng.intake = IntakeType::Plenum; eng.name = "K20A (Plenum, 16V i-VTEC)"; } }
-    double Tmax = 0.0;
-    for (auto* c : {&eng.lowCam, &eng.highCam}) for (auto& pr : *c) Tmax = std::max(Tmax, pr.second);
-    ClutchSpec clutch;
-    if (car) clutch.maxTorque = Tmax * 1.7;          // sokak baskisi: motor torkunun ~1.7 kati
-    PowertrainCore pt(eng, clutch, DiffSpec{}, gbx);
-    const Drive drive = car ? car->drive : Drive::FWD;
-    const Gearbox boxType = car ? gearboxTable()[car->gearbox].type : Gearbox::HPattern;
-    // Cekis dagitimi: AWD'de merkez dagitim %40 on / %60 arka (sabit oranli)
-    const double frontShare = drive == Drive::FWD ? 1.0 : drive == Drive::RWD ? 0.0 : 0.40;
-    const int dL = drive == Drive::RWD ? 2 : 0, dR = dL + 1;   // birincil tahrikli aks
-    // Aks capi: fabrika muhendisligi, 1. viteste tepe motor torkunda stok kopma gerilmesinin ~%55'i
-    AxleSpec axle = o.stockAxles ? AxleSpec::Stock() : AxleSpec::Chromoly();
-    if (car) {
-        const double G1 = gbx.ratios.front() * gbx.finalDrive;
-        const double perSide = Tmax * G1 * gbx.efficiency * 0.5 * std::max(frontShare, 1.0 - frontShare);
-        axle.diameterMm = std::cbrt(16.0 * perSide / (3.14159265 * 0.55 * AxleSpec::Stock().tauUltMPa * 1e6)) * 1000.0;
-    }
-    DrivetrainFailure fail(axle, LubeSpec{o.drySump, o.oilL, 3.0});
-    const double launchRpm = o.launchRpm > 0 ? o.launchRpm
-                           : car ? std::clamp(0.55 * eng.redlineRpm, 3000.0, 6500.0) : 6500.0;
-    const double shiftRpm = eng.redlineRpm - 250.0;
-
-    TireParams slick;                           // tahrikli aks: yapiskan drag slick, dovme jant
-    TireParams skinny; skinny.muPeak = 1.0; skinny.wheelMass = 9.0; skinny.B = 10.0; // serbest aks: ince "skinny"
-    const double ambient = 25.0;
-    const bool fDriven = frontShare > 0.0, rDriven = frontShare < 1.0;
-    WheelSimulation w[4] = {
-        WheelSimulation(fDriven ? slick : skinny, fDriven ? o.psi : 32.0, fDriven ? 55.0 : 30.0, ambient),
-        WheelSimulation(fDriven ? slick : skinny, fDriven ? o.psi : 32.0, fDriven ? 55.0 : 30.0, ambient),
-        WheelSimulation(rDriven ? slick : skinny, rDriven ? o.psi : 32.0, rDriven ? 55.0 : 30.0, ambient),
-        WheelSimulation(rDriven ? slick : skinny, rDriven ? o.psi : 32.0, rDriven ? 55.0 : 30.0, ambient)};
-    w[dL].setSurfaceMu(0.96); // sol serit daha az lastik kaplamali -> LSD asimetri yonetir
-
-    const double fuelDensity = (o.fuel == FuelType::E85) ? 0.785 : 0.745;
-    const double baseMass = (car ? car->massKg : 1080.0) + 75.0;      // kuru arac + surucu
-    double fuelKg = o.fuelL * fuelDensity;
-    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (o.drySump ? 0.012 : 0.0);
-    VehicleLoad vl{baseMass + fuelKg, car ? car->wheelbaseM : 2.62, car ? car->widthM * 0.85 : 1.50, hCoG,
-                   car ? car->frontWeight : 0.62};
-    // Suspansiyon: kasa tipine gore dogal frekans (Hz); yaris araclari sert
-    double fRide = 1.6;
-    if (car) {
-        switch (car->body) {
-        case Body::Super: fRide = 2.2; break;   case Body::Roadster: fRide = 1.9; break;
-        case Body::Muscle: fRide = 1.4; break;  case Body::SUV: case Body::Pickup: case Body::Van: fRide = 1.2; break;
-        case Body::Sedan: case Body::Wagon: fRide = 1.45; break; default: fRide = 1.7; break;
-        }
-        if (!car->streetLegal) fRide = 2.8;
-    }
-    Suspension susp(SuspensionSetup::fromVehicle(vl.mass, vl.wheelbase, vl.track, vl.hCoG, vl.frontStatic,
-                                                 fRide, fRide * 1.1, 0.30, 0.60));
-    for (int i = 0; i < 4; ++i) susp.setTirePressure(i, w[i].psi());
-    const RoadProfile roadProfile = RoadProfile::preset(o.road);
-    const double rho = 1.20;
-    double CdA = 0.68;
-    if (car) {
-        const double cd = car->body == Body::Super ? 0.34 : car->body == Body::SUV || car->body == Body::Pickup ? 0.45
-                        : car->body == Body::Van ? 0.48 : car->body == Body::Muscle ? 0.40 : 0.34;
-        CdA = cd * car->widthM * car->heightM * 0.85;
-    }
-    const double brakeTotal = 7000.0 * (baseMass / 1155.0), bias = 0.65; // %65 on / %35 arka, ABS yok
+    VehicleSimConfig cfg;
+    cfg.car = car; cfg.stockAxles = o.stockAxles; cfg.drySump = o.drySump; cfg.oilLiters = o.oilL;
+    cfg.slickPsi = o.psi; cfg.fuelLiters = o.fuelL; cfg.gasketMm = o.gasket; cfg.fuel = o.fuel;
+    cfg.valvetrain = o.vt; cfg.plenum = o.plenum; cfg.road = o.road;
+    VehicleSim sim(cfg);
+    PowertrainCore& pt = sim.powertrain();
+    const DrivetrainFailure& fail = sim.failure();
+    const Suspension& susp = sim.suspension();
+    const EngineSpec& eng = sim.engineSpec();
+    const GearboxSpec& gbx = sim.gearboxSpec();
+    const Gearbox boxType = sim.gearboxType();
+    const Drive drive = sim.drive();
+    const int dL = sim.drivenLeft(), dR = sim.drivenRight();
+    auto w = [&](int i) -> const WheelSimulation& { return sim.wheel(i); };
+    const double launchRpm = o.launchRpm > 0 ? o.launchRpm : sim.defaultLaunchRpm();
+    const double shiftRpm = sim.shiftRpm();
+    const double fRide = sim.rideFreqHz();
 
     std::printf("=== ZEHRA KINIK :: Guc Aktarma Simulasyonu ===\n");
     if (car) std::printf("Arac #%d: %s (%d) | %s %s | %.0f kg | %.0f HP\n", car->id, car->fullName().c_str(), car->year,
-                         bodyName(car->body), driveName(drive), baseMass, peakPowerHp(*car));
+                         bodyName(car->body), driveName(drive), sim.baseMassKg(), peakPowerHp(*car));
     std::printf("Motor: %s | CR %.2f:1 (conta %.2f mm) | Yakit: %s\n", eng.name.c_str(),
                 pt.compressionRatio(), o.gasket, fuelName(o.fuel));
     std::printf("Sanziman: %s, %zu vites, son disli %.2f | Aks: %s %.1f mm\n", gearboxName(boxType), gbx.ratios.size(),
                 gbx.finalDrive, fail.axle().material.c_str(), fail.axle().diameterMm);
     std::printf("Karter: %s (%.1f L, kritik %.2f g) | Slick %.1f PSI | Depo %.0f L (%.1f kg)\n",
-                o.drySump ? "KURU" : "ISLAK", o.oilL, o.drySump ? 99.0 : fail.criticalG(), o.psi, o.fuelL, fuelKg);
-    std::printf("Diferansiyel: 1.5-Way plaka LSD (45/60 rampa) | I_w=%.3f kg*m^2\n", w[dL].inertia());
+                o.drySump ? "KURU" : "ISLAK", o.oilL, o.drySump ? 99.0 : fail.criticalG(), o.psi, o.fuelL, sim.fuelKg());
+    std::printf("Diferansiyel: 1.5-Way plaka LSD (45/60 rampa) | I_w=%.3f kg*m^2\n", w(dL).inertia());
     std::printf("Suspansiyon: %.2f Hz on / %.2f Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: %s (%s)\n\n", fRide,
-                fRide * 1.1, o.road.c_str(), roadProfile.describe().c_str());
+                fRide * 1.1, o.road.c_str(), sim.road().describe().c_str());
 
     FILE* csv = o.csv.empty() ? nullptr : std::fopen(o.csv.c_str(), "w");
     if (csv) std::fprintf(csv, "t,dist,v_kmh,ax_g,gear,rpm,wL,wR,kappaL,kappaR,vtec,fuel_g,tireL_C,tireR_C,FzF,TL,TR,tauL,oil_bar\n");
@@ -171,16 +124,15 @@ int main(int argc, char** argv) {
     // ---------------- Faz makinesi ----------------
     enum Phase { BURNOUT, SETTLE, STAGE, RUN, BRAKE, DONE } phase = o.burnout ? BURNOUT : STAGE;
     const double dt = 1e-5;                     // 100 kHz alt adim (debriyaj/LSD sertligi icin)
-    double t = 0.0, phaseT = 0.0, V = 0.0, dist = 0.0, axRaw = 0.0, axF = 0.0;
+    double t = 0.0, phaseT = 0.0;
     double tLaunch = -1.0, nextLog = 0.0, nextCsv = 0.0;
     double shiftT = -1.0; bool brakeHard = true;
     double t60 = -1, t100m = -1, t201 = -1, t305 = -1, t0100 = -1, peakG = 0, maxV = 0;
     const double reaction = 0.050;
     int treeStage = 0;
-    double fuelAtLaunch = 0.0, hapticIntensity = 0.0;
+    double fuelAtLaunch = 0.0;
     double footThr = 1.0;
-    int suspCounter = 0, airLogs = 0;
-    bool wasAir[4] = {false, false, false, false}, wasStop[4] = {false, false, false, false};
+    int airLogs = 0;
     const char* cornerName[4] = {"on sol", "on sag", "arka sol", "arka sag"}; // surucunun gaz ayagi: patinaji hedef kaymada tutar
 
     auto logEvent = [&](const std::string& s) {
@@ -192,6 +144,7 @@ int main(int argc, char** argv) {
     };
 
     while (phase != DONE && t < 60.0) {
+        const double V = sim.speed(), dist = sim.distance();
         // ---- surucu girdileri ----
         double brakePedal = 0.0, handbrake = 0.0;
         switch (phase) {
@@ -206,12 +159,12 @@ int main(int argc, char** argv) {
             pt.setClutchPedal(phaseT < 1.0 ? 1.0 : std::max(hold, 1.0 - (phaseT - 1.0) / 0.6));
             handbrake = 1.0;
             if (phaseT >= 5.0) { pt.setTwoStep(false, 0.0); phase = SETTLE; phaseT = 0.0; logEvent("Burnout bitti, on lastikler " +
-                std::to_string((int)w[dL].tempC()) + "/" + std::to_string((int)w[dR].tempC()) + " C"); }
+                std::to_string((int)w(dL).tempC()) + "/" + std::to_string((int)w(dR).tempC()) + " C"); }
             break;
         }
         case SETTLE:
             pt.setThrottle(0.0); pt.setClutchPedal(1.0); brakePedal = 0.6;
-            if (phaseT > 0.5 && std::fabs(w[dL].omega()) < 0.01 && std::fabs(w[dR].omega()) < 0.01) {
+            if (phaseT > 0.5 && std::fabs(w(dL).omega()) < 0.01 && std::fabs(w(dR).omega()) < 0.01) {
                 if (pt.stalled()) { pt.restart(); logEvent("Mars basildi, motor yeniden calisti"); }
                 phase = STAGE; phaseT = 0.0; logEvent("Stage isiklari yandi. 2-Step " + std::to_string((int)launchRpm) + " RPM aktif.");
             }
@@ -238,7 +191,7 @@ int main(int argc, char** argv) {
         case RUN: {
             double clutch = std::max(0.0, 1.0 - phaseT / o.dumpTime); // clutch dump
             // Ayak modulasyonu (pedal feathering): hedef kayma ~%12, drag slickin Pacejka tepesi
-            const double kap = 0.5 * (w[dL].kappa() + w[dR].kappa());
+            const double kap = 0.5 * (w(dL).kappa() + w(dR).kappa());
             if (o.feather && phaseT > 0.12)
                 footThr = std::clamp(footThr + dt * 8.0 * (0.12 - kap), pt.rpm() < 5500.0 ? 1.0 : 0.35, 1.0);
             double thr = footThr;
@@ -297,107 +250,63 @@ int main(int argc, char** argv) {
         default: break;
         }
 
-        // ---- guc aktarma ----
-        pt.setAxleSnapped(fail.snapped(0), fail.snapped(1));
-        pt.setIgnitionKilled(fail.bearingSpun());
-        const double wLin = drive == Drive::AWD ? frontShare * w[0].omega() + (1 - frontShare) * w[2].omega() : w[dL].omega();
-        const double wRin = drive == Drive::AWD ? frontShare * w[1].omega() + (1 - frontShare) * w[3].omega() : w[dR].omega();
-        pt.step(dt, wLin, wRin, fail.oilPressureFactor());
-        {
-            const double sh = std::max(frontShare, 1.0 - frontShare);
-            fail.updateAxles(dt, sh * pt.axleTorqueL(), sh * pt.axleTorqueR());
+        // ---- fizik adimi ----
+        VehicleInputs in;
+        in.brake = brakePedal; in.handbrake = handbrake;
+        in.held = phase == BURNOUT || phase == STAGE || phase == SETTLE;   // line-lock / el freni tutar
+        sim.step(dt, in);
+        for (const SuspEvent& ev : sim.suspEvents()) {
+            if (!((phase == RUN || phase == BRAKE) && airLogs < 12)) continue;
+            ++airLogs;
+            if (ev.airborne) logEvent(std::string("Tekerlek havalandi: ") + cornerName[ev.corner] + " @ " + std::to_string((int)ev.atDistance) + " m");
+            else logEvent(std::string("Takoza vurdu (bottoming): ") + cornerName[ev.corner]);
         }
-        fail.updateOil(dt, axF, 0.0, pt.rpm());
-
-        // ---- dinamik yuk + tekerlekler ----
-        // ---- suspansiyon (2 kHz) -> dinamik tekerlek yukleri ----
-        double Fz[4];
-        vl.mass = baseMass + fuelKg;
-        if (++suspCounter >= 50) {
-            suspCounter = 0;
-            susp.step(50 * dt, roadProfile, dist, axRaw, 0.0);
-            for (int c = 0; c < 4; ++c) {
-                if (susp.airborne(c) && !wasAir[c] && (phase == RUN || phase == BRAKE) && airLogs < 12) {
-                    ++airLogs;
-                    logEvent(std::string("Tekerlek havalandi: ") + cornerName[c] + " @ " + std::to_string((int)dist) + " m");
-                }
-                if (susp.onBumpStop(c) && !wasStop[c] && (phase == RUN || phase == BRAKE) && airLogs < 12) {
-                    ++airLogs;
-                    logEvent(std::string("Takoza vurdu (bottoming): ") + cornerName[c]);
-                }
-                wasAir[c] = susp.airborne(c); wasStop[c] = susp.onBumpStop(c);
-            }
-        }
-        for (int c = 0; c < 4; ++c) Fz[c] = susp.tireLoad(c);
-        const double bF = brakePedal * brakeTotal * bias * 0.5;
-        const double bR = brakePedal * brakeTotal * (1 - bias) * 0.5 + handbrake * 1500.0;
-        double sumFx = 0.0;
-        for (int i = 0; i < 4; ++i) {
-            w[i].setNormalLoad(Fz[i]);
-            const double share = i < 2 ? frontShare : 1.0 - frontShare;
-            const double Ta = share * ((i % 2 == 0) ? pt.axleTorqueL() : pt.axleTorqueR());
-            w[i].step(dt, V, Ta, i < 2 ? bF : bR);
-            sumFx += w[i].Fx();
-            const double h = w[i].consumeHapticPulse();
-            if (h > 0.0) hapticIntensity = std::max(hapticIntensity, h);
-        }
-
-        // ---- govde ----
-        const double drag = 0.5 * rho * CdA * V * V;
-        if (phase == BURNOUT || phase == STAGE || phase == SETTLE) { axRaw = 0.0; V = 0.0; } // line-lock / el freni tutar
-        else {
-            axRaw = (sumFx - drag) / vl.mass;
-            V += axRaw * dt;
-            if (V < 0.0) V = 0.0;
-        }
-        axF += (axRaw - axF) * std::min(1.0, dt / 0.08);   // govde pitch gecikmesi (suspansiyon)
-        dist += V * dt;
-        fuelKg = std::max(0.0, o.fuelL * fuelDensity - pt.fuelGrams() * 1e-3);
         t += dt; phaseT += dt;
+        const double Vn = sim.speed(), distn = sim.distance(), axF = sim.accelFiltered();
 
         if (phase == RUN || phase == BRAKE) {
             const double tr = t - tLaunch;
-            peakG = std::max(peakG, axF / 9.81); maxV = std::max(maxV, V);
-            if (t60   < 0 && dist >= 18.288)  t60 = tr;
-            if (t100m < 0 && dist >= 100.584) t100m = tr;
-            if (t201  < 0 && dist >= 201.168) t201 = tr;
-            if (t305  < 0 && dist >= 304.8)   t305 = tr;
-            if (t0100 < 0 && V >= 100.0 / 3.6) { t0100 = tr; logEvent("0-100 km/h: " + std::to_string(tr).substr(0, 5) + " s"); }
+            peakG = std::max(peakG, axF / 9.81); maxV = std::max(maxV, Vn);
+            if (t60   < 0 && distn >= 18.288)  t60 = tr;
+            if (t100m < 0 && distn >= 100.584) t100m = tr;
+            if (t201  < 0 && distn >= 201.168) t201 = tr;
+            if (t305  < 0 && distn >= 304.8)   t305 = tr;
+            if (t0100 < 0 && Vn >= 100.0 / 3.6) { t0100 = tr; logEvent("0-100 km/h: " + std::to_string(tr).substr(0, 5) + " s"); }
         }
 
         for (auto& e : pt.drainEvents()) logEvent(e);
-        for (auto& e : fail.drainEvents()) logEvent(e);
+        for (auto& e : sim.drainFailureEvents()) logEvent(e);
 
         if ((phase == RUN || phase == BRAKE || phase == DONE) && t >= nextLog) {
             nextLog += o.logInterval;
             std::printf("%6.2f %7.1f %6.1f %2d %5.0f %6.1f %6.1f %6.3f %5s %7.1f %6.1f %6.1f %5.0f %5.2f\n",
-                        t - tLaunch, dist, V * 3.6, pt.gear(), pt.rpm(), w[dL].omega(), w[dR].omega(),
-                        w[dL].kappa(), pt.vtecActive() ? "ON" : "off", pt.fuelGrams(), w[dL].tempC(),
-                        w[dR].tempC(), fail.shearMPa(0), pt.oilPressureBar());
+                        t - tLaunch, distn, Vn * 3.6, pt.gear(), pt.rpm(), w(dL).omega(), w(dR).omega(),
+                        w(dL).kappa(), pt.vtecActive() ? "ON" : "off", pt.fuelGrams(), w(dL).tempC(),
+                        w(dR).tempC(), fail.shearMPa(0), pt.oilPressureBar());
         }
         if (csv && t >= nextCsv) {
             nextCsv += 0.01;
             std::fprintf(csv, "%.3f,%.3f,%.2f,%.3f,%d,%.0f,%.2f,%.2f,%.4f,%.4f,%d,%.2f,%.1f,%.1f,%.0f,%.1f,%.1f,%.1f,%.2f\n",
-                         tLaunch >= 0 ? t - tLaunch : t - 1000.0, dist, V * 3.6, axF / 9.81, pt.gear(), pt.rpm(),
-                         w[dL].omega(), w[dR].omega(), w[dL].kappa(), w[dR].kappa(), pt.vtecActive() ? 1 : 0,
-                         pt.fuelGrams(), w[dL].tempC(), w[dR].tempC(), Fz[dL] + Fz[dR], pt.axleTorqueL(),
+                         tLaunch >= 0 ? t - tLaunch : t - 1000.0, distn, Vn * 3.6, axF / 9.81, pt.gear(), pt.rpm(),
+                         w(dL).omega(), w(dR).omega(), w(dL).kappa(), w(dR).kappa(), pt.vtecActive() ? 1 : 0,
+                         pt.fuelGrams(), w(dL).tempC(), w(dR).tempC(), susp.tireLoad(dL) + susp.tireLoad(dR), pt.axleTorqueL(),
                          pt.axleTorqueR(), fail.shearMPa(0), pt.oilPressureBar());
         }
     }
 
     std::printf("\n=== DURUS / HASAR RAPORU ===\n");
-    std::printf("  Toplam mesafe %.1f m | Toplam yakit %.1f g | Kalan depo %.2f kg\n", dist, pt.fuelGrams(), fuelKg);
+    std::printf("  Toplam mesafe %.1f m | Toplam yakit %.1f g | Kalan depo %.2f kg\n", sim.distance(), pt.fuelGrams(), sim.fuelKg());
     const char* wn[4] = {"On Sol", "On Sag", "Arka Sol", "Arka Sag"};
     for (int i = 0; i < 4; ++i)
-        std::printf("  %-8s: %5.1f C, %4.1f PSI, flat-spot %.2f mm, haptik vuruntu %d kez\n", wn[i], w[i].tempC(),
-                    w[i].psi(), w[i].flatSpotMm(), w[i].hapticPulseCount());
+        std::printf("  %-8s: %5.1f C, %4.1f PSI, flat-spot %.2f mm, haptik vuruntu %d kez\n", wn[i], w(i).tempC(),
+                    w(i).psi(), w(i).flatSpotMm(), w(i).hapticPulseCount());
     std::printf("  Suspansiyon: havalanma sayisi FL/FR/RL/RR = %d/%d/%d/%d | takoz = %d/%d/%d/%d\n",
                 susp.airborneEvents(0), susp.airborneEvents(1), susp.airborneEvents(2), susp.airborneEvents(3),
                 susp.bumpStopEvents(0), susp.bumpStopEvents(1), susp.bumpStopEvents(2), susp.bumpStopEvents(3));
     std::printf("  Tepe lastik yuku FL/FR/RL/RR = %.0f/%.0f/%.0f/%.0f N\n", susp.peakLoad(0), susp.peakLoad(1),
                 susp.peakLoad(2), susp.peakLoad(3));
-    if (hapticIntensity > 0.0)
-        std::printf("  >> Telefon titresimi: flat-spot her turda %.0f%% siddetle vuruyor\n", hapticIntensity * 100.0);
+    if (sim.hapticIntensity() > 0.0)
+        std::printf("  >> Telefon titresimi: flat-spot her turda %.0f%% siddetle vuruyor\n", sim.hapticIntensity() * 100.0);
     std::printf("  Akslar: sol %s (burulma %.1f deg), sag %s (burulma %.1f deg), tepe tau %.0f MPa\n",
                 fail.snapped(0) ? "KIRIK" : "saglam", fail.twistDeg(0), fail.snapped(1) ? "KIRIK" : "saglam",
                 fail.twistDeg(1), fail.peakShearMPa());

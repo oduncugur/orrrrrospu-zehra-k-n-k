@@ -15,6 +15,7 @@ add_library(zk_sim STATIC
   src/sim/PowertrainCore.cpp
   src/sim/DrivetrainFailure.cpp
   src/sim/Suspension.cpp
+  src/sim/VehicleSim.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp)
@@ -41,3 +42,7 @@ if(SDL3_FOUND)
 else()
   message(STATUS "SDL3 bulunamadi: zehra_game atlandi (CMAKE_PREFIX_PATH ile SDL3 kurulumunu gosterin)")
 endif()
+
+# Testler: ctest --test-dir build
+enable_testing()
+add_test(NAME fizik_regresyon COMMAND ${CMAKE_SOURCE_DIR}/tests/run_regression.sh $<TARGET_FILE:zehra_sim>)
