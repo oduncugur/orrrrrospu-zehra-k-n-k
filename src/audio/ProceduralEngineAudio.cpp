@@ -37,17 +37,27 @@ ProceduralEngineAudio::ProceduralEngineAudio(const VehicleDef& v, int sampleRate
         return (cyl <= e_.cylinders / 2) ? 0 : 1;
     };
 
+    // Silindirler arasi sabit dolum/yanma farki (+-%9): gercek motorun "tirtikli" alt harmonikleri buradan gelir
+    auto cylGain = [&]() { return 1.0 + 0.09 * noise(); };
     if (rotary) {
         // Eksantrik mil devri = RPM; her rotor tur basina bir kez atesler -> 720 deg'de 2n olay
         for (int k = 0; k < 2 * n; ++k)
-            events_.push_back({k * 720.0 / (2 * n), 0, 0.0});
+            events_.push_back({k * 720.0 / (2 * n), 0, 0.0, cylGain(), false});
     } else if (e_.layout == Layout::V6_90Odd) {
         // 90 derece odd-fire V6: 90/150 degisen aralik
         double a = 0.0;
-        for (int k = 0; k < n; ++k) { events_.push_back({a, bankOf(order[k]), 0.0}); a += (k % 2 == 0) ? 90.0 : 150.0; }
+        for (int k = 0; k < n; ++k) { events_.push_back({a, bankOf(order[k]), 0.0, cylGain(), false}); a += (k % 2 == 0) ? 90.0 : 150.0; }
     } else {
         for (int k = 0; k < n; ++k)
-            events_.push_back({k * 720.0 / n, bankOf(order[k]), headerDelay(order[k])});
+            events_.push_back({k * 720.0 / n, bankOf(order[k]), headerDelay(order[k]), cylGain(), false});
+    }
+    // Supap kapanma tiklari (emme ve egzoz): silindir basina 2 olay / cevrim
+    if (!rotary) {
+        const size_t nf = events_.size();
+        for (size_t k = 0; k < nf; ++k) {
+            events_.push_back({std::fmod(events_[k].angle + 230.0, 720.0), 0, 0.0, 0.8 + 0.2 * noise(), true});
+            events_.push_back({std::fmod(events_[k].angle + 470.0, 720.0), 0, 0.0, 0.8 + 0.2 * noise(), true});
+        }
     }
 
     // Tini: silindir hacmi buyudukce darbe uzun ve bas; rotari kisa ve keskin (port "brap")
@@ -59,10 +69,24 @@ ProceduralEngineAudio::ProceduralEngineAudio(const VehicleDef& v, int sampleRate
     // Boru boyu: arac uzunluguna yakin; V motorda banklar farkli boy (X/H boru gecikmesi)
     pipeLen_[0] = 0.55 * v.lengthM + 0.3;
     pipeLen_[1] = pipeLen_[0] * (e_.layout == Layout::V8Cross ? 1.13 : 1.05);
+    // Sicak egzoz gazinda ses hizi ~520 m/s (500-600 C)
     for (int b = 0; b < 2; ++b) {
-        dlLen_[b] = std::clamp((int)(2.0 * pipeLen_[b] / 343.0 * fs_), 16, 8000);
+        dlLen_[b] = std::clamp((int)(2.0 * pipeLen_[b] / 520.0 * fs_), 16, 8000);
         dl_[b].assign(dlLen_[b], 0.0f);
     }
+    // Motor blogu / kapak cinlamasi (dokum demir ~1.1 kHz, aluminyum kapak ~2.6 kHz), kisa sonumlu
+    const double blockScale = std::clamp(2.0 / std::max(0.7, e_.displacementL), 0.5, 1.6);
+    blockA_.setBandpass(900.0 + 300.0 * blockScale, 6.0, fs_);
+    blockB_.setBandpass(2200.0 + 500.0 * blockScale, 8.0, fs_);
+    valveBp_.setBandpass(4200.0, 3.0, fs_);
+    // Susturucu hacim rezonansi (Helmholtz, ~120-320 Hz), dusuk Q: tonal degil govdeli
+    for (int b = 0; b < 2; ++b)
+        cavity_[b].setBandpass((v.exhaust == Exhaust::StraightPipe ? 320.0 : 160.0) * (b ? 1.12 : 1.0), 1.2, fs_);
+}
+
+void ProceduralEngineAudio::Biquad::setBandpass(double f, double q, double fs) {
+    const double w0 = 2.0 * kPi * f / fs, alpha = std::sin(w0) / (2.0 * q), a0 = 1.0 + alpha;
+    b0 = alpha / a0; b2 = -alpha / a0; a1 = -2.0 * std::cos(w0) / a0; a2 = (1.0 - alpha) / a0;
 }
 
 float ProceduralEngineAudio::noise() {
@@ -70,10 +94,10 @@ float ProceduralEngineAudio::noise() {
     return (float)((rng_ & 0xFFFFFF) / 8388608.0 - 1.0);
 }
 
-void ProceduralEngineAudio::firePulse(const Event& ev, double amp, double tau, bool pop) {
+void ProceduralEngineAudio::firePulse(double start, int bank, double amp, double tau, bool pop, bool mech) {
     for (Pulse& p : pulses_) {
         if (!p.active) {
-            p = {t_ + ev.delay, amp, tau, ev.bank, pop, true};
+            p = {start, amp, tau, bank, pop, true, mech};
             return;
         }
     }
@@ -87,114 +111,140 @@ void ProceduralEngineAudio::render(float* out, int n) {
     const bool sc = e_.induction == Induction::Supercharger;
     const bool dogbox = gearboxTable()[v_.gearbox].type == Gearbox::Dogbox;
     const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.12 : v_.exhaust == Exhaust::Sport ? 0.05 : 0.015;
+    // Yanma ayrisma (combustion crack) payi: yuksek sikistirma / yaris motoru daha sert
+    const double crack = raceCam ? 0.45 : 0.3;
 
     for (int i = 0; i < n; ++i) {
         double rpm = std::max(0.0, in_.rpm);
         // Yaris kami rolantide "lope": devir ve dolum dalgalanir
         if (raceCam && rpm < 1500) { lopePhase_ += dt * 2.1; rpm *= 1.0 + 0.05 * std::sin(2 * kPi * lopePhase_); }
         const double thr = std::clamp(in_.throttle, 0.0, 1.0);
+        const double load = 0.3 + 0.7 * thr;
 
         // VTEC gecisi: yumusatilmis ama hizli (40 ms)
         const bool vtecOn = e_.variableCam && rpm > e_.camSwitchRpm && thr > 0.4;
         vtecMix_ += ((vtecOn ? 1.0 : 0.0) - vtecMix_) * std::min(1.0, dt / 0.04);
 
-        // ---- krank acisi ve atesleme olaylari ----
+        // Bant sinirli gurultu (beyaz gurultu yerine ~4 kHz alcak gecirilmis): dijital cizirti yok
+        nLp_ += (noise() - nLp_) * 0.45;
+
+        // ---- krank acisi ve olaylar (alt-ornek hassasiyetli zamanlama) ----
         const double prev = theta_;
-        theta_ += rpm / 60.0 * 360.0 * dt;
+        const double dTheta = rpm / 60.0 * 360.0 * dt;
+        theta_ += dTheta;
         for (const Event& ev : events_) {
             double a = ev.angle;
             while (a <= prev) a += cycleDeg_;
             if (a > theta_) continue;
-            const bool overrun = thr < 0.05 && rpm > 2800;
-            double amp = 0.3 + 0.7 * thr;
-            amp *= 1.0 + 0.08 * noise() + (raceCam && rpm < 1500 ? 0.25 * noise() : 0.0);
+            const double frac = dTheta > 0.0 ? (a - prev) / dTheta : 0.0;      // olayin ornek icindeki yeri
+            const double tEv = t_ - dt + frac * dt;
+            if (ev.valve) {                                                     // supap tiki: kisa mekanik vurus
+                firePulse(tEv, 0, 0.35 * ev.gain * (0.6 + 0.4 * (1.0 - thr)), 0.00012, false, true);
+                continue;
+            }
+            // Cevrimden cevrime yanma degiskenligi + zamanlama sapmasi (rolantide daha fazla)
+            const double idleF = rpm < 1500 ? 1.0 : 0.4;
+            const double jitter = 0.00012 * idleF * noise();
+            double amp = load * ev.gain * (1.0 + (0.06 + 0.08 * idleF) * noise());
+            if (raceCam && rpm < 1500 && noise() > 0.8) amp *= 0.55;           // zayif cevrim (kacan atesleme)
             bool pop = false;
             if (in_.fuelCut) {
-                amp = 0.05;                                         // yakitsiz: sadece pompalama
-                if (noise() > 0.7) { amp = 1.8; pop = true; }        // kesicide yanmamis yakit patlar
-            } else if (overrun) {
-                amp = 0.12;
+                amp = 0.06;                                                     // yakitsiz: sadece pompalama
+                if (noise() > 0.7) { amp = 1.8; pop = true; }                  // kesicide yanmamis yakit patlar
+            } else if (thr < 0.05 && rpm > 2800) {
+                amp = 0.14;
                 const double p = in_.antiLag ? 0.5 : popProb;
-                if ((noise() * 0.5 + 0.5) < p) { amp = 2.2; pop = true; }
+                if ((noise() * 0.5 + 0.5) < p) { amp = 2.0; pop = true; }
             }
-            firePulse(ev, amp, pulseTau_ * (pop ? 2.5 : 1.0), pop);
+            firePulse(tEv + ev.delay + jitter, ev.bank, amp, pulseTau_ * (pop ? 2.2 : 1.0), pop, false);
+            // Yanma blogu uyarir (mekanik vuruntu/tikirti), yukle artar
+            firePulse(tEv, 0, crack * amp * (pop ? 0.4 : 1.0), 0.00018, false, true);
         }
         if (theta_ >= cycleDeg_ * 8) theta_ -= cycleDeg_ * 8;
 
-        // ---- darbe uyarimi (bank basina) ----
-        double exc[2] = {0.0, 0.0};
+        // ---- darbe uyarimi: iki ustel fark (yumusak yukselis, bant sinirli) ----
+        double exc[2] = {0.0, 0.0}, mech = 0.0;
         for (Pulse& p : pulses_) {
             if (!p.active) continue;
             const double age = t_ - p.start;
             if (age < 0.0) continue;
-            if (age > p.tau * 12.0) { p.active = false; continue; }
-            const double attack = std::min(1.0, age / 0.00015);
-            double s = p.amp * attack * std::exp(-age / p.tau);
-            s *= p.pop ? (0.3 + noise()) : (0.75 + 0.25 * noise());
-            exc[p.bank] += s;
+            if (age > p.tau * 10.0 + 0.0005) { p.active = false; continue; }
+            const double rise = p.mech ? 0.00005 : 0.00022;
+            const double env = std::exp(-age / p.tau) - std::exp(-age / rise);
+            if (p.mech) { mech += p.amp * env * nLp_; continue; }
+            // Egzoz blowdown: basinc darbesi + turbulansli (gurultulu) kuyruk
+            const double body = p.pop ? (0.25 + 0.9 * nLp_) : (0.82 + 0.3 * nLp_);
+            exc[p.bank] += p.amp * env * body;
         }
-        if (rotary) { exc[0] *= 1.3; }
+        if (rotary) exc[0] *= 1.3;
 
-        // ---- egzoz boru rezonansi: dalga kilavuzu ----
+        // ---- egzoz: zayif geri beslemeli boru (sonumlu) + susturucu hacim rezonansi ----
         double ex = 0.0;
         for (int b = 0; b < banks_; ++b) {
             float& slot = dl_[b][dlPos_[b]];
-            loopLp_[b] += (slot - loopLp_[b]) * 0.35;           // boru ici kayip (alcak gecis)
-            const double y = exc[b] - 0.55 * loopLp_[b];         // acik uc: ters isaretli yansima
+            loopLp_[b] += (slot - loopLp_[b]) * 0.18;           // boru ici kayip: yuksek frekans hizla sonumlenir
+            const double y = exc[b] - 0.32 * loopLp_[b];         // acik uc yansimasi (zayif: metalik cinlama yok)
             slot = (float)y;
             dlPos_[b] = (dlPos_[b] + 1) % dlLen_[b];
-            ex += y;
+            ex += y + 0.9 * cavity_[b].run(y);
         }
 
         // ---- susturucu (2 kutuplu alcak gecis), VTEC parlakligi ----
-        const double fc = mufflerHz_ * (1.0 + 0.9 * vtecMix_) * (0.6 + 0.4 * thr + rpm / 20000.0);
+        const double fc = mufflerHz_ * (1.0 + 0.8 * vtecMix_) * (0.6 + 0.4 * thr + rpm / 20000.0);
         const double a = 1.0 - std::exp(-2.0 * kPi * fc * dt);
         lp1_ += (ex - lp1_) * a; lp2_ += (lp1_ - lp2_) * a;
-        double sig = lp2_ * 0.9 + (ex - lp2_) * (0.05 + 0.15 * vtecMix_);
+        double sig = lp2_ * 0.92 + (ex - lp2_) * (0.05 + 0.12 * vtecMix_);
+
+        // ---- mekanik katman: blok/kapak cinlamasi + supap tiklari ----
+        sig += 0.55 * blockA_.run(mech) + 0.35 * blockB_.run(mech) + 0.25 * valveBp_.run(mech);
 
         // ---- emme: ITB homurtusu / plenum ugultusu, atesleme frekansiyla modulasyonlu ----
         const double fFire = rpm * std::max(1, e_.cylinders) / 120.0;
         {
-            const double f = std::min(0.45, 2.0 * std::sin(kPi * intakeHz_ * (1.0 + 0.5 * vtecMix_) * dt));
-            const double x = noise();
+            const double f = std::min(0.45, 2.0 * std::sin(kPi * intakeHz_ * (1.0 + 0.4 * vtecMix_) * dt));
             bpLow_ += f * bpBand_;
-            const double high = x - bpLow_ - 0.6 * bpBand_;
+            const double high = nLp_ - bpLow_ - 0.9 * bpBand_;
             bpBand_ += f * high;
-            const double env = 0.55 + 0.45 * std::sin(2 * kPi * fFire * t_);
-            const double g = (e_.induction == Induction::ITB ? 0.45 : 0.12) * (1.0 + 1.2 * vtecMix_);
+            const double env = 0.5 + 0.5 * std::max(0.0, std::sin(2 * kPi * fFire * t_));
+            const double g = (e_.induction == Induction::ITB ? 0.5 : 0.14) * (1.0 + 1.0 * vtecMix_);
             sig += bpBand_ * g * thr * std::pow(rpm / e_.redline, 1.5) * env;
         }
 
-        // ---- turbo: mil hizi, islik, flutter ----
+        // ---- turbo: mil hizi, islik (dar bant gurultu + az ton), flutter ----
         if (turbo) {
             const double target = in_.boost >= 0.0 ? in_.boost
                                 : thr * std::clamp((rpm - 0.35 * e_.redline) / (0.3 * e_.redline), 0.0, 1.0);
             spool_ += (target - spool_) * std::min(1.0, dt / (target > spool_ ? 0.6 : 0.35));
-            whPhase_ += (2500.0 + 7000.0 * spool_) * dt;
-            sig += 0.05 * spool_ * spool_ * std::sin(2 * kPi * whPhase_);
+            const double fw = 2500.0 + 6000.0 * spool_;
+            whPhase_ += fw * dt;
+            const double f = std::min(0.9, 2.0 * std::sin(kPi * fw * dt));
+            tbLow_ += f * tbBand_;
+            tbBand_ += f * (nLp_ - tbLow_ - 0.08 * tbBand_);
+            sig += spool_ * spool_ * (0.012 * tbBand_ + 0.008 * std::sin(2 * kPi * whPhase_));
             if (prevThr_ > 0.6 && thr < 0.2 && spool_ > 0.4) flutterT_ = 0.0;   // kompresor surge
             if (flutterT_ >= 0.0) {
                 flutterT_ += dt;
                 const double lambda = 5.0, fFl = 22.0;
                 const double env = std::exp(-lambda * flutterT_);
-                sig += 0.35 * env * std::max(0.0, std::sin(2 * kPi * fFl * flutterT_)) * noise();
+                sig += 0.35 * env * std::max(0.0, std::sin(2 * kPi * fFl * flutterT_)) * nLp_;
                 if (env < 0.01) flutterT_ = -1.0;
             }
         }
         if (sc) {   // Roots/vida kompresor uguldamasi: kasnak orani * lob sayisi
             scPhase_ += rpm / 60.0 * 2.4 * 4.0 * dt;
-            sig += 0.03 * thr * (rpm / e_.redline) * std::sin(2 * kPi * scPhase_);
+            sig += 0.015 * thr * (rpm / e_.redline) * std::sin(2 * kPi * scPhase_) * (0.7 + 0.3 * nLp_);
         }
         if (dogbox && in_.inGear) {  // duz disli inlemesi: f = mil devri * dis sayisi
             gwPhase_ += rpm / 60.0 * 23.0 * dt;
-            sig += 0.02 * (0.3 + thr) * (rpm / e_.redline) * std::sin(2 * kPi * gwPhase_);
+            sig += 0.012 * (0.3 + thr) * (rpm / e_.redline) * std::sin(2 * kPi * gwPhase_) * (0.8 + 0.2 * nLp_);
         }
         prevThr_ = thr;
 
-        // ---- DC engelleme + yumusak sinirlama ----
+        // ---- DC engelleme + son alcak gecis (~9 kHz) + yumusak sinirlama ----
         const double hp = sig - dcIn_ + 0.995 * dc_;
         dcIn_ = sig; dc_ = hp;
-        out[i] = (float)std::tanh(hp * 1.6);
+        outLp_ += (hp - outLp_) * 0.72;
+        out[i] = (float)std::tanh(outLp_ * 1.25);
         t_ += dt;
     }
 }

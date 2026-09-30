@@ -35,11 +35,16 @@ public:
     std::string signature() const;   // sesin parametrik ozeti (debug)
 
 private:
-    struct Event { double angle; int bank; double delay; };
-    struct Pulse { double start; double amp; double tau; int bank; bool pop; bool active; };
+    struct Event { double angle; int bank; double delay; double gain; bool valve; };
+    struct Pulse { double start; double amp; double tau; int bank; bool pop; bool active; bool mech; };
+    struct Biquad {                       // RBJ band-geciren (sabit katsayi)
+        double b0 = 0, b2 = 0, a1 = 0, a2 = 0, x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        void setBandpass(double f, double q, double fs);
+        double run(double x) { const double y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; }
+    };
 
     float noise();
-    void  firePulse(const Event& ev, double amp, double tau, bool pop);
+    void  firePulse(double start, int bank, double amp, double tau, bool pop, bool mech);
 
     VehicleDef v_; EngineDef e_;
     int    fs_;
@@ -48,13 +53,15 @@ private:
     int    banks_ = 1;
     double theta_ = 0.0, t_ = 0.0;
     double pulseTau_, mufflerHz_, intakeHz_, pipeLen_[2];
-    Pulse  pulses_[96] = {};
+    Pulse  pulses_[192] = {};
     std::vector<float> dl_[2]; int dlPos_[2] = {0, 0}; int dlLen_[2];
     double loopLp_[2] = {0, 0};
     double lp1_ = 0, lp2_ = 0, dc_ = 0, dcIn_ = 0;
     double bpLow_ = 0, bpBand_ = 0;
     double spool_ = 0.0, flutterT_ = -1.0, prevThr_ = 0.0, whPhase_ = 0.0, scPhase_ = 0.0, gwPhase_ = 0.0;
     double vtecMix_ = 0.0, lopePhase_ = 0.0;
+    double nLp_ = 0.0, outLp_ = 0.0, tbLow_ = 0.0, tbBand_ = 0.0;
+    Biquad blockA_, blockB_, valveBp_, cavity_[2];
     uint32_t rng_;
     EngineAudioInput in_;
 };
