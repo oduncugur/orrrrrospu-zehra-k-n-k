@@ -70,6 +70,11 @@ double RoadProfile::height(double x, int side) const {
 }
 
 RoadProfile RoadProfile::preset(const std::string& name) {
+    if (name == "duz") {                                          // ideal duz zemin (test / referans)
+        RoadProfile r('A', 1);
+        r.common_.clear(); r.left_.clear(); r.right_.clear();
+        return r;
+    }
     if (name == "otoban") {                                       // sehirlerarasi: B sinifi + kopru derzleri
         RoadProfile r('B', 7);
         for (double x = 60; x < 5000; x += 45) r.addFeature({RoadFeatureType::ExpansionJoint, x, 0.05, 0.012, 0});

@@ -9,6 +9,7 @@
 #include "sim/Tune.h"
 #include "sim/WheelSimulation.h"
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,12 +26,14 @@ struct VehicleSimConfig {
     std::string road = "drag";
     bool   laneAsymmetry = true;                // sol iz daha az lastik kaplamali (LSD davranisini gosterir)
     const Tune* tune = nullptr;                 // nullptr: Faz 1 drag kurulumu (slick, krom-moly, 1.5-way)
+    bool   planar = false;                      // true: duzlemsel dinamik (viraj, yaw); false: 1B drag fizigi (birebir)
 };
 
 struct VehicleInputs {
     double brake = 0.0;       // 0..1 servis freni (ABS yok, %65 on / %35 arka)
     double handbrake = 0.0;   // 0..1 arka hidrolik el freni
     bool   held = false;      // line-lock / stage: arac yerinde tutulur (burnout, agac)
+    double steer = 0.0;       // on tekerlek direksiyon acisi (rad, sola +); yalnizca duzlemsel modda
 };
 
 // Suspansiyon olayi (tekerlek havalanmasi ya da takoza vurma), olustugu andaki konumla
@@ -49,7 +52,16 @@ public:
     const std::vector<SuspEvent>& suspEvents() const { return suspEvents_; }
 
     // Durum
-    double speed() const { return V_; }
+    double speed() const { return cfg_.planar ? std::sqrt(vx_ * vx_ + vy_ * vy_) : V_; }
+    // Duzlemsel durum (dunya: X ileri baslangic yonu, Y sola; psi sola donus +)
+    double posX() const { return X_; }
+    double posY() const { return Y_; }
+    double heading() const { return psi_; }
+    double vxBody() const { return vx_; }
+    double vyBody() const { return vy_; }
+    double yawRate() const { return r_; }
+    double lateralAccel() const { return ayRaw_; }
+    double bodySlipAngle() const { return std::atan2(vy_, std::max(std::fabs(vx_), 0.5)); }
     double distance() const { return dist_; }
     double accel() const { return axRaw_; }
     double accelFiltered() const { return axF_; }
@@ -76,6 +88,7 @@ public:
     const VehicleSimConfig& config() const { return cfg_; }
 
 private:
+    void stepPlanar(double dt, const VehicleInputs& in);
     VehicleSimConfig cfg_;
     EngineSpec eng_; GearboxSpec gbx_;
     Gearbox boxType_ = Gearbox::HPattern;
@@ -90,6 +103,7 @@ private:
     VehicleLoad vl_{};
     double baseMass_ = 0, fuelDensity_ = 0.745, fuelKg_ = 0, CdA_ = 0.68, brakeTotal_ = 7000, fRide_ = 1.6;
     double V_ = 0, dist_ = 0, axRaw_ = 0, axF_ = 0, haptic_ = 0;
+    double X_ = 0, Y_ = 0, psi_ = 0, vx_ = 0, vy_ = 0, r_ = 0, ayRaw_ = 0, Iz_ = 1500;
     int suspCounter_ = 0;
     bool wasAir_[4] = {false, false, false, false}, wasStop_[4] = {false, false, false, false};
     std::vector<SuspEvent> suspEvents_;

@@ -19,6 +19,9 @@ struct TireParams {
     double treadHeatCap = 3000.0; // J/K, taban kaucugu isil kutlesi
     double slipHeatFrac = 0.25;   // kayma gucunun tabana giden orani
     double flatSpotRate = 2.0e-7; // mm/J, kilitli kaymada eriyen kaucuk
+    // Yanal (kayma acisi, rad) Magic Formula katsayilari ve yanal gevseme boyu
+    double By = 11.0, Cy = 1.35, Ey = 0.30;
+    double relaxLat = 0.35;       // m
 };
 
 class WheelSimulation {
@@ -32,6 +35,11 @@ public:
 
     // I_w * dw/dt = T_axle - T_brake - Fx*r_eff - Crr*Fz*r_eff
     void step(double dt, double Vx, double T_axle, double T_brakeCapacity);
+    // Duzlemsel: tekerlek eksenindeki boyuna/yanal hiz. step()'i cagirir, ustune yanal kuvvet:
+    // alpha = atan(vlat/|vlong|), Fy = -D*MF(alpha) * sqrt(1 - (Fx/D)^2)  (cekis elipsi) + yanal gevseme
+    void stepPlanar(double dt, double vlong, double vlat, double T_axle, double T_brakeCapacity);
+    double Fy()           const { return Fy_; }
+    double slipAngle()    const { return alpha_; }
 
     double omega()        const { return omega_; }
     double kappa()        const { return kappa_; }      // transient (gevsemeli) kayma
@@ -58,7 +66,7 @@ private:
     double inertia_;          // 0.5*m*r^2
     double omega_ = 0.0;
     double kappa_ = 0.0, kappaSS_ = 0.0;
-    double Fx_ = 0.0, Fz_ = 0.0;
+    double Fx_ = 0.0, Fz_ = 0.0, Fy_ = 0.0, alpha_ = 0.0;
     double surfaceMu_ = 1.0;
     double flatSpot_ = 0.0;   // mm
     double revPhase_ = 0.0;
