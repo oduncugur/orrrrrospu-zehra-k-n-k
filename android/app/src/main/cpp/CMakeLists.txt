@@ -20,6 +20,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/sim/Suspension.cpp
     ${ZK_ROOT}/src/sim/VehicleSim.cpp
     ${ZK_ROOT}/src/game/DragRace.cpp
+    ${ZK_ROOT}/src/game/Career.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp)

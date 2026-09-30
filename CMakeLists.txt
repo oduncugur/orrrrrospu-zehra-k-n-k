@@ -17,6 +17,7 @@ add_library(zk_sim STATIC
   src/sim/Suspension.cpp
   src/sim/VehicleSim.cpp
   src/game/DragRace.cpp
+  src/game/Career.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
   src/audio/ProceduralEngineAudio.cpp)
@@ -56,3 +57,7 @@ add_executable(tune_test tests/tune_test.cpp)
 target_link_libraries(tune_test PRIVATE zk_sim)
 target_include_directories(tune_test PRIVATE src)
 add_test(NAME parca_etkileri COMMAND tune_test)
+add_executable(career_test tests/career_test.cpp)
+target_link_libraries(career_test PRIVATE zk_sim)
+target_include_directories(career_test PRIVATE src)
+add_test(NAME kariyer_kayit COMMAND career_test)
