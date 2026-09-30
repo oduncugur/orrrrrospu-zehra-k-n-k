@@ -206,3 +206,12 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 3. Arayüzü `xvfb-run` + `--screenshot` ile gör; tuş betiğiyle (`ZK_KEYS`) gerçek oyuncu akışını oyna.
 4. Commit mesajları Türkçe, "ne + neden + nasıl doğrulandı"; her adım push → CI → `latest-build`.
 5. Kullanıcıya sunarken durumu açık yaz: bitti / ara taslak / doğrulanmadı.
+
+## Guncelleme — Faz 5 adim 1 (ara taslak, commit'lendi)
+- Duzlemsel dinamik kodda: `VehicleSimConfig::planar`, `VehicleInputs::steer`, `WheelSimulation::stepPlanar`. Drag oyunu hala 1B modu kullanir; oyun etkilenmedi.
+- Duzeltme: sokak/yari-slick lastiklerine slick sicaklik penceresi uygulaniyordu (soguk = %55 tutus). Artik sokak 55 C / yari-slick 75 C ideal, genis pencere.
+- `tests/planar_test.cpp`: [1] duz cizgi, [3] FWD understeer, [5] tam kilit GECIYOR.
+  KALAN: [2] skidpad 0.75 g (hedef 0.80-1.10) ve slick farki yok. Suphe: skidpad FWD aracla 2. viteste; arka aks
+  once doyuyor (arka kayma acisi on'un ~2 kati). [4] RWD tam gaz govde kaymasi 4.4 deg (hedef >8).
+  Test ctest'e kapali (CMakeLists'te yorum satiri); gecince acilacak.
+- Hata ayiklama: `/tmp` altindaki iz araclari kalici degil; test dosyasina `ZK_TRACE` ciktisi eklenerek yeniden uretilebilir.
