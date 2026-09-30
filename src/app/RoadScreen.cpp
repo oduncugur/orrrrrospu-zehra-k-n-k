@@ -70,7 +70,12 @@ void RoadScreen::update(double dt) {
     // Direksiyon: hiza gore sinirli (kinematik yanal ivme ~1.1 g), rampali; klavye veya dokunma
     const bool L = kL_ || tL_ >= 0, Rr = kR_ || tR_ >= 0;
     const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0), 0.035, 0.50);
-    const double target = (L ? maxSteer : 0.0) - (Rr ? maxSteer : 0.0);
+    double target = (L ? maxSteer : 0.0) - (Rr ? maxSteer : 0.0);
+    if (!L && !Rr && app_.tiltAvailable && app_.tiltSteer) {   // telefon egimi (olu bolge %6)
+        const double t = app_.tilt(), dz = 0.06;
+        const double u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);
+        target = u * maxSteer;
+    }
     const double rate = (std::fabs(target) > std::fabs(steer_) ? 1.0 : 2.5) * dt;
     steer_ += std::clamp(target - steer_, -rate, rate);
     thr_ = (kT_ || tG_ >= 0) ? std::min(1.0, thr_ + dt / 0.15) : std::max(0.0, thr_ - dt / 0.10);
@@ -240,6 +245,7 @@ void RoadScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "%5.0f RPM", pt.rpm());
     r.text(236, 30, b, 1, {1, 1, 1});
     r.text(236, 46, Pc.assist ? "YARDIM ACIK" : "YARDIM KAPALI", 1, Pc.assist ? Color{0.4f, 0.9f, 0.5f} : Color{1.0f, 0.5f, 0.3f});
+    if (app_.tiltAvailable) r.text(236, 66, app_.tiltSteer ? "EGIM ACIK" : "EGIM KAPALI", 1, app_.tiltSteer ? Color{0.4f, 0.9f, 0.5f} : Color{0.7f, 0.7f, 0.7f});
     if (ses_->mode() == RoadSession::Mode::Race) {
         const double left = std::max(0.0, RoadSession::kStartS + ses_->raceLength() - ps);
         const double gap = ses_->gapMeters();
@@ -293,6 +299,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
     else if (kSteerR.hit(x, y)) tR_ = id;
     else if (kBrakeB.hit(x, y)) tB_ = id;
     else if (kGas.hit(x, y)) tG_ = id;
+    else if (y >= 60 && y < 84 && x > 230 && app_.tiltAvailable) { app_.tiltSteer = !app_.tiltSteer; flash(app_.tiltSteer ? "EGIM DIREKSIYONU ACIK" : "EGIM DIREKSIYONU KAPALI", 1.5); }
     else if (y < 60 && x > 230) { P.assist = !P.assist; flash(P.assist ? "SURUS YARDIMI ACIK" : "SURUS YARDIMI KAPALI", 1.5); }
     else if (y < 60) { P.manual = !P.manual; flash(P.manual ? "MANUEL VITES" : "OTOMATIK VITES", 1.5); }
     else if (y > 380 && y < 520 && P.manual) P.requestShift(x > 180 ? +1 : -1);   // manuel: alt yari sol/sag vites

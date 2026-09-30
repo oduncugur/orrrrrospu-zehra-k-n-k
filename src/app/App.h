@@ -56,6 +56,10 @@ public:
     std::function<void(bool)> onOrientation;
     std::function<void(int, int)> onHaptic;
     void haptic(int ms, int amplitude) { if (onHaptic) onHaptic(ms, amplitude); }
+    // Egim (ivmeolcer) direksiyonu: platform yazar (-1 sag .. +1 sol); yoksa tiltAvailable=false
+    void setTilt(float t) { tilt_ = t; tiltAvailable = true; }
+    float tilt() const { return tilt_; }
+    bool tiltAvailable = false, tiltSteer = true;
     bool treePro = false;
     std::string startupMsg;                       // acilista garajda bir kez gosterilir                         // agac tipi (garajda secilir)
     // Performans olcumu (ekranda kucuk gosterge): kare hizi ve kare basina guncelleme (fizik) suresi
@@ -79,6 +83,7 @@ public:
     void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
 
 private:
+    std::atomic<float> tilt_{0.0f};
     struct Voice {
         std::unique_ptr<ProceduralEngineAudio> synth;
         std::atomic<float> rpm{900}, thr{0}, gain{1};

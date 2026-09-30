@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #include <aaudio/AAudio.h>
 #include <android/log.h>
+#include <android/sensor.h>
 #include <android_native_app_glue.h>
 
 #include <algorithm>
@@ -22,6 +23,11 @@ struct Platform {
     std::unique_ptr<App> game;       // kayit klasoru bilinince olusturulur (android_main)
     EGLDisplay dpy = EGL_NO_DISPLAY; EGLSurface surf = EGL_NO_SURFACE; EGLContext ctx = EGL_NO_CONTEXT;
     AAudioStream* stream = nullptr;
+    // Ivmeolcer (egim direksiyonu)
+    ASensorManager* sensorMgr = nullptr;
+    const ASensor* accel = nullptr;
+    ASensorEventQueue* sensorQ = nullptr;
+    float tiltLp = 0.0f;
     bool running = false;
 };
 
@@ -188,6 +194,12 @@ void onCmd(android_app* app, int32_t cmd) {
         break;
     case APP_CMD_PAUSE: stopAudio(p); break;
     case APP_CMD_RESUME: if (p.dpy != EGL_NO_DISPLAY) startAudio(p); break;
+    case APP_CMD_GAINED_FOCUS:   // sensor yalniz odaktayken acik (pil)
+        if (p.accel && p.sensorQ) { ASensorEventQueue_enableSensor(p.sensorQ, p.accel); ASensorEventQueue_setEventRate(p.sensorQ, p.accel, 16667); }
+        break;
+    case APP_CMD_LOST_FOCUS:
+        if (p.accel && p.sensorQ) ASensorEventQueue_disableSensor(p.sensorQ, p.accel);
+        break;
     case APP_CMD_CONFIG_CHANGED:
     case APP_CMD_WINDOW_RESIZED:
         if (p.dpy != EGL_NO_DISPLAY) {
@@ -215,14 +227,32 @@ void android_main(android_app* app) {
     p.game->onOrientation = [&jni](bool landscape) { requestOrientation(jni, landscape); };
     p.game->onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
     requestOrientation(jni, p.game->landscape());
+    p.sensorMgr = ASensorManager_getInstance();
+    if (p.sensorMgr) {
+        p.accel = ASensorManager_getDefaultSensor(p.sensorMgr, ASENSOR_TYPE_ACCELEROMETER);
+        if (p.accel) p.sensorQ = ASensorManager_createEventQueue(p.sensorMgr, app->looper, LOOPER_ID_USER, nullptr, nullptr);
+    }
     auto last = std::chrono::steady_clock::now();
 
     while (true) {
         int events = 0;
         android_poll_source* src = nullptr;
-        while (ALooper_pollOnce(p.running ? 0 : -1, nullptr, &events, (void**)&src) >= 0) {
+        int ident;
+        while ((ident = ALooper_pollOnce(p.running ? 0 : -1, nullptr, &events, (void**)&src)) >= 0) {
             if (src) src->process(app, src);
-            if (app->destroyRequested) { stopAudio(p); termEGL(p); jniShutdown(jni); return; }
+            if (ident == LOOPER_ID_USER && p.sensorQ) {
+                // Dikey tutus: telefon sola yatinca x ivmesi +; ~30 derece = tam direksiyon; alcak geciren suzgec
+                ASensorEvent ev;
+                while (ASensorEventQueue_getEvents(p.sensorQ, &ev, 1) > 0) {
+                    const float t = std::clamp(ev.acceleration.x / (9.81f * 0.5f), -1.0f, 1.0f);
+                    p.tiltLp += (t - p.tiltLp) * 0.25f;
+                    p.game->setTilt(p.tiltLp);
+                }
+            }
+            if (app->destroyRequested) {
+                if (p.sensorQ) ASensorManager_destroyEventQueue(p.sensorMgr, p.sensorQ);
+                stopAudio(p); termEGL(p); jniShutdown(jni); return;
+            }
         }
         const auto now = std::chrono::steady_clock::now();
         const double dt = std::chrono::duration<double>(now - last).count();
