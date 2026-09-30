@@ -65,4 +65,4 @@ add_test(NAME kariyer_kayit COMMAND career_test)
 add_executable(planar_test tests/planar_test.cpp)
 target_link_libraries(planar_test PRIVATE zk_sim)
 target_include_directories(planar_test PRIVATE src)
-# add_test(NAME duzlemsel_dinamik COMMAND planar_test)  # Faz 5 ara taslak: skidpad + RWD oversteer testleri henuz gecmiyor
+add_test(NAME duzlemsel_dinamik COMMAND planar_test)

@@ -106,15 +106,15 @@ int main() {
         }
     };
 
-    std::printf("[2] Skidpad R=50 m: sokak lastigi vs drag slick (#5 FWD)\n");
+    std::printf("[2] Skidpad R=50 m: sokak lastigi vs yari-slick takim (#5 FWD)\n");
     double ayStreet, vStreet, aySlick, vSlick;
     {
-        Tune street, slick; slick.tires = TireType::DragSlick;
+        Tune street, slick; slick.tires = TireType::SemiSlick;
         skidpad(5, street, 50.0, &ayStreet, &vStreet);
         skidpad(5, slick, 50.0, &aySlick, &vSlick);
-        std::printf("    sokak: %.2f g @ %.1f km/h | slick: %.2f g @ %.1f km/h\n", ayStreet, vStreet * 3.6, aySlick, vSlick * 3.6);
+        std::printf("    sokak: %.2f g @ %.1f km/h | yari-slick: %.2f g @ %.1f km/h\n", ayStreet, vStreet * 3.6, aySlick, vSlick * 3.6);
         CHECK(ayStreet > 0.80 && ayStreet < 1.10, "sokak lastigi yanal limit 0.80-1.10 g");
-        CHECK(aySlick > ayStreet + 0.12, "slick belirgin daha fazla yanal tutus");
+        CHECK(aySlick > ayStreet + 0.12, "yari-slick belirgin daha fazla yanal tutus");
     }
 
     // Sabit direksiyon + gaz: yol egriligi (yaw hizi / hiz) ve govde kayma acisi
@@ -149,9 +149,11 @@ int main() {
         CHECK(kHi < kLo * 0.9, "tam gazda yol acildi (understeer)");
     }
 
-    std::printf("[4] RWD guc altinda oversteer (#227 V8, sokak lastigi)\n");
+    std::printf("[4] RWD guc altinda oversteer (#227 V8, sokak lastigi, 1.5-yol LSD)\n");
     {
-        Tune t; double kLo, kHi, bLo, bHi, mLo, mHi;
+        // Acik diferansiyelde ic teker bosa doner, tork sinirlanir (tek teker patinaji) -> hafif kayma;
+        // gercek "arkayi atma" kilitli/LSD diferansiyel ister.
+        Tune t; t.diff = DiffType::OneAndHalfWay; double kLo, kHi, bLo, bHi, mLo, mHi;
         turnTest(227, t, 0.15, &kLo, &bLo, &mLo);
         turnTest(227, t, 1.0, &kHi, &bHi, &mHi);
         std::printf("    tepe govde kayma acisi: az gaz %.1f deg, tam gaz %.1f deg\n", mLo * 57.3, mHi * 57.3);

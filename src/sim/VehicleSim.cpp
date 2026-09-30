@@ -107,6 +107,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         for (int i = 0; i < 4; ++i) {
             const bool d = i < 2 ? fDriven : rDriven;
             if (d) w_.emplace_back(*dt, tune->psi > 0 ? tune->psi : defPsi, defTemp, ambient);
+            else if (tune->tires == TireType::SemiSlick) w_.emplace_back(semi, 30.0, defTemp, ambient);   // yari-slick 4 teker takim
             else   w_.emplace_back(street, 32.0, 30.0, ambient);
         }
     }
