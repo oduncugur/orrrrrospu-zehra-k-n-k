@@ -35,6 +35,7 @@ public:
     bool takeStalled() { const bool r = stalledEv_; stalledEv_ = false; return r; }
     void recover(double backM = 20.0);
     void bump(double speedFactor);         // carpisma: hiz kaybi
+    void nudge(double dx, double dy) { sim_->nudge(dx, dy); }   // temas: konumu it
 
 private:
     void driverAssist(double dt, double thrIn);

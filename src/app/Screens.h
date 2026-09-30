@@ -2,7 +2,7 @@
 #pragma once
 #include "app/App.h"
 #include "game/DragRace.h"
-#include "game/RoadPath.h"
+#include "game/RoadSession.h"
 #include "sim/PowertrainCore.h"
 
 #include <memory>
@@ -133,8 +133,7 @@ private:
     double pullRpm_ = -1;          // cekis sirasinda devir (-1 = yok)
 };
 
-// Acik yol (serbest surus): dikey 360x640, arkadan takip kamerasi, duzlemsel dinamik.
-// Surus yardimi: otomatik debriyaj (kalkis + vites), otomatik vites (E/Q ile manuele gecer).
+// Acik yol: dikey 360x640, arkadan takip kamerasi, duzlemsel dinamik. Once mod secimi (serbest / yol yarisi).
 class RoadScreen : public Screen {
 public:
     RoadScreen(App& app, int carId, const Tune* tune);
@@ -147,20 +146,20 @@ public:
     void key(Key k, bool down) override;
 
 private:
-    void driverAssist(double dt);
-    void recover();
+    void start(RoadSession::Mode m);
+    void finishRace();
+    void flash(const std::string& m, double t = 1.8) { msg_ = m; msgT_ = t; }
     App& app_;
     int carId_;
-    Tune tune_; bool hasTune_ = false;
-    RoadPath road_;
-    std::unique_ptr<VehicleSim> sim_;
-    int hint_ = 0; double s_ = 0, lat_ = 0;
+    Tune tune_;
+    std::unique_ptr<RoadSession> ses_;
+    bool menu_ = true, rewarded_ = false;
+    long prize_ = 0;
     double steer_ = 0, thr_ = 0, brake_ = 0;
     bool kL_ = false, kR_ = false, kT_ = false, kB_ = false;
     int tL_ = -1, tR_ = -1, tG_ = -1, tB_ = -1;
-    double launchPedal_ = 1.0; bool launching_ = true;
-    double shiftT_ = -1, sinceShift_ = 0; int target_ = 1; bool manual_ = false, assist_ = true, autopilot_ = false;
-    double acc_ = 0, camPsi_ = 0, topSpeed_ = 0, offT_ = 0;
+    bool autopilot_ = false;
+    double camPsi_ = 0, finT_ = 0;
     std::string msg_; double msgT_ = 0;
 };
 

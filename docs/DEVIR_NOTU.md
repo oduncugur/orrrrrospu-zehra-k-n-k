@@ -236,3 +236,10 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - Acik yol: `src/game/RoadPath`, `src/app/RoadScreen.cpp`. Garajda YOL butonu / PgUp. Test: `ZK_START_SCREEN=road ZK_AUTOPILOT=1 ZK_ROAD_LOG=1`.
 - Siradaki: trafik araclari, yol tipleri (otoban/sehirlerarasi/dag-touge), yol disi engeller/carpisma,
   jiroskop direksiyon (Android), yarisma modu (rakip + kontrol noktasi), kariyer odulu.
+
+## Guncelleme — Faz 5 adim 3 (ara taslak)
+- `RoadCar` (oyuncu+YZ ortak), `RoadSession` (serbest / 4 km yol yarisi, trafik, carpisma, geri sayim, sonuc). Ekran: mod menusu.
+- Yarista odul `Career::recordRace` ile (ayni rakip azalmasi gecerli), motor asinmasi kaydedilir.
+- Test: `road_test` (ctest `acik_yol`): 3 aracla 6 km kurtarmasiz + trafikli yaris. `ZK_ROAD_MODE=race ZK_AUTOPILOT=1`.
+- Bilinen: planar skidpad sokak 0.80 g sinirda; oyuncu-rakip temasi basit itme; trafik araclari sabit hizli (fren yok);
+  YZ oyuncuyu sollarken karsi seridi kontrol eder ama agresif degil.

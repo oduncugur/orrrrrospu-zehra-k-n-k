@@ -69,6 +69,7 @@ public:
     double hapticIntensity() const { return haptic_; }
     const WheelSimulation& wheel(int i) const { return w_[i]; }
     // Aci yolda arac kurtarma: konum/yon ayarla, hizlar sifir
+    void nudge(double dx, double dy) { X_ += dx; Y_ += dy; }
     void scaleVelocity(double f) { vx_ *= f; vy_ *= f; r_ *= f; V_ = vx_; }   // carpisma: hiz kaybi
     void resetPose(double x, double y, double psi) { X_ = x; Y_ = y; psi_ = psi; vx_ = vy_ = r_ = 0.0; V_ = 0.0; }
     void setSurfaceMu(double mu) { for (auto& w : w_) w.setSurfaceMu(mu); }   // asfalt 1.0, cim/toprak ~0.55
