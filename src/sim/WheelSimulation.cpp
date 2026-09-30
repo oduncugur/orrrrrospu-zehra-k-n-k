@@ -18,7 +18,7 @@ double WheelSimulation::magicFormula(double s, double Fz, double mu, double B, d
 
 double WheelSimulation::rEff() const {
     // Dikey yay sertligi PSI ile artar; efektif yuvarlanma yaricapi ~ r0 - delta/3
-    const double kVert = 120000.0 + 6500.0 * psi_;           // N/m
+    const double kVert = 60000.0 + 5000.0 * psi_;            // N/m (32 PSI ~ 220 kN/m)
     const double deflection = Fz_ / kVert;
     // Yuksek devirde santrifuj buyume (drag slickleri belirgin uzar)
     const double growth = 1.5e-7 * omega_ * omega_ * p_.radius * (30.0 / std::max(psi_, 8.0));
