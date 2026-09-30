@@ -26,7 +26,7 @@ private:
     App& app_;
     std::unique_ptr<PowertrainCore> pt_;
     float throttle_ = 0; int throttlePtr_ = -1; bool throttleKey_ = false;
-    float spin_ = 0; double acc_ = 0;
+    float spin_ = 0; double acc_ = 0; double hapT_ = 0;
 };
 
 // Drag yarisi: yatay 640x360.
@@ -71,6 +71,9 @@ private:
     std::string flash_; Color flashColor_{1, 1, 1}; double flashT_ = 0;   // kritik an: buyuk yazi
     float camX_ = 0;
     bool autopilot_ = false;
+    // Haptik izleme (onceki kare durumu)
+    int  hapGear_ = 1, hapFlat_ = 0; bool hapLeft_ = false, hapBroke_ = false, hapRed_ = false;
+    double hapLimiterT_ = 0;
 };
 
 } // namespace zk

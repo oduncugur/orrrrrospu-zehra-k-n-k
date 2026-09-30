@@ -9,6 +9,7 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
+#include <algorithm>
 #include <chrono>
 
 using namespace zk;
@@ -77,18 +78,70 @@ void termEGL(Platform& p) {
     p.dpy = EGL_NO_DISPLAY; p.surf = EGL_NO_SURFACE; p.ctx = EGL_NO_CONTEXT;
 }
 
+// Ana thread icin JNI onbellegi (android_main thread'i bir kez baglanir)
+struct Jni {
+    JavaVM* vm = nullptr; JNIEnv* env = nullptr; jobject activity = nullptr;
+    jmethodID setOrientation = nullptr;
+    jobject vibrator = nullptr; jclass effectCls = nullptr; jmethodID createOneShot = nullptr, vibrate = nullptr;
+};
+
+void clearEx(JNIEnv* env) { if (env->ExceptionCheck()) env->ExceptionClear(); }
+
+void jniInit(Jni& j, android_app* app) {
+    j.vm = app->activity->vm;
+    if (j.vm->AttachCurrentThread(&j.env, nullptr) != JNI_OK || !j.env) { j.env = nullptr; return; }
+    JNIEnv* env = j.env;
+    j.activity = app->activity->clazz;
+    jclass actCls = env->GetObjectClass(j.activity);
+    j.setOrientation = env->GetMethodID(actCls, "setRequestedOrientation", "(I)V");
+    jmethodID getSys = env->GetMethodID(actCls, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+    clearEx(env);
+    if (getSys) {
+        jstring name = env->NewStringUTF("vibrator");
+        jobject vib = env->CallObjectMethod(j.activity, getSys, name);
+        clearEx(env);
+        env->DeleteLocalRef(name);
+        jclass eff = env->FindClass("android/os/VibrationEffect");
+        clearEx(env);
+        if (vib && eff) {
+            j.vibrator = env->NewGlobalRef(vib);
+            j.effectCls = (jclass)env->NewGlobalRef(eff);
+            j.createOneShot = env->GetStaticMethodID(j.effectCls, "createOneShot", "(JI)Landroid/os/VibrationEffect;");
+            jclass vibCls = env->GetObjectClass(vib);
+            j.vibrate = env->GetMethodID(vibCls, "vibrate", "(Landroid/os/VibrationEffect;)V");
+            clearEx(env);
+            env->DeleteLocalRef(vibCls);
+        }
+        if (vib) env->DeleteLocalRef(vib);
+        if (eff) env->DeleteLocalRef(eff);
+    }
+    env->DeleteLocalRef(actCls);
+}
+
+void jniShutdown(Jni& j) {
+    if (!j.env) return;
+    if (j.vibrator) j.env->DeleteGlobalRef(j.vibrator);
+    if (j.effectCls) j.env->DeleteGlobalRef(j.effectCls);
+    j.vm->DetachCurrentThread();
+    j.env = nullptr;
+}
+
 // Activity.setRequestedOrientation: 6 = SENSOR_LANDSCAPE, 7 = SENSOR_PORTRAIT
-void requestOrientation(android_app* app, bool landscape) {
-    JavaVM* vm = app->activity->vm;
-    JNIEnv* env = nullptr;
-    if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env) return;
-    jobject activity = app->activity->clazz;
-    jclass cls = env->GetObjectClass(activity);
-    jmethodID mid = env->GetMethodID(cls, "setRequestedOrientation", "(I)V");
-    if (mid) env->CallVoidMethod(activity, mid, landscape ? 6 : 7);
-    if (env->ExceptionCheck()) env->ExceptionClear();
-    env->DeleteLocalRef(cls);
-    vm->DetachCurrentThread();
+void requestOrientation(Jni& j, bool landscape) {
+    if (!j.env || !j.setOrientation) return;
+    j.env->CallVoidMethod(j.activity, j.setOrientation, landscape ? 6 : 7);
+    clearEx(j.env);
+}
+
+// VibrationEffect.createOneShot(ms, genlik 1..255) -> Vibrator.vibrate
+void vibrate(Jni& j, int ms, int amplitude) {
+    if (!j.env || !j.vibrator || !j.createOneShot || !j.vibrate) return;
+    jobject e = j.env->CallStaticObjectMethod(j.effectCls, j.createOneShot, (jlong)ms, (jint)std::clamp(amplitude, 1, 255));
+    clearEx(j.env);
+    if (!e) return;
+    j.env->CallVoidMethod(j.vibrator, j.vibrate, e);
+    clearEx(j.env);
+    j.env->DeleteLocalRef(e);
 }
 
 int32_t onInput(android_app* app, AInputEvent* ev) {
@@ -156,8 +209,11 @@ void android_main(android_app* app) {
     app->userData = &p;
     app->onAppCmd = onCmd;
     app->onInputEvent = onInput;
-    p.game.onOrientation = [app](bool landscape) { requestOrientation(app, landscape); };
-    requestOrientation(app, p.game.landscape());
+    Jni jni;
+    jniInit(jni, app);
+    p.game.onOrientation = [&jni](bool landscape) { requestOrientation(jni, landscape); };
+    p.game.onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
+    requestOrientation(jni, p.game.landscape());
     auto last = std::chrono::steady_clock::now();
 
     while (true) {
@@ -165,7 +221,7 @@ void android_main(android_app* app) {
         android_poll_source* src = nullptr;
         while (ALooper_pollOnce(p.running ? 0 : -1, nullptr, &events, (void**)&src) >= 0) {
             if (src) src->process(app, src);
-            if (app->destroyRequested) { stopAudio(p); termEGL(p); return; }
+            if (app->destroyRequested) { stopAudio(p); termEGL(p); jniShutdown(jni); return; }
         }
         const auto now = std::chrono::steady_clock::now();
         const double dt = std::chrono::duration<double>(now - last).count();

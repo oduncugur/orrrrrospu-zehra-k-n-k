@@ -3,6 +3,7 @@
 #include "Screens.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace zk {
@@ -73,6 +74,24 @@ void App::renderAudio(float* out, int frames) {
         v.synth->render(mix_.data(), frames);
         const float g = v.gain.load() * 0.8f;
         for (int i = 0; i < frames; ++i) out[i] += mix_[i] * g;
+    }
+    // Lastik cigligi: dar bantli rezonansli gurultu; perde ve siddet kayma hizina bagli
+    for (Voice& v : voices_) {
+        const double slip = v.slip.load();
+        const double target = std::clamp((slip - 2.0) / 10.0, 0.0, 1.0);
+        if (target <= 0.0 && v.env < 1e-4) continue;
+        const double f = 850.0 + 45.0 * std::min(slip, 25.0);
+        const double w0 = 2.0 * 3.14159265358979 * f / kSampleRate, q = 14.0, alpha = std::sin(w0) / (2 * q);
+        const double a0 = 1 + alpha, b0 = alpha / a0, a1 = -2 * std::cos(w0) / a0, a2 = (1 - alpha) / a0;
+        const float g = v.gain.load();
+        for (int i = 0; i < frames; ++i) {
+            v.env += (target - v.env) * 0.0008;
+            v.rng ^= v.rng << 13; v.rng ^= v.rng >> 17; v.rng ^= v.rng << 5;
+            const double x = ((v.rng & 0xFFFF) / 32768.0 - 1.0);
+            const double y = b0 * x - a1 * v.z1 - a2 * v.z2;           // iki kutuplu rezonator
+            v.z2 = v.z1; v.z1 = y;
+            out[i] += (float)(y * v.env * 0.9 * g);
+        }
     }
     audioLock_.unlock();
     for (int i = 0; i < frames; ++i) out[i] = std::clamp(out[i], -1.0f, 1.0f);

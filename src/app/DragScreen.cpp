@@ -41,11 +41,12 @@ DragScreen::DragScreen(App& app, int playerCar, int opponentCar) : app_(app), se
 
 void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
-    race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], TreeType::Sportsman, seed_, true);
+    race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true);
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;
     knobX_ = kColX[0]; knobY_ = kRowTop; pendingGear_ = 1; pendingPaddle_ = 0;
     finishedT_ = 0; t_ = 0;
+    hapGear_ = 1; hapFlat_ = 0; hapLeft_ = hapBroke_ = hapRed_ = false; hapLimiterT_ = 0;
     race_->setPlayerAutopilot(autopilot_);
 }
 
@@ -206,6 +207,22 @@ void DragScreen::update(double dt) {
 
     camX_ = (float)race_->lane(0).sim->distance() - kCamLead;
 
+    // ---- haptik (oyuncu serdi) ----
+    {
+        const LaneState& P = race_->lane(0);
+        const PowertrainCore& pt = P.sim->powertrain();
+        if (P.left && !hapLeft_) app_.haptic(45, 220);                       // kalkis vurusu
+        if (pt.gear() != hapGear_ && pt.gear() > 0) app_.haptic(22, 150);   // vites
+        if (P.slip.broke && !hapBroke_) app_.haptic(320, 255);              // aks kirildi
+        if (P.slip.redLight && !hapRed_) app_.haptic(180, 200);
+        hapLimiterT_ -= dt;
+        if ((pt.limiterHit() || P.cutIgnition) && hapLimiterT_ <= 0) { app_.haptic(10, 90); hapLimiterT_ = 0.06; }   // kesici tirtiklamasi
+        int flat = 0;
+        for (int i = 0; i < 4; ++i) flat += P.sim->wheel(i).hapticPulseCount();
+        if (flat > hapFlat_) app_.haptic(14, (int)std::clamp(80 + 400 * P.sim->hapticIntensity(), 80.0, 255.0));   // flat-spot turu
+        hapLeft_ = P.left; hapGear_ = pt.gear() > 0 ? pt.gear() : hapGear_; hapBroke_ = P.slip.broke; hapRed_ = P.slip.redLight; hapFlat_ = flat;
+    }
+
     // ---- ses ----
     for (int lane = 0; lane < 2; ++lane) {
         const LaneState& L = race_->lane(lane);
@@ -216,6 +233,12 @@ void DragScreen::update(double dt) {
             gain = (float)(0.45 * std::clamp(1.0 - gap / 150.0, 0.15, 1.0));
         }
         app_.voice(lane, pt.rpm(), pt.throttleEffective(), pt.limiterHit() || L.cutIgnition, pt.gear() > 0, gain);
+        double slip = 0;
+        for (int i = 0; i < 4; ++i) {
+            const WheelSimulation& w = L.sim->wheel(i);
+            if (w.Fz() > 100) slip = std::max(slip, std::fabs(w.omega() * w.rEff() - L.sim->speed()));
+        }
+        app_.tire(lane, slip);
     }
 }
 

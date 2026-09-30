@@ -5,6 +5,7 @@
 #include "audio/ProceduralEngineAudio.h"
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -48,8 +49,11 @@ public:
     void renderAudio(float* out, int frames);
     bool readPixelsRGB(std::vector<unsigned char>& rgb, int& w, int& h);
 
-    // Platform geri cagrisi: ekran yonu degisti (true = yatay)
+    // Platform geri cagrilari: ekran yonu (true = yatay), titresim (sure ms, siddet 1..255)
     std::function<void(bool)> onOrientation;
+    std::function<void(int, int)> onHaptic;
+    void haptic(int ms, int amplitude) { if (onHaptic) onHaptic(ms, amplitude); }
+    bool treePro = false;                         // agac tipi (garajda secilir)
     bool landscape() const { return screen_ && screen_->landscape(); }
 
     // Ekranlar icin
@@ -58,12 +62,16 @@ public:
     int  selectedCar = 5;
     void setVoice(int i, const VehicleDef* v);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
+    void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
 
 private:
     struct Voice {
         std::unique_ptr<ProceduralEngineAudio> synth;
         std::atomic<float> rpm{900}, thr{0}, gain{1};
         std::atomic<bool> cut{false}, inGear{false};
+        std::atomic<float> slip{0};
+        // Lastik cigligi sentez durumu (yalnizca ses thread'i)
+        double z1 = 0, z2 = 0, env = 0; uint32_t rng = 0x1234567u;
     };
     void setScreen(std::unique_ptr<Screen> s);
 

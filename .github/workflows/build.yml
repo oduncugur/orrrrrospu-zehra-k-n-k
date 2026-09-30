@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# Ayni dalda yeni push gelirse eski calisma iptal (latest-build surumu icin yaris durumu olmasin)
+concurrency:
+  group: derleme-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   desktop:
     name: Windows + Linux (grafik oyun + konsol araclari)
