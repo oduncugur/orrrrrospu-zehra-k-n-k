@@ -34,6 +34,12 @@ int  sellPrice(const OwnedCar& c);
 double performanceIndex(const VehicleDef& v, const Tune& t);
 int  racePrize(const VehicleDef& opponent, bool won);
 
+// Rakip: oyuncunun (parcali) performansina yakin arac + yapay zekanin parca seti (stok / sokak / drag)
+struct Opponent { int carId; Tune tune; double index; };
+Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed);
+// Kisa parca ozeti (HUD): "SLICK ST2 KM 1.5W T1"
+std::string tuneSummary(const Tune& t);
+
 struct Career {
     static constexpr int kVersion = 1;
     long money = 0;

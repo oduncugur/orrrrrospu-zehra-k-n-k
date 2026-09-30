@@ -32,8 +32,11 @@ std::string sec(double t) { if (t < 0) return "--.---"; char b[16]; std::snprint
 const Color kDim{0.18f, 0.16f, 0.12f}, kAmber{1.0f, 0.62f, 0.05f}, kGreen{0.1f, 1.0f, 0.25f}, kRed{1.0f, 0.1f, 0.1f};
 } // namespace
 
-DragScreen::DragScreen(App& app, int playerCar, int opponentCar) : app_(app), seed_(1234) {
+DragScreen::DragScreen(App& app, int playerCar, int opponentCar, const Tune* playerTune, const Tune* opponentTune, bool career)
+    : app_(app), seed_(1234), career_(career) {
     carIds_[0] = playerCar; carIds_[1] = opponentCar;
+    if (playerTune) { tunes_[0] = *playerTune; hasTune_[0] = true; }
+    if (opponentTune) { tunes_[1] = *opponentTune; hasTune_[1] = true; }
     app_.setVoice(0, findVehicle(playerCar));
     app_.setVoice(1, findVehicle(opponentCar));
     restart();
@@ -41,7 +44,9 @@ DragScreen::DragScreen(App& app, int playerCar, int opponentCar) : app_(app), se
 
 void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
-    race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true);
+    race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
+                                       hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
+    rewarded_ = false; prize_ = 0;
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;
     knobX_ = kColX[0]; knobY_ = kRowTop; pendingGear_ = 1; pendingPaddle_ = 0;
@@ -182,6 +187,14 @@ void DragScreen::update(double dt) {
     tickerT_ -= dt; flashT_ -= dt;
     if (tickerT_ <= 0 && !ticker_.empty()) { ticker_.erase(ticker_.begin()); tickerT_ = ticker_.empty() ? 0 : 2.0; }
     if (race_->phase() == RacePhase::Finished) finishedT_ += dt;
+    // Kariyer: sonuc bir kez islenir ve kaydedilir (otopilotta degil)
+    if (career_ && !autopilot_ && !rewarded_ && race_->phase() == RacePhase::Finished) {
+        rewarded_ = true;
+        const bool won = race_->winner() == 0;
+        const TimeSlip& s = race_->lane(0).slip;
+        app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_);
+        app_.saveCareer();
+    }
 
     // ---- duman: tahrikli tekerlek kayma hizi yuksekse ----
     for (int lane = 0; lane < 2; ++lane) {
@@ -498,7 +511,11 @@ void DragScreen::drawResults(Renderer& r) {
     const LaneState& O = race_->lane(1);
     r.rect(110, 40, 530, 304, {0.03f, 0.03f, 0.05f, 0.96f});
     const bool won = race_->winner() == 0;
-    r.textCentered(320, 50, won ? "KAZANDIN!" : "KAYBETTIN", 3, won ? kGreen : kRed);
+    r.textCentered(career_ ? 250 : 320, 50, won ? "KAZANDIN!" : "KAYBETTIN", 3, won ? kGreen : kRed);
+    if (career_) {
+        char pb[48]; std::snprintf(pb, sizeof pb, "+$%ld", prize_);
+        r.text(420, 52, prize_ > 0 ? pb : "$0", 2, prize_ > 0 ? kGreen : Color{0.6f, 0.6f, 0.6f});
+    }
     r.text(250, 80, "SEN", 2, {1, 1, 1});
     r.text(390, 80, "RAKIP", 2, {1.0f, 0.75f, 0.55f});
     auto row = [&](int i, const char* label, const std::string& a, const std::string& o) {

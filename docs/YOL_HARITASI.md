@@ -9,7 +9,7 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 | 2 | 324 araç / 280 motor / 127 şanzıman kataloğu, prosedürel ses, süspansiyon + yol | ✅ |
 | 2.5 | Grafik istemci iskeleti (Android + Windows + Linux), garaj ekranı, CI + indirme linki | ✅ |
 | **3** | **Oynanabilir drag yarışı (yan mod / yatay ekran)** | ⏳ ara taslak oynanabilir, cila sürüyor |
-| 4 | Kariyer ve ekonomi: para, garaj, parça/tuning, swap, dyno, kayıt | |
+| 4 | Kariyer ve ekonomi: para, garaj, parça/tuning, swap, dyno, kayıt | ⏳ ara taslak oynanabilir |
 | 5 | Dik mod: 3D spline yol, jiroskop direksiyon, trafik, virajlar, yanal lastik modeli | |
 | 6 | Isı, arıza ve yakıt sistemleri; şehirlerarası maraton, benzinlik, polis, çekici | |
 | 7 | Çok oyunculu: deterministik rollback netcode, sunucu doğrulaması, modlar | |
@@ -53,3 +53,12 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
    (ör. slick lastik 60 ft'i kısaltır, krom-moly aks kırılmaz).
 4. Dyno ekranı: motorun güç/tork eğrisi (parçalarla birlikte) grafik olarak.
 5. Yarış ödülleri: rakip zorluğuna göre para; kazanç/kayıp kaydı.
+
+### Faz 4 durum (ara taslak)
+- [x] 1. Kayıt: sürümlü, sağlama toplamlı, atomik; Android iç depolama / masaüstü kullanıcı klasörü (`tests/career_test`)
+- [x] 2. Galeri: 324 araç fiyatı, satın alma / satma
+- [x] 3. Parça dükkânı: 12 kategori, fizikte gerçek etki (`tests/tune_test`), aks riski tahmini
+- [x] 4. Dyno: parçalı vs stok güç/tork eğrisi, sesli çekiş
+- [x] 5. Yarış ödülü + performansa göre rakip eşleştirme (yapay zekâ parça setiyle)
+- [ ] Denge: ödül/fiyat ekonomisi oyun testiyle ayarlanacak; aynı rakibe tekrar yarışta ödül azalması
+- [ ] Frankenstein motor swap (Faz 3.5 şartnamesi: blok + kapak) — Faz 6 motor atölyesiyle birlikte

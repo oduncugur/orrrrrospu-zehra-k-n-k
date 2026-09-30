@@ -9,7 +9,24 @@
 
 namespace zk {
 
-App::App() { setScreen(std::make_unique<GarageScreen>(*this)); }
+App::App(const std::string& saveDir) {
+    if (!saveDir.empty()) {
+        savePath_ = saveDir;
+        if (savePath_.back() != '/' && savePath_.back() != '\\') savePath_ += '/';
+        savePath_ += "kariyer.zks";
+        career = Career::loadOrNew(savePath_);
+    } else {
+        career = Career::newGame();
+    }
+    treePro = career.treePro;
+    selectedCar = career.car().carId;
+    setScreen(std::make_unique<GarageScreen>(*this));
+}
+
+void App::saveCareer() {
+    career.treePro = treePro;
+    if (!savePath_.empty()) career.save(savePath_);
+}
 App::~App() = default;
 
 bool App::initGraphics() { return renderer_.init(); }
@@ -21,10 +38,18 @@ void App::setScreen(std::unique_ptr<Screen> s) {
 }
 void App::goGarage() { setVoice(1, nullptr); setScreen(std::make_unique<GarageScreen>(*this)); }
 void App::goDrag(int p, int o, bool autopilot) {
-    auto s = std::make_unique<DragScreen>(*this, p, o);
+    auto s = std::make_unique<DragScreen>(*this, p, o, nullptr, nullptr, false);
     s->setAutopilot(autopilot);
     setScreen(std::move(s));
 }
+void App::goCareerRace() {
+    const OwnedCar& oc = career.car();
+    const Opponent opp = pickOpponent(oc.carId, oc.tune, raceSeed_++);
+    setScreen(std::make_unique<DragScreen>(*this, oc.carId, opp.carId, &oc.tune, &opp.tune, true));
+}
+void App::goParts() { setScreen(std::make_unique<PartsScreen>(*this)); }
+void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
+void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
 
 void App::update(double dt) {
     if (pending_) {
@@ -55,6 +80,11 @@ void App::pointerMove(int id, float px, float py) {
 }
 void App::pointerUp(int id) { screen_->pointerUp(id); }
 void App::key(Key k, bool down) { screen_->key(k, down); }
+bool App::back() {
+    if (dynamic_cast<GarageScreen*>(screen_.get()) && !pending_) return false;
+    screen_->key(Key::Back, true);
+    return true;
+}
 
 void App::setVoice(int i, const VehicleDef* v) {
     std::unique_ptr<ProceduralEngineAudio> s = v ? std::make_unique<ProceduralEngineAudio>(*v, kSampleRate) : nullptr;

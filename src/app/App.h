@@ -3,6 +3,7 @@
 #pragma once
 #include "app/Renderer.h"
 #include "audio/ProceduralEngineAudio.h"
+#include "game/Career.h"
 
 #include <atomic>
 #include <cstdint>
@@ -34,7 +35,7 @@ public:
 class App {
 public:
     static constexpr int kSampleRate = 48000;
-    App();
+    explicit App(const std::string& saveDir = "");   // kayit klasoru (bossa kayit yok)
     ~App();
 
     bool initGraphics();
@@ -46,6 +47,7 @@ public:
     void pointerMove(int id, float px, float py);
     void pointerUp(int id);
     void key(Key k, bool down);
+    bool back();                                  // geri: garaj disindaysa ekran isler (true); garajda false (uygulamadan cik)
     void renderAudio(float* out, int frames);
     bool readPixelsRGB(std::vector<unsigned char>& rgb, int& w, int& h);
 
@@ -61,8 +63,14 @@ public:
 
     // Ekranlar icin
     void goGarage();
-    void goDrag(int playerCarId, int opponentCarId, bool autopilot = false);
-    int  selectedCar = 5;
+    void goDrag(int playerCarId, int opponentCarId, bool autopilot = false);   // serbest (kariyer disi) yaris
+    void goCareerRace();                        // kariyer araci + parcalari vs eslesen rakip
+    void goParts();
+    void goGallery();
+    void goDyno();
+    Career career;
+    void saveCareer();
+    int  selectedCar = 5;                       // serbest mod / test icin
     void setVoice(int i, const VehicleDef* v);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
     void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
@@ -83,6 +91,8 @@ private:
     int sw_ = 1, sh_ = 1;
     std::mutex audioLock_;
     Voice voices_[2];
+    std::string savePath_;
+    uint32_t raceSeed_ = 1;
     std::vector<float> mix_;
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <memory>
 
 using namespace zk;
 
@@ -18,7 +19,7 @@ namespace {
 
 struct Platform {
     android_app* app = nullptr;
-    App game;
+    std::unique_ptr<App> game;       // kayit klasoru bilinince olusturulur (android_main)
     EGLDisplay dpy = EGL_NO_DISPLAY; EGLSurface surf = EGL_NO_SURFACE; EGLContext ctx = EGL_NO_CONTEXT;
     AAudioStream* stream = nullptr;
     bool running = false;
@@ -37,7 +38,7 @@ void startAudio(Platform& p) {
     AAudioStreamBuilder_setChannelCount(b, 1);
     AAudioStreamBuilder_setSampleRate(b, App::kSampleRate);
     AAudioStreamBuilder_setPerformanceMode(b, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    AAudioStreamBuilder_setDataCallback(b, audioCb, &p.game);
+    AAudioStreamBuilder_setDataCallback(b, audioCb, p.game.get());
     if (AAudioStreamBuilder_openStream(b, &p.stream) == AAUDIO_OK) AAudioStream_requestStart(p.stream);
     else p.stream = nullptr;
     AAudioStreamBuilder_delete(b);
@@ -63,12 +64,12 @@ bool initEGL(Platform& p) {
     EGLint w = 1, h = 1;
     eglQuerySurface(p.dpy, p.surf, EGL_WIDTH, &w);
     eglQuerySurface(p.dpy, p.surf, EGL_HEIGHT, &h);
-    p.game.resize(w, h);
-    return p.game.initGraphics();
+    p.game->resize(w, h);
+    return p.game->initGraphics();
 }
 
 void termEGL(Platform& p) {
-    p.game.shutdownGraphics();
+    p.game->shutdownGraphics();
     if (p.dpy != EGL_NO_DISPLAY) {
         eglMakeCurrent(p.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         if (p.ctx != EGL_NO_CONTEXT) eglDestroyContext(p.dpy, p.ctx);
@@ -148,9 +149,8 @@ int32_t onInput(android_app* app, AInputEvent* ev) {
     Platform& p = *static_cast<Platform*>(app->userData);
     if (AInputEvent_getType(ev) == AINPUT_EVENT_TYPE_KEY) {
         if (AKeyEvent_getKeyCode(ev) != AKEYCODE_BACK) return 0;
-        if (!p.game.landscape()) return 0;                          // garajda: varsayilan (uygulamadan cik)
-        if (AKeyEvent_getAction(ev) == AKEY_EVENT_ACTION_UP) p.game.key(Key::Back, true);
-        return 1;
+        if (AKeyEvent_getAction(ev) != AKEY_EVENT_ACTION_UP) return 1;
+        return p.game->back() ? 1 : 0;                                // garajda: varsayilan (uygulamadan cik)
     }
     if (AInputEvent_getType(ev) != AINPUT_EVENT_TYPE_MOTION) return 0;
     const int32_t action = AMotionEvent_getAction(ev);
@@ -159,18 +159,18 @@ int32_t onInput(android_app* app, AInputEvent* ev) {
     switch (act) {
     case AMOTION_EVENT_ACTION_DOWN:
     case AMOTION_EVENT_ACTION_POINTER_DOWN:
-        p.game.pointerDown(AMotionEvent_getPointerId(ev, idx), AMotionEvent_getX(ev, idx), AMotionEvent_getY(ev, idx));
+        p.game->pointerDown(AMotionEvent_getPointerId(ev, idx), AMotionEvent_getX(ev, idx), AMotionEvent_getY(ev, idx));
         break;
     case AMOTION_EVENT_ACTION_MOVE:
         for (size_t i = 0; i < AMotionEvent_getPointerCount(ev); ++i)
-            p.game.pointerMove(AMotionEvent_getPointerId(ev, i), AMotionEvent_getX(ev, i), AMotionEvent_getY(ev, i));
+            p.game->pointerMove(AMotionEvent_getPointerId(ev, i), AMotionEvent_getX(ev, i), AMotionEvent_getY(ev, i));
         break;
     case AMOTION_EVENT_ACTION_UP:
     case AMOTION_EVENT_ACTION_POINTER_UP:
-        p.game.pointerUp(AMotionEvent_getPointerId(ev, idx));
+        p.game->pointerUp(AMotionEvent_getPointerId(ev, idx));
         break;
     case AMOTION_EVENT_ACTION_CANCEL:
-        for (size_t i = 0; i < AMotionEvent_getPointerCount(ev); ++i) p.game.pointerUp(AMotionEvent_getPointerId(ev, i));
+        for (size_t i = 0; i < AMotionEvent_getPointerCount(ev); ++i) p.game->pointerUp(AMotionEvent_getPointerId(ev, i));
         break;
     default: break;
     }
@@ -194,7 +194,7 @@ void onCmd(android_app* app, int32_t cmd) {
             EGLint w = 1, h = 1;
             eglQuerySurface(p.dpy, p.surf, EGL_WIDTH, &w);
             eglQuerySurface(p.dpy, p.surf, EGL_HEIGHT, &h);
-            p.game.resize(w, h);
+            p.game->resize(w, h);
         }
         break;
     default: break;
@@ -206,14 +206,15 @@ void onCmd(android_app* app, int32_t cmd) {
 void android_main(android_app* app) {
     Platform p;
     p.app = app;
+    p.game = std::make_unique<App>(app->activity->internalDataPath ? app->activity->internalDataPath : "");
     app->userData = &p;
     app->onAppCmd = onCmd;
     app->onInputEvent = onInput;
     Jni jni;
     jniInit(jni, app);
-    p.game.onOrientation = [&jni](bool landscape) { requestOrientation(jni, landscape); };
-    p.game.onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
-    requestOrientation(jni, p.game.landscape());
+    p.game->onOrientation = [&jni](bool landscape) { requestOrientation(jni, landscape); };
+    p.game->onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
+    requestOrientation(jni, p.game->landscape());
     auto last = std::chrono::steady_clock::now();
 
     while (true) {
@@ -227,8 +228,8 @@ void android_main(android_app* app) {
         const double dt = std::chrono::duration<double>(now - last).count();
         last = now;
         if (!p.running) continue;
-        p.game.update(dt);
-        p.game.render();
+        p.game->update(dt);
+        p.game->render();
         eglSwapBuffers(p.dpy, p.surf);
     }
 }

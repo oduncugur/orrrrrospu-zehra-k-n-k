@@ -54,7 +54,11 @@ int main(int argc, char** argv) {
     if (!ctx || !zkLoadGL(getProc)) { std::fprintf(stderr, "OpenGL 3.3 baglami: %s\n", SDL_GetError()); return 1; }
     SDL_GL_SetSwapInterval(1);
 
-    App game;
+    // Kayit klasoru: ZK_SAVE_DIR (test) ya da SDL kullanici klasoru
+    std::string saveDir;
+    if (const char* sd = std::getenv("ZK_SAVE_DIR")) saveDir = sd;
+    else if (char* pp = SDL_GetPrefPath("ZehraKinik", "ZehraKinik")) { saveDir = pp; SDL_free(pp); }
+    App game(saveDir);
     if (carDelta) game.selectedCar = 5 + carDelta;
     const bool startDrag = std::getenv("ZK_START_DRAG") != nullptr;   // test: dogrudan yarisa
     game.onOrientation = [&](bool landscape) {
@@ -85,6 +89,11 @@ int main(int argc, char** argv) {
         }
     }
     size_t scriptPos = 0;
+    if (const char* ss = std::getenv("ZK_START_SCREEN")) {       // test: dogrudan bir ekran
+        const std::string n = ss;
+        if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
+        else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
+    }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;
     SDL_GetWindowSizeInPixels(win, &pw, &ph);
@@ -127,7 +136,7 @@ int main(int argc, char** argv) {
                 const bool down = e.type == SDL_EVENT_KEY_DOWN;
                 if (down && e.key.repeat) break;
                 const SDL_Keycode k = e.key.key;
-                if (k == SDLK_ESCAPE && down && !game.landscape()) { quit = true; break; }
+                if (k == SDLK_ESCAPE) { if (down && !game.back()) quit = true; break; }
                 struct Map { SDL_Keycode sdl; Key key; };
                 static const Map map[] = {
                     {SDLK_W, Key::Throttle}, {SDLK_UP, Key::Throttle}, {SDLK_S, Key::Brake}, {SDLK_DOWN, Key::Brake},

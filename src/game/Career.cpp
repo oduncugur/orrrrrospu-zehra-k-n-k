@@ -129,6 +129,45 @@ int racePrize(const VehicleDef& opponent, bool won) {
     return won ? (int)(std::round((250.0 + carPrice(opponent) * 0.04) / 10.0) * 10.0) : 0;
 }
 
+Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed) {
+    const VehicleDef& pv = *findVehicle(playerCarId);
+    const double target = performanceIndex(pv, playerTune);
+    Tune presets[3];
+    presets[1].intake = 1; presets[1].exhaust = 1; presets[1].tires = TireType::SemiSlick; presets[1].diff = DiffType::OneAndHalfWay;
+    presets[2].intake = 2; presets[2].exhaust = 2; presets[2].ecu = 1; presets[2].tires = TireType::DragSlick;
+    presets[2].clutch = 1; presets[2].axles = 1; presets[2].diff = DiffType::OneAndHalfWay;
+    std::vector<Opponent> all;
+    for (const auto& v : vehicleCatalog()) {
+        if (v.id == playerCarId || !v.streetLegal) continue;
+        for (const Tune& t : presets) all.push_back({v.id, t, performanceIndex(v, t)});
+    }
+    std::vector<const Opponent*> pool;
+    for (double band : {0.06, 0.12, 0.25, 1.0}) {                 // yeterli aday yoksa bandi genislet
+        pool.clear();
+        for (const Opponent& o : all) if (std::fabs(o.index / target - 1.0) <= band) pool.push_back(&o);
+        if (pool.size() >= 6) break;
+    }
+    if (pool.empty()) return {playerCarId, Tune{}, target};
+    uint32_t x = seed * 2654435761u + 0x9E3779B9u; x ^= x >> 15;
+    return *pool[x % pool.size()];
+}
+
+std::string tuneSummary(const Tune& t) {
+    std::string s;
+    auto add = [&](const char* p) { if (!s.empty()) s += ' '; s += p; };
+    if (t.tires == TireType::DragSlick) add("SLICK"); else if (t.tires == TireType::SemiSlick) add("YARI-SLICK"); else add("SOKAK");
+    if (t.clutch) add(t.clutch == 1 ? "ST1" : t.clutch == 2 ? "ST2" : "ST3");
+    if (t.axles) add(t.axles == 1 ? "KM-AKS" : "300M");
+    if (t.diff != DiffType::Open) add(t.diff == DiffType::OneAndHalfWay ? "1.5W" : t.diff == DiffType::TwoWay ? "2W" : "SPOOL");
+    if (t.turbo) add(t.turbo == 1 ? "TURBO-K" : "TURBO-B");
+    if (t.ecu) add("ECU");
+    if (t.intake || t.exhaust) add("EMME/EGZ");
+    if (t.weight) add("HAFIF");
+    if (t.drySump) add("KURU-KRT");
+    if (t.fuel == FuelType::E85) add("E85");
+    return s;
+}
+
 // ------------------------------------------------------------------ kariyer islemleri
 Career Career::newGame() {
     Career c;
