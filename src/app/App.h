@@ -56,7 +56,8 @@ public:
     std::function<void(bool)> onOrientation;
     std::function<void(int, int)> onHaptic;
     void haptic(int ms, int amplitude) { if (onHaptic) onHaptic(ms, amplitude); }
-    bool treePro = false;                         // agac tipi (garajda secilir)
+    bool treePro = false;
+    std::string startupMsg;                       // acilista garajda bir kez gosterilir                         // agac tipi (garajda secilir)
     // Performans olcumu (ekranda kucuk gosterge): kare hizi ve kare basina guncelleme (fizik) suresi
     double fps() const { return fps_; }
     double updateMs() const { return updMs_; }

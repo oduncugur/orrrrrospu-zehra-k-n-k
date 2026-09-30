@@ -14,7 +14,9 @@ App::App(const std::string& saveDir) {
         savePath_ = saveDir;
         if (savePath_.back() != '/' && savePath_.back() != '\\') savePath_ += '/';
         savePath_ += "kariyer.zks";
-        career = Career::loadOrNew(savePath_);
+        bool corrupt = false;
+        career = Career::loadOrNew(savePath_, &corrupt);
+        if (corrupt) startupMsg = "KAYIT BOZUK - YENI OYUN";
     } else {
         career = Career::newGame();
     }

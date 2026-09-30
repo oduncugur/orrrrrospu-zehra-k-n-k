@@ -129,6 +129,26 @@ int main() {
         c.recordDamage(false, 0.1, true);
         CHECK(!c.car().raceable() && c.car().engineWear == 1.0, "sarmis yatak: motor revizyonu gerekir");
     }
+    std::printf("[I] Para kasma engeli + bozuk kayit\n");
+    {
+        Career c = Career::newGame();
+        const VehicleDef& opp = *findVehicle(227);
+        long p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+        c.recordRace(opp, true, 13.0, &p1); c.recordRace(opp, true, 13.0, &p2); c.recordRace(opp, true, 13.0, &p3);
+        c.recordRace(*findVehicle(5), true, 13.0, &p4);
+        std::printf("    ayni rakip odulleri: %ld %ld %ld\n", p1, p2, p3);
+        CHECK(p2 < p1 && p3 < p2 && p3 >= p1 / 4, "ayni rakibe ust uste galibiyet odulu azalir");
+        CHECK(p4 == racePrize(*findVehicle(5), true), "yeni rakipte odul tam");
+        Career d; CHECK(Career::parse(c.serialize(), d) && d.lastOppId == 5 && d.sameOppWins == 1, "seri kayitta korunur");
+        const std::string path = "/tmp/zk_bozuk_test.zks";
+        { std::FILE* f = std::fopen(path.c_str(), "wb"); std::fputs("cop veri", f); std::fclose(f); }
+        bool corrupt = false;
+        Career e = Career::loadOrNew(path, &corrupt);
+        std::FILE* bk = std::fopen((path + ".bozuk").c_str(), "rb");
+        CHECK(corrupt && bk && e.money == Career::newGame().money, "bozuk kayit: bildirilir, yedeklenir, yeni oyun");
+        if (bk) std::fclose(bk);
+        std::remove((path + ".bozuk").c_str());
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

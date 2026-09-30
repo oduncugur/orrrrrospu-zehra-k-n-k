@@ -53,6 +53,7 @@ struct Career {
     int  races = 0, wins = 0;
     long earnings = 0;
     bool treePro = false;
+    int  lastOppId = 0, sameOppWins = 0;   // ayni rakibi tekrar tekrar yenme (odul azalir, para kasma engeli)
 
     static Career newGame();
     OwnedCar& car() { return cars[current]; }
@@ -70,7 +71,8 @@ struct Career {
     std::string serialize() const;
     static bool parse(const std::string& text, Career& out);   // bozuk/eksik veride false
     bool save(const std::string& path) const;                  // atomik: gecici dosya + yeniden adlandirma
-    static Career loadOrNew(const std::string& path);
+    // corrupt: dosya var ama okunamadi (bozuk dosya .bozuk olarak saklanir, yeni oyun baslar)
+    static Career loadOrNew(const std::string& path, bool* corrupt = nullptr);
 };
 
 } // namespace zk

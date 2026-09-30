@@ -26,6 +26,7 @@ double peakHp(const EngineSpec& e) {
 GarageScreen::GarageScreen(App& app) : app_(app) {
     app_.setVoice(1, nullptr);
     select(app_.career.current);
+    if (!app_.startupMsg.empty()) { msg_ = app_.startupMsg; msgT_ = 4.0; app_.startupMsg.clear(); }
 }
 
 void GarageScreen::refreshEngine() {

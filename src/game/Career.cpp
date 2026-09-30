@@ -213,7 +213,11 @@ bool Career::buyPart(PartCat c, int level, std::string* why) {
 }
 
 void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut) {
-    const long prize = racePrize(opponent, won);
+    // Ayni rakibe ust uste galibiyet: odul %25 azalir (en az %25)
+    if (opponent.id != lastOppId) { lastOppId = opponent.id; sameOppWins = 0; }
+    const double decay = won ? std::max(0.25, 1.0 - 0.25 * sameOppWins) : 1.0;
+    const long prize = (long)(racePrize(opponent, won) * decay);
+    if (won) ++sameOppWins;
     money += prize; earnings += prize;
     ++races; if (won) ++wins;
     OwnedCar& oc = car();
@@ -262,7 +266,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\n";
     char buf[256];
     for (const OwnedCar& c : cars) {
         const Tune& t = c.tune;
@@ -300,6 +304,10 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "wins") c.wins = std::max(0, std::atoi(v.c_str()));
         else if (k == "earnings") c.earnings = std::max(0L, std::atol(v.c_str()));
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
+        else if (k == "streak") {
+            if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;
+            c.sameOppWins = std::clamp(c.sameOppWins, 0, 100);
+        }
         else if (k == "dmg" && !c.cars.empty()) {          // onceki araca ait hasar
             int ax = 0; double ew = 0;
             if (std::sscanf(v.c_str(), "%d;%lf", &ax, &ew) != 2) return false;
@@ -351,13 +359,17 @@ bool Career::save(const std::string& path) const {
     return std::rename(tmp.c_str(), path.c_str()) == 0;
 }
 
-Career Career::loadOrNew(const std::string& path) {
-    std::ifstream f(path, std::ios::binary);
-    if (f) {
+Career Career::loadOrNew(const std::string& path, bool* corrupt) {
+    if (corrupt) *corrupt = false;
+    {
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return newGame();
         std::stringstream ss; ss << f.rdbuf();
         Career c;
         if (parse(ss.str(), c)) return c;
     }
+    std::rename(path.c_str(), (path + ".bozuk").c_str());      // kullanici/destek icin sakla, uzerine yazilmasin
+    if (corrupt) *corrupt = true;
     return newGame();
 }
 

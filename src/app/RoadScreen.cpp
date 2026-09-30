@@ -233,12 +233,13 @@ void RoadScreen::render(Renderer& r) {
     r.rect(230, 12, 230 + 122 * fill, 24, pt.rpm() > red * 0.9 ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
     std::snprintf(b, sizeof b, "%5.0f RPM", pt.rpm());
     r.text(236, 30, b, 1, {1, 1, 1});
+    r.text(236, 46, assist_ ? "YARDIM ACIK" : "YARDIM KAPALI", 1, assist_ ? Color{0.4f, 0.9f, 0.5f} : Color{1.0f, 0.5f, 0.3f});
     std::snprintf(b, sizeof b, "%.2f KM  %.2f G  KAYMA %2.0f", s_ / 1000.0, std::fabs(sim_->lateralAccel()) / 9.81, std::fabs(sim_->bodySlipAngle()) * 57.3);
     r.text(8, 46, b, 1, {0.75f, 0.8f, 0.9f});
     if (std::fabs(lat_) > road_.halfWidth() + 0.6) r.textCentered(W / 2.0f, 70, "YOL DISI", 2, {1.0f, 0.4f, 0.2f});
     if (msgT_ > 0) r.textCentered(W / 2.0f, 92, msg_, 1, {1.0f, 0.85f, 0.3f});
 #ifndef __ANDROID__
-    r.text(8, 510, "</> DIREKSIYON  W GAZ  S FREN  E/Q VITES  ESC", 1, {0.55f, 0.75f, 1.0f});
+    r.text(8, 510, "<> DIREKSIYON W GAZ S FREN E/Q VITES PGDN YARDIM", 1, {0.55f, 0.75f, 1.0f});
 #endif
     // Dokunmatik kontroller
     button(r, kSteerL, "<", tL_ >= 0 ? kUiOrange : Color{0.2f, 0.22f, 0.28f, 0.8f}, 4);
@@ -253,7 +254,9 @@ void RoadScreen::pointerDown(int id, float x, float y) {
     else if (kSteerR.hit(x, y)) tR_ = id;
     else if (kBrakeB.hit(x, y)) tB_ = id;
     else if (kGas.hit(x, y)) tG_ = id;
-    else if (y < 60) {                                      // ustteki gosterge: manuel/otomatik degistir
+    else if (y < 60 && x > 230) {                           // sag ust: surus yardimi ac/kapa
+        assist_ = !assist_; msg_ = assist_ ? "SURUS YARDIMI ACIK" : "SURUS YARDIMI KAPALI"; msgT_ = 1.5;
+    } else if (y < 60) {                                      // ustteki gosterge: manuel/otomatik degistir
         manual_ = !manual_; msg_ = manual_ ? "MANUEL VITES (E/Q)" : "OTOMATIK VITES"; msgT_ = 1.5;
     } else if (y > 380 && y < 520) {                        // manuel: ekranin sol/sag alt yarisi vites
         if (manual_ && shiftT_ < 0) {
@@ -286,6 +289,7 @@ void RoadScreen::key(Key k, bool down) {
         }
         break;
     case Key::Enter: if (down) { manual_ = !manual_; msg_ = manual_ ? "MANUEL VITES" : "OTOMATIK VITES"; msgT_ = 1.5; } break;
+    case Key::PageDown: if (down) { assist_ = !assist_; msg_ = assist_ ? "SURUS YARDIMI ACIK" : "SURUS YARDIMI KAPALI"; msgT_ = 1.5; } break;
     case Key::Back: if (down) app_.goGarage(); break;
     default: break;
     }
