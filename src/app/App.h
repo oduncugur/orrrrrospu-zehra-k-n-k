@@ -49,6 +49,7 @@ public:
     void pointerDown(int id, float px, float py);
     void pointerMove(int id, float px, float py);
     void pointerUp(int id);
+    void tapVirtual(float x, float y) { screen_->pointerDown(9, x, y); screen_->pointerUp(9); }   // test betigi (sanal koordinat)
     void key(Key k, bool down);
     bool back();                                  // geri: garaj disindaysa ekran isler (true); garajda false (uygulamadan cik)
     void renderAudio(float* out, int frames);

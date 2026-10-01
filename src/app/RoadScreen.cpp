@@ -166,7 +166,13 @@ void RoadScreen::update(double dt) {
         P.manual = false; P.slowClutch = false;
     }
     ses_->update(dt, c);
-    if (P.grinding()) flash("DEBRIYAJ!", 0.6);
+    if (P.grinding()) {
+        // Debriyajsiz vites girmedi: kol gercek vitese geri seker (kol ile gercek vites hic ayrismasin; eskiden kol
+        // 5'te kalip arac alt viteste gidiyor, debriyaja basinca 5 aniden giriyordu)
+        cockpit_.setKnobGear(pt.gear());
+        flash("DEBRIYAJ!", 0.6);
+        app_.haptic(60, 200);
+    }
     for (auto& m : ses_->drainMessages()) flash(m);
     if (ses_->takeCrash()) app_.haptic(220, 255);
     if (ses_->mode() != RoadSession::Mode::Free && ses_->phase() == RoadSession::Phase::Finished) {
@@ -313,6 +319,48 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
         }
     }
+    if (ses_->mode() == RoadSession::Mode::Karma) {
+        // Viraj yaklasim levhalari: 300/200/100 m (beyaz, 3/2/1 kirmizi serit) ve viraj girisinde yon levhasi (sari ok).
+        // Levhalar sagda; yon levhasi virajin dis tarafinda.
+        auto post = [&](double sb, double off, double h0, double h1, Proj& top, Proj& bot) {
+            const RoadPoint p = R.at(sb);
+            const double bx = p.x - off * std::sin(p.heading), by = p.y + off * std::cos(p.heading);
+            const Proj base = project(vp, bx, by, p.z, W, H);
+            top = project(vp, bx, by, p.z + h1, W, H);
+            bot = project(vp, bx, by, p.z + h0, W, H);
+            if (!base.ok || !top.ok || !bot.ok) return 0.0f;
+            const float sc = pxPerM / base.w;
+            r.rect(base.x - 0.07f * sc, top.y, base.x + 0.07f * sc, base.y, {0.55f, 0.55f, 0.58f});
+            return sc;
+        };
+        for (const RoadSection& q : R.sections()) {
+            for (int k = 3; k >= 1; --k) {
+                const double sb = q.entry - 100.0 * k;
+                if (sb < ps - 30 || sb > ps + 320) continue;
+                Proj t, m;
+                const float sc = post(sb, -(hw + 3.0), 0.9, 2.7, t, m);
+                if (sc <= 0) continue;
+                const float hw2 = 0.6f * sc, hgt = m.y - t.y;
+                r.rect(t.x - hw2, t.y, t.x + hw2, m.y, {0.95f, 0.95f, 0.95f});
+                for (int i = 0; i < k; ++i) {
+                    const float yy = t.y + hgt * (0.12f + 0.3f * i);
+                    r.rect(t.x - hw2 * 0.85f, yy, t.x + hw2 * 0.85f, yy + hgt * 0.16f, {0.85f, 0.1f, 0.1f});
+                }
+            }
+            const double se = q.entry - 15.0;
+            if (se > ps - 30 && se < ps + 320) {
+                const double kk = R.at(q.entry + 40.0).curvature;         // sola donus (+) -> levha sagda, ok sola
+                Proj t, m;
+                const float sc = post(se, kk > 0 ? -(hw + 3.0) : (hw + 3.0), 1.0, 2.4, t, m);
+                if (sc > 0) {
+                    const float hw2 = 1.0f * sc;
+                    r.rect(t.x - hw2, t.y, t.x + hw2, m.y, {0.98f, 0.8f, 0.1f});
+                    const float ts = std::clamp((m.y - t.y) / 9.0f, 1.0f, 8.0f);
+                    r.textCentered(t.x, (t.y + m.y) * 0.5f - 3.5f * ts, kk > 0 ? "<<<" : ">>>", ts, {0.08f, 0.08f, 0.08f});
+                }
+            }
+        }
+    }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu. z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim
     struct Obj { double d, x, y, psi, z, pitch; int id; };
@@ -386,10 +434,23 @@ void RoadScreen::drawHud(Renderer& r) {
     } else if (ses_->hasRival()) {
         if (ses_->mode() == RoadSession::Mode::Karma) {                // bolum gostergesi: DRAG / VIRAJ
             const double s = Pc.s();
-            double next = -1;
-            for (const RoadSection& q : ses_->road().sections()) if (q.curvy && q.s0 > s) { next = q.s0 - s; break; }
-            if (ses_->road().curvyAt(s)) std::snprintf(b, sizeof b, "VIRAJ BOLUMU");
-            else if (next > 0) std::snprintf(b, sizeof b, "DRAG  VIRAJA %.0f M", next);
+            const RoadSection* nextQ = nullptr;
+            for (const RoadSection& q : ses_->road().sections()) if (q.curvy && q.entry > s - 1.0) { nextQ = &q; break; }
+            if (nextQ && s >= nextQ->s0 && s < nextQ->entry) {
+                // Viraj yaklasimi: kalan mesafe + onerilen giris hizi (en dar R'de ~0.8 g). Hiz, kalan mesafede
+                // ~7 m/s^2 ile frenlenemeyecek kadar yuksekse kirmizi (simdi fren!)
+                const double left = nextQ->entry - s, v = sim.speed();
+                const double vRec = std::sqrt(0.8 * 9.81 * nextQ->minR);
+                const bool late = v > vRec && (v * v - vRec * vRec) / (2.0 * 7.0) > left - 15.0;
+                std::snprintf(b, sizeof b, "VIRAJ %3.0f M  ONERILEN %3.0f %s", left, vRec * app_.settings.speedFactor(), app_.settings.speedUnit());
+                const float w = r.textWidth(b, 2) + 16;
+                r.rect(W / 2.0f - w / 2, infoY + 30, W / 2.0f + w / 2, infoY + 52, late ? Color{0.6f, 0.05f, 0.05f, 0.85f} : Color{0.35f, 0.28f, 0.02f, 0.8f});
+                r.textCentered(W / 2.0f, infoY + 34, b, 2, late ? Color{1.0f, 1.0f, 1.0f} : Color{1.0f, 0.85f, 0.3f});
+                if (late) r.textCentered(W / 2.0f, infoY + 56, "FRENE BAS!", 2, {1.0f, 0.3f, 0.2f});
+                std::snprintf(b, sizeof b, "VIRAJ YAKLASIYOR");
+            }
+            else if (ses_->road().curvyAt(s)) std::snprintf(b, sizeof b, "VIRAJ BOLUMU");
+            else if (nextQ) std::snprintf(b, sizeof b, "DRAG  VIRAJA %.0f M", nextQ->entry - s);
             else std::snprintf(b, sizeof b, "DRAG  BITIS DUZLUGU");
             r.text(x0, infoY + 12, b, 1, ses_->road().curvyAt(s) ? Color{1.0f, 0.75f, 0.2f} : Color{0.5f, 0.85f, 1.0f});
         }

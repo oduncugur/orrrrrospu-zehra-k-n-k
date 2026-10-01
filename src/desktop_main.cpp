@@ -115,6 +115,18 @@ int main(int argc, char** argv) {
         }
     }
     size_t scriptPos = 0;
+    // Test: zamanli dokunus betigi, sanal koordinat "sure:x:y,..." (ornek: ZK_TAPS="0.5:180:170,1.0:180:170")
+    struct TapEv { double t; float x, y; };
+    std::vector<TapEv> taps;
+    if (const char* ts = std::getenv("ZK_TAPS")) {
+        double t; float x, y; int n = 0; const char* p = ts;
+        while (std::sscanf(p, "%lf:%f:%f%n", &t, &x, &y, &n) == 3) {
+            taps.push_back({t, x, y}); p += n;
+            if (*p != ',') break;
+            ++p;
+        }
+    }
+    size_t tapPos = 0;
     if (const char* ss = std::getenv("ZK_START_SCREEN")) {       // test: dogrudan bir ekran
         const std::string n = ss;
         if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
@@ -194,6 +206,7 @@ int main(int argc, char** argv) {
             while (scriptPos < script.size() && script[scriptPos].t <= tNow) {
                 game.key(script[scriptPos].k, script[scriptPos].down); ++scriptPos;
             }
+            while (tapPos < taps.size() && taps[tapPos].t <= tNow) { game.tapVirtual(taps[tapPos].x, taps[tapPos].y); ++tapPos; }
         }
         game.update(dt);
         game.render();

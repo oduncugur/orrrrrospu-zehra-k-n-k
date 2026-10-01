@@ -85,16 +85,18 @@ RoadPath RoadPath::karma(uint32_t seed, double maxGrade) {
     auto curveBlock = [&]() {
         const double s0 = s;
         const int n = 1 + (int)(r.uni() * 3.0);                      // 1-3 viraj
-        double sign = r.uni() < 0.5 ? 1.0 : -1.0;
+        double sign = r.uni() < 0.5 ? 1.0 : -1.0, minR = 1e9;
         for (int i = 0; i < n; ++i) {
             if (i > 0) { straight(r.range(30.0, 120.0)); if (r.uni() < 0.6) sign = -sign; }   // S ihtimali
             const double R = r.range(70.0, 220.0), k = sign / R;
+            minR = std::min(minR, R);
             const double trans = std::clamp(0.25 * R, 20.0, 60.0);
             const double arc = r.range(30.0, 100.0) * 3.14159265358979 / 180.0 * R;
             prog.push_back({trans, 0.0, k}); prog.push_back({arc, k, k}); prog.push_back({trans, k, 0.0});
             s += 2 * trans + arc;
         }
-        p.sections_.push_back({std::max(0.0, s0 - 120.0), s + 60.0, true});
+        // Virajli bolum 450 m once baslar: 250 km/h'ten ~90 km/h'e frenleme (~260 m) + kamera gecisi (0.9 s) payi
+        p.sections_.push_back({std::max(0.0, s0 - kKarmaLead), s + 60.0, true, s0, minR});
     };
     straight(r.range(2800.0, 3600.0));
     curveBlock();

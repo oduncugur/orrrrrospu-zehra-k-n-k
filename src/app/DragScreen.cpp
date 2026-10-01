@@ -174,6 +174,15 @@ void DragScreen::update(double dt) {
     pc_.paddle = pendingPaddle_;
     pendingPaddle_ = 0;
     race_->advance(dt, pc_);
+    // Debriyajsiz vites girmedi: kol gercek vitese geri seker (eskiden kol yeni viteste kalip debriyaja basilinca
+    // vites aniden giriyordu; kol ile gercek vites ayrisiyordu)
+    if (box == Gearbox::HPattern && race_->lane(0).grind) {
+        const int g = race_->lane(0).sim->powertrain().gear();
+        pendingGear_ = g;
+        if (g == 0) { knobY_ = kRowMid; }
+        else { knobX_ = kColX[(g - 1) / 2]; knobY_ = (g % 2) ? kRowTop : kRowBot; }
+        app_.haptic(60, 200);
+    }
     for (auto& e : race_->drainEvents()) {
         const bool mine = e.rfind("SEN:", 0) == 0;
         if (e == "YESIL!") { flash_ = "YESIL!"; flashColor_ = {0.2f, 1.0f, 0.3f}; flashT_ = 0.9; continue; }

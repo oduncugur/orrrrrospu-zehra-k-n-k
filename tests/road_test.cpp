@@ -189,7 +189,9 @@ int main() {
         for (const RoadSection& q : sec) std::printf(" [%.0f-%.0f m]", q.s0, q.s1);
         std::printf("\n");
         CHECK(sec.size() == 2 && sec[0].curvy && sec[1].curvy, "iki viraj blogu");
-        CHECK(sec.size() == 2 && sec[0].s0 >= 2650.0 && sec[1].s0 > sec[0].s1 + 1300.0, "once uzun duzluk (>= ~2.8 km), bloklar arasi duzluk");
+        CHECK(sec.size() == 2 && sec[0].entry >= 2800.0 && sec[1].entry > sec[0].s1 + 1000.0, "once uzun duzluk (>= 2.8 km), bloklar arasi duzluk");
+        CHECK(sec.size() == 2 && std::fabs(sec[0].s0 - (sec[0].entry - RoadPath::kKarmaLead)) < 1e-9 && sec[0].minR >= 70.0 && sec[0].minR <= 220.0,
+              "virajli bolum ilk virajdan 450 m once baslar (fren + kamera), en dar R bilinir");
         double maxKStraight = 0, maxKCurve = 0;
         for (const RoadPoint& p : k.points()) {
             if (k.curvyAt(p.s)) maxKCurve = std::max(maxKCurve, std::fabs(p.curvature));

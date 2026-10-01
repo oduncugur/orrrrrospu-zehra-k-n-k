@@ -95,11 +95,18 @@ public:
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
 private:
+    struct Stats { double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0; };
+    Stats statsFor(const Tune& t) const;
     void recompute();
+    void select(int option);       // onizleme: secili parca takilirsa degerler
+    void buySelected();
     App& app_;
     int cat_ = -1;                 // -1: kategori listesi
+    int sel_ = -1;                 // onizlenen secenek (-1: yok)
+    bool confirm_ = false;         // "SATIN AL?" onay cubugu acik
+    Stats prev_;
     std::string msg_; double msgT_ = 0;
-    double hpNow_ = 0, nmNow_ = 0, idx_ = 0, axleRisk_ = 0;
+    double hpNow_ = 0, nmNow_ = 0, idx_ = 0, axleRisk_ = 0, massNow_ = 0;
 };
 
 // Galeri: tum katalog, fiyat, satin alma; mevcut araci satma.
@@ -112,8 +119,11 @@ public:
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
 private:
+    enum class Confirm { None, Buy, Sell };
+    void confirmAction();
     App& app_;
     int carId_;
+    Confirm confirm_ = Confirm::None;   // acik onay penceresi
     float spin_ = 0;
     std::string msg_; double msgT_ = 0;
 };

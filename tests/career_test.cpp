@@ -112,6 +112,16 @@ int main() {
         h.money = 50000; h.buyCar(5);
         const long m = h.money;
         CHECK(h.sellCurrent() && h.money > m && h.cars.size() == 1, "ikinci arac satildi, para geldi");
+        // Fiyat dokumu: arac + parca - hasar; hasar fiyati dusurur, alt sinir govdenin %25'i
+        OwnedCar oc; oc.carId = 5; oc.paidParts = 3000;
+        const SaleQuote clean = saleQuote(oc);
+        CHECK(clean.damage == 0 && clean.total == clean.car + clean.parts && clean.parts == 1200, "hasarsiz: arac + %40 parca");
+        oc.axleBroken = true; oc.engineWear = 0.5;
+        const SaleQuote dmg = saleQuote(oc);
+        std::printf("    Civic: temiz $%d | hasarli $%d (hasar $%d)\n", clean.total, dmg.total, dmg.damage);
+        CHECK(dmg.damage > 0 && dmg.total < clean.total && dmg.total == sellPrice(oc), "hasar satis fiyatindan duser");
+        oc.engineWear = 1.0; oc.paidParts = 0;
+        CHECK(saleQuote(oc).total >= saleQuote(oc).car / 4 - 10, "hurda alt siniri");
     }
     std::printf("[H] Hasar ve tamir\n");
     {

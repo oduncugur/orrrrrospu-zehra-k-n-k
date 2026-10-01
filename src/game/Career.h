@@ -35,6 +35,10 @@ int  partPrice(PartCat c, int level, const VehicleDef& v);      // arac sinifina
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr, const Tune* t = nullptr);
 
 int  carPrice(const VehicleDef& v);
+// Satis fiyati dokumu (galeri onay penceresi): arac + parcalar - hasar = toplam
+struct SaleQuote { int car = 0, parts = 0, damage = 0, total = 0; };
+long repairCostFor(const OwnedCar& c);
+SaleQuote saleQuote(const OwnedCar& c);
 int  sellPrice(const OwnedCar& c);
 // Yaris degerlendirme endeksi (guc/agirlik + parca etkisi), rakip eslestirme icin
 double performanceIndex(const VehicleDef& v, const Tune& t);

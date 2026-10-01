@@ -172,19 +172,26 @@ birlikte, parça parça eklenir. Her madde fizikte gerçek bir etkiyle gelir ve 
 
 # KULLANICI GERİ BİLDİRİMİ — ÖNCELİKLİ (2026-10-02, oyun testinden)
 ## Hatalar / his
-- [ ] **H-desen kol ile gerçek vites ayrışıyor (hata):** debriyajsız vites denenince kol 5'e gidiyor ama vites girmiyor
+- [x] **H-desen kol ile gerçek vites ayrışıyor (hata):** debriyajsız vites denenince kol 5'e gidiyor ama vites girmiyor
       (çıtırtı). Araç düşük viteste kalıyor ("5'te ama hız transferi yok, viraja 1. viteste gibi giriyor"); debriyaja
       basınca 5 aniden giriyor. Çözüm: vites girmezse kol gerçek vitese geri sekmeli (+ titreşim, "DEBRİYAJ!"),
       kol her zaman gerçek vitesi göstermeli; vites göstergesi ile kol çelişmemeli.
-- [ ] **Karma: virajlı bölüme geçiş çok ani, fren mesafesi yok.** Çözüm: viraj öncesi hıza göre yaklaşım mesafesi
+      → YAPILDI (ara taslak): drag ve yolda vites girmezse kol gerçek vitese seker + titreşim + "DEBRİYAJ!".
+- [x] **Karma: virajlı bölüme geçiş çok ani, fren mesafesi yok.** Çözüm: viraj öncesi hıza göre yaklaşım mesafesi
       (v²/2a + pay; 200 km/h'te ~350-450 m), "VİRAJ 300/200/100 M" levhaları ve HUD uyarısı, kamera geçişinin
       fren noktasından önce bitmesi, viraj girişinde önerilen hız göstergesi.
+      → YAPILDI (ara taslak): bölüm ilk virajdan 450 m önce başlar; 300/200/100 m levhaları, viraj girişinde
+        ok levhası; HUD "VİRAJ N M  ÖNERİLEN X KM/H" (√(0.8·g·Rmin)), fren noktası geçilince kırmızı "FRENE BAS!".
 - [ ] Karma: hız hissi (drag görünümünde arka plan paralaksı, rüzgâr sesi, hız çizgileri); vites/hız aktarımı hissi.
 ## Arayüz / ekonomi
-- [ ] **Parça satın alma önizleme + onay:** ilk dokunuş = önizleme (yeni HP/Nm, tahmini 1/4 mil, aks riski, ağırlık
+- [x] **Parça satın alma önizleme + onay:** ilk dokunuş = önizleme (yeni HP/Nm, tahmini 1/4 mil, aks riski, ağırlık
       farkı, dyno eğrisi karşılaştırması); ikinci dokunuş = "SATIN AL $X?" onayı; geri al/iptal.
-- [ ] **Araç satma:** şu an yalnız galeride, yalnız seçili araç ve ancak 2+ araç varken (onaysız). Eklenecek:
+      → YAPILDI (ara taslak): önizleme paneli HP/Nm/endeks/aks riski/ağırlık (önce > sonra, renkli), EVET/VAZGEÇ.
+        Kalan: tahmini 1/4 mil, dyno eğrisi karşılaştırması.
+- [x] **Araç satma:** şu an yalnız galeride, yalnız seçili araç ve ancak 2+ araç varken (onaysız). Eklenecek:
       garajdan sat, satış fiyatı dökümü (araç + parçalar - hasar), onay penceresi, ikinci el pazarı/açık artırma.
+      → YAPILDI (ara taslak): galeride satış onay penceresi + döküm (araç %65 + parça %40 − tamir bedeli, alt sınır
+        gövdenin %25'i); araç satın alma da onaylı. Kalan: garajdan doğrudan sat, ikinci el pazarı/açık artırma.
 
 # MODİFİYE DERİNLİĞİ — "THE STRIP" SEVİYESİ VE ÖTESİ
 Kaynak: https://www.thestrip.io/ ve App Store sayfası (300+ araç, 5 seviye, gerçek debriyaj/vites/gaz;

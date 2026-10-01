@@ -120,6 +120,7 @@ cmake -B build -DCMAKE_PREFIX_PATH=$HOME/sdl3 && cmake --build build -j8 && ./bu
 | `--run-seconds=N` | gerçek zamanlı N s çalış, ortalama FPS'i stdout'a yaz, çık (FPS sınırı ölçümü) |
 | `ZK_START_DRAG=1` [+ `ZK_AUTOPILOT=1`] | serbest drag yarışı (oyuncu şeridini yapay zekâ sürer) |
 | `ZK_KEYS="t:Tuş:1/0,..."` | zamanlı tuş betiği (Throttle, Clutch, Brake, Gear0..6, ShiftUp/Down, Enter) |
+| `ZK_TAPS="t:x:y,..."` | zamanlı dokunuş betiği, sanal koordinat (dikey 360×640 / yatay 640×360) |
 | `SDL_AUDIO_DRIVER=dummy` | ses cihazı olmayan ortamda |
 
 Klavye: W/↑ gaz, S/↓ fren, Boşluk/Shift debriyaj (analog rampa), 1–6/N vites, E/Q vites ±,
@@ -368,3 +369,14 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
 - Test `road_test` [8]: iki blok, ilk duzluk >= ~2.8 km, duz bolum gercekten duz, yaris sonuclanir, belirlenimci.
 - Bilinen / sonraki: karma odulu normal yol yarisi odulu (mesafeye gore ayarlanmadi); YZ duzlukte de pace 0.6
   (drag'de tam gaz ama vites/kalkis plani yok); drag gorunumunde agac (yesil isik) yerine 3-2-1 geri sayim.
+
+## Guncelleme — 2026-10-02: Oyun testi geri bildirimi (oncelikli 4 madde, ara taslak)
+- H-desen kol hatasi: debriyajsiz vites denenince (cıtırtı) kol gercek vitese geri seker (DragScreen + Cockpit::setKnobGear),
+  titresim + "DEBRIYAJ!". Onceden kol yeni viteste kaliyor, debriyaja basinca vites aniden giriyordu.
+- Karma yaklasim: `RoadPath::kKarmaLead` = 450 m (virajli bolum ilk virajdan bu kadar once baslar); `RoadSection`
+  `entry` (ilk viraj) ve `minR`. HUD onerilen giris hizi sqrt(0.8 g Rmin); (v²-vRec²)/(2·7) > kalan-15 ise "FRENE BAS!".
+  Levhalar 300/200/100 m + girişte ok. Test road_test [8].
+- Parca dukkani: 1. dokunus onizleme (`PartsScreen::statsFor` ile once > sonra), 2. dokunus onay cubugu EVET/VAZGEC.
+- Galeri: arac al/sat onay penceresi; satis dokumu `saleQuote` (arac %65 + parca %40 - tamir bedeli, alt sinir %25).
+  `repairCostFor(OwnedCar)` serbest fonksiyon. Test career_test [11].
+- Test kancasi `ZK_TAPS` (desktop_main, App::tapVirtual).

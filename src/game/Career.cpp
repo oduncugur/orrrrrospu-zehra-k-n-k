@@ -119,9 +119,18 @@ bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, 
     return true;
 }
 
-int sellPrice(const OwnedCar& c) {
-    return (int)(std::round((0.65 * carPrice(*findVehicle(c.carId)) + 0.4 * c.paidParts) / 10.0) * 10.0);
+// Satis: arac %65 + parcalar %40 - hasar (tamir bedeli); hasarli arac en az govde degerinin %25'ine gider
+SaleQuote saleQuote(const OwnedCar& c) {
+    auto r10 = [](double x) { return (int)(std::round(x / 10.0) * 10.0); };
+    SaleQuote q;
+    q.car = r10(0.65 * carPrice(*findVehicle(c.carId)));
+    q.parts = r10(0.4 * c.paidParts);
+    q.damage = r10((double)repairCostFor(c));
+    q.total = std::max(r10(0.25 * q.car), q.car + q.parts - q.damage);
+    return q;
 }
+
+int sellPrice(const OwnedCar& c) { return saleQuote(c).total; }
 
 double performanceIndex(const VehicleDef& v, const Tune& t) {
     VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
@@ -261,8 +270,9 @@ long Career::recordFlow(long score, bool* newRecord) {
     return prize;
 }
 
-long Career::repairCost() const {
-    const OwnedCar& c = car();
+long Career::repairCost() const { return repairCostFor(car()); }
+
+long repairCostFor(const OwnedCar& c) {
     const VehicleDef& v = *findVehicle(c.carId);
     long cost = 0;
     // Aks: takili seviyenin parca fiyati (stok aks icin 1. seviye fiyatinin yarisi) + iscilik
