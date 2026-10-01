@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
         else if (!std::strncmp(argv[i], "--throttle-frames=", 18)) thrFrames = std::atoi(argv[i] + 18);
         else if (!std::strncmp(argv[i], "--car-offset=", 13)) carDelta = std::atoi(argv[i] + 13);
     }
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD) && !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         if (!SDL_Init(SDL_INIT_VIDEO)) { std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError()); return 1; }
     }
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -162,6 +162,10 @@ int main(int argc, char** argv) {
     Uint64 last = SDL_GetTicksNS();
     const Uint64 runStart = last;
     bool quit = false; int frame = 0;
+    // Oyun kolu: tetikler gaz / fren, sol cubuk direksiyon, LB debriyaj, A / X vites yukari / asagi, RB bos,
+    // B geri, Start onay, Back ayarlar, D-pad sol / sag / yukari (yol) / asagi. Eksenler esikli dijital tusa cevrilir.
+    bool padThr = false, padBrk = false, padL = false, padR = false;
+    auto padAxis = [&](bool& st, bool now, Key k) { if (now != st) { st = now; game.key(k, now); } };
     while (!quit) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -197,6 +201,40 @@ int main(int argc, char** argv) {
                     {SDLK_PAGEUP, Key::PageUp}, {SDLK_PAGEDOWN, Key::PageDown}, {SDLK_RETURN, Key::Enter}, {SDLK_ESCAPE, Key::Back},
                     {SDLK_O, Key::Settings}, {SDLK_F1, Key::Settings}, {SDLK_A, Key::Left}, {SDLK_D, Key::Right}};
                 for (const Map& m : map) if (m.sdl == k) game.key(m.key, down);
+                break;
+            }
+            case SDL_EVENT_GAMEPAD_ADDED: SDL_OpenGamepad(e.gdevice.which); break;
+            case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            case SDL_EVENT_GAMEPAD_BUTTON_UP: {
+                const bool down = e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+                switch (e.gbutton.button) {
+                case SDL_GAMEPAD_BUTTON_EAST: if (down) game.back(); break;          // garajda cikis yok (yalniz klavye ESC)
+                case SDL_GAMEPAD_BUTTON_SOUTH: game.key(Key::ShiftUp, down); break;
+                case SDL_GAMEPAD_BUTTON_WEST: game.key(Key::ShiftDown, down); break;
+                case SDL_GAMEPAD_BUTTON_NORTH: game.key(Key::PageUp, down); break;
+                case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER: game.key(Key::Clutch, down); break;
+                case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: game.key(Key::Gear0, down); break;
+                case SDL_GAMEPAD_BUTTON_START: game.key(Key::Enter, down); break;
+                case SDL_GAMEPAD_BUTTON_BACK: game.key(Key::Settings, down); break;
+                case SDL_GAMEPAD_BUTTON_DPAD_LEFT: game.key(Key::Left, down); break;
+                case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: game.key(Key::Right, down); break;
+                case SDL_GAMEPAD_BUTTON_DPAD_UP: game.key(Key::PageUp, down); break;
+                case SDL_GAMEPAD_BUTTON_DPAD_DOWN: game.key(Key::PageDown, down); break;
+                default: break;
+                }
+                break;
+            }
+            case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
+                const float v = e.gaxis.value / 32767.0f;
+                switch (e.gaxis.axis) {
+                case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER: padAxis(padThr, v > (padThr ? 0.25f : 0.35f), Key::Throttle); break;
+                case SDL_GAMEPAD_AXIS_LEFT_TRIGGER: padAxis(padBrk, v > (padBrk ? 0.25f : 0.35f), Key::Brake); break;
+                case SDL_GAMEPAD_AXIS_LEFTX:
+                    padAxis(padL, v < (padL ? -0.3f : -0.4f), Key::Left);
+                    padAxis(padR, v > (padR ? 0.3f : 0.4f), Key::Right);
+                    break;
+                default: break;
+                }
                 break;
             }
             default: break;

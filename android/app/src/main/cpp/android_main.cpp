@@ -1,5 +1,7 @@
 // ZEHRA KINIK - Android platform katmani (NativeActivity): EGL/GLES3 baglami, AAudio, dokunmatik girdi,
 // ekran yonu (JNI) ve geri tusu. Oyun/cizim mantigi platformdan bagimsiz App'tedir (masaustu ile ortak).
+#include <cmath>
+#include <algorithm>
 #include "app/App.h"
 #include "app/FramePacer.h"
 
@@ -199,8 +201,54 @@ void vibrate(Jni& j, int ms, int amplitude) {
     j.env->DeleteLocalRef(e);
 }
 
+// Oyun kolu (masaustuyle ayni dizilim): tetikler gaz / fren, sol cubuk / hat direksiyon, L1 debriyaj, A / X vites,
+// B geri, Start onay, Select ayarlar, R1 bos, Y yol. Eksenler esikli dijital tusa cevrilir.
+bool padKey(zk::App& g, int32_t code, bool down) {
+    using zk::Key;
+    switch (code) {
+    case AKEYCODE_BUTTON_A: g.key(Key::ShiftUp, down); return true;
+    case AKEYCODE_BUTTON_X: g.key(Key::ShiftDown, down); return true;
+    case AKEYCODE_BUTTON_Y: g.key(Key::PageUp, down); return true;
+    case AKEYCODE_BUTTON_L1: g.key(Key::Clutch, down); return true;
+    case AKEYCODE_BUTTON_R1: g.key(Key::Gear0, down); return true;
+    case AKEYCODE_BUTTON_START: g.key(Key::Enter, down); return true;
+    case AKEYCODE_BUTTON_SELECT: g.key(Key::Settings, down); return true;
+    case AKEYCODE_BUTTON_B: if (!down) g.back(); return true;
+    case AKEYCODE_DPAD_LEFT: g.key(Key::Left, down); return true;
+    case AKEYCODE_DPAD_RIGHT: g.key(Key::Right, down); return true;
+    case AKEYCODE_DPAD_UP: g.key(Key::PageUp, down); return true;
+    case AKEYCODE_DPAD_DOWN: g.key(Key::PageDown, down); return true;
+    default: return false;
+    }
+}
+void padAxes(zk::App& g, const AInputEvent* ev) {
+    static bool thr = false, brk = false, l = false, r = false;
+    auto set = [&](bool& st, bool now, zk::Key k) { if (now != st) { st = now; g.key(k, now); } };
+    const float rt = std::max(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_RTRIGGER, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_GAS, 0));
+    const float lt = std::max(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_LTRIGGER, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_BRAKE, 0));
+    float x = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_X, 0);
+    const float hx = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_HAT_X, 0);
+    if (std::fabs(hx) > std::fabs(x)) x = hx;
+    set(thr, rt > (thr ? 0.25f : 0.35f), zk::Key::Throttle);
+    set(brk, lt > (brk ? 0.25f : 0.35f), zk::Key::Brake);
+    set(l, x < (l ? -0.3f : -0.4f), zk::Key::Left);
+    set(r, x > (r ? 0.3f : 0.4f), zk::Key::Right);
+}
+
 int32_t onInput(android_app* app, AInputEvent* ev) {
     Platform& p = *static_cast<Platform*>(app->userData);
+    const int32_t src = AInputEvent_getSource(ev);
+    const bool pad = (src & AINPUT_SOURCE_GAMEPAD) == AINPUT_SOURCE_GAMEPAD || (src & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK
+                  || (src & AINPUT_SOURCE_DPAD) == AINPUT_SOURCE_DPAD;
+    if (AInputEvent_getType(ev) == AINPUT_EVENT_TYPE_KEY && pad && AKeyEvent_getKeyCode(ev) != AKEYCODE_BACK) {
+        const int32_t a = AKeyEvent_getAction(ev);
+        if (AKeyEvent_getRepeatCount(ev) > 0) return 1;
+        return padKey(*p.game, AKeyEvent_getKeyCode(ev), a == AKEY_EVENT_ACTION_DOWN) ? 1 : 0;
+    }
+    if (AInputEvent_getType(ev) == AINPUT_EVENT_TYPE_MOTION && (src & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK) {
+        padAxes(*p.game, ev);
+        return 1;
+    }
     if (AInputEvent_getType(ev) == AINPUT_EVENT_TYPE_KEY) {
         if (AKeyEvent_getKeyCode(ev) != AKEYCODE_BACK) return 0;
         if (AKeyEvent_getAction(ev) != AKEY_EVENT_ACTION_UP) return 1;
