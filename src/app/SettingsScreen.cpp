@@ -131,7 +131,7 @@ void SettingsScreen::change(It it, int dir) {
         return dir == 0 && n == cur ? opts.front() : n;
     };
     switch (it) {
-    case It::Language: s.language = (s.language + 1) % 2; break;
+    case It::Language: s.language = (s.language + (dir < 0 ? (int)Lang::Count - 1 : 1)) % (int)Lang::Count; break;
     case It::FpsCap: s.fpsCap = list(Settings::fpsOptions(), s.fpsCap); break;
     case It::VSync: {
         const int v = ((int)s.vsync + (dir < 0 ? 2 : 1)) % 3;

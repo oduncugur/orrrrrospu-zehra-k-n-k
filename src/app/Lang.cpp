@@ -140,8 +140,10 @@ const Entry kEnWords[] = {
     {"YIRTILMA", "TEARING"}, {"YOK", "NONE"}, {"YOKSA", "ELSE"}, {"YOL", "ROAD"}, {"YOLA", "ROAD"}, {"YOLDA", "ON ROAD"}, {"YOLU", "ROAD"},
     {"YORGUN", "TIRED"}, {"YUK", "LOAD"}, {"YUKLENDI", "LOADED"}, {"YUKSEK", "HIGH"}, {"YUKSELTME", "UPGRADE"}, {"YUKU", "LOAD"},
     {"YUZDE", "PERCENT"}, {"YUZER", "FLOATING"}, {"ZATEN", "ALREADY"}, {"KALDI", "LEFT"}, {"GALIBIYET", "WINS"}, {"GAL", "W"},
-    {"EGIK", "TILT"}, {"OLU", "DEAD"}, {"SU", "WATER"}, {"KM", "KM"}, {"SECILI", "SELECTED"}, {"TEPKI", "REACTION"}, {"RAKIBI", "RIVAL"},
+    {"EGIK", "TILT"}, {"ARAYUZ", "INTERFACE"}, {"DILI", "LANGUAGE"}, {"DIL", "LANG"}, {"MENULER", "MENUS"}, {"EKRANLARI", "SCREENS"}, {"TUM", "ALL"}, {"SKOR", "SCORE"}, {"OLU", "DEAD"}, {"SU", "WATER"}, {"KM", "KM"}, {"SECILI", "SELECTED"}, {"TEPKI", "REACTION"}, {"RAKIBI", "RIVAL"},
 };
+
+#include "LangMore.inc"
 
 struct Table { std::unordered_map<std::string, std::string> phrases, words; };
 
@@ -152,10 +154,27 @@ Table build(const Entry* p, size_t np, const Entry* w, size_t nw) {
     return t;
 }
 
+// Diger diller: kelime tablosu (kMulti) + eksik kelimede Ingilizce karsilik; cumle tablosu yok (kelime duzeyi)
+Table buildMulti(int col, const Table& en) {
+    Table t;
+    t.words = en.words;                                            // varsayilan: Ingilizce
+    for (const Multi& m : kMulti) {
+        const char* w[5] = {m.de, m.es, m.fr, m.it, m.pt};
+        t.words[m.tr] = w[col];
+    }
+    return t;
+}
+
 const Table* tableFor(Lang l) {
     static const Table en = build(kEnPhrases, sizeof kEnPhrases / sizeof *kEnPhrases, kEnWords, sizeof kEnWords / sizeof *kEnWords);
+    static const Table more[5] = {buildMulti(0, en), buildMulti(1, en), buildMulti(2, en), buildMulti(3, en), buildMulti(4, en)};
     switch (l) {
     case Lang::EN: return &en;
+    case Lang::DE: return &more[0];
+    case Lang::ES: return &more[1];
+    case Lang::FR: return &more[2];
+    case Lang::IT: return &more[3];
+    case Lang::PT: return &more[4];
     default: return nullptr;
     }
 }
