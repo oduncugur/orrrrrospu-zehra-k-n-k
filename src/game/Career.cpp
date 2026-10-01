@@ -588,8 +588,9 @@ uint32_t fnv1a(const std::string& s) {
 }
 } // namespace
 
-void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke, double engineStress) {
+void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke, double engineStress, double tireWear) {
     OwnedCar& c = car();
+    c.tune.wearTires = std::clamp(c.tune.wearTires + std::max(0.0, tireWear), 0.0, 1.0);   // patinaj / drift lastigi yer
     c.axleBroken = c.axleBroken || axleBroke;
     c.gearboxBroken = c.gearboxBroken || gearboxBroke;
     c.engineWear = bearingSpun || engineStress >= 1.0 ? 1.0

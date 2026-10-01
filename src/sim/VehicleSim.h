@@ -129,6 +129,7 @@ public:
     double octane() const { return octane_; }
     double octaneRequired() const { return knockReq_; }
     bool knocking() const { return knockNow_; }
+    double tireWearGained() const { return tireWear_; }   // bu surusteki lastik asinmasi (patinaj / kayma; kariyere yazilir)
     double engineStress() const { return std::min(1.0, stress_); }
     double gearboxStress() const { return std::min(1.0, gbStress_); }
     bool engineBlown() const { return engBlown_; }
@@ -145,6 +146,7 @@ private:
     double coolCap_ = 0, coolLow_ = 0.4, coolT_ = 88.0, heatLim_ = 1.0, teF_ = 0, stress_ = 0, gbStress_ = 0;
     double octane_ = 100, knockReq_ = 0, knockLim_ = 1.0, tmax_ = 1.0, boostTot_ = 0, boostFac_ = 0, icCredit_ = 0, ecuAgg_ = 0;
     bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
+    double tireWear_ = 0;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;
     std::vector<std::string> failEvents_;

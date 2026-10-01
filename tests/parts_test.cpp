@@ -110,6 +110,19 @@ int main() {
         CHECK(d->sim().engineStress() > e->sim().engineStress() + 0.02, "korumasiz ECU + dusuk oktan motoru dover");
         delete a; delete b; delete c; delete d; delete e;
     }
+    std::printf("[3c] Lastik asinmasi: patinaj lastigi yer, kariyere yazilir\n");
+    {
+        Tune spin; spin.turbo = 2; spin.fuelSel = 7; spin.clutch = 9; spin.axles = 9;   // sokak lastigi + cok guc: patinaj
+        Tune grip = spin; grip.tires = TireType::DragSlick; grip.tireSel = 25;
+        RoadCar* a = runWot(sahin, spin, 6.0); RoadCar* b = runWot(sahin, grip, 6.0);
+        std::printf("    6 s tam gaz: sokak lastigi asinma %.4f, slick %.4f\n", a->sim().tireWearGained(), b->sim().tireWearGained());
+        CHECK(a->sim().tireWearGained() > 0.004 && a->sim().tireWearGained() > b->sim().tireWearGained() * 1.5, "patinaj lastigi asindirir");
+        Career c = Career::newGame();
+        c.recordDamage(false, 0.0, false, false, 0.0, 0.05);
+        c.recordDamage(false, 0.0, false, false, 0.0, 0.05);
+        CHECK(std::fabs(c.car().tune.wearTires - 0.10) < 1e-9, "asinma birikir (yarislar arasi)");
+        delete a; delete b;
+    }
     std::printf("[4] Atolye ve kayit\n");
     {
         Career c = Career::newGame();

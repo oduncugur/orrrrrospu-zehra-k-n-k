@@ -342,6 +342,15 @@ void VehicleSim::updateHeatAndStress(double dt) {
     heatLim_ = coolT_ > 108.0 ? std::clamp(1.0 - (coolT_ - 108.0) * 0.025, 0.55, 1.0) : 1.0;
     if (coolT_ > 125.0) stress_ += dt * 0.02 * (coolT_ - 125.0);
     teF_ += (pt.engineTorque() - teF_) * std::min(1.0, dt / 0.12);
+    {   // Lastik asinmasi: boyuna patinaj + yanal kayma hizi (1.5 m/s ustu). 5 s burnout ~%3, 30 s drift ~%2
+        const double v = std::fabs(speed());
+        for (int i = 0; i < 4; ++i) {
+            const WheelSimulation& w = w_[i];
+            if (w.Fz() < 100) continue;
+            const double sl = std::fabs(w.omega() * w.rEff() - v) + std::fabs(w.slipAngle()) * v * 0.9;
+            if (sl > 1.5) tireWear_ += dt * (sl - 1.5) * 1.3e-4;
+        }
+    }
     {   // Vuruntu: yuksek yukte oktan acigi. Sensorlu ECU %2.5/oktan avans geri ceker; korumasiz ECU motoru dover
         const double deficit = knockReq_ + std::max(0.0, coolT_ - 100.0) * 0.25 - octane_;
         const double load = teF_ / tmax_;

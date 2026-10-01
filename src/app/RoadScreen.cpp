@@ -145,7 +145,7 @@ void RoadScreen::finishRace() {
         app_.career.money -= cut; app_.career.earnings -= cut; prize_ -= cut;
     }
     const VehicleSim& ps = ses_->player().sim();
-    app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress());
+    app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());
     app_.saveCareer();
 }
 

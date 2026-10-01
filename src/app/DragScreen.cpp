@@ -228,7 +228,7 @@ void DragScreen::update(double dt) {
             else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
         } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
-        app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress());
+        app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());
         app_.saveCareer();
     }
 

@@ -139,7 +139,7 @@ struct Career {
     // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir
     void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr, double prizeScale = 1.0);
     // Yaris sonu hasar: aks, motor (yatak / zorlanma 0..1, patlama), sanziman
-    void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke = false, double engineStress = 0.0);
+    void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke = false, double engineStress = 0.0, double tireWear = 0.0);
     // Otoban akisi sonu: odul = skor / 20 (en fazla kFlowPrizeCap); rekor kirilirsa +%50. Donus: odul
     static constexpr long kFlowPrizeCap = 4000;
     long recordFlow(long score, bool* newRecord = nullptr);
