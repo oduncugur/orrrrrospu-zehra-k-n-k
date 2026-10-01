@@ -33,7 +33,7 @@ enum class PartCat {
     // MOTOR
     Head, Valve, Cam, Piston, Rod, Crank, Bearing, Gasket, Flywheel, EngineSwap,
     // BESLEME
-    Intake, Exhaust, Turbo, Turbine, Wastegate, BoostCtl, Supercharger, Intercooler, Nitrous, FuelSys, Fuel,
+    Intake, Exhaust, Turbo, Turbine, Wastegate, BoostCtl, Supercharger, Intercooler, Nitrous, FuelPump, Injector, FuelLine, Fuel,
     // AKTARMA
     Clutch, Gearbox, GbStrength, FinalDrive, Diff, Axles,
     // SASI
@@ -48,6 +48,8 @@ int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
 int  usedPrice(int newPrice);               // %55
 void applyUsedWear(Tune& t, PartCat c);     // ikinci el parcanin yipranmasi
+int  ecuSwPrice(int sw, int level, const VehicleDef& v);   // yazilim modulunun bu seviyesinin fiyati (arac sinifina gore)
+void migrateTune(Tune& t);                  // eski kayit: tek yakit sistemi / ECU paketi -> ayri parcalar + yazilim
 // Atolyede (ozel uretim) uretilebilen kategori ve ozel satir indeksi (-1: yok)
 int  customOption(PartCat c);
 
@@ -142,6 +144,9 @@ struct Career {
     // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).
     // Sokulen eski (stok olmayan) parca %35'e satilir: refund (verildiyse) ciktisi.
     bool buyPart(PartCat c, int level, std::string* why = nullptr, bool used = false, long* refund = nullptr);
+    // ECU yazilimi: modulu bir seviye yukselt (yuva / ECU siniri / para) ya da bir seviye dusur (iade yok)
+    bool buyEcuSoftware(int sw, std::string* why = nullptr);
+    void dropEcuSoftware(int sw);
     bool buyJunk(const JunkCar& j, std::string* why = nullptr);
     bool restoreStep(int comp, std::string* why = nullptr);  // secili arac: bir restorasyon adimi
     // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir

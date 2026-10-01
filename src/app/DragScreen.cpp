@@ -125,7 +125,7 @@ void DragScreen::pointerDown(int id, float x, float y) {
         if (in(kGraph, x, y)) { showGraph_ = !showGraph_; return; }
     }
     if (ph == RacePhase::Burnout && in(kStageBtn, x, y)) { race_->skipBurnout(); return; }
-    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0]
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
         && race_->lane(0).sim->gearboxType() != Gearbox::TorqueConverter && (in(kLcDn, x, y) || in(kLcUp, x, y))) {
         adjustLaunch(in(kLcUp, x, y) ? +250 : -250);
         return;
@@ -497,7 +497,8 @@ void DragScreen::drawHud(Renderer& r) {
 
     // ---- ust serit ----
     r.rect(0, 0, 640, kWorldTop, {0.07f, 0.07f, 0.09f, 0.95f});
-    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && box != Gearbox::TorqueConverter) {
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
+        && box != Gearbox::TorqueConverter) {
         r.rect(kLcDn[0], kLcDn[1], kLcUp[2], kLcUp[3], {0.05f, 0.05f, 0.08f, 0.8f});
         r.rect(kLcDn[0], kLcDn[1], kLcDn[2], kLcDn[3], {0.25f, 0.27f, 0.35f});
         r.rect(kLcUp[0], kLcUp[1], kLcUp[2], kLcUp[3], {0.25f, 0.27f, 0.35f});

@@ -71,6 +71,26 @@ const std::vector<IcOpt>&      intercoolerTable();
 const std::vector<FuelSysOpt>& fuelSysTable();
 const std::vector<NosOpt>&     nosTable();
 const std::vector<EcuOpt>&     ecuTable();
+// Yakit sistemi parcalari (FuelSysOpt.cap: fabrika HP x cap). Sinir = min(pompa, enjektor) x hat carpani
+const std::vector<FuelSysOpt>& fuelPumpTable();
+const std::vector<FuelSysOpt>& injectorTable();
+const std::vector<FuelSysOpt>& fuelLineTable();
+double fuelCap(const Tune& t);
+// ECU donanimi: yazilim yuvasi ve modul seviye sinirlari
+struct EcuHwOpt { const char* name; int price; int slots; int maxLv[7]; bool knockBuiltin; };
+const std::vector<EcuHwOpt>& ecuHwTable();
+// Yazilim modulleri (sira: harita, devir, launch, flat shift, anti-lag, flex fuel, vuruntu kontrol)
+enum EcuSw { SwMap = 0, SwRev, SwLaunch, SwFlat, SwAntiLag, SwFlex, SwKnock, SwCount };
+struct EcuSwDef { const char* name; const char* desc; int price[10]; };
+const EcuSwDef& ecuSwDef(int sw);
+int  ecuSwLevel(const Tune& t, int sw);
+void setEcuSwLevel(Tune& t, int sw, int lv);
+int  ecuSwMax(const Tune& t, int sw);               // takili ECU'nun izin verdigi en yuksek seviye
+int  ecuSlotsUsed(const Tune& t);
+void clampEcuSoftware(Tune& t);                      // ECU degisince yazilim yeni donanima sigdirilir
+bool ecuNewSystem(const Tune& t);                    // donanim / yazilim kullaniliyor (eski ecu alani yerine)
+EcuOpt effectiveEcu(const Tune& t, bool* knockSensor = nullptr);
+bool launchControlAvailable(const Tune& t);          // ayarlanabilir 2-step (launch yazilimi ya da eski ECU paketi)
 const std::vector<FuelOpt>&    fuelTable();
 const std::vector<OilOpt>&     oilTable();
 const std::vector<ClutchOpt>&  clutchTable();

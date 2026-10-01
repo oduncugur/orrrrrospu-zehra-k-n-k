@@ -212,6 +212,21 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// ECU yazilim: donanimin yuva / seviye sinirlari icinde moduller (harita, devir, launch, flat shift, anti-lag, flex, vuruntu)
+class EcuScreen : public Screen {
+public:
+    explicit EcuScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
+    TuneStats now_;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Basarimlar: liste (kazanilan altin, odul), ilerleme
 class AchievementsScreen : public Screen {
 public:

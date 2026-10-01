@@ -159,6 +159,14 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
         if (L.shiftT > dur) L.shiftT = -1.0;
     }
     pt.setTwoStep(pc.twoStep && beforeLeave && phase_ != RacePhase::Burnout, L.sim->defaultLaunchRpm());
+    // Flat shift (ECU yazilimi): kalktiktan sonra debriyaj basili + gaz acikken devir basildigi anda tutulur
+    // (gazdan ayak kalkmadan vites; motor kesiciye firlamaz)
+    if (const Tune* tn = L.sim->config().tune; tn && tn->swFlat > 0 && !beforeLeave && box == Gearbox::HPattern) {
+        if (clutch > 0.5 && throttle > 0.5) {
+            if (L.flatRpm < 0) L.flatRpm = pt.rpm();
+            pt.setTwoStep(true, std::max(L.flatRpm, 2500.0));
+        } else L.flatRpm = -1;
+    }
     if (L.slip.finished) { throttle = 0.0; clutch = 1.0; in.brake = std::max(in.brake, 0.45); }   // parasut + fren
     pt.setThrottle(throttle);
     pt.setClutchPedal(clutch);

@@ -1,5 +1,6 @@
 // Modifiye sistemi: kategori kapsami, parca fizigi (turbo, nitro, swap, dayanim, isi), atolye, kayit
 #include "game/Career.h"
+#include "game/League.h"
 #include "game/RoadCar.h"
 #include "garage/VehicleCatalog.h"
 #include "sim/PartTables.h"
@@ -123,13 +124,48 @@ int main() {
         CHECK(std::fabs(c.car().tune.wearTires - 0.10) < 1e-9, "asinma birikir (yarislar arasi)");
         delete a; delete b;
     }
+    std::printf("[3d] Yakit sistemi parcalari + ECU donanim / yazilim\n");
+    {
+        Tune big; big.turbo = 12;
+        Tune pumpOnly = big; pumpOnly.fuelPump = 9;
+        Tune injOnly = big; injOnly.injector = 9;
+        Tune both = big; both.fuelPump = 9; both.injector = 9;
+        const double h0 = peakHp(sahin, big), hp = peakHp(sahin, pumpOnly), hi = peakHp(sahin, injOnly), hb = peakHp(sahin, both);
+        std::printf("    GT4088: stok yakit %.0f HP, yalniz pompa %.0f, yalniz enjektor %.0f, ikisi %.0f\n", h0, hp, hi, hb);
+        CHECK(hp < hb * 0.85 && hi < hb * 0.85 && hb > h0 * 1.3, "pompa ve enjektor birlikte gerekir (en zayif halka)");
+        Career c = Career::newGame();
+        c.money = 1000000; c.dailyDay = todayIndex(); c.dailyDone = 7;
+        std::string why;
+        CHECK(!c.buyEcuSoftware(SwRev, &why) && why == "ECU DESTEKLEMIYOR", "stok ECU devir yazilimi almaz");
+        CHECK(c.buyEcuSoftware(SwMap, &why), "stok ECU: stage 1 harita");
+        CHECK(!c.buyEcuSoftware(SwMap, &why) && why == "ECU SINIRINDA", "stok ECU harita siniri 1");
+        CHECK(c.buyPart(PartCat::Ecu, 4, &why), "plug-in ECU takildi");
+        CHECK(c.buyEcuSoftware(SwMap, &why) && c.buyEcuSoftware(SwRev, &why) && c.buyEcuSoftware(SwRev, &why) && c.buyEcuSoftware(SwLaunch, &why),
+              "plug-in: stage 2 + devir +500 + launch");
+        CHECK(!c.buyEcuSoftware(SwFlat, &why) && why == "YAZILIM YUVASI DOLU", "plug-in 3 yuva dolu");
+        CHECK(!c.buyEcuSoftware(SwAntiLag, &why) && why == "ECU DESTEKLEMIYOR", "anti-lag plug-in'de yok");
+        VehicleSimConfig cf; cf.car = &sahin; cf.tune = &c.car().tune;
+        const VehicleSim vs(cf);
+        VehicleSimConfig c0; c0.car = &sahin; Tune st; c0.tune = &st;
+        const VehicleSim v0(c0);
+        std::printf("    plug-in + devir +500: kesici %.0f, supap siniri %.0f (stok %.0f)\n", vs.engineSpec().redlineRpm, vs.valveSafeRpm(), v0.engineSpec().redlineRpm);
+        CHECK(vs.engineSpec().redlineRpm == v0.engineSpec().redlineRpm + 500 && vs.valveSafeRpm() < vs.engineSpec().redlineRpm,
+              "devir +500 supap sinirini asar (supap / kam gerekli)");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.car().tune.signature() == c.car().tune.signature(), "ECU yazilimi kayitta");
+        // Eski kayit donusumu: tek yakit sistemi + ECU paketi
+        Tune old; old.fuelSys = 7; old.ecu = 8;
+        migrateTune(old);
+        CHECK(old.fuelSys == 0 && old.fuelPump == 7 && old.injector == 7 && old.ecu == 0 && old.ecuHw == 4 && old.swLaunch == 1 && old.swFlat == 1,
+              "eski yakit sistemi / ECU paketi yeni parcalara cevrilir");
+    }
     std::printf("[4] Atolye ve kayit\n");
     {
         Career c = Career::newGame();
         c.money = 1000000;
         std::string why;
         CHECK(!c.buyPart(PartCat::Turbo, kCustomTurbo, &why) && why == "ATOLYEDE URET", "ozel turbo once uretilmeli");
-        c.car().tune.custTurboMm = 72; c.car().tune.custTurboAr = 0.9; c.car().tune.fuelSys = 6;
+        c.car().tune.custTurboMm = 72; c.car().tune.custTurboAr = 0.9; c.car().tune.fuelPump = 6; c.car().tune.injector = 6;
         CHECK(c.buyPart(PartCat::Turbo, kCustomTurbo, &why), "uretilen ozel turbo takilir");
         CHECK(peakHp(sahin, c.car().tune) > peakHp(sahin, Tune{}) * 1.5, "72 mm ozel turbo guc katar");
         c.buyPart(PartCat::EngineSwap, 200); c.buyPart(PartCat::Nitrous, 4); c.buyPart(PartCat::Tires, 22); c.buyPart(PartCat::Gearbox, 9);

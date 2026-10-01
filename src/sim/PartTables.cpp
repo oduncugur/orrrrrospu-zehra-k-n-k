@@ -228,6 +228,98 @@ const std::vector<FuelSysOpt>& fuelSysTable() {
     };
     return t;
 }
+const std::vector<FuelSysOpt>& fuelPumpTable() {
+    static const std::vector<FuelSysOpt> t = {
+        {"STOK POMPA", 0, 1.35}, {"190 LPH", 250, 1.60}, {"255 LPH", 400, 2.00}, {"340 LPH", 600, 2.50}, {"450 LPH", 850, 3.00},
+        {"525 LPH", 1100, 3.40}, {"CIFT 340 LPH", 1500, 4.00}, {"CIFT 450 LPH", 2000, 4.80}, {"MEKANIK POMPA", 2800, 5.60},
+        {"SURGE TANK + UC POMPA", 3800, 6.50},
+    };
+    return t;
+}
+const std::vector<FuelSysOpt>& injectorTable() {
+    static const std::vector<FuelSysOpt> t = {
+        {"STOK ENJEKTOR", 0, 1.35}, {"440 CC", 350, 1.55}, {"550 CC", 500, 1.75}, {"650 CC", 620, 2.00}, {"750 CC", 750, 2.25},
+        {"1000 CC", 1000, 2.90}, {"1300 CC", 1300, 3.60}, {"1650 CC", 1700, 4.40}, {"2000 CC", 2200, 5.20},
+        {"2400 CC + IKINCI SIRA", 3000, 6.50},
+    };
+    return t;
+}
+const std::vector<FuelSysOpt>& fuelLineTable() {
+    static const std::vector<FuelSysOpt> t = {
+        {"STOK HAT", 0, 1.00}, {"ORGULU HAT", 150, 1.02}, {"AYARLI REGULATOR", 250, 1.04}, {"-6AN HAT", 300, 1.05},
+        {"-8AN HAT", 400, 1.07}, {"YUKSEK DEBI RAY", 450, 1.08}, {"RAY + REGULATOR", 650, 1.10}, {"-10AN + RAY", 800, 1.12},
+        {"DONUS HATLI SISTEM", 1000, 1.14}, {"YARIS HATTI + FILTRE", 1300, 1.16},
+    };
+    return t;
+}
+double fuelCap(const Tune& t) {
+    if (t.fuelPump == 0 && t.injector == 0 && t.fuelLine == 0) return fuelSysTable()[std::clamp(t.fuelSys, 0, 9)].cap;   // eski kayit
+    const double pump = fuelPumpTable()[std::clamp(t.fuelPump, 0, 9)].cap, inj = injectorTable()[std::clamp(t.injector, 0, 9)].cap;
+    return std::min(pump, inj) * fuelLineTable()[std::clamp(t.fuelLine, 0, 9)].cap;
+}
+
+// ECU donanimi: yuva, modul seviye siniri {harita, devir(+250 adim), launch, flat, anti-lag, flex, vuruntu}
+const std::vector<EcuHwOpt>& ecuHwTable() {
+    static const std::vector<EcuHwOpt> t = {
+        {"STOK ECU", 0, 1, {1, 0, 0, 0, 0, 0, 0}, true},
+        {"CHIP (EPROM)", 350, 1, {2, 1, 0, 0, 0, 0, 0}, true},
+        {"PIGGYBACK", 600, 2, {1, 2, 0, 0, 0, 1, 0}, true},
+        {"PIGGYBACK PRO", 900, 3, {2, 2, 1, 0, 0, 1, 0}, true},
+        {"PLUG-IN ECU", 1400, 3, {2, 4, 1, 1, 0, 1, 0}, true},
+        {"PLUG-IN PRO", 1900, 4, {3, 4, 1, 1, 0, 1, 0}, true},
+        {"STANDALONE", 2800, 5, {3, 6, 1, 1, 1, 1, 1}, false},
+        {"STANDALONE PRO", 3600, 6, {3, 7, 1, 1, 1, 1, 1}, false},
+        {"YARIS ECU", 5200, 7, {3, 8, 1, 1, 1, 1, 0}, true},
+        {"TAKIM YARIS ECU", 7500, 8, {3, 10, 1, 1, 1, 1, 0}, true},
+    };
+    return t;
+}
+const EcuSwDef& ecuSwDef(int sw) {
+    static const EcuSwDef d[SwCount] = {
+        {"HARITA (STAGE)", "ATESLEME + YAKIT: STAGE 1/2/3", {500, 900, 1400}},
+        {"DEVIR SINIRI", "HER SEVIYE +250 RPM", {300, 300, 300, 300, 300, 300, 300, 300, 300, 300}},
+        {"LAUNCH KONTROL", "AYARLANABILIR 2-STEP", {700}},
+        {"FLAT SHIFT", "GAZDAN AYAK KALKMADAN VITES", {600}},
+        {"ANTI-LAG", "TURBO ERKEN DOLAR (SPOOL)", {1500}},
+        {"FLEX FUEL", "E85 / METANOLDE +%5 GUC", {800}},
+        {"VURUNTU KONTROL", "STANDALONE VURUNTU KORUMASI", {500}},
+    };
+    return d[std::clamp(sw, 0, SwCount - 1)];
+}
+namespace {
+int* swRef(Tune& t, int sw) {
+    switch (sw) {
+    case SwMap: return &t.swMap; case SwRev: return &t.swRev; case SwLaunch: return &t.swLaunch; case SwFlat: return &t.swFlat;
+    case SwAntiLag: return &t.swAntiLag; case SwFlex: return &t.swFlex; default: return &t.swKnock;
+    }
+}
+}
+int ecuSwLevel(const Tune& t, int sw) { return *swRef(const_cast<Tune&>(t), sw); }
+void setEcuSwLevel(Tune& t, int sw, int lv) { *swRef(t, sw) = std::max(0, lv); }
+int ecuSwMax(const Tune& t, int sw) { return ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].maxLv[std::clamp(sw, 0, SwCount - 1)]; }
+int ecuSlotsUsed(const Tune& t) { int n = 0; for (int i = 0; i < SwCount; ++i) n += ecuSwLevel(t, i) > 0; return n; }
+void clampEcuSoftware(Tune& t) {
+    for (int i = 0; i < SwCount; ++i) setEcuSwLevel(t, i, std::min(ecuSwLevel(t, i), ecuSwMax(t, i)));
+    const int slots = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].slots;
+    for (int i = SwCount - 1; i >= 0 && ecuSlotsUsed(t) > slots; --i) setEcuSwLevel(t, i, 0);   // sigmayan (son) moduller silinir
+}
+bool ecuNewSystem(const Tune& t) { return t.ecuHw > 0 || ecuSlotsUsed(t) > 0; }
+EcuOpt effectiveEcu(const Tune& t, bool* knockSensor) {
+    if (!ecuNewSystem(t)) {
+        if (knockSensor) *knockSensor = !(t.ecu == 4 || t.ecu == 9);   // eski standalone / yaris haritasi: koruma yok
+        return ecuTable()[std::clamp(t.ecu, 0, (int)ecuTable().size() - 1)];
+    }
+    static const double na[4] = {1.0, 1.04, 1.07, 1.10}, fo[4] = {1.0, 1.10, 1.18, 1.26};
+    const int m = std::clamp(t.swMap, 0, 3);
+    EcuOpt e{"ECU", 0, na[m], fo[m], 250.0 * t.swRev, t.swAntiLag ? 0.07 : 0.0};
+    if (t.swFlex && t.fuel == FuelType::E85) { e.na *= 1.05; e.forced *= 1.05; }
+    if (knockSensor) *knockSensor = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].knockBuiltin || t.swKnock > 0;
+    return e;
+}
+bool launchControlAvailable(const Tune& t) {
+    return ecuNewSystem(t) ? t.swLaunch > 0 : (t.ecu == 4 || t.ecu == 8 || t.ecu == 9);
+}
+
 const std::vector<NosOpt>& nosTable() {
     static const std::vector<NosOpt> t = {
         {"YOK", 0, 0, 0}, {"KURU 25 HP", 900, 25, 16}, {"KURU 50 HP", 1300, 50, 14}, {"KURU 75 HP", 1700, 75, 12},
@@ -462,8 +554,15 @@ std::string Tune::signature() const {
                   custGear[0], custGear[1], custGear[2], custGear[3], custGear[4], custGear[5], custGear[6], custGear[7]);
     char w[96];
     std::snprintf(w, sizeof w, "|w%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", wearEngine, wearTires, wearBrakes, wearSusp, wearBody, wearElec);
-    if (launchRpm > 0) { char l[16]; std::snprintf(l, sizeof l, "|L%d", launchRpm); return std::string(b) + w + l; }
-    return std::string(b) + w;
+    std::string out = std::string(b) + w;
+    if (launchRpm > 0) { char l[16]; std::snprintf(l, sizeof l, "|L%d", launchRpm); out += l; }
+    if (fuelPump || injector || fuelLine || ecuNewSystem(*this)) {
+        char e[96];
+        std::snprintf(e, sizeof e, "|F%d,%d,%d|E%d,%d,%d,%d,%d,%d,%d,%d", fuelPump, injector, fuelLine, ecuHw, swMap, swRev, swLaunch, swFlat,
+                      swAntiLag, swFlex, swKnock);
+        out += e;
+    }
+    return out;
 }
 
 } // namespace zk

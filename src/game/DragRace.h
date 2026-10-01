@@ -47,7 +47,8 @@ struct LaneState {
     TimeSlip slip;
     bool staged = false, left = false;   // stage isigini terk etti mi
     bool armed = false;                  // stage'de debriyaja (DCT/otomatikte frene) basti: kalkis kontrolu oyuncuda
-    bool burnArmed = false;              // burnout'ta gaza / debriyaja dokundu (oncesinde debriyaj basili: motor bogulmaz)
+    bool burnArmed = false;
+    double flatRpm = -1;                 // flat shift: debriyaja basildigi andaki devir (ECU tutar)              // burnout'ta gaza / debriyaja dokundu (oncesinde debriyaj basili: motor bogulmaz)
     double leaveTime = -1;               // yaris saatinde (s)
     // Vites gecisi durumu
     double shiftT = -1; int shiftTarget = 0;

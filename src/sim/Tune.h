@@ -35,6 +35,10 @@ struct Tune {
     int turbine = 0, wastegate = 0, boostCtl = 0, gbStrength = 0, cooling = 0;
     int oil = 0, fuelSel = 0, elec = 0, susp = 0, brakes = 0, aero = 0;
     int launchRpm = 0;                        // 2-step kalkis devri (0: otomatik, redline x 0.55)
+    // Yakit sistemi (ayri parcalar; sinir = en zayif halka): pompa, enjektor, hat / regulator. Eski fuelSys yalniz eski kayit.
+    int fuelPump = 0, injector = 0, fuelLine = 0;
+    // ECU donanimi (yazilim yuvasi + modul seviye siniri) ve yazilim modulleri. Eski ecu alani: rakip paketleri / eski kayit.
+    int ecuHw = 0, swMap = 0, swRev = 0, swLaunch = 0, swFlat = 0, swAntiLag = 0, swFlex = 0, swKnock = 0;
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi
     double custTurboMm = 0, custTurboAr = 0, custCamDeg = 0, custDisp = 0, custFinal = 0, custWingN = 0;
     double custGear[8] = {0, 0, 0, 0, 0, 0, 0, 0};   // vites basina fabrika oranina carpan (0 = fabrika)

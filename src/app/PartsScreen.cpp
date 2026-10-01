@@ -16,6 +16,13 @@ namespace zk {
 namespace {
 constexpr double kHpK = 2.0 * 3.14159265358979 / 60.0 / 745.7;
 const Rect kBackP{8, 596, 352, 634};
+const Rect kSoftP{230, 100, 352, 126};        // ECU kategorisi: yazilim ekrani
+// Kategori listesi satir yuksekligi: sekmedeki kategori sayisina gore (BESLEME 13 kategori)
+float catRowH(int tab) {
+    int n = 0;
+    for (int i = 0; i < (int)PartCat::Count; ++i) n += partTab((PartCat)i) == tab;
+    return std::min(40.0f, (588.0f - 132.0f) / std::max(1, n));
+}
 const Rect kYesP{8, 548, 176, 590}, kNoP{184, 548, 352, 590};
 const Rect kNewP{8, 548, 124, 590}, kUsedP{128, 548, 244, 590}, kNo3P{248, 548, 352, 590};   // yeni / ikinci el / vazgec
 constexpr float kListY0 = 132, kListY1 = 446, kRowH = 40;
@@ -176,15 +183,17 @@ void PartsScreen::render(Renderer& r) {
         for (int i = 0; i < (int)PartCat::Count; ++i) {
             const PartCat c = (PartCat)i;
             if (partTab(c) != tab_) continue;
-            const Rect rr{8, 132.0f + row * 40, 352, 168.0f + row * 40};
+            const float rh = catRowH(tab_);
+            const Rect rr{8, 132.0f + row * rh, 352, 132.0f + row * rh + rh - 4};
             r.rect(rr.x0, rr.y0, rr.x1, rr.y1, kUiPanel);
-            r.text(16, rr.y0 + 6, partCatName(c), 2, {1, 1, 1});
+            r.text(16, rr.y0 + (rh < 38 ? 3 : 6), partCatName(c), 2, {1, 1, 1});
             const int lvl = partLevel(oc.tune, c, v);
             std::string cur = partOptions(c)[lvl].name;
             if (c == PartCat::Electronics && lvl == 0) cur = v.abs ? (v.tc ? "FABRIKA ABS+TC" : "FABRIKA ABS") : "YOK";
             char cnt[16]; std::snprintf(cnt, sizeof cnt, "%zu SECENEK", partOptions(c).size());
-            r.text(16, rr.y0 + 24, cnt, 1, kUiDim);
-            r.text(344 - r.textWidth(cur.substr(0, 26), 1), rr.y0 + 24, cur.substr(0, 26), 1, lvl > 0 ? kUiGold : kUiDim);
+            const float y2 = rr.y0 + (rh < 38 ? rh - 14 : 24);
+            r.text(16, y2, cnt, 1, kUiDim);
+            r.text(344 - r.textWidth(cur.substr(0, 26), 1), y2, cur.substr(0, 26), 1, lvl > 0 ? kUiGold : kUiDim);
             if (customOption(c) >= 0) r.text(344 - r.textWidth("ATOLYE", 1), rr.y0 + 6, "ATOLYE", 1, {0.55f, 0.75f, 1.0f});
             ++row;
         }
@@ -194,7 +203,8 @@ void PartsScreen::render(Renderer& r) {
         r.text(8, 104, partCatName(c), 2, kUiGold);
         const auto& opts = partOptions(c);
         char b[32]; std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
-        r.text(352 - r.textWidth(b, 1), 110, b, 1, kUiDim);
+        if (c == PartCat::Ecu) button(r, kSoftP, "YAZILIM >", {0.15f, 0.35f, 0.6f}, 1);
+        else r.text(352 - r.textWidth(b, 1), 110, b, 1, kUiDim);
         const int cur = partLevel(oc.tune, c, v);
         const float listH = (sel_ >= 0 ? kListY1 : 540.0f) - kListY0;
         const float maxScroll = std::max(0.0f, opts.size() * kRowH - listH);
@@ -272,6 +282,7 @@ void PartsScreen::tap(float x, float y) {
         }
     }
     if (kBackP.hit(x, y)) { if (cat_ >= 0) { cat_ = -1; sel_ = -1; confirm_ = false; } else app_.goGarage(); return; }
+    if (cat_ == (int)PartCat::Ecu && kSoftP.hit(x, y)) { app_.goEcu(); return; }
     const OwnedCar& oc = app_.career.car();
     const VehicleDef& v = *findVehicle(oc.carId);
     if (cat_ < 0) {
@@ -280,7 +291,8 @@ void PartsScreen::tap(float x, float y) {
         int row = 0;
         for (int i = 0; i < (int)PartCat::Count; ++i) {
             if (partTab((PartCat)i) != tab_) continue;
-            if (Rect{8, 132.0f + row * 40, 352, 168.0f + row * 40}.hit(x, y)) {
+            const float rh = catRowH(tab_);
+            if (Rect{8, 132.0f + row * rh, 352, 132.0f + row * rh + rh - 4}.hit(x, y)) {
                 cat_ = i; sel_ = -1; confirm_ = false; scroll_ = 0;
                 const int cur = partLevel(oc.tune, (PartCat)i, v);                 // takili parcayi gorunur yap
                 scroll_ = std::max(0.0f, cur * kRowH - 120.0f);
@@ -543,5 +555,76 @@ void FabricateScreen::key(Key k, bool down) {
     if (k == Key::Right) nudge(0, +1);
     if (k == Key::Enter) { if (confirm_) make(); else confirm_ = true; }
 }
+
+// ---------------------------------------------------------------- ECU yazilim
+// Donanim: yuva sayisi + modul seviye siniri. Her modul satiri: seviye, etki, [-] dusur (iade yok), [+] bir seviye al.
+namespace {
+constexpr float kSwY0 = 132, kSwH = 56;
+const Rect kBackE{8, 596, 352, 634};
+Rect swMinus(int i) { return {214, kSwY0 + i * kSwH + 16, 254, kSwY0 + i * kSwH + 46}; }
+Rect swPlus(int i) { return {258, kSwY0 + i * kSwH + 16, 352, kSwY0 + i * kSwH + 46}; }
+}
+
+EcuScreen::EcuScreen(App& app) : app_(app) { now_ = tuneStats(*findVehicle(app_.career.car().carId), app_.career.car().tune); }
+
+void EcuScreen::render(Renderer& r) {
+    const OwnedCar& oc = app_.career.car();
+    const VehicleDef& v = *findVehicle(oc.carId);
+    const Tune& t = oc.tune;
+    r.begin(360, 640, kUiBg);
+    headerP(r, app_, "ECU YAZILIM");
+    const EcuHwOpt& hw = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)];
+    char b[96];
+    std::snprintf(b, sizeof b, "%s   YUVA %d / %d", hw.name, ecuSlotsUsed(t), hw.slots);
+    r.text(8, 64, b, 2, kUiGold);
+    {   // supap siniri: devir siniri bunu asarsa supap atar
+        VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
+        const VehicleSim sim(cfg);
+        const bool over = sim.engineSpec().redlineRpm > sim.valveSafeRpm();
+        std::snprintf(b, sizeof b, "%.0f HP   KESICI %.0f   SUPAP %.0f", now_.hp, sim.engineSpec().redlineRpm, sim.valveSafeRpm());
+        r.text(8, 88, b, 1, over ? Color{1.0f, 0.4f, 0.3f} : kUiText);
+        if (over) r.text(8, 100, "SUPAP SINIRI ASILDI: SUPAP / KAM AL YA DA DEVRI DUSUR", 1, {1.0f, 0.4f, 0.3f});
+        std::snprintf(b, sizeof b, "OKTAN %.0f / ISTENEN %.0f%s", now_.octane, now_.octaneReq, hw.knockBuiltin || t.swKnock ? "" : "   VURUNTU KORUMASI YOK");
+        r.text(8, 112, b, 1, now_.octaneReq > now_.octane || !(hw.knockBuiltin || t.swKnock) ? Color{1.0f, 0.75f, 0.3f} : kUiDim);
+    }
+    for (int i = 0; i < SwCount; ++i) {
+        const EcuSwDef& d = ecuSwDef(i);
+        const int lv = ecuSwLevel(t, i), mx = ecuSwMax(t, i);
+        const float y = kSwY0 + i * kSwH;
+        r.rect(8, y, 352, y + kSwH - 4, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
+        r.text(16, y + 5, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
+        if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 250);
+        else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
+        r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
+        r.text(16, y + 33, std::string(d.desc).substr(0, 30), 1, kUiDim);
+        if (mx <= 0) continue;
+        if (lv > 0) button(r, swMinus(i), "-", kUiBtn, 2);
+        if (lv < mx) {
+            const int p = ecuSwPrice(i, lv + 1, v);
+            button(r, swPlus(i), "+ " + money(p), app_.career.money >= p ? kUiGreen : Color{0.3f, 0.3f, 0.32f}, 1);
+        } else r.textCentered(swPlus(i).cx(), swPlus(i).y0 + 10, "MAKS", 1, kUiGold);
+    }
+    button(r, kBackE, "< ECU", kUiBtn, 2);
+    if (msgT_ > 0) { r.rect(0, 560, 360, 590, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 568, msg_, 2, kUiGold); }
+}
+
+void EcuScreen::pointerDown(int, float x, float y) {
+    if (kBackE.hit(x, y)) { app_.goParts((int)PartCat::Ecu); return; }
+    for (int i = 0; i < SwCount; ++i) {
+        std::string why;
+        if (swPlus(i).hit(x, y)) {
+            if (app_.career.buyEcuSoftware(i, &why)) { msg_ = std::string(ecuSwDef(i).name) + " YUKLENDI"; app_.saveCareer(); }
+            else msg_ = why;
+            msgT_ = 1.6;
+        } else if (swMinus(i).hit(x, y) && ecuSwLevel(app_.career.car().tune, i) > 0) {
+            app_.career.dropEcuSoftware(i); app_.saveCareer();
+            msg_ = std::string(ecuSwDef(i).name) + " DUSURULDU"; msgT_ = 1.2;
+        } else continue;
+        now_ = tuneStats(*findVehicle(app_.career.car().carId), app_.career.car().tune);
+        return;
+    }
+}
+
+void EcuScreen::key(Key k, bool down) { if (down && k == Key::Back) app_.goParts((int)PartCat::Ecu); }
 
 } // namespace zk

@@ -46,7 +46,8 @@ int customOption(PartCat c) {
 const char* partCatName(PartCat c) {
     static const char* n[(int)PartCat::Count] = {
         "SILINDIR KAPAGI", "SUPAP + YAY", "KAM MILI", "PISTON", "BIYEL", "KRANK", "YATAK", "KAPAK CONTASI", "VOLAN", "MOTOR SWAP",
-        "EMME", "EGZOZ", "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "NITRO (NOS)", "YAKIT SISTEMI", "YAKIT",
+        "EMME", "EGZOZ", "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "NITRO (NOS)",
+        "YAKIT POMPASI", "ENJEKTOR", "YAKIT HATTI / REGULATOR", "YAKIT",
         "DEBRIYAJ", "SANZIMAN SWAP", "SANZIMAN GUCLENDIRME", "SON DISLI", "DIFERANSIYEL", "AKS",
         "LASTIK", "JANT", "SUSPANSIYON", "FREN", "HAFIFLETME", "AERO",
         "ECU", "ELEKTRONIK", "SOGUTMA", "YAG / KARTER"};
@@ -79,14 +80,15 @@ const std::vector<PartOption>& partOptions(PartCat c) {
         t[(int)PartCat::Turbo] = opts(turboTable());        t[(int)PartCat::Turbine] = opts(turbineTable());
         t[(int)PartCat::Wastegate] = opts(wastegateTable()); t[(int)PartCat::BoostCtl] = opts(boostCtlTable());
         t[(int)PartCat::Supercharger] = opts(superTable()); t[(int)PartCat::Intercooler] = opts(intercoolerTable());
-        t[(int)PartCat::Nitrous] = opts(nosTable());        t[(int)PartCat::FuelSys] = opts(fuelSysTable());
+        t[(int)PartCat::Nitrous] = opts(nosTable());        t[(int)PartCat::FuelPump] = opts(fuelPumpTable());
+        t[(int)PartCat::Injector] = opts(injectorTable());  t[(int)PartCat::FuelLine] = opts(fuelLineTable());
         t[(int)PartCat::Fuel] = opts(fuelTable());          t[(int)PartCat::Clutch] = opts(clutchTable());
         t[(int)PartCat::Gearbox] = opts(gearTable());       t[(int)PartCat::GbStrength] = opts(gbStrengthTable());
         t[(int)PartCat::FinalDrive] = opts(finalTable());   t[(int)PartCat::Diff] = opts(diffTable());
         t[(int)PartCat::Axles] = opts(axleTable());         t[(int)PartCat::Tires] = opts(tireTable());
         t[(int)PartCat::Rims] = opts(rimTable());           t[(int)PartCat::Suspension] = opts(suspTable());
         t[(int)PartCat::Brakes] = opts(brakeTable());       t[(int)PartCat::Weight] = opts(weightTable());
-        t[(int)PartCat::Aero] = opts(aeroTable());          t[(int)PartCat::Ecu] = opts(ecuTable());
+        t[(int)PartCat::Aero] = opts(aeroTable());          t[(int)PartCat::Ecu] = opts(ecuHwTable());
         t[(int)PartCat::Electronics] = opts(elecTable());   t[(int)PartCat::Cooling] = opts(coolingTable());
         t[(int)PartCat::DrySump] = opts(oilTable());
     }
@@ -104,7 +106,8 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     case PartCat::Turbo: return t.turbo;         case PartCat::Turbine: return t.turbine;
     case PartCat::Wastegate: return t.wastegate; case PartCat::BoostCtl: return t.boostCtl;
     case PartCat::Supercharger: return t.superch; case PartCat::Intercooler: return t.intercooler;
-    case PartCat::Nitrous: return t.nitrous;     case PartCat::FuelSys: return t.fuelSys;
+    case PartCat::Nitrous: return t.nitrous;     case PartCat::FuelPump: return t.fuelPump;
+    case PartCat::Injector: return t.injector;   case PartCat::FuelLine: return t.fuelLine;
     case PartCat::Fuel: return t.fuelSel > 0 ? t.fuelSel : t.fuel == FuelType::Pump95 ? 1 : t.fuel == FuelType::E85 ? 2 : 0;
     case PartCat::Clutch: return t.clutch;       case PartCat::Gearbox: return t.gearSwap;
     case PartCat::GbStrength: return t.gbStrength;
@@ -117,7 +120,7 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     case PartCat::Tires: return t.tireSel > 0 ? t.tireSel : (int)t.tires;
     case PartCat::Rims: return t.rims;           case PartCat::Suspension: return t.susp;
     case PartCat::Brakes: return t.brakes;       case PartCat::Weight: return t.weight;
-    case PartCat::Aero: return t.aero;           case PartCat::Ecu: return t.ecu;
+    case PartCat::Aero: return t.aero;           case PartCat::Ecu: return t.ecuHw;
     case PartCat::Electronics: return t.elec > 0 ? t.elec : t.tcKit ? 2 : t.absKit ? 1 : 0;
     case PartCat::Cooling: return t.cooling;
     case PartCat::DrySump: return t.oil > 0 ? t.oil : t.drySump ? 1 : 0;
@@ -138,7 +141,10 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::Turbo: t.turbo = l; break;         case PartCat::Turbine: t.turbine = l; break;
     case PartCat::Wastegate: t.wastegate = l; break; case PartCat::BoostCtl: t.boostCtl = l; break;
     case PartCat::Supercharger: t.superch = l; break; case PartCat::Intercooler: t.intercooler = l; break;
-    case PartCat::Nitrous: t.nitrous = l; break;     case PartCat::FuelSys: t.fuelSys = l; break;
+    case PartCat::Nitrous: t.nitrous = l; break;
+    case PartCat::FuelPump: t.fuelPump = l; t.fuelSys = 0; break;
+    case PartCat::Injector: t.injector = l; t.fuelSys = 0; break;
+    case PartCat::FuelLine: t.fuelLine = l; t.fuelSys = 0; break;
     case PartCat::Fuel: t.fuelSel = l; t.fuel = (FuelType)fuelTable()[l].type; break;
     case PartCat::Clutch: t.clutch = l; break;       case PartCat::Gearbox: t.gearSwap = l; break;
     case PartCat::GbStrength: t.gbStrength = l; break;
@@ -147,7 +153,8 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::Tires: t.tireSel = l; t.tires = (TireType)tireTable()[l].type; t.psi = 0; break;
     case PartCat::Rims: t.rims = l; break;           case PartCat::Suspension: t.susp = l; break;
     case PartCat::Brakes: t.brakes = l; break;       case PartCat::Weight: t.weight = l; break;
-    case PartCat::Aero: t.aero = l; break;           case PartCat::Ecu: t.ecu = l; break;
+    case PartCat::Aero: t.aero = l; break;
+    case PartCat::Ecu: t.ecuHw = l; t.ecu = 0; clampEcuSoftware(t); break;   // yeni ECU: yazilim sigdirilir
     case PartCat::Electronics: t.elec = l; t.absKit = elecTable()[l].abs; t.tcKit = elecTable()[l].tc; break;
     case PartCat::Cooling: t.cooling = l; break;
     case PartCat::DrySump: t.oil = l; t.drySump = oilTable()[l].dry; break;
@@ -182,7 +189,7 @@ bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, 
         // Fabrikada olan sistem tekrar takilmaz; olmayana ancak ECU yukseltmesiyle eklenir
         if (level == 1 && v.abs) return no("FABRIKADA VAR");
         if (level == 2 && v.abs && v.tc) return no("FABRIKADA VAR");
-        if (t && t->ecu < 1) return no("ONCE ECU GEREKLI");
+        if (t && t->ecu < 1 && t->ecuHw < 1) return no("ONCE ECU GEREKLI");
     }
     const EngineDef& e = engineTable()[effectiveEngine(v, t)];
     const bool turboEngine = e.induction == Induction::Turbo || e.induction == Induction::TwinTurbo;
@@ -345,14 +352,14 @@ std::string tuneSummary(const Tune& t) {
     if (t.clutch) add(t.clutch == 1 ? "ST1" : t.clutch == 2 ? "ST2" : t.clutch == 3 ? "ST3" : "DEBR+");
     if (t.axles) add(t.axles == 1 ? "KM-AKS" : t.axles == 2 ? "300M" : "AKS+");
     if (t.diff != DiffType::Open) add(t.diff == DiffType::OneAndHalfWay ? "1.5W" : t.diff == DiffType::TwoWay ? "2W" : t.diff == DiffType::Spool ? "SPOOL" : "LSD");
-    if (t.ecu) add("ECU");
+    if (t.ecu || ecuNewSystem(t)) add("ECU");
     if (t.intake || t.exhaust) add("EMME/EGZ");
     if (t.weight) add("HAFIF");
     if (t.drySump) add("KURU-KRT");
     if (t.fuel == FuelType::E85) add("E85");
     int more = 0;                                                  // diger parcalar
     for (int x : {t.cam, t.valve, t.head, t.piston, t.rod, t.crank, t.bearing, t.gasket, t.flywheel, t.turbine, t.wastegate,
-                  t.boostCtl, t.intercooler, t.fuelSys, t.gbStrength, t.gearSwap, t.finalSel, t.rims, t.susp, t.brakes, t.aero, t.cooling})
+                  t.boostCtl, t.intercooler, t.fuelSys, t.fuelPump, t.injector, t.fuelLine, t.gbStrength, t.gearSwap, t.finalSel, t.rims, t.susp, t.brakes, t.aero, t.cooling})
         more += x > 0;
     if (more) add("+" + std::to_string(more) + " PARCA");
     return s;
@@ -386,6 +393,57 @@ bool Career::sellCurrent(std::string* why) {
     cars.erase(cars.begin() + current);
     current = std::min(current, (int)cars.size() - 1);
     return true;
+}
+
+int ecuSwPrice(int sw, int level, const VehicleDef& v) {
+    if (level < 1 || level > 10) return 0;
+    const double scale = std::clamp(0.6 + carPrice(v) / 40000.0, 0.6, 4.0);
+    const int base = ecuSwDef(sw).price[std::min(level - 1, 9)];
+    return (int)(std::round((base > 0 ? base : ecuSwDef(sw).price[0]) * scale / 10.0) * 10.0);
+}
+
+bool Career::buyEcuSoftware(int sw, std::string* why) {
+    OwnedCar& oc = car();
+    const VehicleDef& v = *findVehicle(oc.carId);
+    Tune& t = oc.tune;
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    const int lv = ecuSwLevel(t, sw), mx = ecuSwMax(t, sw);
+    if (mx <= 0) return no("ECU DESTEKLEMIYOR");
+    if (lv >= mx) return no("ECU SINIRINDA");
+    if (lv == 0 && ecuSlotsUsed(t) >= ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].slots) return no("YAZILIM YUVASI DOLU");
+    const int p = ecuSwPrice(sw, lv + 1, v);
+    if (money < p) return no("PARA YETMIYOR");
+    if (!ecuNewSystem(t) && t.ecu > 0) migrateTune(t);              // eski paket: once yeni sisteme cevrilir
+    money -= p;
+    oc.paidParts += p;
+    t.ecu = 0;
+    setEcuSwLevel(t, sw, lv + 1);
+    dailyAdd(TaskType::BuyParts, 1);
+    return true;
+}
+void Career::dropEcuSoftware(int sw) {
+    Tune& t = car().tune;
+    setEcuSwLevel(t, sw, ecuSwLevel(t, sw) - 1);
+}
+
+// Eski kayit: tek "yakit sistemi" secenegi -> pompa + enjektor; tek ECU paketi -> donanim + yazilim modulleri
+void migrateTune(Tune& t) {
+    if (t.fuelSys > 0 && t.fuelPump == 0 && t.injector == 0) {
+        static const int pump[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, inj[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        const int f = std::clamp(t.fuelSys, 0, 9);
+        t.fuelPump = pump[f]; t.injector = inj[f]; t.fuelLine = f == 9 ? 9 : 0;
+        t.fuelSys = 0;
+    }
+    if (t.ecu > 0 && !ecuNewSystem(t)) {
+        struct M { int hw, map, rev, lc, flat, al, flex; };
+        static const M m[10] = {{0, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0}, {4, 2, 0, 0, 0, 0, 0}, {5, 3, 0, 0, 0, 0, 0},
+                                {6, 3, 1, 0, 0, 0, 0}, {4, 1, 2, 0, 0, 0, 0}, {2, 1, 0, 0, 0, 0, 1}, {6, 1, 0, 0, 0, 1, 0},
+                                {4, 1, 0, 1, 1, 0, 0}, {8, 3, 2, 0, 0, 0, 0}};
+        const M& x = m[std::clamp(t.ecu, 0, 9)];
+        t.ecuHw = x.hw; t.swMap = x.map; t.swRev = x.rev; t.swLaunch = x.lc; t.swFlat = x.flat; t.swAntiLag = x.al; t.swFlex = x.flex;
+        t.ecu = 0;
+        clampEcuSoftware(t);
+    }
 }
 
 bool usedAvailable(PartCat c, int level) {
@@ -574,6 +632,9 @@ const IntField kIntFields[] = {
     {"bc", &Tune::boostCtl, 9}, {"gbs", &Tune::gbStrength, 9}, {"cool", &Tune::cooling, 9}, {"oil", &Tune::oil, 9},
     {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
     {"lrpm", &Tune::launchRpm, 12000},
+    {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
+    {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 10}, {"slc", &Tune::swLaunch, 1},
+    {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1},
 };
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
@@ -899,6 +960,7 @@ bool Career::parse(const std::string& text, Career& out) {
         }
     }
     if (c.cars.empty()) return false;
+    for (OwnedCar& oc : c.cars) migrateTune(oc.tune);              // eski yakit sistemi / ECU paketi -> yeni parcalar
     c.current = std::clamp(c.current, 0, (int)c.cars.size() - 1);
     out = c;
     return true;

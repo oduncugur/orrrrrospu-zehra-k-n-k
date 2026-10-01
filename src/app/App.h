@@ -96,6 +96,7 @@ public:
     void goJunkyard();
     void goBodyShop();
     void goAchievements();
+    void goEcu();
     void toast(const std::string& msg) { toasts_.push_back(msg); }   // ust bildirim (sirayla, ~2.6 s)
     // Ilk giris ipucu: her kimlik bir kez (ayarlarda saklanir); kart acikken ekran durur, dokunus / Enter kapatir.
     // Satirlar '\n' ile ayrilir. Test calistirmalarinda (ZK_START_SCREEN / ZK_AUTOPILOT / ZK_START_DRAG) kapali.

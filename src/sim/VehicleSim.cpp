@@ -78,7 +78,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double hp0 = peakHp(eng_), red0 = eng_.redlineRpm;
         const IntakeOpt& IT = row(intakeTable(), tune->intake);
         const ShapeOpt& EX = row(exhaustTable(), tune->exhaust);
-        const EcuOpt& EC = row(ecuTable(), tune->ecu);
+        bool knockSensor = true;
+        const EcuOpt EC = effectiveEcu(*tune, &knockSensor);
         const double ecuMul = (forced || tune->turbo || tune->superch) ? EC.forced : EC.na;
         if (IT.low == IT.high && EX.low == EX.high) {
             double mul = IT.low * EX.low * ecuMul;
@@ -93,7 +94,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         boostFac_ = boostTot_ = ed ? ed->boostBar : 0.0;
         icCredit_ = (ic - 1.0) * 60.0;                                         // soguk sarj: 1.12 -> ~7 oktan
         ecuAgg_ = boostFac_ > 0 || tune->turbo > 0 || tune->superch > 0 ? (EC.forced - 1.0) * 20.0 : (EC.na - 1.0) * 30.0;
-        knockSensor_ = !(tune->ecu == 4 || tune->ecu == 9);                    // standalone / yaris haritasi: koruma yok
+        knockSensor_ = knockSensor;                                            // standalone (vuruntu modulu yok) / eski yaris haritasi
         const double gate = row(wastegateTable(), tune->wastegate).mul * (1.0 + row(boostCtlTable(), tune->boostCtl).extra);
         if (tune->turbo > 0) {
             const TurboOpt T = tune->turbo == kCustomTurbo ? customTurbo(*tune) : row(turboTable(), tune->turbo);
@@ -133,6 +134,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         if (FU.mul != 1.0) { double f = FU.mul; scaleCurves(eng_, constMul, &f); }
         // Devir siniri: supap + kam + ECU + motor ici (stroker dusurur)
         const double redAdd = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + EC.redline + inRed;
+        // Supap siniri: ECU disindaki parcalarin kaldirabilecegi devir + 300 pay; ECU ile ustune cikilirsa supap atar
+        valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 300.0);
         if (redAdd != 0.0) {
             eng_.redlineRpm = std::max(eng_.idleRpm + 2500.0, red0 + redAdd);
             extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);
@@ -145,7 +148,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         }
         // Yakit sistemi siniri: fabrika gucunun cap katini asan tork kirpilir (buyuk turbo / kompresor yakit ister).
         // v1 turbo kitleri yakit yukseltmesini icerir.
-        double cap = row(fuelSysTable(), tune->fuelSys).cap;
+        double cap = fuelCap(*tune);
         if (tune->turbo == 1 || tune->turbo == 2) cap = std::max(cap, 3.5);
         const double capHp = hp0 * cap;
         for (auto* c : {&eng_.lowCam, &eng_.highCam})
@@ -293,7 +296,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
 
 double VehicleSim::defaultLaunchRpm() const {
     if (boxType_ == Gearbox::TorqueConverter) return 0.42 * eng_.redlineRpm;   // konvertor stall devri
-    if (cfg_.tune && cfg_.tune->launchRpm > 0)                                  // oyuncunun ayarladigi 2-step
+    if (cfg_.tune && cfg_.tune->launchRpm > 0 && launchControlAvailable(*cfg_.tune))   // launch yazilimiyla ayarlanan 2-step
         return std::clamp((double)cfg_.tune->launchRpm, eng_.idleRpm + 600.0, eng_.redlineRpm - 200.0);
     return cfg_.car ? std::clamp(0.55 * eng_.redlineRpm, 3000.0, 6500.0) : 6500.0;
 }
@@ -352,6 +355,10 @@ void VehicleSim::updateHeatAndStress(double dt) {
             const double sl = std::fabs(w.omega() * w.rEff() - v) + std::fabs(w.slipAngle()) * v * 0.9;
             if (sl > 1.5) tireWear_ += dt * (sl - 1.5) * 1.3e-4;
         }
+    }
+    if (valveSafeRpm_ > 0 && pt.rpm() > valveSafeRpm_ && !engBlown_) {         // supap atmasi: sinirin ustunde birikir
+        stress_ += dt * 0.05 * (pt.rpm() - valveSafeRpm_) / 250.0;
+        if (!valveWarned_) { valveWarned_ = true; failEvents_.push_back("SUPAP ATIYOR! DEVIR SINIRI SUPAPLARA FAZLA"); }
     }
     {   // Vuruntu: yuksek yukte oktan acigi. Sensorlu ECU %2.5/oktan avans geri ceker; korumasiz ECU motoru dover
         const double deficit = knockReq_ + std::max(0.0, coolT_ - 100.0) * 0.25 - octane_;
