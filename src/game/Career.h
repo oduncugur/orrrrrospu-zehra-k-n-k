@@ -19,6 +19,7 @@ struct OwnedCar {
     bool   axleBroken = false;    // kirik aks: yarisamaz
     double engineWear = 0.0;      // 0..1 motor hasari (yatak / asiri zorlanma / isi); 1 = motor patlak, revizyon sart
     bool   gearboxBroken = false; // kirik sanziman: yarisamaz
+    bool   fromJunk = false;      // hurdaliktan alindi (restorasyon ekrani)
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
 };
@@ -81,6 +82,15 @@ double prizeDifficulty(double gapSeconds);
 // Kisa parca ozeti (HUD): "SLICK ST2 KM 1.5W T1"
 std::string tuneSummary(const Tune& t);
 
+// Hurdalik: hasarli araclar kelepir fiyata; bilesenleri harbi bitik (restorasyon emek ister)
+struct JunkCar { int carId = 0; int price = 0; Tune tune; double engineWear = 0; bool axleBroken = false, gearboxBroken = false; };
+std::vector<JunkCar> junkyardOffers(uint32_t seed);
+// Restorasyon: bilesenler (motor, sanziman+aks, lastik, fren, suspansiyon, kaporta, elektrik)
+constexpr int kRestoreParts = 7;
+const char* restoreName(int comp);
+double restoreDamage(const OwnedCar& c, int comp);       // 0..1
+long restoreStepCost(const OwnedCar& c, int comp);       // bir adim (0: saglam)
+
 struct Career {
     static constexpr int kVersion = 1;
     long money = 0;
@@ -103,6 +113,8 @@ struct Career {
     bool buyCar(int carId, std::string* why = nullptr);
     bool sellCurrent(std::string* why = nullptr);
     bool buyPart(PartCat c, int level, std::string* why = nullptr);
+    bool buyJunk(const JunkCar& j, std::string* why = nullptr);
+    bool restoreStep(int comp, std::string* why = nullptr);  // secili arac: bir restorasyon adimi
     // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir
     void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr, double prizeScale = 1.0);
     // Yaris sonu hasar: aks, motor (yatak / zorlanma 0..1, patlama), sanziman

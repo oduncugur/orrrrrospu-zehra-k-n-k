@@ -131,6 +131,11 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);
         }
         eng_.inertia *= row(flywheelTable(), tune->flywheel).inertia;
+        // Yipranma: dusuk kompresyon / elektrik arizasi guc kaybi
+        if (tune->wearEngine > 0 || tune->wearElec > 0) {
+            double w = (1.0 - 0.40 * std::clamp(tune->wearEngine, 0.0, 1.0)) * (1.0 - 0.10 * std::clamp(tune->wearElec, 0.0, 1.0));
+            scaleCurves(eng_, constMul, &w);
+        }
         // Yakit sistemi siniri: fabrika gucunun cap katini asan tork kirpilir (buyuk turbo / kompresor yakit ister).
         // v1 turbo kitleri yakit yukseltmesini icerir.
         double cap = row(fuelSysTable(), tune->fuelSys).cap;
@@ -170,8 +175,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[gbIdx].type : Gearbox::HPattern;
     // ABS / TC: fabrika donanimi ya da ECU kiti; yalniz oyun kurulumunda (tune var)
-    absAvail_ = car && tune && (car->abs || tune->absKit);
-    tcAvail_ = car && tune && (car->tc || tune->tcKit);
+    absAvail_ = car && tune && (car->abs || tune->absKit) && tune->wearElec < 0.5;     // bozuk elektrik: ABS/TC calismaz
+    tcAvail_ = car && tune && (car->tc || tune->tcKit) && tune->wearElec < 0.5;
     tcOn_ = tcAvail_;
     // Otomatik: debriyaj yerine tork konvertoru (stall devri %42 redline)
     if (boxType_ == Gearbox::TorqueConverter) pt_->setConverter(true, 0.42 * eng_.redlineRpm, PowertrainCore::kConverterTr0);
@@ -218,7 +223,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         // Kesin lastik (tireTable): sinifin tutus carpani + teker kutlesi; jant kutlesi
         const TireOpt& TR = row(tireTable(), tune->tireSel > 0 ? tune->tireSel : (int)tune->tires);
         const double wkg = TR.wheelKg + row(rimTable(), tune->rims).wheelKg;
-        for (TireParams* p : {&street, &semi, &slick}) { p->muPeak *= TR.grip; p->wheelMass += wkg; }
+        const double tireWear = 1.0 - 0.35 * std::clamp(tune->wearTires, 0.0, 1.0);        // kel / sertlesmis lastik
+        for (TireParams* p : {&street, &semi, &slick}) { p->muPeak *= TR.grip * tireWear; p->wheelMass += wkg; }
         const TireParams* dt = tune->tires == TireType::DragSlick ? &slick : tune->tires == TireType::SemiSlick ? &semi : &street;
         const double defPsi = tune->tires == TireType::DragSlick ? 16.0 : tune->tires == TireType::SemiSlick ? 26.0 : 32.0;
         const double defTemp = tune->tires == TireType::DragSlick ? 55.0 : tune->tires == TireType::SemiSlick ? 45.0 : 35.0;
@@ -233,7 +239,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
 
     fuelDensity_ = (cfg_.fuel == FuelType::E85) ? 0.785 : 0.745;
     baseMass_ = (car ? car->massKg : 1080.0) + 75.0 - (tune ? Tune::weightKg(tune->weight) : 0);   // kuru arac + surucu - hafifletme
-    if (tune && car) baseMass_ += swapMassDelta(*car, *tune);
+    if (tune && car) baseMass_ += swapMassDelta(*car, *tune) + 45.0 * std::clamp(tune->wearBody, 0.0, 1.0);   // pas / macun
     fuelKg_ = cfg.fuelLiters * fuelDensity_;
     const SuspOpt& SU = row(suspTable(), tune ? tune->susp : 0);
     const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0) - SU.lowerMm * 0.0008;
@@ -248,7 +254,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         case Body::Sedan: case Body::Wagon: fRide_ = 1.45; break; default: fRide_ = 1.7; break;
         }
         if (!car->streetLegal) fRide_ = 2.8;
-        fRide_ *= SU.ride;
+        fRide_ *= SU.ride * (tune ? 1.0 - 0.30 * std::clamp(tune->wearSusp, 0.0, 1.0) : 1.0);   // bitik amortisor: yumusak
     }
     susp_ = std::make_unique<Suspension>(SuspensionSetup::fromVehicle(vl_.mass, vl_.wheelbase, vl_.track, vl_.hCoG,
                                                                       vl_.frontStatic, fRide_, fRide_ * 1.1, 0.30, 0.60));
@@ -261,7 +267,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     }
     brakeTotal_ = 7000.0 * (baseMass_ / 1155.0);
     if (tune) {
-        brakeTotal_ *= row(brakeTable(), tune->brakes).mul;
+        brakeTotal_ *= row(brakeTable(), tune->brakes).mul * (1.0 - 0.5 * std::clamp(tune->wearBrakes, 0.0, 1.0));
+        CdA_ *= 1.0 + 0.05 * std::clamp(tune->wearBody, 0.0, 1.0);
         const AeroOpt A = tune->aero == kCustomAero ? customAero(*tune) : row(aeroTable(), tune->aero);
         CdA_ *= A.cd;
         dfK_ = A.downforce / (27.78 * 27.78);                               // N / (m/s)^2

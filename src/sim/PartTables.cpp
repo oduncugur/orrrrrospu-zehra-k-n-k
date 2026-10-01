@@ -460,7 +460,9 @@ std::string Tune::signature() const {
                   wastegate * 10000 + boostCtl * 100 + gbStrength, cooling,
                   custTurboMm, custTurboAr, custCamDeg, custDisp, custFinal, custWingN,
                   custGear[0], custGear[1], custGear[2], custGear[3], custGear[4], custGear[5], custGear[6], custGear[7]);
-    return b;
+    char w[96];
+    std::snprintf(w, sizeof w, "|w%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", wearEngine, wearTires, wearBrakes, wearSusp, wearBody, wearElec);
+    return std::string(b) + w;
 }
 
 } // namespace zk

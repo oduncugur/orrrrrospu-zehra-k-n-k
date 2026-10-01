@@ -209,6 +209,12 @@ SaleQuote saleQuote(const OwnedCar& c) {
     q.car = r10(0.65 * carPrice(*findVehicle(c.carId)));
     q.parts = r10(0.4 * c.paidParts);
     q.damage = r10((double)repairCostFor(c));
+    {   // Yipranmis bilesenler (hurdalik araci): restorasyon bedelinin %80'i dusulur
+        double w = 0;
+        for (int k = 2; k < kRestoreParts; ++k) w += restoreStepCost(c, k) * (restoreDamage(c, k) > 0.15 ? 1.6 : 1.0);
+        if (c.tune.wearEngine > 0.02) w += restoreStepCost(c, 0) * 0.5;
+        q.damage += r10(w * 0.8);
+    }
     q.total = std::max(r10(0.25 * q.car), q.car + q.parts - q.damage);
     return q;
 }
@@ -426,6 +432,8 @@ const IntField kIntFields[] = {
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
     {"cdisp", &Tune::custDisp, 0.4}, {"cfin", &Tune::custFinal, 7.5}, {"cwing", &Tune::custWingN, 1600},
+    {"wEng", &Tune::wearEngine, 1}, {"wTir", &Tune::wearTires, 1}, {"wBrk", &Tune::wearBrakes, 1}, {"wSus", &Tune::wearSusp, 1},
+    {"wBdy", &Tune::wearBody, 1}, {"wElx", &Tune::wearElec, 1},
 };
 } // namespace
 
@@ -503,6 +511,101 @@ long repairCostFor(const OwnedCar& c) {
     return cost;
 }
 
+// ------------------------------------------------------------------ hurdalik + restorasyon
+std::vector<JunkCar> junkyardOffers(uint32_t seed) {
+    std::vector<JunkCar> out;
+    uint32_t x = seed * 2654435761u + 0x1234567u;
+    auto rnd = [&]() { x ^= x << 13; x ^= x >> 17; x ^= x << 5; return (x & 0xFFFFFF) / double(0x1000000); };
+    const auto& cat = vehicleCatalog();
+    while (out.size() < 6) {
+        const VehicleDef& v = cat[(size_t)(rnd() * cat.size())];
+        if (!v.streetLegal) continue;
+        bool dup = false;
+        for (const JunkCar& j : out) dup |= j.carId == v.id;
+        if (dup) continue;
+        JunkCar j;
+        j.carId = v.id;
+        // Harbi hurda: her bilesen kotu, cogu bitik; motor ya da sanziman cogu zaman olu
+        auto bad = [&](double lo) { return std::min(1.0, lo + (1.0 - lo) * rnd()); };
+        j.tune.wearEngine = bad(0.35); j.tune.wearTires = bad(0.55); j.tune.wearBrakes = bad(0.45);
+        j.tune.wearSusp = bad(0.40); j.tune.wearBody = bad(0.30); j.tune.wearElec = bad(0.25);
+        j.engineWear = rnd() < 0.55 ? 1.0 : bad(0.3);                 // %55 motor yatak sarmis
+        j.axleBroken = rnd() < 0.35;
+        j.gearboxBroken = rnd() < 0.40;
+        const double cond = (j.tune.wearEngine + j.tune.wearTires + j.tune.wearBrakes + j.tune.wearSusp + j.tune.wearBody + j.tune.wearElec) / 6.0;
+        const double f = 0.35 - 0.20 * cond - (j.engineWear >= 1.0 ? 0.04 : 0.0) - (j.gearboxBroken ? 0.02 : 0.0);
+        j.price = (int)(std::round(carPrice(v) * std::max(0.08, f) / 10.0) * 10.0);
+        out.push_back(j);
+    }
+    return out;
+}
+
+bool Career::buyJunk(const JunkCar& j, std::string* why) {
+    if (money < j.price) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= j.price;
+    OwnedCar oc; oc.carId = j.carId; oc.tune = j.tune;
+    oc.engineWear = j.engineWear; oc.axleBroken = j.axleBroken; oc.gearboxBroken = j.gearboxBroken;
+    oc.fromJunk = true;
+    cars.push_back(oc);
+    current = (int)cars.size() - 1;
+    return true;
+}
+
+const char* restoreName(int comp) {
+    static const char* n[kRestoreParts] = {"MOTOR REVIZYONU", "SANZIMAN + AKS", "LASTIKLER", "FRENLER", "SUSPANSIYON",
+                                           "KAPORTA + PAS", "ELEKTRIK TESISATI"};
+    return n[std::clamp(comp, 0, kRestoreParts - 1)];
+}
+// Bilesenin bozukluk orani 0..1 (gosterge)
+double restoreDamage(const OwnedCar& c, int comp) {
+    switch (comp) {
+    case 0: return std::max(c.engineWear, c.tune.wearEngine);
+    case 1: return (c.gearboxBroken ? 0.6 : 0.0) + (c.axleBroken ? 0.4 : 0.0);
+    case 2: return c.tune.wearTires;
+    case 3: return c.tune.wearBrakes;
+    case 4: return c.tune.wearSusp;
+    case 5: return c.tune.wearBody;
+    case 6: return c.tune.wearElec;
+    default: return 0.0;
+    }
+}
+// Bir adim (tek seferde yariya; lastik ve sanziman/aks tek seferde): fiyat arac degerine ve hasara gore
+long restoreStepCost(const OwnedCar& c, int comp) {
+    const VehicleDef& v = *findVehicle(c.carId);
+    const double d = restoreDamage(c, comp), P = carPrice(v);
+    if (d < 0.02) return 0;
+    switch (comp) {
+    case 0: return (long)(250 + P * (c.engineWear >= 1.0 ? 0.14 : 0.08) * d);
+    case 1: return repairCostFor(c) > 0 ? (long)((c.gearboxBroken ? 600 + partPrice(PartCat::GbStrength, std::max(1, c.tune.gbStrength), v) / 2 : 0) +
+                                                (c.axleBroken ? std::max(150L, (long)partPrice(PartCat::Axles, std::max(1, c.tune.axles), v) / 2) + 120 : 0)) : 0;
+    case 2: return (long)(120 + partPrice(PartCat::Tires, std::max(1, partLevel(c.tune, PartCat::Tires, v)), v) * 0.6 * d + 80);
+    case 3: return (long)(90 + P * 0.025 * d);
+    case 4: return (long)(150 + P * 0.04 * d);
+    case 5: return (long)(300 + P * 0.10 * d);
+    case 6: return (long)(120 + P * 0.035 * d);
+    default: return 0;
+    }
+}
+
+bool Career::restoreStep(int comp, std::string* why) {
+    OwnedCar& c = car();
+    const long cost = restoreStepCost(c, comp);
+    if (cost <= 0) { if (why) *why = "SAGLAM"; return false; }
+    if (money < cost) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= cost;
+    auto half = [](double& w) { w = w < 0.15 ? 0.0 : w * 0.5; };   // her adim yariya indirir (tam toparlamak icin ugras)
+    switch (comp) {
+    case 0: if (c.engineWear >= 1.0) c.engineWear = 0.3; else half(c.engineWear); half(c.tune.wearEngine); break;
+    case 1: c.gearboxBroken = false; c.axleBroken = false; break;
+    case 2: c.tune.wearTires = 0.0; break;                         // yeni lastik
+    case 3: half(c.tune.wearBrakes); break;
+    case 4: half(c.tune.wearSusp); break;
+    case 5: half(c.tune.wearBody); break;
+    case 6: half(c.tune.wearElec); break;
+    }
+    return true;
+}
+
 bool Career::repairCurrent(std::string* why) {
     const long cost = repairCost();
     if (cost <= 0) { if (why) *why = "HASAR YOK"; return false; }
@@ -526,6 +629,7 @@ std::string Career::serialize() const {
         o << buf;
         if (c.damaged()) { std::snprintf(buf, sizeof buf, "dmg=%d;%.4f\n", c.axleBroken ? 1 : 0, c.engineWear); o << buf; }
         if (c.gearboxBroken) o << "gbx=1\n";
+        if (c.fromJunk) o << "junk=1\n";
         o << "tun2=" << tuneV2String(t) << "\n";
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
@@ -575,6 +679,7 @@ bool Career::parse(const std::string& text, Career& out) {
             c.cars.back().engineWear = std::clamp(ew, 0.0, 1.0);
         }
         else if (k == "gbx" && !c.cars.empty()) c.cars.back().gearboxBroken = v == "1";
+        else if (k == "junk" && !c.cars.empty()) c.cars.back().fromJunk = v == "1";
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;

@@ -37,6 +37,9 @@ struct Tune {
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi
     double custTurboMm = 0, custTurboAr = 0, custCamDeg = 0, custDisp = 0, custFinal = 0, custWingN = 0;
     double custGear[8] = {0, 0, 0, 0, 0, 0, 0, 0};   // vites basina fabrika oranina carpan (0 = fabrika)
+    // Bilesen yipranmasi (hurdalik araclari; 0 = yeni, 1 = bitik): motor kompresyonu, lastik, fren, suspansiyon,
+    // kaporta/pas (agirlik + surtunme), elektrik (guc kaybi, ABS/TC calismaz). Restorasyonla duzelir.
+    double wearEngine = 0, wearTires = 0, wearBrakes = 0, wearSusp = 0, wearBody = 0, wearElec = 0;
 
     static int weightKg(int level);
     // Onbellek / kayit anahtari: tum alanlar
