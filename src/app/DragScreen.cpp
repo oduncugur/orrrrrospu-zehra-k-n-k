@@ -25,6 +25,7 @@ constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekr
 
 bool in(const float* r, float x, float y) { return x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]; }
 std::string up(const std::string& s) { std::string o = s; for (char& c : o) c = (char)std::toupper((unsigned char)c); return o; }
+std::string upperS(const std::string& s) { return up(s); }
 float sliderValue(const float* r, float y) { return std::clamp((r[3] - 6 - y) / (r[3] - r[1] - 12), 0.0f, 1.0f); }
 float hash01(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 std::string sec(double t) { if (t < 0) return "--.---"; char b[16]; std::snprintf(b, sizeof b, "%6.3f", t); return b; }
@@ -46,7 +47,7 @@ void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
-    race_->setOpponentHandicap(true);                    // rakip insan gibi hata yapar (manuel debriyaj avantajli)
+    race_->setOpponentHandicap(app_.activeEvent >= 0 ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
     rewarded_ = false; prize_ = 0;
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;
@@ -214,7 +215,12 @@ void DragScreen::update(double dt) {
         const TimeSlip& s = race_->lane(0).slip;
         const Opponent& o = app_.lastOpp;
         const double diff = o.carId == race_->lane(1).car->id && o.estEt > 0 && o.playerEt > 0 ? prizeDifficulty(o.playerEt - o.estEt) : 1.0;
-        app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
+        if (app_.activeEvent >= 0) {                                    // lig etkinligi
+            int pink = 0;
+            prize_ = app_.career.recordEvent(app_.activeEvent, won, s.finished && !s.redLight ? s.quarter : 0.0, 0, &pink);
+            if (pink > 0) app_.eventNote = "PINK SLIP: " + upperS(findVehicle(pink)->model) + " SENIN!";
+            else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
+        } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
         app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress());
         app_.saveCareer();

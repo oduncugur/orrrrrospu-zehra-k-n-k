@@ -93,6 +93,12 @@ public:
     void goParts(int cat = -1);                  // cat: dogrudan kategori (atolyeden donus)
     void goFabricate(int cat);                   // ozel uretim atolyesi
     void goJunkyard();
+    void goLeague();
+    // Lig etkinligi baslat: rakip (isimli ya da dengi), mod; sonuc ekranindan donus lig ekranina
+    void startEvent(int idx);
+    int activeEvent = -1;                        // suren lig etkinligi (-1: yok)
+    double eventHandicap = 1.6;                  // etkinlik rakibinin hata payi
+    std::string eventNote;                       // lig ekranina donuste gosterilecek not (pink slip vb.)
     void goRestore();
     int junkSalt = 0;                            // hurdalik teklifleri: alimdan sonra yenilenir
     void goGallery();

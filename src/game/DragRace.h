@@ -84,7 +84,8 @@ public:
     TreeType tree() const { return tree_; }
     // Rakibe insan hata payi (kariyer): otomatik debriyajli oyuncu gibi gec tepki, yavas debriyaj ve vites.
     // Boylece manuel debriyaji iyi kullanan oyuncu avantajli (kullanici istegi). Plan / ET tablosu etkilenmez.
-    void setOpponentHandicap(bool on);
+    void setOpponentHandicap(bool on) { setOpponentHandicap(on ? 1.6 : 1.0); }
+    void setOpponentHandicap(double k);           // 1.0 kusursuz .. 1.6 otomatik debriyajli oyuncu (patronlar 1.05-1.3)
 
     using LaunchPlan = zk::LaunchPlan;
     static LaunchPlan planLaunch(const VehicleDef* car, const Tune* tune);

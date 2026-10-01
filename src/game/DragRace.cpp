@@ -159,10 +159,10 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
     pt.setClutchPedal(clutch);
 }
 
-void DragRace::setOpponentHandicap(bool on) {
+void DragRace::setOpponentHandicap(double k) {
     LaneState& L = lanes_[1];
-    L.aiSlow = on ? 1.6 : 1.0;                                            // otomatik debriyaj cezasiyla ayni (RoadCar slowClutch)
-    if (on) L.aiReaction = 0.18 + (rnd() % 1000) / 1000.0 * 0.17;          // .180 - .350 (insan)
+    L.aiSlow = std::max(1.0, k);                                          // 1.6: otomatik debriyaj cezasiyla ayni (RoadCar slowClutch)
+    if (k > 1.0) L.aiReaction = 0.06 + (k - 1.0) * 0.25 + (rnd() % 1000) / 1000.0 * 0.15;   // 1.6: .21-.36, patron 1.05: .07-.22
 }
 
 void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {

@@ -59,13 +59,39 @@ void App::setScreen(std::unique_ptr<Screen> s) {
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
     windSpeed_ = 0.0f;
 }
-void App::goGarage() { setVoice(1, nullptr); setScreen(std::make_unique<GarageScreen>(*this)); }
+void App::goGarage() {
+    setVoice(1, nullptr);
+    if (activeEvent >= 0) { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this)); return; }   // etkinlikten donus
+    setScreen(std::make_unique<GarageScreen>(*this));
+}
+void App::goLeague() { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this)); }
+void App::startEvent(int idx) {
+    const auto& ev = leagueEvents();
+    if (idx < 0 || idx >= (int)ev.size() || !career.eventAvailable(idx)) return;
+    const EventDef& e = ev[idx];
+    const OwnedCar& oc = career.car();
+    Opponent o;
+    if (e.rival >= 0) {
+        const RivalDef& r = rivals()[e.rival];
+        o.carId = r.carId; o.tune = opponentPreset(r.preset); o.estEt = tableEt(r.carId, r.preset);
+        o.playerEt = estimatedEt(*findVehicle(oc.carId), oc.tune);
+        eventHandicap = r.handicap;
+    } else {
+        o = career.pickOpponentFor((uint32_t)career.races * 7919u + raceSeed_++);
+        eventHandicap = 1.6;
+    }
+    lastOpp = o;
+    activeEvent = idx;
+    if (e.mode == EventMode::Drag) setScreen(std::make_unique<DragScreen>(*this, oc.carId, o.carId, &oc.tune, &o.tune, true));
+    else setScreen(std::make_unique<RoadScreen>(*this, oc.carId, &oc.tune));
+}
 void App::goDrag(int p, int o, bool autopilot) {
     auto s = std::make_unique<DragScreen>(*this, p, o, nullptr, nullptr, false);
     s->setAutopilot(autopilot);
     setScreen(std::move(s));
 }
 void App::goCareerRace() {
+    if (true) { goLeague(); return; }                 // kariyer artik lig ekranindan
     const OwnedCar& oc = career.car();
     const Opponent opp = career.pickOpponentFor((uint32_t)career.races * 7919u + raceSeed_++);
     lastOpp = opp;

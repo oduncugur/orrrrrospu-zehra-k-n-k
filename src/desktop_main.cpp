@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
         else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
-        else if (n == "junk") game.goJunkyard(); else if (n == "restore") game.goRestore();
+        else if (n == "junk") game.goJunkyard(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore();
     }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;

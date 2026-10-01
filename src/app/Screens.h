@@ -183,6 +183,23 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// Kariyer: lig sekmeleri, etkinlik listesi (rakip, mod, odul, un), secili etkinlik ayrintisi / gunluk gorevler.
+class LeagueScreen : public Screen {
+public:
+    explicit LeagueScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    std::vector<int> rows() const;
+    App& app_;
+    int tab_ = 0, sel_ = -1;
+    bool confirm_ = false;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Hurdalik: 6 hasarli arac kelepir fiyata (her yaristan sonra yenilenir); alinca restorasyona gider.
 class JunkyardScreen : public Screen {
 public:

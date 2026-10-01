@@ -94,6 +94,7 @@ int main() {
     std::printf("[9] Yaris odulu\n");
     {
         Career g = Career::newGame();
+        g.dailyDay = todayIndex(); g.dailyDone = 7;                  // gunluk gorev odulu karismasin
         long prize = 0;
         g.recordRace(*findVehicle(227), true, 14.2, &prize);
         CHECK(prize > 0 && g.money == 6000 + prize && g.wins == 1 && g.car().bestEt == 14.2, "galibiyet parasi ve en iyi ET");
@@ -141,6 +142,51 @@ int main() {
         CHECK(c.form == 2, "galibiyet formu artirir");
         Career d; CHECK(Career::parse(c.serialize(), d) && d.form == 2, "form kayitta korunur");
         CHECK(prizeDifficulty(0.5) > 1.2 && prizeDifficulty(-0.5) < 0.8 && prizeDifficulty(5) == 1.8, "zor rakip daha cok odul");
+    }
+    std::printf("[L] Ligler: patron kilidi, lig acilmasi, pink slip, gunluk gorev, kayit\n");
+    {
+        Career c = Career::newGame();
+        c.money = 100000;
+        const auto& ev = leagueEvents();
+        int boss0 = -1, pink1 = -1, ev1 = -1;
+        for (int i = 0; i < (int)ev.size(); ++i) {
+            if (ev[i].league == 0 && ev[i].rival >= 0 && rivals()[ev[i].rival].boss) boss0 = i;
+            if (ev[i].league == 1 && ev[i].pink) pink1 = i;
+            if (ev[i].league == 1 && ev1 < 0) ev1 = i;
+        }
+        std::string why;
+        CHECK(!c.eventAvailable(boss0, &why) && why.find("3 GALIBIYET") != std::string::npos, "patron icin once 3 galibiyet");
+        CHECK(!c.eventAvailable(ev1, &why) && c.leagueUnlocked() == 0, "sehir ligi kilitli");
+        long got = 0;
+        for (int i = 0; i < 3; ++i) got += c.recordEvent(i, true, 15.0, 0);
+        CHECK(got == ev[0].prize + ev[1].prize + ev[2].prize && c.rep > 0, "ilk galibiyetler tam odul + un");
+        const long again = c.recordEvent(0, true, 15.0, 0);
+        CHECK(again == ev[0].prize * 4 / 10, "tekrar galibiyet %40 odul");
+        CHECK(c.eventAvailable(boss0, &why), "3 galibiyetten sonra patron acik");
+        c.recordEvent(boss0, true, 15.0, 0);
+        CHECK(c.leagueUnlocked() == 1, "patron yenilince sehir ligi acilir");
+        // Pink slip: 2 arac gerekir; kazaninca rakibin arabasi gelir, kaybedince secili arac gider
+        CHECK(!c.eventAvailable(pink1, &why) && why.find("2 ARAC") != std::string::npos, "pink slip 2 arac ister");
+        c.buyCar(217);
+        const size_t n0 = c.cars.size();
+        int pinkCar = 0;
+        c.recordEvent(pink1, true, 15.0, 0, &pinkCar);
+        CHECK(c.cars.size() == n0 + 1 && pinkCar == rivals()[ev[pink1].rival].carId, "pink slip kazanildi: rakibin arabasi garajda");
+        Career d2 = c; d2.eventWins = 0;
+        d2.recordEvent(pink1, false, 0.0, 0, &pinkCar);
+        CHECK(d2.cars.size() == c.cars.size() - 1 && pinkCar < 0, "pink slip kaybedildi: araba gitti");
+        // Gunluk gorevler: odul bir kez verilir
+        c.dailyDay = -1; c.dailyRefresh();                         // onceki yarislarin ilerlemesi sifirlansin
+        const auto tasks = dailyTasks(c.dailyDay, 15.0);
+        const long m0 = c.money;
+        for (int k = 0; k < 10; ++k) { c.dailyAdd(TaskType::WinAny, 1); c.dailyAdd(TaskType::WinDrag, 1); c.dailyAdd(TaskType::WinRoad, 1);
+            c.dailyAdd(TaskType::Earn, 1000); c.dailyAdd(TaskType::Restore, 1); c.dailyAdd(TaskType::BuyParts, 1);
+            c.dailyAdd(TaskType::FlowScore, 99999); c.dailyAdd(TaskType::EtUnder, 100); }
+        const long paid = c.money - m0;
+        CHECK(c.dailyDone == 7 && paid == tasks[0].reward + tasks[1].reward + tasks[2].reward, "uc gunluk gorev tamamlandi, odul bir kez");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.rep == c.rep && d.eventWins == c.eventWins && d.dailyDone == 7 && d.leagueUnlocked() == 1,
+              "un, etkinlikler ve gorevler kayitta korunur");
     }
     std::printf("[11] Satis\n");
     {

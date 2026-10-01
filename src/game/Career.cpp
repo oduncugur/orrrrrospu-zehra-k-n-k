@@ -398,7 +398,115 @@ bool Career::buyPart(PartCat c, int level, std::string* why) {
     money -= p;
     oc.paidParts += p;
     setPartLevel(oc.tune, c, level, v);
+    dailyAdd(TaskType::BuyParts, 1);
     return true;
+}
+
+// ------------------------------------------------------------------ ligler
+int Career::leagueWins(int league) const {
+    int n = 0;
+    const auto& ev = leagueEvents();
+    for (size_t i = 0; i < ev.size(); ++i) n += ev[i].league == league && eventWon((int)i);
+    return n;
+}
+
+int Career::leagueUnlocked() const {
+    const auto& ev = leagueEvents();
+    int l = 0;
+    for (int L = 0; L < kLeagues - 1; ++L) {
+        bool boss = false;
+        for (size_t i = 0; i < ev.size(); ++i)
+            if (ev[i].league == L && ev[i].rival >= 0 && rivals()[ev[i].rival].boss && eventWon((int)i)) boss = true;
+        if (!boss) break;
+        l = L + 1;
+    }
+    return l;
+}
+
+bool Career::eventAvailable(int idx, std::string* why) const {
+    auto no = [&](const std::string& m) { if (why) *why = m; return false; };
+    const auto& ev = leagueEvents();
+    if (idx < 0 || idx >= (int)ev.size()) return no("GECERSIZ");
+    const EventDef& e = ev[idx];
+    if (e.league > leagueUnlocked()) return no("ONCEKI LIGIN PATRONUNU YEN");
+    const bool boss = e.rival >= 0 && rivals()[e.rival].boss;
+    if (boss && leagueWins(e.league) < kBossUnlockWins) return no("PATRON ICIN 3 GALIBIYET GEREK");
+    if (e.pink && cars.size() < 2) return no("PINK SLIP ICIN 2 ARAC GEREK");
+    if (e.pink && eventWon(idx)) return no("ARABASINI ZATEN ALDIN");
+    if (!car().raceable()) return no("ARAC HASARLI - TAMIR");
+    const double cap = leagueIndexCap(e.league);
+    if (cap > 0 && performanceIndex(*findVehicle(car().carId), car().tune) > cap) {
+        char b[48]; std::snprintf(b, sizeof b, "SINIF ASIMI (ENDEKS > %.0f)", cap);
+        return no(b);
+    }
+    return true;
+}
+
+long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut) {
+    if (pinkOut) *pinkOut = 0;
+    const auto& ev = leagueEvents();
+    if (idx < 0 || idx >= (int)ev.size()) return 0;
+    const EventDef& e = ev[idx];
+    if (e.mode == EventMode::Flow) won = flowScore >= e.flowTarget;
+    const bool first = !eventWon(idx);
+    long prize = 0;
+    ++races; ++car().races;
+    if (won) {
+        ++wins; ++car().wins;
+        prize = first ? e.prize : e.prize * 4 / 10;
+        rep += first ? e.rep : std::max(1, e.rep * 3 / 10);
+        eventWins |= (uint64_t)1 << idx;
+        form = std::clamp(form + 1, -3, 3);
+    } else {
+        rep = std::max(0, rep - e.rep / 4);
+        form = std::clamp(form - 1, -3, 3);
+    }
+    if (et > 0 && (car().bestEt <= 0 || et < car().bestEt)) car().bestEt = et;
+    // Pink slip: kazanan rakibin arabasini (parcalariyla) alir; kaybeden kendi arabasini verir
+    if (e.pink && e.rival >= 0) {
+        const RivalDef& r = rivals()[e.rival];
+        if (won) {
+            OwnedCar oc; oc.carId = r.carId; oc.tune = opponentPreset(r.preset);
+            cars.push_back(oc);
+            if (pinkOut) *pinkOut = r.carId;
+        } else if (cars.size() > 1) {
+            if (pinkOut) *pinkOut = -car().carId;
+            cars.erase(cars.begin() + current);
+            current = std::min(current, (int)cars.size() - 1);
+        }
+    }
+    money += prize; earnings += prize;
+    // Gunluk gorevler
+    if (won) {
+        dailyAdd(TaskType::WinAny, 1);
+        dailyAdd(e.mode == EventMode::Drag ? TaskType::WinDrag : TaskType::WinRoad, 1);
+    }
+    if (et > 0) dailyAdd(TaskType::EtUnder, (long)std::round(et * 100.0));
+    if (e.mode == EventMode::Flow) dailyAdd(TaskType::FlowScore, flowScore);
+    if (prize > 0) dailyAdd(TaskType::Earn, prize);
+    return prize;
+}
+
+void Career::dailyRefresh() {
+    const int d = todayIndex();
+    if (d == dailyDay) return;
+    dailyDay = d; dailyDone = 0;
+    for (long& p : dailyProg) p = 0;
+}
+
+long Career::dailyAdd(TaskType t, long amount) {
+    dailyRefresh();
+    const auto tasks = dailyTasks(dailyDay, cars.empty() ? 15.0 : estimatedEt(*findVehicle(car().carId), car().tune));
+    long paid = 0;
+    for (int i = 0; i < 3; ++i) {
+        if (tasks[i].type != t || ((dailyDone >> i) & 1)) continue;
+        bool done;
+        if (t == TaskType::EtUnder) { if (dailyProg[i] == 0 || amount < dailyProg[i]) dailyProg[i] = amount; done = dailyProg[i] <= tasks[i].target; }
+        else if (t == TaskType::FlowScore) { dailyProg[i] = std::max(dailyProg[i], amount); done = dailyProg[i] >= tasks[i].target; }
+        else { dailyProg[i] += amount; done = dailyProg[i] >= tasks[i].target; }
+        if (done) { dailyDone |= 1 << i; money += tasks[i].reward; earnings += tasks[i].reward; rep += tasks[i].rep; paid += tasks[i].reward; }
+    }
+    return paid;
 }
 
 void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut, double prizeScale) {
@@ -414,6 +522,9 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
     ++oc.races; if (won) ++oc.wins;
     if (et > 0 && (oc.bestEt <= 0 || et < oc.bestEt)) oc.bestEt = et;
     if (prizeOut) *prizeOut = prize;
+    if (won) { dailyAdd(TaskType::WinAny, 1); dailyAdd(et > 0 ? TaskType::WinDrag : TaskType::WinRoad, 1); rep += 2; }
+    if (et > 0) dailyAdd(TaskType::EtUnder, (long)std::round(et * 100.0));
+    if (prize > 0) dailyAdd(TaskType::Earn, prize);
 }
 
 // ------------------------------------------------------------------ kayit
@@ -493,6 +604,8 @@ long Career::recordFlow(long score, bool* newRecord) {
     prize = prize / 10 * 10;
     money += prize; earnings += prize;
     if (newRecord) *newRecord = rec;
+    dailyAdd(TaskType::FlowScore, score);
+    if (prize > 0) dailyAdd(TaskType::Earn, prize);
     return prize;
 }
 
@@ -603,6 +716,7 @@ bool Career::restoreStep(int comp, std::string* why) {
     case 5: half(c.tune.wearBody); break;
     case 6: half(c.tune.wearElec); break;
     }
+    dailyAdd(TaskType::Restore, 1);
     return true;
 }
 
@@ -619,7 +733,12 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\n";
+    {
+        char lb[160];
+        std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone);
+        o << lb;
+    }
     char buf[256];
     for (const OwnedCar& c : cars) {
         const Tune& t = c.tune;
@@ -663,6 +782,9 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
         else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
         else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
+        else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));
+        else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
+        else if (k == "daily") std::sscanf(v.c_str(), "%d;%ld;%ld;%ld;%d", &c.dailyDay, &c.dailyProg[0], &c.dailyProg[1], &c.dailyProg[2], &c.dailyDone);
         else if (k == "streak") {
             if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;
             c.sameOppWins = std::clamp(c.sameOppWins, 0, 100);

@@ -71,6 +71,7 @@ public:
 
     std::vector<std::string> drainMessages() { auto m = std::move(msgs_); msgs_.clear(); return m; }
     bool takeCrash() { const bool c = crashEv_; crashEv_ = false; return c; }
+    void setRivalPace(double p) { rivalPace_ = p; }   // YZ viraj temposu (yanal g payi; varsayilan 0.55)
 
 private:
     void spawnTraffic(TrafficCar& t, double fromS);
@@ -91,6 +92,7 @@ private:
     double finishT_[2] = {0, 0};
     int winner_ = -1, collisions_ = 0;
     double rivalLane_ = -kLane;
+    double rivalPace_ = 0.55;
     double reaction_ = -1.0, rivalReact_ = 0.0;      // karma tepki sureleri (rakip: 0.15-0.35 s, tohumdan)
     std::vector<std::string> msgs_;
     bool crashEv_ = false, touching_ = false;

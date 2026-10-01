@@ -58,12 +58,21 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
               n == "touge" ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
     }
     else if (autopilot_) start(RoadSession::Mode::Free);
+    if (app_.activeEvent >= 0) {                                         // lig etkinligi: mod dogrudan
+        switch (leagueEvents()[app_.activeEvent].mode) {
+        case EventMode::Road: start(RoadSession::Mode::Race); break;
+        case EventMode::Touge: start(RoadSession::Mode::Race, RoadSession::Kind::Touge); break;
+        case EventMode::Karma: start(RoadSession::Mode::Karma); break;
+        case EventMode::Flow: start(RoadSession::Mode::Flow); break;
+        default: break;
+        }
+    }
 }
 
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
     if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma) {
-        const Opponent o = app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
+        const Opponent o = app_.activeEvent >= 0 ? app_.lastOpp : app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
         app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
         app_.setVoiceTuned(1, rival, &rt);
@@ -71,6 +80,10 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
     ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind);
+    if (RoadCar* rv = ses_->rival(); rv && app_.activeEvent >= 0) {     // isimli rakip: patron daha keskin
+        rv->slowClutch = app_.eventHandicap > 1.25;
+        ses_->setRivalPace(0.55 + (1.6 - std::clamp(app_.eventHandicap, 1.0, 1.6)) * 0.15);
+    }
     camPsi_ = ses_->player().sim().heading();
     RoadCar& P = ses_->player();
     P.assist = app_.settings.assist;
@@ -103,7 +116,14 @@ bool RoadScreen::autoClutchPenalty() const {
 void RoadScreen::finishRace() {
     rewarded_ = true;
     if (autopilot_) return;
-    if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
+    if (app_.activeEvent >= 0) {                                         // lig etkinligi
+        int pink = 0;
+        const long score = ses_->flow() ? ses_->flow()->score() : 0;
+        prize_ = app_.career.recordEvent(app_.activeEvent, ses_->rival() ? ses_->playerWon() : false, 0.0, score, &pink);
+        if (pink > 0) app_.eventNote = std::string("PINK SLIP: ") + upper(findVehicle(pink)->model) + " SENIN!";
+        else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
+    }
+    else if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
     else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
                                                          ses_->prizeScale() * (app_.lastOpp.estEt > 0 && app_.lastOpp.playerEt > 0 ? prizeDifficulty(app_.lastOpp.playerEt - app_.lastOpp.estEt) : 1.0));
     else return;

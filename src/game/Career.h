@@ -1,6 +1,7 @@
 // ZEHRA KINIK - Kariyer: para, garaj (sahip olunan araclar + parcalari), ekonomi, parca katalogu, kayit.
 #pragma once
 #include "garage/VehicleCatalog.h"
+#include "game/League.h"
 #include "sim/Tune.h"
 
 #include <cstdint>
@@ -102,6 +103,23 @@ struct Career {
     int  form = 0;                         // son yaris formu -3..+3 (galibiyet +1, maglubiyet -1): rakip zorlugu
     int  lastOppId = 0, sameOppWins = 0;   // ayni rakibi tekrar tekrar yenme (odul azalir, para kasma engeli)
     long bestFlow = 0;                     // otoban akisi en iyi skoru
+    // ---- ligler (League.h) ----
+    int  rep = 0;                          // un puani
+    uint64_t eventWins = 0;                // kazanilmis etkinlikler (leagueEvents indeksi -> bit)
+    int  dailyDay = -1;                    // gunluk gorevlerin gunu
+    long dailyProg[3] = {0, 0, 0};
+    int  dailyDone = 0;                    // tamamlanan gorev bitleri
+    int  leagueUnlocked() const;           // acik en yuksek lig (onceki ligin patronu yenildiyse)
+    int  leagueWins(int league) const;
+    bool eventWon(int idx) const { return idx >= 0 && idx < 64 && ((eventWins >> idx) & 1u); }
+    // Etkinlige girilebilir mi (lig kilidi, patron icin 3 galibiyet, pink slip 2+ arac, sinif siniri)
+    bool eventAvailable(int idx, std::string* why = nullptr) const;
+    // Etkinlik sonucu: odul (ilk galibiyet tam, tekrar %40), un, pink slip (araci al / kaybet), gunluk gorevler.
+    // Donus: odul. pinkOut: pink slip'te el degistiren arac kimligi (0: yok)
+    long recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut = nullptr);
+    // Gunluk gorevler: gun degistiyse sifirlar; ilerleme ekler, tamamlananin odulunu verir (donus: verilen odul)
+    void dailyRefresh();
+    long dailyAdd(TaskType t, long amount);
     // Rakip sec: oyuncunun tahmini ET'sine (+ forma gore hedef) yakin, son rakipten farkli
     Opponent pickOpponentFor(uint32_t seed) const;
 

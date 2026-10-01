@@ -108,7 +108,7 @@ void RoadSession::collide(RoadCar& car, bool isPlayer) {
 // YZ rakip: sag seritte yavas trafik varsa karsi serit bossa sollar, degilse arkasinda bekler
 RoadControls RoadSession::rivalControls() {
     RoadCar& r = *rival_;
-    if (mode_ == Mode::Karma) return r.aiControls(+lane(), 0.6);        // kapali yol: kendi (sol) seridinde kalir
+    if (mode_ == Mode::Karma) return r.aiControls(+lane(), rivalPace_ + 0.05);   // kapali yol: kendi (sol) seridinde kalir
     const double s = r.s(), v = r.sim().speed();
     double cap = 1e9, blockV = -1;
     for (const TrafficCar& t : traffic_)
@@ -129,7 +129,7 @@ RoadControls RoadSession::rivalControls() {
         if (std::fabs(player_->s() - s) < 12.0 && player_->lateral() < 0.0) rightClear = false;
         if (rightClear || oncomingClose) rivalLane_ = -lane();
     }
-    return r.aiControls(rivalLane_, 0.55, cap);
+    return r.aiControls(rivalLane_, rivalPace_, cap);
 }
 
 void RoadSession::update(double dt, const RoadControls& in) {
