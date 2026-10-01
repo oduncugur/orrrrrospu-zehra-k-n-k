@@ -39,24 +39,60 @@ void RoadCar::requestShift(int dir) {
     if (target_ != pt.gear()) { shiftT_ = 0; sinceShift_ = 0; }
 }
 
-// Otomatik debriyaj/vites: kalkista devir tutulur, vites degisiminde gaz kesilip debriyaj basilir
-void RoadCar::driverAssist(double dt, double thrIn) {
+void RoadCar::requestGear(int g) {
+    PowertrainCore& pt = sim_->powertrain();
+    g = std::clamp(g, 0, pt.gearCount());
+    if (shiftT_ >= 0 || g == pt.gear()) return;
+    target_ = g; shiftT_ = 0; sinceShift_ = 0;
+}
+
+// Oyuncu debriyaji (H-desen): pedal ve vites dogrudan; debriyajsiz vites girmez (citirti), stop edince
+// debriyaja basinca mars
+void RoadCar::playerClutch(const RoadControls& c) {
+    PowertrainCore& pt = sim_->powertrain();
+    if (pt.stalled()) {
+        if (!stalledEv_ && !launching_) stalledEv_ = true;
+        launching_ = true;                                               // stop bayragi (bir kez mesaj)
+        if (c.clutch > 0.6) { pt.restart(); launching_ = false; }
+    } else launching_ = false;
+    grind_ = false;
+    if (c.gear >= 0 && c.gear != pt.gear()) {
+        if (c.clutch >= 0.55 || c.gear == 0) pt.setGear(std::min(c.gear, pt.gearCount()));   // bosa almak debriyajsiz olur
+        else grind_ = true;
+    }
+    pt.setClutchPedal(c.clutch);
+    pt.setThrottle(std::clamp(c.throttle, 0.0, 1.0));
+}
+
+// Otomatik debriyaj/vites: kalkista devir tutulur, vites degisiminde gaz kesilip debriyaj basilir.
+// Sirali (dogbox/DCT) vites hizli: dogbox 35 ms atesleme kesme, DCT 60 ms; debriyaj yalniz kalkista.
+void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
     PowertrainCore& pt = sim_->powertrain();
     const double v = sim_->speed();
+    const Gearbox box = sim_->gearboxType();
+    const bool seq = box == Gearbox::Dogbox || box == Gearbox::DCT;
+    const double k = slowClutch ? 1.6 : 1.0;                            // otomatik debriyaj cezasi: gec kavrar
     double clutch = 0.0, thr = thrIn;
-    if (pt.stalled()) { pt.restart(); pt.setGear(1); launching_ = true; launchPedal_ = 1.0; stalledEv_ = true; }
-    if (shiftT_ >= 0.0) {
+    if (pt.stalled()) { pt.restart(); pt.setGear(manual ? std::max(pt.gear(), 1) : 1); launching_ = true; launchPedal_ = 1.0; stalledEv_ = true; }
+    const bool launchGear = manual ? pt.gear() >= 1 : pt.gear() == 1;
+    if (shiftT_ >= 0.0 && seq) {
         shiftT_ += dt;
-        clutch = shiftT_ < 0.12 ? 1.0 : std::max(0.0, 1.0 - (shiftT_ - 0.12) / 0.14);
-        if (shiftT_ < 0.12) thr = 0.0;
-        if (shiftT_ > 0.08 && pt.gear() != target_) pt.setGear(target_);
-        if (shiftT_ > 0.26) shiftT_ = -1.0;
-    } else if (pt.gear() == 1 && v < 3.0 && (launching_ || thrIn < 0.05)) {
+        const double dur = box == Gearbox::Dogbox ? 0.035 : 0.060;
+        if (pt.gear() != target_) pt.setGear(target_);
+        if (box == Gearbox::Dogbox) thr = 0.0;
+        if (shiftT_ > dur) shiftT_ = -1.0;
+    } else if (shiftT_ >= 0.0) {
+        shiftT_ += dt;
+        clutch = shiftT_ < 0.12 * k ? 1.0 : std::max(0.0, 1.0 - (shiftT_ - 0.12 * k) / (0.14 * k));
+        if (shiftT_ < 0.12 * k) thr = 0.0;
+        if (shiftT_ > 0.08 * k && pt.gear() != target_) pt.setGear(target_);
+        if (shiftT_ > 0.26 * k) shiftT_ = -1.0;
+    } else if (launchGear && v < 3.0 && (launching_ || thrIn < 0.05)) {
         if (thrIn < 0.05 && v < 1.0) launchPedal_ = 1.0;                      // durus: debriyaj basili (stop etmez)
         else {   // kalkis: devir gaza gore 1500-2700'de tutulur, pedal isirma noktasindan devre gore birakilir
             const double hold = 1500.0 + 1200.0 * thrIn;
             launchPedal_ = std::min(launchPedal_, 0.65);
-            launchPedal_ = std::clamp(launchPedal_ + (pt.rpm() < hold ? 0.8 : -1.6) * dt, 0.0, 1.0);
+            launchPedal_ = std::clamp(launchPedal_ + (pt.rpm() < hold ? 0.8 : -1.6) / k * dt, 0.0, 1.0);
         }
         launching_ = launchPedal_ > 0.0;
         clutch = launchPedal_;
@@ -72,16 +108,22 @@ void RoadCar::driverAssist(double dt, double thrIn) {
             if (shiftRpm > sim_->shiftRpm() - 150 && gear < pt.gearCount()) { shiftT_ = 0; target_ = gear + 1; sinceShift_ = 0; }
             else if (shiftRpm < 0.36 * sim_->engineSpec().redlineRpm && gear > 1 && sinceShift_ > 1.5) { shiftT_ = 0; target_ = gear - 1; sinceShift_ = 0; }
         }
-        if (gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
-        if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && gear == 1) { launching_ = true; launchPedal_ = 0.6; }
+        if (!manual && gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
+        if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && (manual ? gear >= 1 : gear == 1)) { launching_ = true; launchPedal_ = 0.6; }
     }
+    if (neutral || pt.gear() == 0) clutch = 1.0;                         // N / P: konvertor / debriyaj ayrik
     pt.setClutchPedal(clutch);
     pt.setThrottle(std::clamp(thr, 0.0, 1.0));
 }
 
 void RoadCar::update(double dt, const RoadControls& c) {
     const double v = sim_->speed();
-    driverAssist(dt, c.throttle);
+    if (c.clutch >= 0.0) playerClutch(c);
+    else {
+        if (c.gear >= 0) requestGear(c.gear);
+        if (c.shift != 0) { manual = true; requestShift(c.shift); }
+        driverAssist(dt, c.throttle, c.neutral);
+    }
     sim_->setSurfaceMu(offRoad() ? 0.55 : 1.0);                       // cim/toprak
     {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)
         const RoadPoint p = road_.at(s_);

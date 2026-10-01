@@ -1,6 +1,8 @@
 // ZEHRA KINIK - Ekranlar
 #pragma once
 #include "app/App.h"
+#include "app/Cockpit.h"
+#include "app/Ui.h"
 #include "game/DragRace.h"
 #include "game/RoadSession.h"
 #include "sim/PowertrainCore.h"
@@ -143,7 +145,7 @@ public:
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
-    enum class Item { FpsCap, VSync, ShowFps, Fullscreen, IntScale, Master, Engine, Tire,
+    enum class Item { FpsCap, VSync, ShowFps, Fullscreen, IntScale, RoadView, Master, Engine, Tire,
                       Haptics, Tilt, TiltSens, Assist, Gears, Speed, Tree };
 private:
     struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi
@@ -155,11 +157,12 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
-// Acik yol: dikey 360x640, arkadan takip kamerasi, duzlemsel dinamik. Once mod secimi (serbest / yol yarisi).
+// Acik yol: yatay 640x360, arkadan takip kamerasi, duzlemsel dinamik. Once mod secimi (serbest / akis / yaris).
+// Kontroller Cockpit'te (analog pedallar + sanzimana gore vites kolu); direksiyon egim / klavye.
 class RoadScreen : public Screen {
 public:
     RoadScreen(App& app, int carId, const Tune* tune);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return land_; }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -168,21 +171,30 @@ public:
     void key(Key k, bool down) override;
 
 private:
+    void setupLayout();                          // ayardan yon: yatay 640x360 / dikey 360x640
+    float fov() const { return land_ ? 0.85f : 1.05f; }
     void start(RoadSession::Mode m, RoadSession::Kind kind = RoadSession::Kind::Highway);
     void finishRace();
     void toggleAssist();
-    void toggleGears();
     void toggleTilt();
+    bool autoClutchPenalty() const;              // H-desen + otomatik debriyaj: virajda vites yok, odul %75
+    void drawMenu(Renderer& r);
+    void drawWorld(Renderer& r);
+    void drawHud(Renderer& r);
+    void drawResults(Renderer& r);
     void flash(const std::string& m, double t = 1.8) { msg_ = m; msgT_ = t; }
     App& app_;
     int carId_;
     Tune tune_;
     std::unique_ptr<RoadSession> ses_;
+    Cockpit cockpit_;
+    bool land_ = true;
+    int W = 640, H = 360;
+    Rect free_{}, flow_{}, race_{}, touge_{}, assistBtn_{}, tiltBtn_{};
     bool menu_ = true, rewarded_ = false, record_ = false;
     long prize_ = 0;
-    double steer_ = 0, thr_ = 0, brake_ = 0;
-    bool kL_ = false, kR_ = false, kT_ = false, kB_ = false;
-    int tL_ = -1, tR_ = -1, tG_ = -1, tB_ = -1;
+    double steer_ = 0;
+    bool kL_ = false, kR_ = false;
     bool autopilot_ = false;
     double camPsi_ = 0, finT_ = 0;
     std::string msg_; double msgT_ = 0;

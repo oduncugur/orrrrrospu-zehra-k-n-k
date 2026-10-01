@@ -19,7 +19,8 @@ static bool same(const Settings& a, const Settings& b) {
     return a.fpsCap == b.fpsCap && a.vsync == b.vsync && a.showFps == b.showFps && a.fullscreen == b.fullscreen &&
            a.integerScale == b.integerScale && a.masterVol == b.masterVol && a.engineVol == b.engineVol &&
            a.tireVol == b.tireVol && a.haptics == b.haptics && a.tiltSteer == b.tiltSteer && a.tiltSens == b.tiltSens &&
-           a.assist == b.assist && a.manualGears == b.manualGears && a.mph == b.mph;
+           a.assist == b.assist && a.manualGears == b.manualGears && a.mph == b.mph && a.autoClutch == b.autoClutch &&
+           a.roadPortrait == b.roadPortrait;
 }
 
 // Sanal saatle kare dongusu: her kare 'work' ns surer, sonra pacer'in dedigi kadar uyunur. Ortalama kare suresi (ns).
@@ -47,7 +48,7 @@ int main() {
     Settings s;
     s.fpsCap = 144; s.vsync = VSync::Adaptive; s.showFps = false; s.fullscreen = true; s.integerScale = true;
     s.masterVol = 70; s.engineVol = 40; s.tireVol = 0; s.haptics = 25; s.tiltSteer = false; s.tiltSens = 175;
-    s.assist = false; s.manualGears = true; s.mph = true;
+    s.assist = false; s.manualGears = true; s.mph = true; s.autoClutch = true; s.roadPortrait = true;
     CHECK(same(Settings::parse(s.serialize()), s), "tum alanlar korunur");
     s.fpsCap = 0;
     CHECK(Settings::parse(s.serialize()).fpsCap == 0, "SINIRSIZ (0) korunur");

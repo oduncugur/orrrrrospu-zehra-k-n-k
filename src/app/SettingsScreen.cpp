@@ -10,7 +10,7 @@ namespace zk {
 namespace {
 using It = SettingsScreen::Item;
 const Rect kDefaults{8, 596, 128, 634}, kBack{136, 596, 352, 634};
-constexpr float kRowH = 28, kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
+constexpr float kRowH = 26, kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
 const char* const kSections[] = {"GORUNTU", "SES", "KONTROL", "OYUN"};
 
 const char* label(It it) {
@@ -20,6 +20,7 @@ const char* label(It it) {
     case It::ShowFps: return "FPS GOSTERGESI";
     case It::Fullscreen: return "TAM EKRAN";
     case It::IntScale: return "OLCEKLEME";
+    case It::RoadView: return "YOL EKRANI";
     case It::Master: return "ANA SES";
     case It::Engine: return "MOTOR SESI";
     case It::Tire: return "LASTIK SESI";
@@ -27,7 +28,7 @@ const char* label(It it) {
     case It::Tilt: return "EGIM DIREKSIYON";
     case It::TiltSens: return "EGIM HASSASIYET";
     case It::Assist: return "SURUS YARDIMI";
-    case It::Gears: return "VITES (YOL)";
+    case It::Gears: return "DEBRIYAJ (H)";
     case It::Speed: return "HIZ BIRIMI";
     case It::Tree: return "DRAG AGACI";
     }
@@ -40,6 +41,7 @@ const char* help(It it) {
     case It::ShowFps: return "EKRANDA KARE HIZI VE KARE BASINA FIZIK SURESI (MS)";
     case It::Fullscreen: return "PENCERE / TAM EKRAN. KISAYOL: F11";
     case It::IntScale: return "TAM SAYI: PIKSEL-KESKIN, KENARLARDA SIYAH BANT KALABILIR";
+    case It::RoadView: return "ACIK YOL EKRANI: YATAY (GENIS GORUS) YA DA DIKEY (TEK EL)";
     case It::Master: return "TUM SESLER";
     case It::Engine: return "MOTOR, EGZOZ, TURBO SESI";
     case It::Tire: return "LASTIK CIGLIGI VE BURNOUT SESI";
@@ -47,7 +49,7 @@ const char* help(It it) {
     case It::Tilt: return "ACIK YOLDA TELEFONU EGEREK DIREKSIYON";
     case It::TiltSens: return "YUKSEK: DAHA AZ EGIMLE TAM DIREKSIYON";
     case It::Assist: return "ACIK YOL: ESP + OTOMATIK DEBRIYAJ. YOLDA DA DEGISTIRILEBILIR";
-    case It::Gears: return "ACIK YOLDA BASLANGIC VITES MODU";
+    case It::Gears: return "H-DESEN MANUEL: OTOMATIKTE VIRAJDA VITES YOK, GEC KAVRAR, ODUL %75";
     case It::Speed: return "HIZ GOSTERGESI BIRIMI";
     case It::Tree: return "PRO: 3 SARI BIRDEN, 0.4 S. SPOR: SIRALI SARILAR, 0.5 S";
     }
@@ -73,7 +75,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
 #ifndef __ANDROID__
         {0, It::Fullscreen},
 #endif
-        {0, It::IntScale},
+        {0, It::IntScale}, {0, It::RoadView},
         {1, It::Master}, {1, It::Engine}, {1, It::Tire},
 #ifdef __ANDROID__
         {2, It::Haptics}, {2, It::Tilt}, {2, It::TiltSens},
@@ -100,6 +102,7 @@ std::string SettingsScreen::value(It it) const {
     case It::ShowFps: return onOff(s.showFps);
     case It::Fullscreen: return onOff(s.fullscreen);
     case It::IntScale: return s.integerScale ? "TAM SAYI" : "SIGDIR";
+    case It::RoadView: return s.roadPortrait ? "DIKEY" : "YATAY";
     case It::Master: return pct(s.masterVol);
     case It::Engine: return pct(s.engineVol);
     case It::Tire: return pct(s.tireVol);
@@ -107,7 +110,7 @@ std::string SettingsScreen::value(It it) const {
     case It::Tilt: return onOff(s.tiltSteer);
     case It::TiltSens: return pct(s.tiltSens);
     case It::Assist: return onOff(s.assist);
-    case It::Gears: return s.manualGears ? "MANUEL" : "OTOMATIK";
+    case It::Gears: return s.autoClutch ? "OTOMATIK" : "OYUNCU";
     case It::Speed: return s.speedUnit();
     case It::Tree: return app_.treePro ? "PRO .4" : "SPOR .5";
     }
@@ -131,6 +134,7 @@ void SettingsScreen::change(It it, int dir) {
     case It::ShowFps: s.showFps = !s.showFps; break;
     case It::Fullscreen: s.fullscreen = !s.fullscreen; break;
     case It::IntScale: s.integerScale = !s.integerScale; break;
+    case It::RoadView: s.roadPortrait = !s.roadPortrait; break;
     case It::Master: s.masterVol = list(Settings::volumeOptions(), s.masterVol); break;
     case It::Engine: s.engineVol = list(Settings::volumeOptions(), s.engineVol); break;
     case It::Tire: s.tireVol = list(Settings::volumeOptions(), s.tireVol); break;
@@ -141,7 +145,7 @@ void SettingsScreen::change(It it, int dir) {
     case It::Tilt: s.tiltSteer = !s.tiltSteer; break;
     case It::TiltSens: s.tiltSens = list(Settings::tiltSensOptions(), s.tiltSens); break;
     case It::Assist: s.assist = !s.assist; break;
-    case It::Gears: s.manualGears = !s.manualGears; break;
+    case It::Gears: s.autoClutch = !s.autoClutch; break;
     case It::Speed: s.mph = !s.mph; break;
     case It::Tree: app_.treePro = !app_.treePro; app_.saveCareer(); return;
     }

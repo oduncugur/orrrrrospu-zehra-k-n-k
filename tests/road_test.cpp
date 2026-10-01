@@ -128,6 +128,59 @@ int main() {
         CHECK(vDown > 2.8 && vDown < 3.95, "yokus asagi yer cekimiyle hizlanir (yuvarlanma direnci kadar eksik)");
         CHECK(vFlat < 0.05, "duzde kendiliginden hareket yok");
     }
+    std::printf("[7] Surus kontrol modlari (oyuncu debriyaji, otomatik debriyaj, sirali, otomatik N)\n");
+    {
+        const RoadPath road2(20250930u, 20000.0, 90.0);
+        // H-desen + oyuncu debriyaji (#217 Sahin): debriyaj bas, 1. vites, gaz, yavas birak; 2. vitese debriyajsiz -> girmez
+        RoadCar h(findVehicle(217), nullptr, road2, 0.0, -1.8);
+        h.manual = true;
+        RoadControls c; c.clutch = 1.0; c.gear = 1; c.throttle = 0.0;
+        for (int i = 0; i < 30; ++i) h.update(1.0 / 60.0, c);
+        double t = 0;
+        for (; t < 6.0; t += 1.0 / 60.0) {                                 // 1.2 s'de debriyaji birak, gaz %60
+            c.clutch = std::max(0.0, 1.0 - t / 1.2); c.throttle = 0.6;
+            h.update(1.0 / 60.0, c);
+        }
+        const double v1 = h.sim().speed();
+        c.gear = 2; c.clutch = 0.0;                                         // debriyajsiz vites denemesi
+        h.update(1.0 / 60.0, c);
+        const bool grind = h.grinding() && h.sim().powertrain().gear() == 1;
+        c.clutch = 1.0; h.update(1.0 / 60.0, c);                            // debriyajla girer
+        const int g2 = h.sim().powertrain().gear();
+        std::printf("    oyuncu debriyaji: 6 s'de %.0f km/h, debriyajsiz 2. vites %s, debriyajla vites %d\n", v1 * 3.6, grind ? "girmedi" : "GIRDI", g2);
+        CHECK(v1 > 8.0 && !h.sim().powertrain().stalled(), "oyuncu debriyajiyla kalkti, stop etmedi");
+        CHECK(grind && g2 == 2, "debriyajsiz vites girmez (citirti), debriyajla girer");
+        // H-desen + otomatik debriyaj: kol ile vites, debriyaji arac kullanir; yavas debriyaj cezasi kalkisi geciktirir
+        auto autoClutch = [&](bool slow) {
+            RoadCar a(findVehicle(217), nullptr, road2, 0.0, -1.8);
+            a.manual = true; a.slowClutch = slow;
+            RoadControls k; k.gear = 1; k.throttle = 1.0;
+            double tt = 0; int geared = 0;
+            for (; tt < 20.0 && a.sim().speed() < 60 / 3.6; tt += 1.0 / 60.0) {
+                if (a.sim().powertrain().rpm() > a.sim().shiftRpm() - 300 && k.gear < 3) ++k.gear, ++geared;
+                a.update(1.0 / 60.0, k);
+            }
+            return std::make_pair(tt, a.sim().powertrain().gear());
+        };
+        const auto fast = autoClutch(false), slow = autoClutch(true);
+        std::printf("    otomatik debriyaj 0-60: %.2f s (vites %d), yavas debriyaj cezasi: %.2f s\n", fast.first, fast.second, slow.first);
+        CHECK(fast.first < 20.0 && fast.second >= 2, "otomatik debriyajla kol vitesi gecer, hizlanir");
+        CHECK(slow.first > fast.first + 0.1, "otomatik debriyaj cezasi (gec kavrama) suresi uzatir");
+        // Sirali (#23 dogbox): +1 darbeyle vites hizli gecer
+        RoadCar s(findVehicle(23), nullptr, road2, 0.0, -1.8);
+        RoadControls sc; sc.throttle = 1.0;
+        for (int i = 0; i < 180; ++i) s.update(1.0 / 60.0, sc);
+        const int sg0 = s.sim().powertrain().gear();
+        sc.shift = +1; s.update(1.0 / 60.0, sc); sc.shift = 0;
+        for (int i = 0; i < 6; ++i) s.update(1.0 / 60.0, sc);
+        CHECK(s.sim().powertrain().gear() == sg0 + 1, "sirali: +1 darbe bir vites buyutur (<0.1 s)");
+        // Otomatik (#36) N: konvertor ayrik, gazla ilerlemez
+        RoadCar o(findVehicle(36), nullptr, road2, 0.0, -1.8);
+        RoadControls oc; oc.throttle = 1.0; oc.neutral = true;
+        for (int i = 0; i < 120; ++i) o.update(1.0 / 60.0, oc);
+        std::printf("    otomatik N'de tam gaz 2 s: %.2f m/s, %.0f rpm\n", o.sim().speed(), o.sim().powertrain().rpm());
+        CHECK(o.sim().speed() < 0.3, "otomatik N: gazla ilerlemez");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

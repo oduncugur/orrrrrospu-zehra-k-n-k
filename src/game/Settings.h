@@ -18,6 +18,7 @@ struct Settings {
     bool  showFps = true;            // FPS / fizik suresi gostergesi
     bool  fullscreen = false;        // yalniz masaustu
     bool  integerScale = false;      // piksel-keskin tam sayi olcek (kenarlarda siyah bant olabilir)
+    bool  roadPortrait = false;      // acik yol ekrani: false yatay (640x360), true dikey (360x640)
     // Ses (yuzde, 0..100)
     int   masterVol = 100, engineVol = 100, tireVol = 100;
     // Kontrol
@@ -25,7 +26,11 @@ struct Settings {
     bool  tiltSteer = true;          // telefon egimiyle direksiyon (Android, acik yol)
     int   tiltSens = 100;            // egim hassasiyeti (%), 50..200
     bool  assist = true;             // acik yol surus yardimi (ESP + otomatik debriyaj) varsayilani
-    bool  manualGears = false;       // acik yolda manuel vites varsayilani
+    bool  manualGears = false;       // (eski) acik yolda manuel vites varsayilani; artik vites kolu sanziman tipinden
+    // H-desen manuelde debriyaj: false = oyuncu (analog pedal), true = otomatik. Otomatigin bedeli (denge):
+    // virajli bolumde vites degistirilemez, debriyaj gec birakilir, yol yarislarinda odul %75.
+    bool  autoClutch = false;
+    static constexpr double kAutoClutchPrize = 0.75;
     // Birim / oyun
     bool  mph = false;               // hiz birimi: km/h ya da mph
 

@@ -51,6 +51,7 @@ std::string Settings::serialize() const {
     o << "show_fps=" << (showFps ? 1 : 0) << "\n";
     o << "fullscreen=" << (fullscreen ? 1 : 0) << "\n";
     o << "integer_scale=" << (integerScale ? 1 : 0) << "\n";
+    o << "road_portrait=" << (roadPortrait ? 1 : 0) << "    # acik yol: 0 yatay, 1 dikey\n";
     o << "master_volume=" << masterVol << "\n";
     o << "engine_volume=" << engineVol << "\n";
     o << "tire_volume=" << tireVol << "\n";
@@ -59,6 +60,7 @@ std::string Settings::serialize() const {
     o << "tilt_sensitivity=" << tiltSens << "\n";
     o << "assist=" << (assist ? 1 : 0) << "\n";
     o << "manual_gears=" << (manualGears ? 1 : 0) << "\n";
+    o << "auto_clutch=" << (autoClutch ? 1 : 0) << "      # H-desen: 0 oyuncu debriyaji, 1 otomatik (odul %75)\n";
     o << "mph=" << (mph ? 1 : 0) << "\n";
     return o.str();
 }
@@ -83,6 +85,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "show_fps") s.showFps = v != 0;
         else if (k == "fullscreen") s.fullscreen = v != 0;
         else if (k == "integer_scale") s.integerScale = v != 0;
+        else if (k == "road_portrait") s.roadPortrait = v != 0;
         else if (k == "master_volume") s.masterVol = snap(volumeOptions(), v);
         else if (k == "engine_volume") s.engineVol = snap(volumeOptions(), v);
         else if (k == "tire_volume") s.tireVol = snap(volumeOptions(), v);
@@ -91,6 +94,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "tilt_sensitivity") s.tiltSens = snap(tiltSensOptions(), v);
         else if (k == "assist") s.assist = v != 0;
         else if (k == "manual_gears") s.manualGears = v != 0;
+        else if (k == "auto_clutch") s.autoClutch = v != 0;
         else if (k == "mph") s.mph = v != 0;
     }
     return s;

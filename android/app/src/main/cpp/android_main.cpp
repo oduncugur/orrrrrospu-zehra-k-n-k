@@ -30,6 +30,8 @@ struct Platform {
     const ASensor* accel = nullptr;
     ASensorEventQueue* sensorQ = nullptr;
     float tiltLp = 0.0f;
+    int rotation = 0;                // ekran donusu (Surface.ROTATION_0..270): egim ekseni buna gore
+    bool rotationDirty = true;
     bool running = false;
     int swapInterval = -99;          // uygulanan dikey esitleme (-99: henuz yok; yeni EGL yuzeyinde yeniden)
 };
@@ -101,6 +103,7 @@ void termEGL(Platform& p) {
 struct Jni {
     JavaVM* vm = nullptr; JNIEnv* env = nullptr; jobject activity = nullptr;
     jmethodID setOrientation = nullptr;
+    jobject display = nullptr; jmethodID getRotation = nullptr;   // Display.getRotation()
     jobject vibrator = nullptr; jclass effectCls = nullptr; jmethodID createOneShot = nullptr, vibrate = nullptr;
 };
 
@@ -134,13 +137,46 @@ void jniInit(Jni& j, android_app* app) {
         if (vib) env->DeleteLocalRef(vib);
         if (eff) env->DeleteLocalRef(eff);
     }
+    // Ekran donusu: Activity.getWindowManager().getDefaultDisplay() -> Display.getRotation()
+    jmethodID getWm = env->GetMethodID(actCls, "getWindowManager", "()Landroid/view/WindowManager;");
+    clearEx(env);
+    if (getWm) {
+        jobject wm = env->CallObjectMethod(j.activity, getWm);
+        clearEx(env);
+        if (wm) {
+            jclass wmCls = env->GetObjectClass(wm);
+            jmethodID getDisp = env->GetMethodID(wmCls, "getDefaultDisplay", "()Landroid/view/Display;");
+            clearEx(env);
+            jobject disp = getDisp ? env->CallObjectMethod(wm, getDisp) : nullptr;
+            clearEx(env);
+            if (disp) {
+                j.display = env->NewGlobalRef(disp);
+                jclass dCls = env->GetObjectClass(disp);
+                j.getRotation = env->GetMethodID(dCls, "getRotation", "()I");
+                clearEx(env);
+                env->DeleteLocalRef(dCls);
+                env->DeleteLocalRef(disp);
+            }
+            env->DeleteLocalRef(wmCls);
+            env->DeleteLocalRef(wm);
+        }
+    }
     env->DeleteLocalRef(actCls);
+}
+
+// Surface.ROTATION_0/90/180/270 -> 0..3 (bilinmiyorsa 0)
+int queryRotation(Jni& j) {
+    if (!j.env || !j.display || !j.getRotation) return 0;
+    const jint r = j.env->CallIntMethod(j.display, j.getRotation);
+    clearEx(j.env);
+    return (r >= 0 && r <= 3) ? (int)r : 0;
 }
 
 void jniShutdown(Jni& j) {
     if (!j.env) return;
     if (j.vibrator) j.env->DeleteGlobalRef(j.vibrator);
     if (j.effectCls) j.env->DeleteGlobalRef(j.effectCls);
+    if (j.display) j.env->DeleteGlobalRef(j.display);
     j.vm->DetachCurrentThread();
     j.env = nullptr;
 }
@@ -214,6 +250,7 @@ void onCmd(android_app* app, int32_t cmd) {
         break;
     case APP_CMD_CONFIG_CHANGED:
     case APP_CMD_WINDOW_RESIZED:
+        p.rotationDirty = true;
         if (p.dpy != EGL_NO_DISPLAY) {
             EGLint w = 1, h = 1;
             eglQuerySurface(p.dpy, p.surf, EGL_WIDTH, &w);
@@ -236,7 +273,7 @@ void android_main(android_app* app) {
     app->onInputEvent = onInput;
     Jni jni;
     jniInit(jni, app);
-    p.game->onOrientation = [&jni](bool landscape) { requestOrientation(jni, landscape); };
+    p.game->onOrientation = [&jni, &p](bool landscape) { requestOrientation(jni, landscape); p.rotationDirty = true; };
     p.game->onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
     requestOrientation(jni, p.game->landscape());
     p.sensorMgr = ASensorManager_getInstance();
@@ -258,7 +295,10 @@ void android_main(android_app* app) {
                 // Dikey tutus: telefon sola yatinca x ivmesi +; ~30 derece = tam direksiyon; alcak geciren suzgec
                 ASensorEvent ev;
                 while (ASensorEventQueue_getEvents(p.sensorQ, &ev, 1) > 0) {
-                    const float t = std::clamp(ev.acceleration.x / (9.81f * 0.5f), -1.0f, 1.0f);
+                    // Ekranin saga dogru ekseni boyunca ivme: dikeyde +x, 90'da +y, 180'de -x, 270'te -y. Sola egim +.
+                    const float ax = ev.acceleration.x, ay = ev.acceleration.y;
+                    const float side = p.rotation == 1 ? ay : p.rotation == 2 ? -ax : p.rotation == 3 ? -ay : ax;
+                    const float t = std::clamp(side / (9.81f * 0.5f), -1.0f, 1.0f);
                     p.tiltLp += (t - p.tiltLp) * 0.25f;
                     p.game->setTilt(p.tiltLp);
                 }
@@ -272,6 +312,10 @@ void android_main(android_app* app) {
         const double dt = std::chrono::duration<double>(now - last).count();
         last = now;
         if (!p.running) continue;
+        // 90 <-> 270 cevirmede Android yapilandirma degisikligi bildirmez: donus yarim saniyede bir de okunur
+        static int rotFrames = 0;
+        if (++rotFrames >= 30) { rotFrames = 0; p.rotationDirty = true; }
+        if (p.rotationDirty) { p.rotation = queryRotation(jni); p.rotationDirty = false; }
         p.game->update(dt);
         p.game->render();
         applySwapInterval(p);

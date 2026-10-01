@@ -16,6 +16,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/MenuScreens.cpp
     ${ZK_ROOT}/src/app/RoadScreen.cpp
     ${ZK_ROOT}/src/app/SettingsScreen.cpp
+    ${ZK_ROOT}/src/app/Cockpit.cpp
     ${ZK_ROOT}/src/app/GLApi.cpp
     ${ZK_ROOT}/src/sim/WheelSimulation.cpp
     ${ZK_ROOT}/src/sim/PowertrainCore.cpp

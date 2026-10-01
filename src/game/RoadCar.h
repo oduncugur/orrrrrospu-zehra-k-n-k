@@ -9,7 +9,13 @@
 
 namespace zk {
 
-struct RoadControls { double steer = 0, throttle = 0, brake = 0; };
+struct RoadControls {
+    double steer = 0, throttle = 0, brake = 0;
+    double clutch = -1.0;   // >= 0: oyuncu debriyaji (pedal 0..1, 1 = basili); < 0: otomatik debriyaj
+    int    gear = -1;       // H-desen kolu: istenen vites (0 = bos); -1: istek yok
+    int    shift = 0;       // sirali vites darbesi (+1 / -1)
+    bool   neutral = false; // otomatik sanziman N / P (P'de durunca fren de tutar)
+};
 
 class RoadCar {
 public:
@@ -30,7 +36,10 @@ public:
     double tireSlipSpeed() const;          // ses icin
 
     bool manual = false, assist = true;
+    bool slowClutch = false;               // otomatik debriyaj cezasi: kalkis ve vites gecisinde gec kavrar
     void requestShift(int dir);            // manuel: +1 / -1
+    void requestGear(int g);               // H-desen (otomatik debriyaj): dogrudan vites (0 = bos)
+    bool grinding() const { return grind_; }   // oyuncu debriyajsiz vites denedi (dis citirtisi)
     // Olaylar (okununca sifirlanir)
     bool takeRecovered() { const bool r = recovered_; recovered_ = false; return r; }
     bool takeStalled() { const bool r = stalledEv_; stalledEv_ = false; return r; }
@@ -39,7 +48,9 @@ public:
     void nudge(double dx, double dy) { sim_->nudge(dx, dy); }   // temas: konumu it
 
 private:
-    void driverAssist(double dt, double thrIn);
+    void driverAssist(double dt, double thrIn, bool neutral);
+    void playerClutch(const RoadControls& c);
+    bool grind_ = false;
     const RoadPath& road_;
     Tune tune_; bool hasTune_ = false;
     std::unique_ptr<VehicleSim> sim_;
