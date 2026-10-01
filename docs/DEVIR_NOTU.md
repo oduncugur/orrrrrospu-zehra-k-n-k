@@ -442,3 +442,16 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
   FabricateScreen (atolye: turbo capi + A/R, kam suresi, stroker %, son disli, vites oranlari, kanat baski kuvveti).
   Yol HUD'unda su sicakligi ve NOS cubugu; garajda takili motor bilgisi ve sesi (App::setVoiceTuned).
 - Kayit: `tun2=anahtar:deger,...` (eski surum yok sayar), `gbx=1` kirik sanziman. Test parts_test.
+
+## Guncelleme — 2026-10-02: Surus, hurdalik, rakip hata payi, diller, arayuz (ara taslak)
+- Vites kolu (Cockpit + DragScreen): kol kanalda parmagi izler, vites yuvanin dibine oturunca / birakinca takilir
+  (titresim); debriyaj esigi %40; gaz kesik + devir uyumlu (+-%15) debriyajsiz gecis (RoadCar).
+- Tekerler ayri cizilir (LowPolyMesh::wheels, Renderer::drawCar wheelSpin/steer); yol lastik dumani; kayarken
+  direksiyon siniri acilir (karsi direksiyon); yol genisligi yol boyunca degisir (RoadPath::setWidthRange, RoadPoint::hw).
+- Rakip hata payi: DragRace::setOpponentHandicap (kariyer drag): tepki .18-.35, debriyaj/vites x1.6; yol rakibi
+  slowClutch. Eslesme hedefi oyuncu ET + 0.05 s (tablo kusursuz surucuyle).
+- Hurdalik (Galeri > HURDALIK) + RESTORASYON: Tune::wear* (motor/lastik/fren/suspansiyon/kaporta/elektrik) fizik
+  etkili; junkyardOffers / buyJunk / restoreStep (her adim yariya); satis dokumunde yipranma dusulur.
+- Diller (app/Lang): ceviri Renderer::text icinde (tam cumle tablosu + kelime sozlugu); EN tam, DE/ES/FR/IT/PT
+  kelime duzeyi (LangMore.inc, eksik -> EN). Ayar `language`. Kiril/Yunan harf seti ve CJK font yok.
+- Arayuz: dugme gorunumu (gecis, kenar, golge), ekran gecis karartmasi.
