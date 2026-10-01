@@ -142,7 +142,12 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
         if (autoBox ? pc.brake > 0.5 : pc.clutch > kClutchHold) L.armed = true;
         if (!L.armed) { clutch = 1.0; in.held = true; }
     }
-    if (phase_ == RacePhase::Burnout) in.held = true;          // line-lock: on frenler kilitli
+    if (phase_ == RacePhase::Burnout) {
+        in.held = true;                                        // line-lock: on frenler kilitli
+        // Oyuncu henuz dokunmadiysa debriyaj basili sayilir: 1. vites takili beklerken motor bogulmasin
+        if (pc.clutch > kClutchHold || pc.throttle > 0.05) L.burnArmed = true;
+        if (!L.burnArmed && box == Gearbox::HPattern) clutch = 1.0;
+    }
     in.brake = pc.brake * (in.held ? 0.0 : 1.0);
 
     // Vites gecisi: dogbox 35 ms ateslemesi kesme, DCT 60 ms ortusme
@@ -252,12 +257,10 @@ void DragRace::aiRun(LaneState& L, double t) {
 // pilot da kalkisi ezbere ayarlar. Olculdu: eski 120 ms dump sokak lastiginde 60 ft ~3.2 s veriyordu.
 namespace {
 // Plan / tahmin onbellegi anahtari: arac + kalkisi etkileyen tum parcalar
+// Onbellek anahtari: arac + tum parca durumu (Tune::signature; v2 parcalar, yipranma, kalkis devri dahil).
+// Eskiden yalniz v1 alanlari vardi: kam / nitro / lastik secimi gibi degisiklikler eski tahmini donduruyordu.
 std::string tuneKey(const VehicleDef* car, const Tune* tune) {
-    char key[160];
-    const Tune t = tune ? *tune : Tune{};
-    std::snprintf(key, sizeof key, "%d|%d|%d|%.1f|%d|%d|%d|%.3f|%d|%d|%d|%d|%d|%d|%d", car->id, tune ? 1 : 0, (int)t.tires, t.psi,
-                  t.clutch, t.axles, (int)t.diff, t.finalDrive, t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
-    return key;
+    return std::to_string(car->id) + (tune ? "|" + tune->signature() : std::string("|-"));
 }
 } // namespace
 

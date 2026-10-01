@@ -34,6 +34,7 @@ struct Tune {
     int head = 0, piston = 0, rod = 0, crank = 0, bearing = 0, gasket = 0;      // motor ici
     int turbine = 0, wastegate = 0, boostCtl = 0, gbStrength = 0, cooling = 0;
     int oil = 0, fuelSel = 0, elec = 0, susp = 0, brakes = 0, aero = 0;
+    int launchRpm = 0;                        // 2-step kalkis devri (0: otomatik, redline x 0.55)
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi
     double custTurboMm = 0, custTurboAr = 0, custCamDeg = 0, custDisp = 0, custFinal = 0, custWingN = 0;
     double custGear[8] = {0, 0, 0, 0, 0, 0, 0, 0};   // vites basina fabrika oranina carpan (0 = fabrika)

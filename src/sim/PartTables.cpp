@@ -462,6 +462,7 @@ std::string Tune::signature() const {
                   custGear[0], custGear[1], custGear[2], custGear[3], custGear[4], custGear[5], custGear[6], custGear[7]);
     char w[96];
     std::snprintf(w, sizeof w, "|w%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", wearEngine, wearTires, wearBrakes, wearSusp, wearBody, wearElec);
+    if (launchRpm > 0) { char l[16]; std::snprintf(l, sizeof l, "|L%d", launchRpm); return std::string(b) + w + l; }
     return std::string(b) + w;
 }
 

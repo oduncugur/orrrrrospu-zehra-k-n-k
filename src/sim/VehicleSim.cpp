@@ -293,6 +293,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
 
 double VehicleSim::defaultLaunchRpm() const {
     if (boxType_ == Gearbox::TorqueConverter) return 0.42 * eng_.redlineRpm;   // konvertor stall devri
+    if (cfg_.tune && cfg_.tune->launchRpm > 0)                                  // oyuncunun ayarladigi 2-step
+        return std::clamp((double)cfg_.tune->launchRpm, eng_.idleRpm + 600.0, eng_.redlineRpm - 200.0);
     return cfg_.car ? std::clamp(0.55 * eng_.redlineRpm, 3000.0, 6500.0) : 6500.0;
 }
 

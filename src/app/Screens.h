@@ -92,6 +92,7 @@ private:
     double telT_ = 0, telAcc_ = 0;
     bool showGraph_ = false;
     void drawGraph(Renderer& r);
+    void adjustLaunch(int delta);                // 2-step kalkis devri (+/- 250)
     int lastGear_ = -2;                          // vites sesi icin
     // Haptik izleme (onceki kare durumu)
     int  hapGear_ = 1, hapFlat_ = 0; bool hapLeft_ = false, hapBroke_ = false, hapRed_ = false;

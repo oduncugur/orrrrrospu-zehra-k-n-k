@@ -21,6 +21,7 @@ constexpr float kColX[3] = {500, 531, 562};
 constexpr float kRowTop = 266, kRowMid = 303, kRowBot = 340;
 constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 350};
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
+constexpr float kLcDn[4] = {352, 62, 382, 88}, kLcUp[4] = {484, 62, 514, 88};   // 2-step kalkis devri (yesilden once)
 constexpr float kAgain[4] = {120, 262, 250, 296}, kGarage[4] = {260, 262, 390, 296}, kGraph[4] = {400, 262, 520, 296};
 constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekranin solundan 8 m sagda
 
@@ -100,6 +101,20 @@ void DragScreen::shifterFromPoint(float x, float y, bool release) {
     if (depth > half * 0.60f && target != pendingGear_) seat(target);
 }
 
+// Kalkis devri: 250 rpm adim; kariyer aracinda araca kaydedilir (yaris icindeki sim ayni Tune'u okur)
+void DragScreen::adjustLaunch(int delta) {
+    const VehicleSim& s = *race_->lane(0).sim;
+    const int cur = (int)std::lround(s.defaultLaunchRpm());
+    const int lo = (int)(s.engineSpec().idleRpm + 600.0), hi = (int)(s.engineSpec().redlineRpm - 200.0);
+    tunes_[0].launchRpm = std::clamp((cur + delta) / 250 * 250, lo / 250 * 250 + 250, hi / 250 * 250);
+    race_->setPlayerLaunchRpm(tunes_[0].launchRpm);
+    if (career_ && app_.career.car().carId == carIds_[0]) {
+        app_.career.cars[app_.career.current].tune.launchRpm = tunes_[0].launchRpm;
+        app_.saveCareer();
+    }
+    app_.haptic(12, 120);
+}
+
 void DragScreen::pointerDown(int id, float x, float y) {
     const RacePhase ph = race_->phase();
     if (ph == RacePhase::Finished && finishedT_ > 1.5) {
@@ -108,6 +123,11 @@ void DragScreen::pointerDown(int id, float x, float y) {
         if (in(kGraph, x, y)) { showGraph_ = !showGraph_; return; }
     }
     if (ph == RacePhase::Burnout && in(kStageBtn, x, y)) { race_->skipBurnout(); return; }
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0]
+        && race_->lane(0).sim->gearboxType() != Gearbox::TorqueConverter && (in(kLcDn, x, y) || in(kLcUp, x, y))) {
+        adjustLaunch(in(kLcUp, x, y) ? +250 : -250);
+        return;
+    }
     const Ctl c = hit(x, y);
     touches_.push_back({id, c});
     switch (c) {
@@ -444,6 +464,16 @@ void DragScreen::drawHud(Renderer& r) {
 
     // ---- ust serit ----
     r.rect(0, 0, 640, kWorldTop, {0.07f, 0.07f, 0.09f, 0.95f});
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && box != Gearbox::TorqueConverter) {
+        r.rect(kLcDn[0], kLcDn[1], kLcUp[2], kLcUp[3], {0.05f, 0.05f, 0.08f, 0.8f});
+        r.rect(kLcDn[0], kLcDn[1], kLcDn[2], kLcDn[3], {0.25f, 0.27f, 0.35f});
+        r.rect(kLcUp[0], kLcUp[1], kLcUp[2], kLcUp[3], {0.25f, 0.27f, 0.35f});
+        r.textCentered((kLcDn[0] + kLcDn[2]) / 2, 68, "-", 2, {1, 1, 1});
+        r.textCentered((kLcUp[0] + kLcUp[2]) / 2, 68, "+", 2, {1, 1, 1});
+        std::snprintf(b, sizeof b, "%d", (int)std::lround(P.sim->defaultLaunchRpm()));
+        r.textCentered((kLcDn[2] + kLcUp[0]) / 2, 64, "KALKIS DEVRI", 1, {0.7f, 0.75f, 0.85f});
+        r.textCentered((kLcDn[2] + kLcUp[0]) / 2, 75, b, 1, tunes_[0].launchRpm > 0 ? Color{1.0f, 0.75f, 0.25f} : Color{1, 1, 1});
+    }
     auto laneLine = [&](const LaneState& L, float x, const char* who, Color c) {
         const double et = L.left ? (L.slip.finished ? L.slip.quarter : race_->clock() - L.leaveTime) : -1;
         const Settings& st = app_.settings;
