@@ -57,7 +57,7 @@ void App::shutdownGraphics() { renderer_.shutdown(); }
 void App::setScreen(std::unique_ptr<Screen> s) {
     if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(screen_->landscape()); return; }
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
-    windSpeed_ = 0.0f;
+    windSpeed_ = 0.0f; nos_ = false; rain_ = false;
 }
 void App::goGarage() {
     setVoice(1, nullptr);
@@ -202,6 +202,38 @@ void App::renderAudio(float* out, int frames) {
             windPh_ += 6.2831853f * 0.27f / kSampleRate;
             if (windPh_ > 6.2831853f) windPh_ -= 6.2831853f;
             out[i] += windLp2_ * amp * (0.8f + 0.2f * std::sin(windPh_));
+        }
+    }
+    // Efektler: vites "tok"u (85 Hz sonumlu govde + 3 ms metal tik), nitro tislamasi (yuksek geciren gurultu),
+    // yagmur (alcak geciren gurultu + seyrek damla tiklari)
+    if (clunk_.exchange(0) > 0) clunkT_ = 0.0f;
+    const bool nosOn = nos_.load(), rainOn = rain_.load();
+    if (clunkT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn) {
+        const float dt = 1.0f / kSampleRate;
+        const float aN = 1.0f - std::exp(-6.2831853f * 2500.0f * dt), aR = 1.0f - std::exp(-6.2831853f * 1100.0f * dt);
+        for (int i = 0; i < frames; ++i) {
+            fxRng_ = fxRng_ * 1664525u + 1013904223u;
+            const float n = (float)(fxRng_ >> 8) / 8388608.0f - 1.0f;
+            float o = 0.0f;
+            if (clunkT_ >= 0.0f) {
+                const float t = clunkT_;
+                o += 0.40f * std::sin(6.2831853f * 85.0f * t) * std::exp(-t / 0.045f) * engVol;
+                if (t < 0.003f) o += 0.30f * n * (1.0f - t / 0.003f) * engVol;
+                clunkT_ += dt;
+                if (clunkT_ > 0.3f) clunkT_ = -1.0f;
+            }
+            nosEnv_ += ((nosOn ? 1.0f : 0.0f) - nosEnv_) * (nosOn ? 0.0008f : 0.0003f);
+            if (nosEnv_ > 1e-4f) { nosLp_ += aN * (n - nosLp_); o += (n - nosLp_) * 0.16f * nosEnv_ * tireVol; }
+            if (rainOn) {
+                rainLp1_ += aR * (n - rainLp1_); rainLp2_ += aR * (rainLp1_ - rainLp2_);
+                o += rainLp2_ * 0.22f * tireVol;
+                if (dripT_ < 0.0f && (fxRng_ & 0xFFFF) < 3) { dripT_ = 0.0f; dripF_ = 900.0f + (float)((fxRng_ >> 16) & 1023); }
+                if (dripT_ >= 0.0f) {
+                    o += 0.05f * std::sin(6.2831853f * dripF_ * dripT_) * std::exp(-dripT_ / 0.012f) * tireVol;
+                    dripT_ += dt; if (dripT_ > 0.06f) dripT_ = -1.0f;
+                }
+            }
+            out[i] += o;
         }
     }
     audioLock_.unlock();

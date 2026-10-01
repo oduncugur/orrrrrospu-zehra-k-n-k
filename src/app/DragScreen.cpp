@@ -187,6 +187,11 @@ void DragScreen::update(double dt) {
     pc_.paddle = pendingPaddle_;
     pendingPaddle_ = 0;
     race_->advance(dt, pc_);
+    {
+        const int g = race_->lane(0).sim->powertrain().gear();
+        if (g != lastGear_) { if (lastGear_ > -2) app_.sfxShift(); lastGear_ = g; }
+        app_.nitrousSound(race_->lane(0).sim->nitrousActive());
+    }
     // Debriyajsiz vites girmedi: kol gercek vitese geri seker (eskiden kol yeni viteste kalip debriyaja basilinca
     // vites aniden giriyordu; kol ile gercek vites ayrisiyordu)
     if (box == Gearbox::HPattern && race_->lane(0).grind) {

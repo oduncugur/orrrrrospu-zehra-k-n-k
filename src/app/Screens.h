@@ -86,6 +86,7 @@ private:
     bool autopilot_ = false;
     bool career_ = false, rewarded_ = false; long prize_ = 0;
     Tune tunes_[2]; bool hasTune_[2] = {false, false};
+    int lastGear_ = -2;                          // vites sesi icin
     // Haptik izleme (onceki kare durumu)
     int  hapGear_ = 1, hapFlat_ = 0; bool hapLeft_ = false, hapBroke_ = false, hapRed_ = false;
     double hapLimiterT_ = 0;
@@ -334,11 +335,15 @@ private:
     double spinP_ = 0, spinR_ = 0;
     bool night_ = false, rain_ = false;          // ortam: gece / yagmur (yaris basinda tohumdan)
     double envT_ = 0;                            // yagmur damlasi animasyonu
+    int lastGear_ = -2;                          // vites sesi icin
     std::string msgNote_;                        // ortam notu (HUD, ilk saniyeler)
     struct Puff { double x, y, z, vx, vy, vz, life, size; };
     std::vector<Puff> smoke_;
+    std::vector<Puff> sparks_;                   // carpisma kivilcimlari (size kullanilmaz)
+    double shakeT_ = 0, popT_ = 0, prevThr_ = 0; // kamera sarsintisi, gaz kesme patlamasi (egzoz alevi)
     void spawnSmoke(const RoadCar& car, double dt);
     int zoneAt(double s) const;                  // 0 kir, 1 sehir, 2 tunel
+    double Pc0z() const;                         // oyuncunun yol yuksekligi (kivilcim zemini)
 };
 
 } // namespace zk

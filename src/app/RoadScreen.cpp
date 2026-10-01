@@ -87,6 +87,8 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
         rain_ = (w >> 17) % 100 < 25 || std::getenv("ZK_RAIN");
         if (std::getenv("ZK_DAY")) night_ = rain_ = false;
         ses_->setRain(rain_);
+        app_.rainSound(rain_);
+        lastGear_ = -2;
     }
     if (RoadCar* rv = ses_->rival(); rv && app_.activeEvent >= 0) {     // isimli rakip: patron daha keskin
         rv->slowClutch = app_.eventHandicap > 1.25;
@@ -218,7 +220,28 @@ void RoadScreen::update(double dt) {
     }
     for (auto& m : ses_->drainMessages()) flash(m);
     for (auto& m : P.sim().drainFailEvents()) { flash(m, 3.0); app_.haptic(400, 255); }
-    if (ses_->takeCrash()) app_.haptic(220, 255);
+    if (ses_->takeCrash()) {                                             // carpisma: titresim, kamera sarsintisi, kivilcim
+        app_.haptic(220, 255);
+        shakeT_ = 0.45;
+        const VehicleSim& s0 = P.sim();
+        const double hc = std::cos(s0.heading()), hs = std::sin(s0.heading());
+        for (int k = 0; k < 34 && sparks_.size() < 160; ++k) {
+            const double a = hashf(k * 7 + (int)(envT_ * 100)) * 6.2831853, sp = 3.0 + 7.0 * hashf(k * 13 + 5);
+            Puff q{s0.posX() + 2.0 * hc, s0.posY() + 2.0 * hs, Pc0z() + 0.4, s0.speed() * hc * 0.6 + sp * std::cos(a),
+                   s0.speed() * hs * 0.6 + sp * std::sin(a), 1.5 + 4.0 * hashf(k * 3 + 1), 0.35 + 0.4 * hashf(k * 11), 0};
+            sparks_.push_back(q);
+        }
+    }
+    shakeT_ = std::max(0.0, shakeT_ - dt);
+    for (Puff& q : sparks_) { q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.vz -= 9.8 * dt; q.life -= dt;
+                              if (q.z < Pc0z()) { q.z = Pc0z(); q.vz = -q.vz * 0.35; q.vx *= 0.7; q.vy *= 0.7; } }
+    sparks_.erase(std::remove_if(sparks_.begin(), sparks_.end(), [](const Puff& q) { return q.life <= 0; }), sparks_.end());
+    {   // Gaz kesme patlamasi: yuksek devirde ani gaz birakma -> 0.45 s egzozdan alev / patlama
+        const double thr = pt.throttleEffective();
+        if (prevThr_ > 0.6 && thr < 0.2 && pt.rpm() > 0.62 * P.sim().engineSpec().redlineRpm) popT_ = 0.45;
+        prevThr_ = thr;
+        popT_ = std::max(0.0, popT_ - dt);
+    }
     if (ses_->mode() != RoadSession::Mode::Free && ses_->phase() == RoadSession::Phase::Finished) {
         finT_ += dt;
         if (!rewarded_) finishRace();
@@ -226,6 +249,8 @@ void RoadScreen::update(double dt) {
     camPsi_ += std::remainder(P.sim().heading() - camPsi_, 6.283185307179586) * std::min(1.0, dt * 4.0);
 
     app_.voice(0, pt.rpm(), pt.throttleEffective(), pt.limiterHit(), pt.gear() > 0, 1.0f);
+    if (pt.gear() != lastGear_) { if (lastGear_ > -2) app_.sfxShift(); lastGear_ = pt.gear(); }
+    app_.nitrousSound(P.sim().nitrousActive());
     app_.tire(0, P.tireSlipSpeed());
     app_.wind(v);
     if (RoadCar* rv = ses_->rival()) {
@@ -238,6 +263,8 @@ void RoadScreen::update(double dt) {
     if (std::getenv("ZK_ROAD_LOG")) { static double t = 0, nx = 0; t += dt; if (t >= nx) { nx += 0.5;
         std::printf("t=%.1f v=%.1f g%d s=%.1f lat=%.2f gap=%.1f phase=%d\n", t, v, pt.gear(), P.s(), P.lateral(), ses_->gapMeters(), (int)ses_->phase()); } }
 }
+
+double RoadScreen::Pc0z() const { return ses_ ? ses_->player().elevation() : 0.0; }
 
 // Yol bolgesi (s'ye gore, 700 m'lik bloklar): 0 kir, 1 sehir, 2 tunel. Tohum: yolun kendisi (ayni yarista sabit)
 int RoadScreen::zoneAt(double s) const {
@@ -319,6 +346,16 @@ void RoadScreen::drawWorld(Renderer& r) {
         ex = sex + (ex - sex) * b; ey = sey + (ey - sey) * b; ez = sez + (ez - sez) * b;
         tx = stx + (tx - stx) * b; ty = sty + (ty - sty) * b; tz = stz + (tz - stz) * b;
         camFov = (land_ ? 0.55 : 0.75) + (fov() - (land_ ? 0.55 : 0.75)) * b;
+    }
+    {   // Kamera sarsintisi: carpismada sert (sonumlu), yuksek hizda hafif titresim
+        const double v = sim.speed();
+        const double amp = shakeT_ * shakeT_ * 1.4 + std::clamp((v - 38.0) / 60.0, 0.0, 1.0) * 0.022;
+        if (amp > 1e-4) {
+            const double t = envT_;
+            ez += amp * (std::sin(t * 61.0) * 0.6 + std::sin(t * 37.0 + 1.3) * 0.4);
+            const double lat = amp * (std::sin(t * 47.0 + 0.7) * 0.6 + std::sin(t * 29.0) * 0.4);
+            ex += lat * -sp; ey += lat * cp;
+        }
     }
     const Mat4 proj = matPerspective((float)camFov, (float)W / H, 0.3f, 900.0f);
     const Mat4 view = matLookAt((float)ex, (float)ez, (float)-ey, (float)tx, (float)tz, (float)-ty);
@@ -644,8 +681,9 @@ void RoadScreen::drawWorld(Renderer& r) {
         const Proj q = project(vp, p.x, p.y, p.z + p.size * 0.5, W, H);
         if (!q.ok || q.w < 1.0f) continue;
         const float rad = (float)p.size * pxPerM / q.w;
-        const float a = (float)std::clamp(p.life / 1.6, 0.0, 1.0) * 0.32f;
-        r.circle(q.x, q.y, rad, 12, {0.86f, 0.86f, 0.88f, a});
+        const float a = (float)std::clamp(p.life / 1.6, 0.0, 1.0) * 0.32f * std::clamp((q.w - 2.0f) / 7.0f, 0.15f, 1.0f);   // kameraya yakin: saydam
+        const float sl = night_ ? 0.42f : rain_ ? 0.8f : 1.0f;            // gece duman karanlik
+        r.circle(q.x, q.y, rad, 12, {0.86f * sl, 0.86f * sl, 0.88f * sl, a});
     }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu. z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim
@@ -677,6 +715,28 @@ void RoadScreen::drawWorld(Renderer& r) {
     r.setCarLook(app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_));
     r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()),
               (float)spinP_, (float)steer_);
+    {   // Egzoz alevi: devir kesici ya da gaz kesme patlamasi (titrek, rastgele)
+        const PowertrainCore& ptc = const_cast<VehicleSim&>(sim).powertrain();
+        const bool burst = (ptc.limiterHit() && ptc.rpm() > 0.6 * sim.engineSpec().redlineRpm) || popT_ > 0;
+        if (burst && hashf((int)(envT_ * 45)) > 0.4f) {
+            const double hl = findVehicle(carId_)->lengthM * 0.5 + 0.05, h = sim.heading();
+            const double fx = X - hl * std::cos(h) + 0.3 * std::sin(h), fy = Y - hl * std::sin(h) - 0.3 * std::cos(h);
+            const Proj q = project(vp, fx, fy, zCar + sim.suspension().heave() + 0.28, W, H);
+            if (q.ok && q.w > 1.0f) {
+                const float k = (float)pxPerM / q.w * (0.7f + 0.6f * hashf((int)(envT_ * 90) + 3));
+                r.circle(q.x, q.y, 0.24f * k, 12, {1.0f, 0.45f, 0.08f, 0.55f});
+                r.circle(q.x, q.y, 0.14f * k, 10, {1.0f, 0.8f, 0.3f, 0.85f});
+                r.circle(q.x, q.y, 0.06f * k, 8, {0.75f, 0.85f, 1.0f, 0.95f});
+            }
+        }
+    }
+    for (const Puff& q : sparks_) {                                    // kivilcimlar: hiz yonunde kisa cizgi
+        const Proj a = project(vp, q.x, q.y, q.z, W, H), b = project(vp, q.x - q.vx * 0.025, q.y - q.vy * 0.025, q.z - q.vz * 0.025, W, H);
+        if (!a.ok || !b.ok) continue;
+        const float al = (float)std::clamp(q.life / 0.4, 0.0, 1.0);
+        r.tri(a.x, a.y, b.x, b.y, a.x + 1.5f, a.y + 1.5f, {1.0f, 0.85f, 0.4f, al});
+        r.tri(a.x, a.y, b.x + 1.2f, b.y, b.x, b.y + 1.2f, {1.0f, 0.6f, 0.2f, al});
+    }
     if (rain_) {                                                       // yagmur: egik damla cizgileri (hizla egilir)
         const float slant = 0.15f + (float)std::min(0.6, sim.speed() / 60.0);
         for (int k = 0; k < 140; ++k) {
