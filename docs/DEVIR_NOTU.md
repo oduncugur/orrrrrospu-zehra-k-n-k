@@ -319,18 +319,22 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - Stok otomatik ETleri eski modele gore esit ya da daha iyi (slick: A90 13.67 -> 12.94, Hellcat 14.01 -> 13.12;
   SVT eskiden hic bitiremiyordu).
 
-### Bilinen (yeni bulunan, eski sorun)
-- **Sokak lastiginde drag ETleri gercegin ~2.5 s ustunde**, 60 ft ~3.2 s (A90 stok 15.2 s; gercek ~12.4).
-  Eski modelde de ayni (olculdu). Trap hizlari gercege yakin (guc dogru), sorun kalkis.
-  Olcum araci: scratchpad `street_et.cpp` (Civic #5, Mustang #227, RX-7 #78, F1 #313, Sahin #217, A90 #36 x 3 lastik)
-  ve `launch_trace.cpp` (kalkisin 0.1 s'lik izi: kayma, gaz, kavrama, Fx/Fz).
-  Bulgular (2026-10-02, denenip GERI ALINDI — sonuc karisik/kotu):
-  * YZ 120 ms dump -> cekis tekeri kayma orani 5-7 (hedef ~0.13); bir kez kayinca MF dususu yuzunden toparlanamiyor.
-  * `aiDrive` gaz alt siniri `rpm < 5500 ? 1.0 : 0.35` mutlak devir (dusuk devirli motorda hep tam gaz) — ama
-    duzeltmek (redline'a gore, 0.15 taban) ETleri kotulestirdi: biraz patinajli tam gaz kesmekten iyi.
-  * Kaymali debriyaj kontrolcusu + lastige gore kalkis devri + asimetrik/suzulmus gaz kontrolu denendi:
-    dusuk hizda kayma tepkisinin zaman sabiti ~sigma/(V+v0) = 0.15 s -> geri beslemeli kontrol salinir;
-    kalkista 2-step acik kalirsa atesleme kesmesi kaymayi titretir. Civic/Mustang yari-slickte daha kotu.
-  * Oneri: geri besleme yerine arac basina onceden hesaplanan kalkis profili (deterministik sim ~50 ms/deneme;
-    yaris oncesi 6-8 aday: kalkis devri x kavrama suresi) ya da Fx/Fz'yi dogrudan hedefleyen tork siniri.
-- Hellcat (900 Nm, RWD, sokak lastigi) YZ test surucusuyle 4 km'de 1 kez yoldan cikti.
+- Hellcat (900 Nm, RWD, sokak lastigi) YZ test surucusuyle 4 km'de 1 kez yoldan cikti (acik yol YZ temposu).
+
+## Guncelleme — 2026-10-02: Gercekci drag ETleri (pist hazirligi + YZ kalkis plani)
+Sorun: sokak lastiginde ETler gercegin ~2.5 s ustunde, 60 ft ~3.2 s (A90 15.2 s; gercek ~12.4). Trap hizlari dogruydu.
+Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde tepe ivme 0.44 g -> sinir FIZIKTE.
+- **Pist hazirligi** (`DragRace.cpp` `trackPrep`): oyundaki drag pistinde zemin tutusu sokak x1.35, yari slick x1.20,
+  slick x1.10 (VHT; sokak lastigi en cok kazanir). `zehra_sim` (Faz 1 referansi) duz asfalt: regresyon 9/9 ayni.
+- **YZ kalkis plani** (`DragRace::planLaunch`): kalkis devri {%35, %50, %65 redline} x debriyaj birakma {0.12, 0.6 s}
+  ayni fizikle 60 ft'e kadar denenir (her aday 2 farkli 2-step evresinde, en kotusu; 1.5 s bekleme); aks gerilmesi
+  > %92 kopma, stop ya da bogulma devri (1.5 x rolanti, en az %20 redline) altina dusen aday elenir. Arac+parca
+  basina onbellek (mutex). Rakip icin `std::async` ile yaris kurulurken arka planda (masaustu ~1 s); agac fazi
+  basinda uygulanir (sabit sim ani -> deterministik). `aiRun`: kalkis sonrasi YZ (yaris ve deneme ortak).
+- Geri beslemeli gaz/debriyaj kontrolu denenip reddedildi: dusuk hizda lastik kayma tepkisi ~0.15 s gecikir ->
+  salinir; 2-step kalkista acik kalirsa atesleme kesmesi kaymayi titretir (ayrinti: f990d47'deki not).
+- **Hata**: yesilden sonra YZ tepki suresinde faz Run oldugu icin gaz 0'a iniyordu -> yarim gazla kalkip bogulma.
+- Sonuc (stok, YZ): Civic 15.02 (gercek ~15.2), Mustang GT 13.61 (~13.1), RX-7 13.83 (~13.5-14), A90 12.99 (~12.3),
+  McLaren F1 12.02 (~11.1), Sahin 18.17 (~19). 120 eslesme: 120/120 bitirdi, 0 aks kirma, ort ET 13.153 (once 13.843).
+- `tune_test` [8] guncellendi: cekis sinirinda kisa son disli 60 ft'i belirgin degistirmez (eski dump'ta kazandiriyordu).
+- Telefonda planlama ~3 s surebilir; agac basinda bitmediyse kisa takilma olur (olculmedi).

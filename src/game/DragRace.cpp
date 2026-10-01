@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <map>
+#include <mutex>
 
 namespace zk {
 
@@ -11,6 +13,13 @@ constexpr double kClutchHold = 0.60;   // bu degerin ustunde debriyaj basili: ar
 constexpr double k60 = 18.288, k330 = 100.584, k660 = 201.168, k1000 = 304.8;
 
 std::string fmt(const char* f, double a) { char b[96]; std::snprintf(b, sizeof b, f, a); return b; }
+
+// Pist hazirligi (VHT/yapiskan zemin): sokak lastigi en cok kazanir, slick en az. Yalniz oyundaki drag pisti;
+// zehra_sim (Faz 1 referansi, regresyon) duz asfalt kalir. Kalibrasyon: gercek stok ET'ler (devir notu).
+double trackPrep(const Tune* t) {
+    const TireType tires = t ? t->tires : TireType::DragSlick;
+    return tires == TireType::Street ? 1.35 : tires == TireType::SemiSlick ? 1.20 : 1.10;
+}
 } // namespace
 
 DragRace::DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout,
@@ -28,8 +37,17 @@ DragRace::DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t s
         cfg.road = "drag";
         cfg.fuelLiters = 8.0;
         L.sim = std::make_unique<VehicleSim>(cfg);
+        L.sim->setSurfaceMu(trackPrep(cfg.tune));
         L.sim->powertrain().setGear(1);
         L.sim->powertrain().setClutchPedal(1.0);
+    }
+    // Rakibin kalkis planini arka planda hesapla (masaustu ~0.8 s; stage + agac en az ~2 s surer). Tune kopyasi
+    // verilir: yaris nesnesi erken silinse de thread gecerli veri okur.
+    {
+        const VehicleDef* car = lanes_[1].car;
+        const bool hasTune = opponentTune != nullptr;
+        const Tune t = hasTune ? *opponentTune : Tune{};
+        lanes_[1].plan = std::async(std::launch::async, [car, hasTune, t] { return planLaunch(car, hasTune ? &t : nullptr); }).share();
     }
     lanes_[1].aiReaction = 0.06 + (rnd() % 1000) / 1000.0 * 0.20;   // .060 - .260
     treeDelay_ = 0.8 + (rnd() % 1000) / 1000.0 * 1.2;
@@ -148,20 +166,36 @@ void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {
         pt.setThrottle(0.0); pt.setClutchPedal(1.0); in.brake = 0.45;
         return;
     }
-    const bool tc = box == Gearbox::TorqueConverter;
+    // Kalkis plani agac fazinin basinda uygulanir (sabit simulasyon ani: yaris deterministik kalir; plan hazir
+    // degilse burada beklenir). Stage'de gaz kapali, plan gerekmez.
+    if (L.aiLaunchRpm < 0.0 && phase_ != RacePhase::Burnout && phase_ != RacePhase::Staging) {
+        const LaunchPlan p = L.plan.valid() ? L.plan.get() : planLaunch(L.car, L.sim->config().tune);
+        L.aiLaunchRpm = p.rpm; L.aiRelease = p.release;
+    }
     if (clock_ < go || phase_ == RacePhase::Burnout || phase_ == RacePhase::Staging) {
         pt.setGear(1);
-        // Debriyaj basili (otomatikte N) + 2-step; otomatikte kalkis devri stall devri (defaultLaunchRpm)
+        // Debriyaj basili (otomatikte N) + 2-step (plandaki kalkis devri; otomatikte stall devri)
         pt.setClutchPedal(1.0);
-        pt.setThrottle(phase_ == RacePhase::Tree ? 1.0 : 0.0);
-        pt.setTwoStep(true, L.sim->defaultLaunchRpm());
+        // Agacta ve yesilden sonra tepki suresince tam gaz (eskiden tepki suresinde faz Run oldugu icin gaz
+        // birakiliyordu: YZ yarim gazla kalkip bogulabiliyordu)
+        pt.setThrottle(phase_ == RacePhase::Tree || phase_ == RacePhase::Run ? 1.0 : 0.0);
+        pt.setTwoStep(true, L.aiLaunchRpm > 0.0 ? L.aiLaunchRpm : L.sim->defaultLaunchRpm());
         in.held = true;
         return;
     }
+    (void)box;
+    aiRun(L, clock_ - go);
+}
+
+// Kalkis sonrasi YZ surusu (yaris ve kalkis plani denemeleri ortak). t: kalkistan beri (s)
+void DragRace::aiRun(LaneState& L, double t) {
+    PowertrainCore& pt = L.sim->powertrain();
+    const Gearbox box = L.sim->gearboxType();
+    const bool tc = box == Gearbox::TorqueConverter;
     pt.setTwoStep(false, 0.0);
-    const double t = clock_ - go;
-    // Kalkis: manuel/dogbox 120 ms clutch dump, DCT launch control 150 ms rampa (oyuncuyla ayni), otomatik konvertor
-    double clutch = tc ? 0.0 : std::max(0.0, 1.0 - t / (box == Gearbox::DCT ? 0.15 : 0.12));
+    // Kalkis: manuel/dogbox plandaki surede debriyaj birakma (pedal 1 -> 0; kavrama bolgesi bunun ~%30'u),
+    // DCT launch control 150 ms rampa (oyuncuyla ayni), otomatik konvertor
+    double clutch = tc ? 0.0 : std::max(0.0, 1.0 - t / (box == Gearbox::DCT ? 0.15 : L.aiRelease));
     const double kap = 0.5 * (L.sim->wheel(L.sim->drivenLeft()).kappa() + L.sim->wheel(L.sim->drivenRight()).kappa());
     if (t > 0.12) L.aiFoot = std::clamp(L.aiFoot + kStep * 8.0 * (0.12 - kap), pt.rpm() < 5500.0 ? 1.0 : 0.35, 1.0);
     double thr = L.aiFoot;
@@ -202,6 +236,70 @@ void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {
     }
     pt.setClutchPedal(clutch);
     pt.setThrottle(thr);
+}
+
+// Kalkis plani: kalkis devri x debriyaj birakma suresi adaylarini ayni fizikle 60 ft'e kadar dener, en hizlisini
+// secer (aks gerilmesi kopmanin %92'sini asan aday elenir). Deterministik; arac+parca basina onbellek.
+// Neden: geri beslemeli gaz/debriyaj kontrolu dusuk hizda lastik gecikmesi (~0.15 s) yuzunden salinir; usta
+// pilot da kalkisi ezbere ayarlar. Olculdu: eski 120 ms dump sokak lastiginde 60 ft ~3.2 s veriyordu.
+DragRace::LaunchPlan DragRace::planLaunch(const VehicleDef* car, const Tune* tune) {
+    static std::map<std::string, LaunchPlan> cache;
+    static std::mutex cacheLock;                                       // plan arka plan thread'inde de hesaplanir
+    char key[160];
+    const Tune t = tune ? *tune : Tune{};
+    std::snprintf(key, sizeof key, "%d|%d|%d|%.1f|%d|%d|%d|%.3f|%d|%d|%d|%d|%d|%d|%d", car->id, tune ? 1 : 0, (int)t.tires, t.psi,
+                  t.clutch, t.axles, (int)t.diff, t.finalDrive, t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
+    {
+        std::lock_guard<std::mutex> g(cacheLock);
+        if (auto it = cache.find(key); it != cache.end()) return it->second;
+    }
+
+    auto trial = [&](double rpm, double release, double holdS) {
+        LaneState L;
+        VehicleSimConfig cfg; cfg.car = car; cfg.tune = tune ? &t : nullptr; cfg.road = "drag"; cfg.fuelLiters = 8.0;
+        L.sim = std::make_unique<VehicleSim>(cfg);
+        L.sim->setSurfaceMu(trackPrep(cfg.tune));
+        L.car = car; L.aiLaunchRpm = rpm; L.aiRelease = release;
+        PowertrainCore& pt = L.sim->powertrain();
+        pt.setGear(1); pt.setClutchPedal(1.0); pt.setThrottle(1.0); pt.setTwoStep(true, rpm);
+        VehicleInputs hold; hold.held = true;
+        for (int i = 0; i < (int)(holdS / kStep); ++i) L.sim->step(kStep, hold);   // agac: 2-step'te bekle
+        double tt = 0.0;
+        const double bogRpm = std::max(1.5 * L.sim->engineSpec().idleRpm, 0.2 * L.sim->engineSpec().redlineRpm);
+        while (L.sim->distance() < k60 && tt < 8.0) {
+            aiRun(L, tt);
+            L.sim->step(kStep, VehicleInputs{});
+            tt += kStep;
+            const DrivetrainFailure& f = L.sim->failure();
+            if (f.snapped(0) || f.snapped(1) || f.peakShearMPa() > 0.92 * f.axle().tauUltMPa) return 1e9;
+            // Bogulma payi: stop eden ya da bogulma devrine (1.5 x rolanti, en az %20 redline) dusen aday elenir;
+            // denemede kil payi toparlanan kalkis yarista ufak farkla stop ediyordu (olculdu: RX-7 slick)
+            if (pt.stalled() || (tt > 0.05 && pt.rpm() < bogRpm)) return 1e9;
+        }
+        return tt;
+    };
+    LaunchPlan best{0.0, 0.12, 1e9};
+    VehicleSimConfig probeCfg; probeCfg.car = car; probeCfg.tune = tune ? &t : nullptr;
+    const VehicleSim probe(probeCfg);
+    if (probe.gearboxType() == Gearbox::TorqueConverter || probe.gearboxType() == Gearbox::DCT) {
+        best = {probe.defaultLaunchRpm(), 0.12, 0.0};                   // otomatik/DCT: kalkis sanzimanda
+    } else {
+        const double red = probe.engineSpec().redlineRpm, idle = probe.engineSpec().idleRpm;
+        for (double f : {0.35, 0.50, 0.65})
+            for (double rel : {0.12, 0.6}) {
+                const double rpm = std::max(idle + 1000.0, f * red);
+                // 2-step kesmesi devri salindirir; yesil salinimin herhangi bir aninda gelebilir -> 2 evre, en kotusu
+                double tt = 0.0;
+                // Bekleme >= 1.5 s: yaristaki gibi suspansiyon/arac oturmus olmali (0.6 s'de oturmamisti: denemede
+                // gecen plan yarista stop ediyordu)
+                for (double hold : {1.50, 1.5137}) { tt = std::max(tt, trial(rpm, rel, hold)); if (tt >= 1e9) break; }
+                if (tt < best.t60) best = {rpm, rel, tt};
+            }
+        if (best.t60 >= 1e9) best = {std::max(idle + 1000.0, 0.50 * red), 0.6, 1e9};   // hepsi riskli: orta devir, yavas birakma
+    }
+    std::lock_guard<std::mutex> g(cacheLock);
+    cache[key] = best;
+    return best;
 }
 
 void DragRace::timing(LaneState& L, int idx) {

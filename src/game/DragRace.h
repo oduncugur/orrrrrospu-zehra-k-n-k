@@ -11,6 +11,7 @@
 #include "sim/VehicleSim.h"
 
 #include <cstdint>
+#include <future>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,6 +36,9 @@ struct TimeSlip {
     std::string note;
 };
 
+// YZ kalkis plani: kalkis devri + debriyaj birakma suresi (t60: denemedeki 60 ft suresi, s)
+struct LaunchPlan { double rpm, release, t60; };
+
 struct LaneState {
     std::unique_ptr<VehicleSim> sim;
     const VehicleDef* car = nullptr;
@@ -47,6 +51,8 @@ struct LaneState {
     bool   cutIgnition = false;          // dogbox/devir kesici: ses icin
     // Yapay zeka
     double aiFoot = 1.0, aiReaction = 0.15, aiFeatherT = 0.0;
+    double aiLaunchRpm = -1.0, aiRelease = 0.12;   // kalkis plani (-1: henuz planlanmadi)
+    std::shared_future<LaunchPlan> plan;            // arka planda hesaplanan plan (rakip seridi)
     double autoRelease = -1;             // DCT launch: fren birakma ani (debriyaj rampasi icin)
     bool   grind = false;                // H-desende debriyajsiz vites denemesi (dis citirtisi)
 };
@@ -73,10 +79,14 @@ public:
     void setPlayerAutopilot(bool on) { autopilot_ = on; }    // oyuncu serdini yapay zeka surer (tanitim / test)
     TreeType tree() const { return tree_; }
 
+    using LaunchPlan = zk::LaunchPlan;
+    static LaunchPlan planLaunch(const VehicleDef* car, const Tune* tune);
+
 private:
     void stepPhysics(const PlayerControls& pc);
     void playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs& in);
     void aiDrive(LaneState& L, VehicleInputs& in);
+    static void aiRun(LaneState& L, double t);
     void timing(LaneState& L, int idx);
     double greenTime() const;
     uint32_t rnd();

@@ -95,7 +95,9 @@ int main() {
         Tune shortFd; shortFd.finalDrive = 4.4; shortFd.tires = TireType::DragSlick; shortFd.axles = 1;
         Tune stock; stock.tires = TireType::DragSlick; stock.axles = 1;
         Result r = race(mustang, shortFd, stock); show("4.40", "3.73", r);
-        CHECK(r.a.sixtyFt <= r.b.sixtyFt + 0.02, "kisa son disli 60 ft'te en az ayni");
+        // Slick + planli kalkista Mustang cekis sinirinda: kisa disli fazla torku patinaja harcar, 60 ft'i belirgin
+        // degistirmez (eski 120 ms dump'ta kisa disli kazandiriyordu). Kaba hata yakalayici: fark <= 0.05 s.
+        CHECK(std::fabs(r.a.sixtyFt - r.b.sixtyFt) <= 0.05, "cekis sinirinda kisa son disli 60 ft'i belirgin degistirmez");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
