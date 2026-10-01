@@ -46,7 +46,11 @@ public:
     void tri(float ax, float ay, float bx, float by, float cx, float cy, Color c);
     void circle(float cx, float cy, float r, int seg, Color c);
     void text(float x, float y, const std::string& s, float scale, Color c);
-    float textWidth(const std::string& s, float scale) const { return translate(lang, s).size() * 6.0f * scale - scale; }
+    float textWidth(const std::string& s, float scale) const {      // UTF-8: kod noktasi sayisi
+        const std::string& t = translate(lang, s);
+        size_t n = 0; for (unsigned char c : t) n += (c & 0xC0) != 0x80;
+        return n * 6.0f * scale - scale;
+    }
     Lang lang = Lang::TR;              // arayuz dili: text() yazarken cevirir (Lang.h)
     void textCentered(float cx, float y, const std::string& s, float scale, Color c) { text(cx - textWidth(s, scale) * 0.5f, y, s, scale, c); }
     void flush2D();

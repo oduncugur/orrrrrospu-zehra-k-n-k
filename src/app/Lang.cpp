@@ -144,6 +144,7 @@ const Entry kEnWords[] = {
 };
 
 #include "LangMore.inc"
+#include "LangMore2.inc"
 
 struct Table { std::unordered_map<std::string, std::string> phrases, words; };
 
@@ -165,6 +166,16 @@ Table buildMulti(int col, const Table& en) {
     return t;
 }
 
+Table buildMulti2(int col, const Table& en) {
+    Table t;
+    t.words = en.words;
+    for (const Multi2& m : kMulti2) {
+        const char* w[6] = {m.ru, m.uk, m.el, m.pl, m.nl, m.id};
+        t.words[m.tr] = w[col];
+    }
+    return t;
+}
+
 const Table* tableFor(Lang l) {
     static const Table en = build(kEnPhrases, sizeof kEnPhrases / sizeof *kEnPhrases, kEnWords, sizeof kEnWords / sizeof *kEnWords);
     static const Table more[5] = {buildMulti(0, en), buildMulti(1, en), buildMulti(2, en), buildMulti(3, en), buildMulti(4, en)};
@@ -175,6 +186,10 @@ const Table* tableFor(Lang l) {
     case Lang::FR: return &more[2];
     case Lang::IT: return &more[3];
     case Lang::PT: return &more[4];
+    case Lang::RU: case Lang::UK: case Lang::EL: case Lang::PL: case Lang::NL: case Lang::ID: {
+        static const Table extra[6] = {buildMulti2(0, en), buildMulti2(1, en), buildMulti2(2, en), buildMulti2(3, en), buildMulti2(4, en), buildMulti2(5, en)};
+        return &extra[(int)l - (int)Lang::RU];
+    }
     default: return nullptr;
     }
 }
@@ -201,7 +216,8 @@ std::string translateWords(const Table& t, const std::string& s) {
 } // namespace
 
 const char* langName(Lang l) {
-    static const char* n[(int)Lang::Count] = {"TURKCE", "ENGLISH", "DEUTSCH", "ESPANOL", "FRANCAIS", "ITALIANO", "PORTUGUES"};
+    static const char* n[(int)Lang::Count] = {"TURKCE", "ENGLISH", "DEUTSCH", "ESPANOL", "FRANCAIS", "ITALIANO", "PORTUGUES",
+                                              "РУССКИЙ", "УКРАЇНСЬКА", "ΕΛΛΗΝΙΚΑ", "POLSKI", "NEDERLANDS", "INDONESIA"};
     return n[(int)l];
 }
 

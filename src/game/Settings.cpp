@@ -89,7 +89,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "fullscreen") s.fullscreen = v != 0;
         else if (k == "integer_scale") s.integerScale = v != 0;
         else if (k == "render_scale") s.renderScale = std::clamp(v, 1, 3);
-        else if (k == "language") s.language = std::clamp(v, 0, 6);
+        else if (k == "language") s.language = std::clamp(v, 0, 12);
         else if (k == "hints_seen") s.hintsSeen = std::max(0, v);
         else if (k == "road_portrait") s.roadPortrait = v != 0;
         else if (k == "master_volume") s.masterVol = snap(volumeOptions(), v);

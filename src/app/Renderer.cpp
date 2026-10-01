@@ -74,6 +74,95 @@ const char* glyph(char c) {
 }
 
 
+// Kiril / Yunan buyuk harfler (5x7). Latin benzerleri ASCII glife esler; kucuk harf buyuge cevrilir.
+const char* glyphU(uint32_t cp) {
+    if (cp < 128) return glyph((char)cp);
+    if (cp >= 0x0430 && cp <= 0x044F) cp -= 0x20;                       // kiril kucuk -> buyuk
+    else if (cp >= 0x0450 && cp <= 0x045F) cp -= 0x50;
+    else if (cp == 0x0491) cp = 0x0490;
+    else if (cp == 0x03C2) cp = 0x03A3;                                 // son sigma
+    else if (cp >= 0x03B1 && cp <= 0x03C9) cp -= 0x20;                  // yunan kucuk -> buyuk
+    switch (cp) {
+    case 0x0391: return glyph('A');
+    case 0x0392: return glyph('B');
+    case 0x0395: return glyph('E');
+    case 0x0396: return glyph('Z');
+    case 0x0397: return glyph('H');
+    case 0x0399: return glyph('I');
+    case 0x039A: return glyph('K');
+    case 0x039C: return glyph('M');
+    case 0x039D: return glyph('N');
+    case 0x039F: return glyph('O');
+    case 0x03A1: return glyph('P');
+    case 0x03A4: return glyph('T');
+    case 0x03A5: return glyph('Y');
+    case 0x03A7: return glyph('X');
+    case 0x0405: return glyph('S');
+    case 0x0406: return glyph('I');
+    case 0x0408: return glyph('J');
+    case 0x0410: return glyph('A');
+    case 0x0412: return glyph('B');
+    case 0x0415: return glyph('E');
+    case 0x041A: return glyph('K');
+    case 0x041C: return glyph('M');
+    case 0x041D: return glyph('H');
+    case 0x041E: return glyph('O');
+    case 0x0420: return glyph('P');
+    case 0x0421: return glyph('C');
+    case 0x0422: return glyph('T');
+    case 0x0425: return glyph('X');
+    case 0x0393: cp = 0x0413; break;
+    case 0x03A0: cp = 0x041F; break;
+    case 0x03A6: cp = 0x0424; break;
+    default: break;
+    }
+    switch (cp) {
+    case 0x0394: return "..#....#...#.#..#.#.#...##...######";
+    case 0x0398: return ".###.#...##...#######...##...#.###.";
+    case 0x039B: return "..#....#...#.#..#.#.#...##...##...#";
+    case 0x039E: return "#####...........###...........#####";
+    case 0x03A3: return "######.....#.....#...#...#....#####";
+    case 0x03A8: return "#.#.##.#.##.#.#.###...#....#....#..";
+    case 0x03A9: return ".###.#...##...##...#.#.#..#.#.##.##";
+    case 0x0401: return ".#.#......######....####.#....#####";
+    case 0x0404: return ".###.#...##....###..#....#...#.###.";
+    case 0x0407: return ".#.#.......###...#....#....#...###.";
+    case 0x0411: return "######....#....####.#...##...#####.";
+    case 0x0413: return "######....#....#....#....#....#....";
+    case 0x0414: return "..##..#.#..#.#..#.#..#.#.######...#";
+    case 0x0416: return "#.#.##.#.#.###...#...###.#.#.##.#.#";
+    case 0x0417: return ".###.#...#....#..##.....##...#.###.";
+    case 0x0418: return "#...##...##..###.#.###..##...##...#";
+    case 0x0419: return "#.#.##...##..###.#.###..##...##...#";
+    case 0x041B: return "..###.#..#.#..#.#..#.#..#.#..##...#";
+    case 0x041F: return "######...##...##...##...##...##...#";
+    case 0x0423: return "#...##...##...#.####....##...#.###.";
+    case 0x0424: return "..#...###.#.#.##.#.#.###...#....#..";
+    case 0x0426: return "#..#.#..#.#..#.#..#.#..#.#####....#";
+    case 0x0427: return "#...##...##...#.####....#....#....#";
+    case 0x0428: return "#...##...##.#.##.#.##.#.##.#.######";
+    case 0x0429: return "#.#.##.#.##.#.##.#.##.#.######....#";
+    case 0x042A: return "##....#....#....###..#..#.#..#.###.";
+    case 0x042B: return "#...##...##...####.##.#.##.#.####.#";
+    case 0x042C: return "#....#....#....####.#...##...#####.";
+    case 0x042D: return ".###.#...#....#..###....##...#.###.";
+    case 0x042E: return "#..#.#.#.##.#.####.##.#.##.#.##..#.";
+    case 0x042F: return ".#####...##...#.####..#.#.#..##...#";
+    case 0x0490: return "....#######....#....#....#....#....";
+    default: return nullptr;
+    }
+}
+
+// UTF-8 cozumleme (gecersiz bayt: tek karakter sayilir)
+uint32_t nextCp(const std::string& s, size_t& i) {
+    const unsigned char c = (unsigned char)s[i++];
+    if (c < 0x80) return c;
+    int n = (c >> 5) == 6 ? 1 : (c >> 4) == 14 ? 2 : (c >> 3) == 30 ? 3 : 0;
+    uint32_t cp = n == 1 ? (c & 0x1F) : n == 2 ? (c & 0x0F) : (c & 0x07);
+    while (n-- > 0 && i < s.size() && ((unsigned char)s[i] & 0xC0) == 0x80) cp = (cp << 6) | ((unsigned char)s[i++] & 0x3F);
+    return cp;
+}
+
 GLuint compile(GLenum type, const char* body) {
     GLuint s = glCreateShader(type);
     const char* parts[2] = {ZK_GLSL_VERSION, body};
@@ -302,8 +391,8 @@ void Renderer::circle(float cx, float cy, float r, int seg, Color c) {
 }
 void Renderer::text(float x, float y, const std::string& src, float sc, Color c) {
     const std::string& s = translate(lang, src);
-    for (char ch : s) {
-        if (const char* g = glyph(ch)) {
+    for (size_t i = 0; i < s.size();) {
+        if (const char* g = glyphU(nextCp(s, i))) {
             for (int row = 0; row < 7; ++row)
                 for (int col = 0; col < 5; ++col)
                     if (g[row * 5 + col] == '#') rect(x + col * sc, y + row * sc, x + (col + 1) * sc, y + (row + 1) * sc, c);
