@@ -42,6 +42,7 @@ void App::applySettings() {
     tireVol_ = master * settings.tireVol / 100.0f;
     renderer_.integerScale = settings.integerScale;
     renderer_.setRenderScale(settings.renderScale);
+    renderer_.lang = (Lang)settings.language;
 }
 void App::saveSettings() { if (!settingsPath_.empty()) settings.save(settingsPath_); }
 

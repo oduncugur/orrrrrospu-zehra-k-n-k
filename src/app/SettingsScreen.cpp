@@ -15,6 +15,7 @@ const char* const kSections[] = {"GORUNTU", "SES", "KONTROL", "OYUN"};
 
 const char* label(It it) {
     switch (it) {
+    case It::Language: return "DIL / LANGUAGE";
     case It::FpsCap: return "FPS SINIRI";
     case It::VSync: return "DIKEY ESITLEME";
     case It::ShowFps: return "FPS GOSTERGESI";
@@ -37,6 +38,7 @@ const char* label(It it) {
 }
 const char* help(It it) {
     switch (it) {
+    case It::Language: return "ARAYUZ DILI. ENGLISH: TUM MENULER VE YARIS EKRANLARI";
     case It::FpsCap: return "KARE HIZI SINIRI. DUSUK: AZ PIL VE ISINMA, YUKSEK: AKICI";
     case It::VSync: return "EKRAN YENILEMESINE KILITLER (YIRTILMA OLMAZ). ADAPTIF: GEC KALAN KAREDE BEKLEMEZ";
     case It::ShowFps: return "EKRANDA KARE HIZI VE KARE BASINA FIZIK SURESI (MS)";
@@ -73,7 +75,7 @@ void wrap2(Renderer& r, float y, const std::string& s, Color c) {
 SettingsScreen::SettingsScreen(App& app) : app_(app) {
     app_.setVoice(1, nullptr);
     const std::vector<std::pair<int, It>> items = {
-        {0, It::FpsCap}, {0, It::VSync}, {0, It::ShowFps},
+        {0, It::Language}, {0, It::FpsCap}, {0, It::VSync}, {0, It::ShowFps},
 #ifndef __ANDROID__
         {0, It::Fullscreen},
 #endif
@@ -97,6 +99,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
 std::string SettingsScreen::value(It it) const {
     const Settings& s = app_.settings;
     switch (it) {
+    case It::Language: return langName((Lang)s.language);
     case It::FpsCap: return s.fpsCap > 0 ? std::to_string(s.fpsCap) : "SINIRSIZ";
     case It::VSync:
         if (s.vsync != VSync::Off && app_.vsyncUnavailable) return "YAZILIM";   // surucu reddetti: yazilimla sinir
@@ -128,6 +131,7 @@ void SettingsScreen::change(It it, int dir) {
         return dir == 0 && n == cur ? opts.front() : n;
     };
     switch (it) {
+    case It::Language: s.language = (s.language + 1) % 2; break;
     case It::FpsCap: s.fpsCap = list(Settings::fpsOptions(), s.fpsCap); break;
     case It::VSync: {
         const int v = ((int)s.vsync + (dir < 0 ? 2 : 1)) % 3;

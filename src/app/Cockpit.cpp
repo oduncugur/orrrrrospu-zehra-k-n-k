@@ -178,7 +178,8 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
         const float y = rc.y1 - 6 - (rc.y1 - rc.y0 - 12) * v;
         r.rect(rc.x0 + 4, y, rc.x1 - 4, rc.y1 - 4, fillC);
         r.rect(rc.x0, y - 2, rc.x1, y + 2, {1, 1, 1, 0.9f});
-        for (size_t i = 0; label[i]; ++i) r.textCentered(rc.cx(), rc.y0 + 8 + i * 16.0f, std::string(1, label[i]), 2, {1, 1, 1, 0.9f});
+        { const std::string lb = translate(r.lang, label);              // dikey etiket: once cevir, sonra harf harf
+          for (size_t i = 0; i < lb.size() && rc.y0 + 24 + i * 16.0f < rc.y1; ++i) r.textCentered(rc.cx(), rc.y0 + 8 + i * 16.0f, std::string(1, lb[i]), 2, {1, 1, 1, 0.9f}); }
     };
     slider(brakeRect(L, clutchPedal_), (float)brake(), "FREN", {0.85f, 0.15f, 0.15f, 0.85f});
     if (clutchPedal_) {

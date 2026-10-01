@@ -34,6 +34,7 @@ struct Settings {
     static constexpr double kAutoClutchPrize = 0.75;
     // Birim / oyun
     bool  mph = false;               // hiz birimi: km/h ya da mph
+    int   language = 0;              // arayuz dili (app/Lang.h: 0 TR, 1 EN, ...)
 
 #ifdef __ANDROID__
     static constexpr int kDefaultFpsCap = 60;    // pil ve isinma

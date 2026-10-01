@@ -241,7 +241,7 @@ public:
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
-    enum class Item { FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, Master, Engine, Tire,
+    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, Master, Engine, Tire,
                       Haptics, Tilt, TiltSens, Assist, Gears, Speed, Tree };
 private:
     struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi

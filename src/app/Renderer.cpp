@@ -286,7 +286,8 @@ void Renderer::circle(float cx, float cy, float r, int seg, Color c) {
         tri(cx, cy, cx + r * std::cos(a0), cy + r * std::sin(a0), cx + r * std::cos(a1), cy + r * std::sin(a1), c);
     }
 }
-void Renderer::text(float x, float y, const std::string& s, float sc, Color c) {
+void Renderer::text(float x, float y, const std::string& src, float sc, Color c) {
+    const std::string& s = translate(lang, src);
     for (char ch : s) {
         if (const char* g = glyph(ch)) {
             for (int row = 0; row < 7; ++row)

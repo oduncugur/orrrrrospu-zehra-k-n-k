@@ -468,7 +468,8 @@ void DragScreen::drawHud(Renderer& r) {
         const float y = rc[3] - 6 - (rc[3] - rc[1] - 12) * v;
         r.rect(rc[0] + 4, y, rc[2] - 4, rc[3] - 4, fillC);
         r.rect(rc[0], y - 2, rc[2], y + 2, {1, 1, 1});
-        for (size_t i = 0; label[i]; ++i) r.textCentered((rc[0] + rc[2]) / 2, rc[1] + 8 + i * 16.0f, std::string(1, label[i]), 2, {1, 1, 1});
+        { const std::string lb = translate(r.lang, label);
+          for (size_t i = 0; i < lb.size() && rc[1] + 24 + i * 16.0f < rc[3]; ++i) r.textCentered((rc[0] + rc[2]) / 2, rc[1] + 8 + i * 16.0f, std::string(1, lb[i]), 2, {1, 1, 1}); }
     };
     if (box == Gearbox::HPattern || box == Gearbox::Dogbox) {
         // Kavrama noktasi (ClutchSpec: pedal 0.62 tutmaya baslar, 0.32 tam kavrar): belirgin bant + yazi; pedal
