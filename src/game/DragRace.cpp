@@ -243,13 +243,22 @@ void DragRace::aiRun(LaneState& L, double t) {
 // secer (aks gerilmesi kopmanin %92'sini asan aday elenir). Deterministik; arac+parca basina onbellek.
 // Neden: geri beslemeli gaz/debriyaj kontrolu dusuk hizda lastik gecikmesi (~0.15 s) yuzunden salinir; usta
 // pilot da kalkisi ezbere ayarlar. Olculdu: eski 120 ms dump sokak lastiginde 60 ft ~3.2 s veriyordu.
-DragRace::LaunchPlan DragRace::planLaunch(const VehicleDef* car, const Tune* tune) {
-    static std::map<std::string, LaunchPlan> cache;
-    static std::mutex cacheLock;                                       // plan arka plan thread'inde de hesaplanir
+namespace {
+// Plan / tahmin onbellegi anahtari: arac + kalkisi etkileyen tum parcalar
+std::string tuneKey(const VehicleDef* car, const Tune* tune) {
     char key[160];
     const Tune t = tune ? *tune : Tune{};
     std::snprintf(key, sizeof key, "%d|%d|%d|%.1f|%d|%d|%d|%.3f|%d|%d|%d|%d|%d|%d|%d", car->id, tune ? 1 : 0, (int)t.tires, t.psi,
                   t.clutch, t.axles, (int)t.diff, t.finalDrive, t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
+    return key;
+}
+} // namespace
+
+DragRace::LaunchPlan DragRace::planLaunch(const VehicleDef* car, const Tune* tune) {
+    static std::map<std::string, LaunchPlan> cache;
+    static std::mutex cacheLock;                                       // plan arka plan thread'inde de hesaplanir
+    const std::string key = tuneKey(car, tune);
+    const Tune t = tune ? *tune : Tune{};
     {
         std::lock_guard<std::mutex> g(cacheLock);
         if (auto it = cache.find(key); it != cache.end()) return it->second;
@@ -302,6 +311,47 @@ DragRace::LaunchPlan DragRace::planLaunch(const VehicleDef* car, const Tune* tun
     std::lock_guard<std::mutex> g(cacheLock);
     cache[key] = best;
     return best;
+}
+
+// Parca onizlemesi: YZ kalkis plani ile tek seritte 1/4 mil (agac/reaksiyon yok, ET stage isigindan).
+// Yarisla ayni fizik ve pist hazirligi; bekleme kisa (0.3 s) -> tahmin. Pahali (~1 s): arka planda cagirin.
+QuarterEstimate DragRace::estimateQuarter(const VehicleDef* car, const Tune* tune) {
+    static std::map<std::string, QuarterEstimate> cache;
+    static std::mutex cacheLock;
+    const std::string key = tuneKey(car, tune);
+    {
+        std::lock_guard<std::mutex> g(cacheLock);
+        if (auto it = cache.find(key); it != cache.end()) return it->second;
+    }
+    const LaunchPlan plan = planLaunch(car, tune);
+    const Tune t = tune ? *tune : Tune{};
+    LaneState L;
+    VehicleSimConfig cfg; cfg.car = car; cfg.tune = tune ? &t : nullptr; cfg.road = "drag"; cfg.fuelLiters = 8.0;
+    L.sim = std::make_unique<VehicleSim>(cfg);
+    L.sim->setSurfaceMu(trackPrep(cfg.tune));
+    L.sim->setTractionControl(false);
+    L.car = car; L.aiLaunchRpm = plan.rpm; L.aiRelease = plan.release;
+    PowertrainCore& pt = L.sim->powertrain();
+    pt.setGear(1); pt.setClutchPedal(1.0); pt.setThrottle(1.0); pt.setTwoStep(true, std::max(plan.rpm, 1.0));
+    VehicleInputs hold; hold.held = true;
+    for (int i = 0; i < (int)(0.3 / kStep); ++i) L.sim->step(kStep, hold);
+    QuarterEstimate e;
+    double tt = 0.0, t0 = -1.0;
+    while (tt < 40.0) {
+        aiRun(L, tt);
+        L.sim->step(kStep, VehicleInputs{});
+        tt += kStep;
+        const double d = L.sim->distance();
+        if (t0 < 0 && d > kRollout) t0 = tt;
+        if (e.sixtyFt < 0 && d >= k60) e.sixtyFt = tt - t0;
+        if (d >= kQuarterMile) { e.quarter = tt - t0; e.trapKmh = L.sim->speed() * 3.6; break; }
+        const DrivetrainFailure& f = L.sim->failure();
+        if (f.snapped(0) || f.snapped(1)) { e.broke = true; break; }
+        if (pt.stalled()) break;
+    }
+    std::lock_guard<std::mutex> g(cacheLock);
+    cache[key] = e;
+    return e;
 }
 
 void DragRace::timing(LaneState& L, int idx) {

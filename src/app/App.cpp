@@ -53,6 +53,7 @@ void App::shutdownGraphics() { renderer_.shutdown(); }
 void App::setScreen(std::unique_ptr<Screen> s) {
     if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(screen_->landscape()); return; }
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
+    windSpeed_ = 0.0f;
 }
 void App::goGarage() { setVoice(1, nullptr); setScreen(std::make_unique<GarageScreen>(*this)); }
 void App::goDrag(int p, int o, bool autopilot) {
@@ -104,7 +105,7 @@ void App::pointerMove(int id, float px, float py) {
 void App::pointerUp(int id) { screen_->pointerUp(id); }
 void App::key(Key k, bool down) { screen_->key(k, down); }
 bool App::back() {
-    if (dynamic_cast<GarageScreen*>(screen_.get()) && !pending_) return false;
+    if (auto* g = dynamic_cast<GarageScreen*>(screen_.get()); g && !g->modal() && !pending_) return false;   // garajda geri = cikis (onay penceresi acik degilse)
     screen_->key(Key::Back, true);
     return true;
 }
@@ -141,6 +142,21 @@ void App::renderAudio(float* out, int frames) {
         const double slip = v.slip.load();
         if (v.tireAudio.silent(slip) || tireVol <= 0.0f) continue;
         v.tireAudio.render(out, frames, slip, v.gain.load() * tireVol);
+    }
+    // Ruzgar: beyaz gurultu, iki kutuplu alcak geciren (kesim hizla 450 -> ~2000 Hz), genlik ~ hiz^2, yavas dalga
+    if (const float ws = windSpeed_.load(); ws > 8.0f && tireVol > 0.0f) {
+        const float u = std::min(1.0f, (ws - 8.0f) / 55.0f);
+        const float a = 1.0f - std::exp(-6.2831853f * (450.0f + 26.0f * ws) / kSampleRate);
+        const float amp = u * u * 0.55f * tireVol;
+        for (int i = 0; i < frames; ++i) {
+            windRng_ = windRng_ * 1664525u + 1013904223u;
+            const float n = (float)(windRng_ >> 8) / 8388608.0f - 1.0f;
+            windLp1_ += a * (n - windLp1_);
+            windLp2_ += a * (windLp1_ - windLp2_);
+            windPh_ += 6.2831853f * 0.27f / kSampleRate;
+            if (windPh_ > 6.2831853f) windPh_ -= 6.2831853f;
+            out[i] += windLp2_ * amp * (0.8f + 0.2f * std::sin(windPh_));
+        }
     }
     audioLock_.unlock();
     for (int i = 0; i < frames; ++i) out[i] = std::clamp(out[i], -1.0f, 1.0f);

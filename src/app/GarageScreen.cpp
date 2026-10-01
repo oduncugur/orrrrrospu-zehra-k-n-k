@@ -14,6 +14,7 @@ const Rect kPrev{8, 470, 60, 508}, kNext{214, 470, 266, 508};
 const Rect kRace{8, 516, 128, 562}, kRoad{132, 516, 188, 562}, kSettings{192, 516, 266, 562};
 const Rect kParts{8, 570, 90, 632}, kGallery{96, 570, 178, 632}, kDyno{184, 570, 266, 632};
 const float kSl[4] = {292, 380, 352, 632};
+const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac varken)
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -147,13 +148,31 @@ void GarageScreen::render(Renderer& r) {
     r.textCentered((kSl[0] + kSl[2]) / 2, kSl[1] - 28, "(W)", 1, {0.55f, 0.75f, 1.0f});
 #endif
 
+    if (c.cars.size() > 1) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 2);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
         r.textCentered(180, 258, msg_, 2, kUiGold);
     }
+    if (selling_) drawSaleDialog(r, c.car());
+}
+
+void GarageScreen::sellConfirmed() {
+    selling_ = false;
+    const int got = sellPrice(app_.career.car());
+    std::string why;
+    if (!app_.career.sellCurrent(&why)) { msg_ = why; msgT_ = 1.8; return; }
+    app_.saveCareer();
+    select(app_.career.current);
+    msg_ = "SATILDI +" + money(got); msgT_ = 2.0;
 }
 
 void GarageScreen::pointerDown(int id, float x, float y) {
+    if (selling_) {                                              // modal onay
+        if (kDlgYes.hit(x, y)) sellConfirmed();
+        else if (kDlgNo.hit(x, y)) selling_ = false;
+        return;
+    }
+    if (app_.career.cars.size() > 1 && kSellG.hit(x, y)) { selling_ = true; return; }
     if (x >= kSl[0] - 10 && y >= kSl[1] - 20) {
         throttlePtr_ = id;
         throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);
@@ -187,6 +206,7 @@ void GarageScreen::pointerUp(int id) { if (id == throttlePtr_) throttlePtr_ = -1
 void GarageScreen::key(Key k, bool down) {
     if (k == Key::Throttle) throttleKey_ = down;
     if (!down) return;
+    if (selling_) { if (k == Key::Enter) sellConfirmed(); else if (k == Key::Back) selling_ = false; return; }
     if (k == Key::Left) select(app_.career.current - 1);
     else if (k == Key::Right) select(app_.career.current + 1);
     else if (k == Key::Enter) raceOrRepair();

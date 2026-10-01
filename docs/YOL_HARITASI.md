@@ -95,7 +95,8 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 - [x] Debriyaj modu: oyuncu / otomatik (bedeli: virajda vites yok, geç kavrama, ödül %75)
 - [x] ABS / TC yalnız gerçekte olan araçlarda; olmayana ECU + ELEKTRONİK parçası (`tests/electronics_test`)
 - [x] Karma yarış: düzde drag görünümü, virajlı bölümde 3B sürüş, tek yarışta (`tests/road_test` [8])
-- [ ] Karma: kalkışta drag ağacı, mesafeye göre ödül, YZ'nin düzlükte drag kalkış planı
+- [x] Karma: kalkışta drag ağacı (3 amber + yeşil, tepki süresi), mesafeye göre ödül (×1-2.5), YZ drag kalkışı
+      (kalkış devri kırmızı çizginin %30'u, tepki 0.15-0.35 s) — ara taslak
 
 ---
 
@@ -182,16 +183,17 @@ birlikte, parça parça eklenir. Her madde fizikte gerçek bir etkiyle gelir ve 
       fren noktasından önce bitmesi, viraj girişinde önerilen hız göstergesi.
       → YAPILDI (ara taslak): bölüm ilk virajdan 450 m önce başlar; 300/200/100 m levhaları, viraj girişinde
         ok levhası; HUD "VİRAJ N M  ÖNERİLEN X KM/H" (√(0.8·g·Rmin)), fren noktası geçilince kırmızı "FRENE BAS!".
-- [ ] Karma: hız hissi (drag görünümünde arka plan paralaksı, rüzgâr sesi, hız çizgileri); vites/hız aktarımı hissi.
+- [x] Karma: hız hissi (drag görünümünde arka plan paralaksı, rüzgâr sesi, hız çizgileri) — ara taslak; rüzgâr
+      sesi kulakla dinlenmedi. Kalan: vites/hız aktarımı hissi (vites darbesi, kamera sarsıntısı).
 ## Arayüz / ekonomi
 - [x] **Parça satın alma önizleme + onay:** ilk dokunuş = önizleme (yeni HP/Nm, tahmini 1/4 mil, aks riski, ağırlık
       farkı, dyno eğrisi karşılaştırması); ikinci dokunuş = "SATIN AL $X?" onayı; geri al/iptal.
       → YAPILDI (ara taslak): önizleme paneli HP/Nm/endeks/aks riski/ağırlık (önce > sonra, renkli), EVET/VAZGEÇ.
-        Kalan: tahmini 1/4 mil, dyno eğrisi karşılaştırması.
+        + tahmini 1/4 mil (yarışla aynı fizik, arka planda; Şahin: tahmin = yarış 18.169 s) ve güç eğrisi karşılaştırması.
 - [x] **Araç satma:** şu an yalnız galeride, yalnız seçili araç ve ancak 2+ araç varken (onaysız). Eklenecek:
       garajdan sat, satış fiyatı dökümü (araç + parçalar - hasar), onay penceresi, ikinci el pazarı/açık artırma.
       → YAPILDI (ara taslak): galeride satış onay penceresi + döküm (araç %65 + parça %40 − tamir bedeli, alt sınır
-        gövdenin %25'i); araç satın alma da onaylı. Kalan: garajdan doğrudan sat, ikinci el pazarı/açık artırma.
+        gövdenin %25'i); araç satın alma da onaylı. Garajdan doğrudan satış (SAT düğmesi, aynı döküm). Kalan: ikinci el pazarı/açık artırma.
 
 # MODİFİYE DERİNLİĞİ — "THE STRIP" SEVİYESİ VE ÖTESİ
 Kaynak: https://www.thestrip.io/ ve App Store sayfası (300+ araç, 5 seviye, gerçek debriyaj/vites/gaz;

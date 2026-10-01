@@ -205,7 +205,7 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - **Modeller geçici** (kullanıcı isteğiyle en sona). Bilinen kusurlar: B direği bazı gövdelerde havada, hatchback
   ön ucu. `ornekler/model_sheet.png` v1'i gösteriyor (eski).
 - **Ekonomi dengesi** oyun testiyle ayarlanmadı; aynı rakibe "TEKRAR" ile sınırsız ödül kasılabilir.
-- **Kayıt bozulursa** sessizce yeni oyun başlar (kullanıcıya uyarı + yedek dosya eklenmeli).
+- **Kayıt bozulursa** yeni oyun başlar; garajda "KAYIT BOZUK - YENI OYUN" uyarısı çıkar, bozuk dosya `.bozuk` olarak saklanır.
 - **Yapay zekâ kalkışı sert** (120 ms clutch dump): güçlü parçalı rakipler aks kırabilir — kasıtlı ama dengelenmeli.
 - `zehra_sim`'deki sürücü mantığı ile `DragRace::aiDrive` benzer ama ayrı kod (teknik borç; regresyon testiyle birleştirilebilir).
 - Veri tablolarında `~` ile işaretli değerler yaklaşık.
@@ -321,6 +321,8 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
   SVT eskiden hic bitiremiyordu).
 
 - Hellcat (900 Nm, RWD, sokak lastigi) YZ test surucusuyle 4 km'de 1 kez yoldan cikti (acik yol YZ temposu).
+  2026-10-02 tekrar olculdu: #269/#255/#227/#318/#36, yol + dag + 2 karma yolu, tempo 0.55/0.60: kurtarma 0,
+  yol disi 0 s, en fazla 8 deg govde kaymasi -> sorun artik yok.
 
 ## Guncelleme — 2026-10-02: Gercekci drag ETleri (pist hazirligi + YZ kalkis plani)
 Sorun: sokak lastiginde ETler gercegin ~2.5 s ustunde, 60 ft ~3.2 s (A90 15.2 s; gercek ~12.4). Trap hizlari dogruydu.
@@ -380,3 +382,16 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
 - Galeri: arac al/sat onay penceresi; satis dokumu `saleQuote` (arac %65 + parca %40 - tamir bedeli, alt sinir %25).
   `repairCostFor(OwnedCar)` serbest fonksiyon. Test career_test [11].
 - Test kancasi `ZK_TAPS` (desktop_main, App::tapVirtual).
+
+## Guncelleme — 2026-10-02: Eksikler (ara taslak)
+- Parca onizlemesi: `DragRace::estimateQuarter` (YZ kalkis plani + yaristaki fizik/pist hazirligi, tek serit,
+  onbellekli) arka plan thread'inde; ~2.3 s (masaustu, ilk kez). Panelde 1/4 mil once > sonra ve guc egrisi
+  (gri simdiki, turuncu parcali). Test drag_race_test [9]: tahmin = yaris ETsi (Sahin 18.169 s).
+- Garajdan satis: SAT dugmesi (2+ arac), ortak `drawSaleDialog` (galeri ile ayni dokum); Android geri tusu
+  pencereyi kapatir (`GarageScreen::modal`).
+- Karma: drag agaci (geri sayimin son 1.5 s'si 3 amber, yesil 1 s), oyuncu tepki suresi (arac 30 cm ilerleyince),
+  rakip tepkisi 0.15-0.35 s (tohumdan) + `RoadCar::launchRpm` = %30 redline (acik yolda olculdu: 0/30/40/50/60%
+  arasinda en iyi 400 m; Aygir S5 GT -1.25 s; otomatiklerde etkisiz). Odul `prizeScale` = uzunluk/4 km (1-2.5).
+  Test road_test [8].
+- Hiz hissi (drag gorunumu): iki katman paralaks tepe, hiz cizgileri (>12 m/s), ruzgar sesi (`App::wind`: beyaz
+  gurultu, 2 kutuplu alcak geciren, genlik ~hiz^2; ekran degisince 0). Ses kulakla dinlenmedi.

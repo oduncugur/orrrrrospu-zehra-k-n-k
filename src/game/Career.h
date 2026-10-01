@@ -69,7 +69,8 @@ struct Career {
     bool buyCar(int carId, std::string* why = nullptr);
     bool sellCurrent(std::string* why = nullptr);
     bool buyPart(PartCat c, int level, std::string* why = nullptr);
-    void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr);
+    // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir
+    void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr, double prizeScale = 1.0);
     void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun);   // yaris sonu
     // Otoban akisi sonu: odul = skor / 20 (en fazla kFlowPrizeCap); rekor kirilirsa +%50. Donus: odul
     static constexpr long kFlowPrizeCap = 4000;

@@ -101,10 +101,13 @@ public:
     void setVoice(int i, const VehicleDef* v, bool turboKit = false);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
     void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
+    void wind(double speed) { windSpeed_ = (float)speed; }   // m/s, ruzgar ugultusu (ekran degisince 0)
 
 private:
     std::atomic<float> tilt_{0.0f};
     std::atomic<float> engineVol_{1.0f}, tireVol_{1.0f};   // ses thread'i okur (ana ses x kanal)
+    std::atomic<float> windSpeed_{0.0f};
+    float windLp1_ = 0, windLp2_ = 0, windPh_ = 0; uint32_t windRng_ = 22222;   // yalniz ses thread'i
     struct Voice {
         std::unique_ptr<ProceduralEngineAudio> synth;
         std::atomic<float> rpm{900}, thr{0}, gain{1};

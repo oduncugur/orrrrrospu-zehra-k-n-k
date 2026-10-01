@@ -90,7 +90,7 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
     } else if (launchGear && v < 3.0 && (launching_ || thrIn < 0.05)) {
         if (thrIn < 0.05 && v < 1.0) launchPedal_ = 1.0;                      // durus: debriyaj basili (stop etmez)
         else {   // kalkis: devir gaza gore 1500-2700'de tutulur, pedal isirma noktasindan devre gore birakilir
-            const double hold = 1500.0 + 1200.0 * thrIn;
+            const double hold = launchRpm > 0.0 ? launchRpm : 1500.0 + 1200.0 * thrIn;
             launchPedal_ = std::min(launchPedal_, 0.65);
             launchPedal_ = std::clamp(launchPedal_ + (pt.rpm() < hold ? 0.8 : -1.6) / k * dt, 0.0, 1.0);
         }

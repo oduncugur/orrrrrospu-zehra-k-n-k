@@ -230,11 +230,11 @@ bool Career::buyPart(PartCat c, int level, std::string* why) {
     return true;
 }
 
-void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut) {
+void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut, double prizeScale) {
     // Ayni rakibe ust uste galibiyet: odul %25 azalir (en az %25)
     if (opponent.id != lastOppId) { lastOppId = opponent.id; sameOppWins = 0; }
     const double decay = won ? std::max(0.25, 1.0 - 0.25 * sameOppWins) : 1.0;
-    const long prize = (long)(racePrize(opponent, won) * decay);
+    const long prize = (long)(racePrize(opponent, won) * decay * prizeScale);
     if (won) ++sameOppWins;
     money += prize; earnings += prize;
     ++races; if (won) ++wins;

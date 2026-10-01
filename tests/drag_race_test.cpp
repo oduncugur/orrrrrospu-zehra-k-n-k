@@ -1,5 +1,6 @@
 // Drag yarisi mantik testleri (basliksiz). Her test PASS/FAIL yazar; herhangi biri basarisizsa cikis kodu 1.
 #include "game/DragRace.h"
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -177,6 +178,26 @@ int main() {
             char m[96]; std::snprintf(m, sizeof m, "#%d %s: ET %.3f, aks saglam", id, t == &semi ? "yari slick" : "slick+parca", r.lane(1).slip.quarter);
             CHECK(!r.lane(0).slip.broke && !r.lane(1).slip.broke && r.lane(1).slip.finished, m);
         }
+    }
+    std::printf("[9] Parca onizlemesi: 1/4 mil tahmini (estimateQuarter) yaris ETsine yakin, slick hizlandirir\n");
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        Tune street, slick; slick.tires = TireType::DragSlick;
+        const QuarterEstimate a = DragRace::estimateQuarter(findVehicle(217), &street);
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        const QuarterEstimate b = DragRace::estimateQuarter(findVehicle(217), &slick);
+        DragRace r(217, 217, TreeType::Pro, 11, false, &street, &street);
+        r.setPlayerAutopilot(true);
+        PlayerControls pc; double tt = 0;
+        while (r.phase() != RacePhase::Finished && tt < 60) { r.advance(1.0 / 60.0, pc); tt += 1.0 / 60.0; }
+        std::printf("    Sahin sokak: tahmin %.3f s (%.0f km/h, %.0f ms) | yaris %.3f s | slick tahmin %.3f s\n",
+                    a.quarter, a.trapKmh, ms, r.lane(1).slip.quarter, b.quarter);
+        CHECK(a.quarter > 0 && std::fabs(a.quarter - r.lane(1).slip.quarter) < 0.35, "tahmin yaris ETsine 0.35 s icinde");
+        CHECK(b.quarter > 0 && b.quarter <= a.quarter + 0.02, "slick tahmini sokaktan yavas degil");
+        const auto t1 = std::chrono::steady_clock::now();
+        DragRace::estimateQuarter(findVehicle(217), &street);
+        const double ms2 = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+        CHECK(ms2 < 5.0, "ikinci cagri onbellekten");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;

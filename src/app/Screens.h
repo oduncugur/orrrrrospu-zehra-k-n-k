@@ -7,6 +7,7 @@
 #include "game/RoadSession.h"
 #include "sim/PowertrainCore.h"
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -17,6 +18,7 @@ class GarageScreen : public Screen {
 public:
     explicit GarageScreen(App& app);
     bool landscape() const override { return false; }
+    bool modal() const { return selling_; }      // onay penceresi acik (Android geri tusu kapatir)
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -26,12 +28,14 @@ public:
 
 private:
     void raceOrRepair();
+    void sellConfirmed();
     void select(int ownedIndex);
     void refreshEngine();
     App& app_;
     std::unique_ptr<PowertrainCore> pt_;
     double tunedHp_ = 0, stockHp_ = 0;
     std::string msg_; double msgT_ = 0;
+    bool selling_ = false;                       // satis onay penceresi acik
     float throttle_ = 0; int throttlePtr_ = -1; bool throttleKey_ = false;
     float spin_ = 0; double acc_ = 0; double hapT_ = 0;
 };
@@ -95,8 +99,11 @@ public:
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
 private:
-    struct Stats { double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0; };
+    struct Stats { double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0; std::vector<std::pair<double, double>> hpCurve; double redline = 7000; };
+    // 1/4 mil tahmini arka planda (DragRace::estimateQuarter ~1 s); ekran kapansa da is guvenle biter
+    struct EtJob { std::atomic<bool> done{false}; QuarterEstimate cur, nxt; };
     Stats statsFor(const Tune& t) const;
+    void drawPreview(Renderer& r, float py);
     void recompute();
     void select(int option);       // onizleme: secili parca takilirsa degerler
     void buySelected();
@@ -104,10 +111,15 @@ private:
     int cat_ = -1;                 // -1: kategori listesi
     int sel_ = -1;                 // onizlenen secenek (-1: yok)
     bool confirm_ = false;         // "SATIN AL?" onay cubugu acik
-    Stats prev_;
+    Stats prev_, now_;
+    std::shared_ptr<EtJob> et_;
     std::string msg_; double msgT_ = 0;
     double hpNow_ = 0, nmNow_ = 0, idx_ = 0, axleRisk_ = 0, massNow_ = 0;
 };
+
+// Ortak onay penceresi (dikey ekranlar): evet / vazgec dugmeleri ve arac satis dokumu (galeri + garaj)
+inline const Rect kDlgYes{36, 400, 176, 450}, kDlgNo{184, 400, 324, 450};
+void drawSaleDialog(Renderer& r, const OwnedCar& oc);
 
 // Galeri: tum katalog, fiyat, satin alma; mevcut araci satma.
 class GalleryScreen : public Screen {

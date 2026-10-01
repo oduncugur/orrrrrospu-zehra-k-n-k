@@ -217,6 +217,24 @@ int main() {
             }
         }
         CHECK(res[0][0] == res[1][0] && res[0][1] == res[1][1], "ayni tohum + girdi = ayni sonuc");
+        // Drag agaci + tepki + rakip kalkis plani + mesafe odulu
+        {
+            Tune t;
+            RoadSession rs(RoadSession::Mode::Karma, 5, &t, 227, &t, 11u);
+            int seen = 0; double t0 = 0;
+            while (t0 < 6.0) {
+                seen |= rs.treeLights();
+                RoadControls c; c.throttle = rs.phase() == RoadSession::Phase::Run ? 1.0 : 0.3;
+                rs.update(1.0 / 60.0, c);
+                t0 += 1.0 / 60.0;
+            }
+            std::printf("    agac isiklari 0x%x, tepki %.3f s, rakip tepki %.3f s, rakip kalkis %.0f rpm, odul carpani %.2f\n",
+                        seen, rs.reaction(), rs.rivalReaction(), rs.rival()->launchRpm, rs.prizeScale());
+            CHECK(seen == 15, "uc amber ve yesil yandi");
+            CHECK(rs.reaction() > 0.0 && rs.reaction() < 1.0, "oyuncu tepki suresi olculdu");
+            CHECK(rs.rivalReaction() >= 0.15 && rs.rivalReaction() <= 0.35 && rs.rival()->launchRpm > 1500.0, "rakip: insan tepkisi + drag kalkis devri");
+            CHECK(rs.prizeScale() > 1.5 && rs.prizeScale() <= 2.5, "karma odulu mesafeyle olceklenir");
+        }
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;

@@ -103,7 +103,7 @@ void RoadScreen::finishRace() {
     rewarded_ = true;
     if (autopilot_) return;
     if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
-    else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_);
+    else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_, ses_->prizeScale());
     else return;
     // Otomatik debriyaj (H-desen) odul cezasi: kazanilan paranin %25'i geri alinir
     if (autoClutchPenalty() && prize_ > 0) {
@@ -117,7 +117,7 @@ void RoadScreen::finishRace() {
 
 void RoadScreen::update(double dt) {
     msgT_ -= dt;
-    if (menu_ || !ses_) { app_.voice(0, 900, 0, false, false, 0.6f); app_.tire(0, 0); app_.tire(1, 0); return; }
+    if (menu_ || !ses_) { app_.voice(0, 900, 0, false, false, 0.6f); app_.tire(0, 0); app_.tire(1, 0); app_.wind(0); return; }
     RoadCar& P = ses_->player();
     const double v = P.sim().speed();
     cockpit_.update(dt);
@@ -183,6 +183,7 @@ void RoadScreen::update(double dt) {
 
     app_.voice(0, pt.rpm(), pt.throttleEffective(), pt.limiterHit(), pt.gear() > 0, 1.0f);
     app_.tire(0, P.tireSlipSpeed());
+    app_.wind(v);
     if (RoadCar* rv = ses_->rival()) {
         // Rakip sesi mesafeye gore kisilir
         const double d = std::hypot(rv->sim().posX() - P.sim().posX(), rv->sim().posY() - P.sim().posY());
@@ -256,6 +257,20 @@ void RoadScreen::drawWorld(Renderer& r) {
     r.gradientV(0, 0, W, horizon, mtn ? Color{0.18f, 0.2f, 0.42f} : Color{0.30f, 0.45f, 0.85f}, mtn ? Color{0.95f, 0.55f, 0.35f} : Color{0.85f, 0.70f, 0.55f});
     if (mtn)   // uzak daglar (siluet)
         for (int k = 0; k < 10; ++k) { const float x0 = k * 70.0f - 30.0f, hh = 30.0f + 25.0f * hashf(k + 3); r.tri(x0, horizon, x0 + 100, horizon, x0 + 50, horizon - hh, {0.25f, 0.24f, 0.36f}); }
+    if (sideCam) {
+        // Drag gorunumu paralaks: uzak tepe katmanlari yol ilerleyisiyle yavas kayar (hiz hissi); takip kamerasinda soner
+        const float a = 1.0f - (float)camBlend_;
+        for (int layer = 0; layer < 2; ++layer) {
+            const float speed = layer == 0 ? 0.35f : 0.9f, period = layer == 0 ? 120.0f : 80.0f;
+            const float off = std::fmod((float)ps * speed, period);
+            const Color c = layer == 0 ? Color{0.45f, 0.52f, 0.68f, a} : Color{0.32f, 0.45f, 0.36f, a};
+            for (int k = -1; k <= (int)(W / period) + 1; ++k) {
+                const int id = k + (int)std::floor((float)ps * speed / period);
+                const float x0 = k * period - off, hh = (layer == 0 ? 26.0f : 14.0f) + (layer == 0 ? 22.0f : 12.0f) * hashf(id * 3 + layer * 101);
+                r.tri(x0 - period * 0.2f, horizon, x0 + period * 1.2f, horizon, x0 + period * 0.5f, horizon - hh, c);
+            }
+        }
+    }
     r.rect(0, horizon, W, horizon + 2, {0.35f, 0.42f, 0.38f});
 
     const double hw = R.halfWidth();
@@ -359,6 +374,17 @@ void RoadScreen::drawWorld(Renderer& r) {
                     r.textCentered(t.x, (t.y + m.y) * 0.5f - 3.5f * ts, kk > 0 ? "<<<" : ">>>", ts, {0.08f, 0.08f, 0.08f});
                 }
             }
+        }
+    }
+    if (sideCam && sim.speed() > 12.0) {
+        // Hiz cizgileri (drag gorunumu): ust ve alt kenarda, hizla uzar ve yogunlasir; arac ortada temiz kalir
+        const float k = std::min(1.0f, (float)(sim.speed() - 12.0) / 35.0f) * (1.0f - (float)camBlend_);
+        const int n = 6 + (int)(14 * k);
+        for (int i = 0; i < n; ++i) {
+            const float h = hashf(i * 13 + 7), y = h < 0.5f ? horizon * (0.15f + 1.6f * h * 0.5f) : H - (H - horizon) * 0.35f * (h - 0.5f) * 2.0f;
+            const float len = 30.0f + 160.0f * k * (0.5f + hashf(i * 5 + 1));
+            const float x = W - std::fmod((float)ps * 28.0f * (0.6f + hashf(i * 7 + 3)) + hashf(i) * (W + len), W + len);
+            r.rect(x, y, x + len, y + 1.5f, {1.0f, 1.0f, 1.0f, 0.15f + 0.3f * k});
         }
     }
     r.flush2D();
@@ -474,7 +500,27 @@ void RoadScreen::drawHud(Renderer& r) {
         r.rect(W / 2.0f - w / 2, my, W / 2.0f + w / 2, my + 22, {0.02f, 0.02f, 0.04f, 0.7f});
         r.textCentered(W / 2.0f, my + 4, msg_, 2, {1.0f, 0.85f, 0.3f});
     }
-    if (ses_->phase() == RoadSession::Phase::Countdown) {
+    if (ses_->mode() == RoadSession::Mode::Karma) {
+        // Drag agaci (Sportsman): stage isiklari, 3 amber .5 s arayla, yesil
+        const int L = ses_->treeLights();
+        if (ses_->phase() == RoadSession::Phase::Countdown || L) {
+            const float cx = land_ ? 545.0f : W - 34.0f, ty = land_ ? 66.0f : 96.0f;   // sagda: arac ve mesaj acik kalir
+            r.rect(cx - 26, ty, cx + 26, ty + 132, {0.06f, 0.06f, 0.07f, 0.92f});
+            r.rect(cx - 3, ty + 132, cx + 3, ty + 150, {0.2f, 0.2f, 0.22f});
+            for (int side = -1; side <= 1; side += 2) {
+                const float x = cx + side * 12.0f;
+                r.circle(x, ty + 10, 4, 10, {0.95f, 0.95f, 0.85f});            // pre-stage / stage
+                r.circle(x, ty + 22, 4, 10, {0.95f, 0.95f, 0.85f});
+                for (int k = 0; k < 3; ++k)
+                    r.circle(x, ty + 42 + k * 22, 8, 14, (L >> k) & 1 ? Color{1.0f, 0.62f, 0.05f} : Color{0.22f, 0.16f, 0.05f});
+                r.circle(x, ty + 110, 8, 14, (L & 8) ? Color{0.2f, 1.0f, 0.3f} : Color{0.05f, 0.2f, 0.07f});
+            }
+        }
+        if (ses_->reaction() > 0 && ses_->raceTime() < ses_->reaction() + 2.5) {
+            std::snprintf(b, sizeof b, "TEPKI %.3f  RAKIP %.3f", ses_->reaction(), ses_->rivalReaction());
+            r.textCentered(W / 2.0f, land_ ? 64 : 90, b, 1, ses_->reaction() <= ses_->rivalReaction() ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.6f, 0.3f});
+        }
+    } else if (ses_->phase() == RoadSession::Phase::Countdown) {
         std::snprintf(b, sizeof b, "%d", (int)std::ceil(ses_->countdown()));
         r.textCentered(W / 2.0f, land_ ? 150 : 220, b, 8, {1.0f, 0.2f, 0.15f});
     }

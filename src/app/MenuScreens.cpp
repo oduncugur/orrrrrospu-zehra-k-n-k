@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <thread>
 
 namespace zk {
 
@@ -58,8 +59,12 @@ PartsScreen::Stats PartsScreen::statsFor(const Tune& t) const {
     VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
     const VehicleSim sim(cfg);
     Stats s;
+    s.redline = sim.engineSpec().redlineRpm;
     for (auto& p : effectiveCurve(sim.engineSpec()))
-        if (p.first <= sim.engineSpec().redlineRpm) { s.hp = std::max(s.hp, p.second * p.first * kHpK); s.nm = std::max(s.nm, p.second); }
+        if (p.first <= s.redline) {
+            s.hp = std::max(s.hp, p.second * p.first * kHpK); s.nm = std::max(s.nm, p.second);
+            s.hpCurve.push_back({p.first, p.second * p.first * kHpK});
+        }
     s.idx = performanceIndex(v, t);
     s.mass = sim.baseMassKg();
     // Aks riski (tahmin): debriyajin aktarabilecegi tork / aksin kirilma torku
@@ -74,7 +79,8 @@ PartsScreen::Stats PartsScreen::statsFor(const Tune& t) const {
 }
 
 void PartsScreen::recompute() {
-    const Stats s = statsFor(app_.career.car().tune);
+    now_ = statsFor(app_.career.car().tune);
+    const Stats& s = now_;
     hpNow_ = s.hp; nmNow_ = s.nm; idx_ = s.idx; axleRisk_ = s.axleRisk; massNow_ = s.mass;
     sel_ = -1; confirm_ = false;
 }
@@ -85,6 +91,66 @@ void PartsScreen::select(int i) {
     setPartLevel(t, (PartCat)cat_, i, *findVehicle(oc.carId));
     prev_ = statsFor(t);
     sel_ = i; confirm_ = false;
+    // 1/4 mil tahmini: mevcut + onizlenen parca, arka planda (ayni parca setleri onbellekte, ikinci kez aninda)
+    et_ = std::make_shared<EtJob>();
+    std::thread([job = et_, car = findVehicle(oc.carId), cur = oc.tune, nxt = t]() {
+        job->cur = DragRace::estimateQuarter(car, &cur);
+        job->nxt = DragRace::estimateQuarter(car, &nxt);
+        job->done = true;
+    }).detach();
+}
+
+// Onizleme paneli: degerler (once > sonra, fark renkli), 1/4 mil tahmini, guc egrisi karsilastirmasi (sagda)
+void PartsScreen::drawPreview(Renderer& r, float py) {
+    const auto& opts = partOptions((PartCat)cat_);
+    r.rect(8, py, 352, py + 112, {0.08f, 0.09f, 0.13f});
+    r.text(16, py + 6, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, 26), 1, kUiGold);
+    const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
+    auto line = [&](int k, const char* name, double a, double bnew, const char* fmt, bool higherBetter) {
+        char t[96]; std::snprintf(t, sizeof t, fmt, a, bnew);
+        const double d = bnew - a;
+        const bool same = std::fabs(d) < 1e-6 * std::max(1.0, std::fabs(a));
+        r.text(16, py + 22 + k * 15, name, 1, kUiText);
+        r.text(76, py + 20 + k * 15, t, 1, same ? kUiDim : (d > 0) == higherBetter ? up : down);
+    };
+    line(0, "GUC", hpNow_, prev_.hp, "%.0f > %.0f HP", true);
+    line(1, "TORK", nmNow_, prev_.nm, "%.0f > %.0f NM", true);
+    line(2, "ENDEKS", idx_, prev_.idx, "%.0f > %.0f", true);
+    line(3, "AKS RISKI", axleRisk_ * 100, prev_.axleRisk * 100, "%%%.0f > %%%.0f", false);
+    line(4, "AGIRLIK", massNow_, prev_.mass, "%.0f > %.0f KG", false);
+    // 1/4 mil (tahmin)
+    r.text(16, py + 97, "1/4 MIL", 1, kUiText);
+    if (!et_ || !et_->done) r.text(76, py + 97, "HESAPLANIYOR...", 1, kUiDim);
+    else {
+        auto str = [](const QuarterEstimate& e) {
+            char t[24];
+            if (e.broke) return std::string("AKS!");
+            if (e.quarter < 0) return std::string("--");
+            std::snprintf(t, sizeof t, "%.2f", e.quarter); return std::string(t);
+        };
+        const std::string t = str(et_->cur) + " > " + str(et_->nxt) + " S";
+        const bool ok = et_->cur.quarter > 0 && et_->nxt.quarter > 0;
+        const double d = ok ? et_->nxt.quarter - et_->cur.quarter : 0.0;
+        r.text(76, py + 97, t, 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
+    }
+    // Guc egrisi: gri = simdiki, turuncu = parcayla
+    const float gx0 = 236, gx1 = 344, gy0 = py + 18, gy1 = py + 104;
+    r.rect(gx0, gy0, gx1, gy1, {0.05f, 0.05f, 0.08f});
+    const double maxRpm = std::max(now_.redline, prev_.redline), maxHp = std::max(now_.hp, prev_.hp) * 1.1 + 1.0;
+    auto plot = [&](const Stats& st, Color c) {
+        for (size_t i = 1; i < st.hpCurve.size(); ++i) {
+            const auto &a = st.hpCurve[i - 1], &b = st.hpCurve[i];
+            const float x0 = gx0 + (float)(a.first / maxRpm) * (gx1 - gx0), x1 = gx0 + (float)(b.first / maxRpm) * (gx1 - gx0);
+            const float y0 = gy1 - (float)(a.second / maxHp) * (gy1 - gy0), y1 = gy1 - (float)(b.second / maxHp) * (gy1 - gy0);
+            const float dx = x1 - x0, dy = y1 - y0, l = std::max(1e-3f, std::sqrt(dx * dx + dy * dy));
+            const float nx = -dy / l * 0.8f, ny = dx / l * 0.8f;          // 1.6 px kalinlik
+            r.tri(x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, c);
+            r.tri(x0 + nx, y0 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny, c);
+        }
+    };
+    plot(now_, {0.55f, 0.55f, 0.6f});
+    plot(prev_, kUiOrange);
+    r.text(gx0 + 2, gy0 + 2, "HP", 1, kUiDim);
 }
 
 void PartsScreen::render(Renderer& r) {
@@ -131,22 +197,7 @@ void PartsScreen::render(Renderer& r) {
         }
         // Onizleme paneli: secili parca takilirsa (onceki -> sonraki, fark renkli)
         const float py = 144.0f + opts.size() * 60 + 4;
-        if (sel_ >= 0) {
-            r.rect(8, py, 352, py + 112, {0.08f, 0.09f, 0.13f});
-            r.text(16, py + 6, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, 28), 1, kUiGold);
-            auto line = [&](int k, const char* name, double a, double bnew, const char* fmt, bool higherBetter) {
-                char t[96]; std::snprintf(t, sizeof t, fmt, a, bnew);
-                const double d = bnew - a;
-                const bool good = std::fabs(d) < 1e-6 ? true : (d > 0) == higherBetter;
-                r.text(16, py + 22 + k * 17, name, 1, kUiText);
-                r.text(112, py + 20 + k * 17, t, 2, std::fabs(d) < 1e-6 ? kUiDim : good ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.4f, 0.3f});
-            };
-            line(0, "GUC", hpNow_, prev_.hp, "%.0f > %.0f HP", true);
-            line(1, "TORK", nmNow_, prev_.nm, "%.0f > %.0f NM", true);
-            line(2, "ENDEKS", idx_, prev_.idx, "%.0f > %.0f", true);
-            line(3, "AKS RISKI", axleRisk_ * 100, prev_.axleRisk * 100, "%%%.0f > %%%.0f", false);
-            line(4, "AGIRLIK", massNow_, prev_.mass, "%.0f > %.0f KG", false);
-        }
+        if (sel_ >= 0) drawPreview(r, py);
         if (confirm_ && sel_ >= 0) {
             char t[64]; std::snprintf(t, sizeof t, "SATIN AL %s?", money(partPrice(c, sel_, v)).c_str());
             r.textCentered(180, 532, t, 2, {1, 1, 1});
@@ -215,8 +266,6 @@ const int kGStep[4] = {-10, -1, +1, +10};
 const Rect kBuy{8, 512, 352, 552}, kSell{8, 558, 352, 590};
 } // namespace
 
-namespace { const Rect kCYes{36, 400, 176, 450}, kCNo{184, 400, 324, 450}; }
-
 GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {}
 
 void GalleryScreen::render(Renderer& r) {
@@ -267,36 +316,45 @@ void GalleryScreen::render(Renderer& r) {
 
     // Onay penceresi (satin alma / satis): tek dokunusla para harcanmaz
     if (confirm_ != Confirm::None) {
-        r.rect(0, 0, 360, 640, {0, 0, 0, 0.6f});
-        r.rect(20, 150, 340, 470, {0.10f, 0.11f, 0.16f});
-        r.rect(20, 150, 340, 154, confirm_ == Confirm::Sell ? kUiRed : kUiGreen);
         if (confirm_ == Confirm::Buy) {
+            r.rect(0, 0, 360, 640, {0, 0, 0, 0.6f});
+            r.rect(20, 150, 340, 470, {0.10f, 0.11f, 0.16f});
+            r.rect(20, 150, 340, 154, kUiGreen);
             r.textCentered(180, 172, "SATIN ALINSIN MI?", 2, {1, 1, 1});
             r.textCentered(180, 204, upper(v.fullName()).substr(0, 40), 1, kUiText);
             r.textCentered(180, 236, money(price), 4, kUiGold);
             std::snprintf(b, sizeof b, "KALAN PARA: %s", money(app_.career.money - price).c_str());
             r.textCentered(180, 290, b, 2, kUiText);
-        } else {
-            const VehicleDef& sv = *findVehicle(cur.carId);
-            const SaleQuote q = saleQuote(cur);
-            r.textCentered(180, 172, "ARAC SATILSIN MI?", 2, {1, 1, 1});
-            r.textCentered(180, 196, upper(sv.fullName()).substr(0, 40), 1, kUiText);
-            auto row = [&](float y, const char* name, const std::string& val, Color c) {
-                r.text(36, y, name, 2, kUiText);
-                r.text(324 - r.textWidth(val, 2), y, val, 2, c);
-            };
-            row(222, "ARAC (%65)", money(q.car), kUiText);
-            row(248, "PARCALAR (%40)", money(q.parts), kUiText);
-            row(274, "HASAR", q.damage > 0 ? "-" + money(q.damage) : "YOK", q.damage > 0 ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
-            r.rect(36, 302, 324, 304, kUiDim);
-            row(314, "TOPLAM", money(q.total), {0.4f, 1.0f, 0.5f});
-            if (q.total > q.car + q.parts - q.damage) r.textCentered(180, 342, "HURDA ALT SINIRI UYGULANDI", 1, kUiGold);
-            std::snprintf(b, sizeof b, "YARIS %d  GALIBIYET %d", cur.races, cur.wins);
-            r.textCentered(180, 362, b, 1, kUiDim);
-        }
-        button(r, kCYes, confirm_ == Confirm::Sell ? "SAT" : "AL", confirm_ == Confirm::Sell ? kUiRed : kUiGreen, 2);
-        button(r, kCNo, "VAZGEC", kUiBtn, 2);
+            button(r, kDlgYes, "AL", kUiGreen, 2);
+            button(r, kDlgNo, "VAZGEC", kUiBtn, 2);
+        } else drawSaleDialog(r, cur);
     }
+}
+
+// Satis onay penceresi (galeri + garaj): fiyat dokumu arac + parca - hasar
+void drawSaleDialog(Renderer& r, const OwnedCar& cur) {
+    char b[96];
+    r.rect(0, 0, 360, 640, {0, 0, 0, 0.6f});
+    r.rect(20, 150, 340, 470, {0.10f, 0.11f, 0.16f});
+    r.rect(20, 150, 340, 154, kUiRed);
+    const VehicleDef& sv = *findVehicle(cur.carId);
+    const SaleQuote q = saleQuote(cur);
+    r.textCentered(180, 172, "ARAC SATILSIN MI?", 2, {1, 1, 1});
+    r.textCentered(180, 196, upper(sv.fullName()).substr(0, 40), 1, kUiText);
+    auto row = [&](float y, const char* name, const std::string& val, Color c) {
+        r.text(36, y, name, 2, kUiText);
+        r.text(324 - r.textWidth(val, 2), y, val, 2, c);
+    };
+    row(222, "ARAC (%65)", money(q.car), kUiText);
+    row(248, "PARCALAR (%40)", money(q.parts), kUiText);
+    row(274, "HASAR", q.damage > 0 ? "-" + money(q.damage) : "YOK", q.damage > 0 ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
+    r.rect(36, 302, 324, 304, kUiDim);
+    row(314, "TOPLAM", money(q.total), {0.4f, 1.0f, 0.5f});
+    if (q.total > q.car + q.parts - q.damage) r.textCentered(180, 342, "HURDA ALT SINIRI UYGULANDI", 1, kUiGold);
+    std::snprintf(b, sizeof b, "YARIS %d  GALIBIYET %d", cur.races, cur.wins);
+    r.textCentered(180, 362, b, 1, kUiDim);
+    button(r, kDlgYes, "SAT", kUiRed, 2);
+    button(r, kDlgNo, "VAZGEC", kUiBtn, 2);
 }
 
 void GalleryScreen::confirmAction() {
@@ -314,8 +372,8 @@ void GalleryScreen::confirmAction() {
 
 void GalleryScreen::pointerDown(int, float x, float y) {
     if (confirm_ != Confirm::None) {                                   // modal: yalniz iki dugme
-        if (kCYes.hit(x, y)) confirmAction();
-        else if (kCNo.hit(x, y)) confirm_ = Confirm::None;
+        if (kDlgYes.hit(x, y)) confirmAction();
+        else if (kDlgNo.hit(x, y)) confirm_ = Confirm::None;
         return;
     }
     const int n = (int)vehicleCatalog().size();

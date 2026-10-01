@@ -42,6 +42,12 @@ public:
     Mode  mode() const { return mode_; }
     Phase phase() const { return phase_; }
     double countdown() const { return countdown_; }
+    // Karma: drag agaci (geri sayimin son 1.5 s'si 3 amber, sonra yesil); tepki = yesilden kalkisa (-1: henuz yok)
+    int    treeLights() const;                        // bit: 1,2,4 amber; 8 yesil
+    double reaction() const { return reaction_; }
+    double rivalReaction() const { return rivalReact_; }
+    // Odul carpani: karma uzun yol (8-10 km) -> mesafeyle orantili (4 km yol yarisi = 1)
+    double prizeScale() const { return mode_ == Mode::Karma ? std::clamp(raceLength() / 4000.0, 1.0, 2.5) : 1.0; }
     double raceTime() const { return raceT_; }
     const RoadPath& road() const { return road_; }
     RoadCar& player() { return *player_; }
@@ -85,6 +91,7 @@ private:
     double finishT_[2] = {0, 0};
     int winner_ = -1, collisions_ = 0;
     double rivalLane_ = -kLane;
+    double reaction_ = -1.0, rivalReact_ = 0.0;      // karma tepki sureleri (rakip: 0.15-0.35 s, tohumdan)
     std::vector<std::string> msgs_;
     bool crashEv_ = false, touching_ = false;
     double rnd();

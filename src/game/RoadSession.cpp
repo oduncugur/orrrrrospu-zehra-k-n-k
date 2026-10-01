@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace zk {
 
@@ -22,6 +23,13 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         // Rakip yan seritte, ayni cizgide
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
         phase_ = Phase::Countdown; countdown_ = 3.0;
+        if (mode == Mode::Karma) {
+            // Drag kalkisi: kalkis devri kirmizi cizginin %30'u (acik yolda olculdu: 0/30/40/50/60% arasinda en iyi
+            // 400 m; Aygir S5 GT -1.25 s), insan gibi tepki suresi
+            const EngineSpec& e = rival_->sim().engineSpec();
+            rival_->launchRpm = std::max(e.idleRpm + 800.0, 0.30 * e.redlineRpm);
+            rivalReact_ = 0.15 + 0.20 * rnd();
+        }
     }
     if (mode == Mode::Flow) {
         // Viraj tepeleri (R < 600 m) + oyuncu govde yari genisligi
@@ -52,6 +60,16 @@ void RoadSession::spawnTraffic(TrafficCar& t, double fromS) {
     if (kind_ == Kind::Touge) t.v0 *= 0.6;                          // dag yolunda yavas
     t.v = t.v0;
     t.s = std::clamp(fromS + 60.0 * rnd(), 0.0, road_.length() - 10.0);
+}
+
+int RoadSession::treeLights() const {
+    if (mode_ != Mode::Karma) return 0;
+    if (phase_ != Phase::Countdown) return raceT_ < 1.0 ? 8 : 0;           // yesil 1 s yanik kalir
+    int m = 0;
+    if (countdown_ <= 1.5) m |= 1;
+    if (countdown_ <= 1.0) m |= 2;
+    if (countdown_ <= 0.5) m |= 4;
+    return m;
 }
 
 void RoadSession::trafficPose(const TrafficCar& t, double& x, double& y, double& psi) const {
@@ -170,7 +188,9 @@ void RoadSession::update(double dt, const RoadControls& in) {
         if (player_->s() > road_.length() - 80.0) { player_->recover(road_.length() - 100.0); msgs_.push_back("YOL SONU - BASA DONULDU"); }
         return;
     }
-    rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
+    if (mode_ == Mode::Karma && raceT_ < rivalReact_) {                 // rakip tepki suresi: henuz yesili gormedi
+        RoadControls rh; rh.brake = 1.0; rh.throttle = 0.3; rival_->update(dt, rh);
+    } else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
     collide(*rival_, false);
     // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h)
@@ -186,6 +206,11 @@ void RoadSession::update(double dt, const RoadControls& in) {
         touching_ = c.touching;
     }
     if (phase_ == Phase::Run || phase_ == Phase::Finished) raceT_ += (phase_ == Phase::Run) ? dt : 0.0;
+    if (mode_ == Mode::Karma && reaction_ < 0 && player_->s() > startS_ + 0.3) {       // tepki: arac ~30 cm ilerledi
+        reaction_ = raceT_;
+        char m[48]; std::snprintf(m, sizeof m, "TEPKI %.3f S", reaction_);
+        msgs_.push_back(m);
+    }
     const double goal = startS_ + raceLength();
     if (finishT_[0] <= 0 && player_->s() >= goal) { finishT_[0] = raceT_; if (winner_ < 0) winner_ = 0; }
     if (finishT_[1] <= 0 && rival_->s() >= goal) { finishT_[1] = raceT_; if (winner_ < 0) winner_ = 1; }

@@ -38,6 +38,8 @@ struct TimeSlip {
 
 // YZ kalkis plani: kalkis devri + debriyaj birakma suresi (t60: denemedeki 60 ft suresi, s)
 struct LaunchPlan { double rpm, release, t60; };
+// 1/4 mil tahmini (parca onizlemesi): -1 = ulasilamadi (aks kirildi / stop)
+struct QuarterEstimate { double sixtyFt = -1, quarter = -1, trapKmh = 0; bool broke = false; };
 
 struct LaneState {
     std::unique_ptr<VehicleSim> sim;
@@ -82,6 +84,7 @@ public:
 
     using LaunchPlan = zk::LaunchPlan;
     static LaunchPlan planLaunch(const VehicleDef* car, const Tune* tune);
+    static QuarterEstimate estimateQuarter(const VehicleDef* car, const Tune* tune);   // pahali: arka planda
 
 private:
     void stepPhysics(const PlayerControls& pc);
