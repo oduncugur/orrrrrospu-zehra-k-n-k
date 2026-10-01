@@ -405,3 +405,17 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
   eslesmede fark %5-%95 -0.17..+0.17 s, %100'u 0.3 s icinde.
 - Odul: `prizeDifficulty(oyuncuET - rakipET)` = 1 + 0.6 x fark (0.5-1.8); drag ve yol yarislarinda (App::lastOpp).
 - FIZIK YA DA YZ DEGISIRSE TABLOYU YENILEYIN: career_test [R] 3 araci estimateQuarter ile karsilastirir (0.02 s).
+
+## Guncelleme — 2026-10-02: Grafik ve arac modelleri (ara taslak)
+- Modeller: `src/garage/BodyShapes.inc` = 26 siluet arketipi (hatch/sedan/coupe/fastback/liftback/kas/orta motor/kama/
+  uzun kaput/911/Beetle/roadster/van/SUV/pickup...) + 324 aracin tek tek atamasi (gercek aracin yan profili, far tipi:
+  dikdortgen/yuvarlak/cift yuvarlak/acilir/ince/kapakli/camurlukta, stop tipi, izgara, jant deseni, kapi sayisi, gercek
+  jant yaricapi). Olculer VehicleTable'dan (gercek). Camurluk siskinligi, C direk yelkeni, kapi cizgileri, kol, ayna,
+  roadster on cam + kokpit + koltuk + roll bar, pickup kasasi. Logo/amblem yok, isimler kurgusal (bilincli karar).
+  Test model_test: 324 arac, ortalama ~2050 ucgen (en fazla 2200), olculer gercek degerlere uyar, teker zeminde.
+- Renderer: piksel basina isik (gunes + gok/zemin ortami + Blinn-Phong + Fresnel gokyuzu yansimasi), malzemeye gore
+  parlaklik (far/stop isik yayar), yumusak normaller (ayni malzeme, 40 derece), yumusak zemin golgesi, 24 bit derinlik.
+  Ayar GRAFIK: RETRO 1x (eski piksel gorunum) / NORMAL 2x / YUKSEK 3x ic cozunurluk (`render_scale`).
+- Garaj/galeri stüdyo arka plani (`studio()`); font '?' ve kesme isareti.
+- Test kancalari: `ZK_SHOT_FBO=1` ekran goruntusunu ic cozunurlukten alir; galeride `ZK_GALLERY_CAR=id`,
+  `ZK_SHEET=1|2` (6 aracin 3/4 ya da yandan model tablosu).

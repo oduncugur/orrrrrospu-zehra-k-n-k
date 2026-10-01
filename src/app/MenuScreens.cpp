@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <thread>
 
 namespace zk {
@@ -266,9 +267,26 @@ const int kGStep[4] = {-10, -1, +1, +10};
 const Rect kBuy{8, 512, 352, 552}, kSell{8, 558, 352, 590};
 } // namespace
 
-GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {}
+GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {
+    if (const char* c = std::getenv("ZK_GALLERY_CAR")) if (findVehicle(std::atoi(c))) carId_ = std::atoi(c);   // test: model goruntusu
+}
 
 void GalleryScreen::render(Renderer& r) {
+    if (std::getenv("ZK_SHEET")) {                    // test: 12 aracin model tablosu (yandan + 3/4 on)
+        r.begin(360, 640, {0.16f, 0.17f, 0.21f});
+        const bool side = std::atoi(std::getenv("ZK_SHEET")) == 2;
+        for (int k = 0; k < 6; ++k) {
+            const VehicleDef* c = findVehicle(carId_ + k);
+            if (!c) break;
+            const float cx = (k % 2) * 180.0f, cy = (k / 2) * 213.0f;
+            const float L = (float)c->lengthM;
+            const Mat4 view = side ? matLookAt(0.0f, 0.7f, 2.9f * L, 0.0f, 0.62f, 0.0f)
+                                   : matLookAt(1.25f * L, 0.9f + 0.18f * L, 1.55f * L, 0.0f, 0.55f, 0.0f);
+            r.drawCar(c->id, cx, cy + 14, 180, 195, matPerspective(0.5f, 180.0f / 195.0f, 0.1f, 50.0f), view, matRotY(0.0f));
+            r.text(cx + 3, cy + 3, std::to_string(c->id) + " " + upper(c->model).substr(0, 24), 1, {1, 1, 1});
+        }
+        return;
+    }
     const VehicleDef& v = *findVehicle(carId_);
     const EngineDef& e = engineTable()[v.engine];
     r.begin(360, 640, kUiBg);
@@ -279,7 +297,7 @@ void GalleryScreen::render(Renderer& r) {
     r.text(8, 32, std::string(b).substr(0, 42), 1, kUiText);
     const std::string m = money(app_.career.money);
     r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
-    r.gradientV(0, 60, 360, 290, {0.09f, 0.10f, 0.14f}, {0.16f, 0.17f, 0.21f});
+    studio(r, 60, 290, 190);
     const float L = (float)v.lengthM;
     r.drawCar(v.id, 0, 64, 360, 222, matPerspective(0.75f, 360.0f / 222.0f, 0.1f, 50.0f),
               matLookAt(0.0f, 1.1f + 0.2f * L, 1.35f * L + 1.2f, 0.0f, 0.55f, 0.0f), matRotY(spin_));

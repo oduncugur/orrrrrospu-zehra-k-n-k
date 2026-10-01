@@ -72,7 +72,7 @@ void GarageScreen::render(Renderer& r) {
     const VehicleDef& v = *findVehicle(oc.carId);
     const EngineDef& e = engineTable()[v.engine];
     r.begin(360, 640, kUiBg);
-    r.gradientV(0, 60, 360, 300, {0.09f, 0.10f, 0.14f}, {0.16f, 0.17f, 0.21f});
+    studio(r, 60, 296, 196);
     r.rect(0, 0, 360, 58, kUiPanel);
     r.text(8, 8, upper(v.brand), 2, kUiGold);
     r.text(8, 30, upper(v.model).substr(0, 20), 2, {1, 1, 1});

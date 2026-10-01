@@ -34,6 +34,10 @@ public:
     int  vw() const { return vw_; }
     int  vh() const { return vh_; }
     bool integerScale = false;         // ekrana tam sayi katla olcekle (piksel-keskin; kenarlarda bant kalabilir)
+    // Ic cozunurluk carpani: 1 = retro (sanal piksel), 2-3 = keskin 3B ve kenarlar (2D koordinatlar degismez)
+    void setRenderScale(int s) { scale_ = s < 1 ? 1 : s > 3 ? 3 : s; }
+    int  renderScale() const { return scale_; }
+    void bindTarget();                 // sanal tamponu bagla (test ekran goruntusu okumasi)
 
     // 2D (sanal piksel, sol ust orijin). flush2D cagrilana kadar biriktirilir.
     void rect(float x0, float y0, float x1, float y1, Color c);
@@ -50,12 +54,15 @@ public:
 
 private:
     float scaleFor(int screenW, int screenH) const;
-    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0; };
+    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0; float halfL = 2, halfW = 0.9f; };
     const Mesh& mesh(int carId);
+    void ensureTarget();                // FBO boyutu = kFbo x olcek (olcek degisince yeniden)
     std::vector<float> batch_;   // x y r g b a
     std::map<int, Mesh> meshes_;
     unsigned p3d_ = 0, p2d_ = 0, pBlit_ = 0, fbo_ = 0, tex_ = 0, depth_ = 0, vao2d_ = 0, vbo2d_ = 0, vaoQ_ = 0, vboQ_ = 0;
-    int uMvp_ = -1, uModel_ = -1, uSize_ = -1, uUv_ = -1;
+    unsigned vaoSh_ = 0, vboSh_ = 0;    // arac golgesi (birim kare, model uzayinda olceklenir)
+    int uMvp_ = -1, uModel_ = -1, uSize_ = -1, uUv_ = -1, uEye_ = -1, uAlpha_ = -1, uShadow_ = -1;
+    int scale_ = 2, texSize_ = 0;
     int vw_ = 360, vh_ = 640;
     bool ready_ = false;
 };

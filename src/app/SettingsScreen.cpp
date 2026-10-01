@@ -20,6 +20,7 @@ const char* label(It it) {
     case It::ShowFps: return "FPS GOSTERGESI";
     case It::Fullscreen: return "TAM EKRAN";
     case It::IntScale: return "OLCEKLEME";
+    case It::Graphics: return "GRAFIK";
     case It::RoadView: return "YOL EKRANI";
     case It::Master: return "ANA SES";
     case It::Engine: return "MOTOR SESI";
@@ -41,6 +42,7 @@ const char* help(It it) {
     case It::ShowFps: return "EKRANDA KARE HIZI VE KARE BASINA FIZIK SURESI (MS)";
     case It::Fullscreen: return "PENCERE / TAM EKRAN. KISAYOL: F11";
     case It::IntScale: return "TAM SAYI: PIKSEL-KESKIN, KENARLARDA SIYAH BANT KALABILIR";
+    case It::Graphics: return "IC COZUNURLUK. RETRO: PIKSELLI (EN HIZLI), NORMAL 2X, YUKSEK 3X (KESKIN)";
     case It::RoadView: return "ACIK YOL EKRANI: YATAY (GENIS GORUS) YA DA DIKEY (TEK EL)";
     case It::Master: return "TUM SESLER";
     case It::Engine: return "MOTOR, EGZOZ, TURBO SESI";
@@ -75,7 +77,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
 #ifndef __ANDROID__
         {0, It::Fullscreen},
 #endif
-        {0, It::IntScale}, {0, It::RoadView},
+        {0, It::IntScale}, {0, It::Graphics}, {0, It::RoadView},
         {1, It::Master}, {1, It::Engine}, {1, It::Tire},
 #ifdef __ANDROID__
         {2, It::Haptics}, {2, It::Tilt}, {2, It::TiltSens},
@@ -102,6 +104,7 @@ std::string SettingsScreen::value(It it) const {
     case It::ShowFps: return onOff(s.showFps);
     case It::Fullscreen: return onOff(s.fullscreen);
     case It::IntScale: return s.integerScale ? "TAM SAYI" : "SIGDIR";
+    case It::Graphics: return s.renderScale == 1 ? "RETRO" : s.renderScale == 2 ? "NORMAL" : "YUKSEK";
     case It::RoadView: return s.roadPortrait ? "DIKEY" : "YATAY";
     case It::Master: return pct(s.masterVol);
     case It::Engine: return pct(s.engineVol);
@@ -134,6 +137,7 @@ void SettingsScreen::change(It it, int dir) {
     case It::ShowFps: s.showFps = !s.showFps; break;
     case It::Fullscreen: s.fullscreen = !s.fullscreen; break;
     case It::IntScale: s.integerScale = !s.integerScale; break;
+    case It::Graphics: s.renderScale = dir < 0 ? (s.renderScale + 1) % 3 + 1 : s.renderScale % 3 + 1; break;
     case It::RoadView: s.roadPortrait = !s.roadPortrait; break;
     case It::Master: s.masterVol = list(Settings::volumeOptions(), s.masterVol); break;
     case It::Engine: s.engineVol = list(Settings::volumeOptions(), s.engineVol); break;

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 namespace zk {
@@ -39,6 +40,7 @@ void App::applySettings() {
     engineVol_ = master * settings.engineVol / 100.0f;
     tireVol_ = master * settings.tireVol / 100.0f;
     renderer_.integerScale = settings.integerScale;
+    renderer_.setRenderScale(settings.renderScale);
 }
 void App::saveSettings() { if (!settingsPath_.empty()) settings.save(settingsPath_); }
 
@@ -164,10 +166,14 @@ void App::renderAudio(float* out, int frames) {
 }
 
 bool App::readPixelsRGB(std::vector<unsigned char>& rgb, int& w, int& h) {
-    w = sw_; h = sh_;
+    // ZK_SHOT_FBO: ic cozunurlukteki sanal tampondan (renderScale x 640x360 / 360x640) - pencere boyutundan bagimsiz
+    const bool fbo = std::getenv("ZK_SHOT_FBO") != nullptr;
+    w = fbo ? renderer_.vw() * renderer_.renderScale() : sw_; h = fbo ? renderer_.vh() * renderer_.renderScale() : sh_;
     std::vector<unsigned char> rgba((size_t)w * h * 4);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    if (fbo) renderer_.bindTarget();
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    if (fbo) glBindFramebuffer(GL_FRAMEBUFFER, 0);
     rgb.resize((size_t)w * h * 3);
     for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x)

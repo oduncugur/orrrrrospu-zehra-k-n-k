@@ -4,6 +4,7 @@
 #include "garage/VehicleCatalog.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -66,6 +67,8 @@ const char* glyph(char c) {
     case '=': return "..........#####.....#####..........";
     case '$': return "..#...#####.#...###...#.#####...#..";
     case ',': return ".....................##....#...#...";
+    case '?': return ".###.#...#....#...#...#.......#....";
+    case '\'': return "..#....#...#.......................";
     default:  return nullptr;
     }
 }
@@ -88,11 +91,33 @@ GLuint program(const char* vs, const char* fs) {
     return p;
 }
 
+// 3B arac: piksel basina isik. Gunes (yonlu) + gok/zemin yarikure ortami + Blinn-Phong parlama + gokyuzu yansimasi
+// (Fresnel). aGloss: 0 mat (lastik) .. 1 boya/cam/krom; < 0 isik yayan (far, stop). uShadow: zemin golgesi (siyah, alfa).
 const char* kVs3D = R"(layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec3 aCol;
-uniform mat4 uMvp; uniform mat4 uModel; flat out vec3 vCol;
-void main(){ vec3 n = normalize(mat3(uModel) * aNrm); float l = 0.40 + 0.60 * max(dot(n, normalize(vec3(0.35,0.9,0.55))), 0.0);
-  vCol = aCol * l; gl_Position = uMvp * vec4(aPos, 1.0); })";
-const char* kFs3D = R"(precision mediump float; flat in vec3 vCol; out vec4 o; void main(){ o = vec4(vCol, 1.0); })";
+layout(location=3) in float aGloss;
+uniform mat4 uMvp; uniform mat4 uModel; out vec3 vN; out vec3 vP; out vec3 vCol; out float vGloss; out vec2 vL;
+void main(){ vL = aPos.xz; vN = mat3(uModel) * aNrm; vP = (uModel * vec4(aPos, 1.0)).xyz; vCol = aCol; vGloss = aGloss;
+  gl_Position = uMvp * vec4(aPos, 1.0); })";
+const char* kFs3D = R"(precision mediump float; in vec3 vN; in vec3 vP; in vec3 vCol; in float vGloss; in vec2 vL;
+uniform vec3 uEye; uniform float uAlpha; uniform float uShadow; out vec4 o;
+vec3 sky(vec3 r){ float y = r.y;
+  vec3 hor = vec3(0.86, 0.80, 0.72), top = vec3(0.32, 0.48, 0.86), gnd = vec3(0.22, 0.24, 0.20);
+  return y > 0.0 ? mix(hor, top, pow(y, 0.6)) : mix(hor * 0.7, gnd, pow(-y, 0.4)); }
+void main(){
+  if (uShadow > 0.5) { float d = length(max(abs(vL) - vec2(0.55), 0.0)) / 0.45;   // yuvarlatilmis dikdortgen, yumusak kenar
+    o = vec4(0.0, 0.0, 0.0, uAlpha * (1.0 - smoothstep(0.0, 1.0, d))); return; }
+  if (vGloss < 0.0) { o = vec4(vCol, 1.0); return; }
+  vec3 n = normalize(vN); vec3 v = normalize(uEye - vP);
+  if (dot(n, v) < 0.0) n = -n;
+  vec3 l = normalize(vec3(0.35, 0.9, 0.55));
+  float dif = max(dot(n, l), 0.0);
+  vec3 amb = mix(vec3(0.30, 0.28, 0.25), vec3(0.62, 0.70, 0.85), n.y * 0.5 + 0.5);
+  vec3 c = vCol * (0.42 * amb + 0.72 * dif);
+  float fr = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+  c = mix(c, sky(reflect(-v, n)), clamp(vGloss * (0.06 + 0.55 * fr), 0.0, 0.6));
+  vec3 h = normalize(l + v);
+  c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), 70.0) * vGloss * 0.9;
+  o = vec4(min(c, vec3(1.0)), 1.0); })";
 const char* kVs2D = R"(layout(location=0) in vec2 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
 void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); })";
 const char* kFs2D = R"(precision mediump float; in vec4 vCol; out vec4 o; void main(){ o = vCol; })";
@@ -142,25 +167,12 @@ Mat4 matScale(float s) { Mat4 r{}; r.m[0] = r.m[5] = r.m[10] = s; r.m[15] = 1; r
 // ------------------------------------------------------------------ Renderer
 bool Renderer::init() {
     p3d_ = program(kVs3D, kFs3D); uMvp_ = glGetUniformLocation(p3d_, "uMvp"); uModel_ = glGetUniformLocation(p3d_, "uModel");
+    uEye_ = glGetUniformLocation(p3d_, "uEye"); uAlpha_ = glGetUniformLocation(p3d_, "uAlpha"); uShadow_ = glGetUniformLocation(p3d_, "uShadow");
     p2d_ = program(kVs2D, kFs2D); uSize_ = glGetUniformLocation(p2d_, "uSize");
     pBlit_ = program(kVsBlit, kFsBlit); uUv_ = glGetUniformLocation(pBlit_, "uUv");
 
-    GLuint t, r, f;
-    glGenTextures(1, &t); tex_ = t;
-    glBindTexture(GL_TEXTURE_2D, t);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFbo, kFbo, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glGenRenderbuffers(1, &r); depth_ = r;
-    glBindRenderbuffer(GL_RENDERBUFFER, r);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, kFbo, kFbo);
-    glGenFramebuffers(1, &f); fbo_ = f;
-    glBindFramebuffer(GL_FRAMEBUFFER, f);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, r);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    texSize_ = 0;
+    ensureTarget();
 
     GLuint a, b;
     glGenVertexArrays(1, &a); glGenBuffers(1, &b); vao2d_ = a; vbo2d_ = b;
@@ -172,18 +184,57 @@ bool Renderer::init() {
     glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
     glBufferData(GL_ARRAY_BUFFER, sizeof quad, quad, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    {   // Golge: model uzayinda birim kare (x,z -1..1), zemin hizasi; 3B shader ile (uShadow) cizilir
+        const float sh[] = {-1, 0, -1, 0, 1, 0, 0, 0, 0, 0,   1, 0, -1, 0, 1, 0, 0, 0, 0, 0,   1, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+                            -1, 0, -1, 0, 1, 0, 0, 0, 0, 0,   1, 0, 1, 0, 1, 0, 0, 0, 0, 0,   -1, 0, 1, 0, 1, 0, 0, 0, 0, 0};
+        glGenVertexArrays(1, &a); glGenBuffers(1, &b); vaoSh_ = a; vboSh_ = b;
+        glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
+        glBufferData(GL_ARRAY_BUFFER, sizeof sh, sh, GL_STATIC_DRAW);
+        for (int i = 0; i < 4; ++i) {
+            glEnableVertexAttribArray(i);
+            glVertexAttribPointer(i, i == 3 ? 1 : 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(i * 3 * sizeof(float)));
+        }
+    }
     glBindVertexArray(0);
     meshes_.clear();
     ready_ = true;
     return true;
 }
 
-void Renderer::shutdown() { ready_ = false; meshes_.clear(); batch_.clear(); }
+void Renderer::shutdown() { ready_ = false; meshes_.clear(); batch_.clear(); texSize_ = 0; fbo_ = tex_ = depth_ = 0; }
+
+void Renderer::ensureTarget() {
+    const int want = kFbo * scale_;
+    if (texSize_ == want && fbo_) return;
+    if (fbo_) { GLuint f = fbo_, t = tex_, r = depth_; glDeleteFramebuffers(1, &f); glDeleteTextures(1, &t); glDeleteRenderbuffers(1, &r); }
+    GLuint t, r, f;
+    glGenTextures(1, &t); tex_ = t;
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, want, want, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    // Retro (1x): piksel-keskin; 2-3x: yumusak olcekleme
+    const GLint filt = scale_ == 1 ? GL_NEAREST : GL_LINEAR;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filt);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filt);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenRenderbuffers(1, &r); depth_ = r;
+    glBindRenderbuffer(GL_RENDERBUFFER, r);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, want, want);
+    glGenFramebuffers(1, &f); fbo_ = f;
+    glBindFramebuffer(GL_FRAMEBUFFER, f);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, r);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    texSize_ = want;
+}
+
+void Renderer::bindTarget() { glBindFramebuffer(GL_FRAMEBUFFER, fbo_); }
 
 void Renderer::begin(int vw, int vh, Color c) {
     vw_ = std::min(vw, kFbo); vh_ = std::min(vh, kFbo);
+    ensureTarget();
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    glViewport(0, 0, vw_, vh_);
+    glViewport(0, 0, vw_ * scale_, vh_ * scale_);
     glClearColor(c.r, c.g, c.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     batch_.clear();
@@ -201,7 +252,7 @@ void Renderer::present(int sw, int sh) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glUseProgram(pBlit_);
-    glUniform2f(uUv_, (float)vw_ / kFbo, (float)vh_ / kFbo);
+    glUniform2f(uUv_, (float)(vw_ * scale_) / texSize_, (float)(vh_ * scale_) / texSize_);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, tex_);
     glBindVertexArray(vaoQ_);
@@ -251,7 +302,7 @@ void Renderer::flush2D() {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, vw_, vh_);
+    glViewport(0, 0, vw_ * scale_, vh_ * scale_);
     glUseProgram(p2d_);
     glUniform2f(uSize_, (float)vw_, (float)vh_);
     glBindVertexArray(vao2d_);
@@ -269,29 +320,70 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     const VehicleDef* v = findVehicle(carId);
     if (!v) return M;
     const LowPolyMesh m = buildVehicleMesh(*v);
-    std::vector<float> buf;
-    for (const Tri& t : m.tris) {
-        const Vertex* p[3] = {&m.verts[t.a], &m.verts[t.b], &m.verts[t.c]};
-        float g[3][3];   // (x ileri, y sol, z yukari) -> GL (x, z, -y)
-        for (int k = 0; k < 3; ++k) { g[k][0] = p[k]->x; g[k][1] = p[k]->z; g[k][2] = -p[k]->y; }
-        const float ux = g[1][0] - g[0][0], uy = g[1][1] - g[0][1], uz = g[1][2] - g[0][2];
-        const float vx = g[2][0] - g[0][0], vy = g[2][1] - g[0][1], vz = g[2][2] - g[0][2];
+    // Yuz normalleri disa yonlendirilir (yuz merkezi - yerel merkez; tekerde tekerin merkezi), sonra ayni malzemede
+    // 40 dereceden yumusak komsu yuzlerle ortalanir (kasa puruzsuz, keskin kenarlar korunur)
+    const size_t nt = m.tris.size();
+    std::vector<std::array<float, 3>> fn(nt);
+    for (size_t i = 0; i < nt; ++i) {
+        const Tri& t = m.tris[i];
+        const Vertex &a = m.verts[t.a], &b = m.verts[t.b], &c = m.verts[t.c];
+        const float ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
         float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-        const float l = std::sqrt(nx * nx + ny * ny + nz * nz) + 1e-9f; nx /= l; ny /= l; nz /= l;
-        if (ny < -0.2f) { nx = -nx; ny = -ny; nz = -nz; }     // cift yuzlu: asagi bakan normali cevir
+        const float l = std::sqrt(nx * nx + ny * ny + nz * nz) + 1e-12f; nx /= l; ny /= l; nz /= l;
+        const float cx = (a.x + b.x + c.x) / 3, cy = (a.y + b.y + c.y) / 3, cz = (a.z + b.z + c.z) / 3;
+        const bool wheelPart = t.material == MatTire || t.material == MatRim;
+        const float ox = wheelPart ? 0.0f : cx * 0.5f, oz = (float)(wheelPart ? cz : v->heightM * 0.45);
+        float dx = cx - ox, dy = wheelPart ? cy - (cy > 0 ? 1.0f : -1.0f) * (float)v->widthM * 0.3f : cy, dz = cz - oz;
+        if (wheelPart) dx = 0.0f, dz = 0.0f;                                      // teker: yanak disa
+        if (nx * dx + ny * dy + nz * dz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        fn[i] = {nx, ny, nz};
+    }
+    std::vector<std::vector<int>> adj(m.verts.size());
+    for (size_t i = 0; i < nt; ++i) for (int k : {m.tris[i].a, m.tris[i].b, m.tris[i].c}) adj[k].push_back((int)i);
+    auto gloss = [](int mat) {
+        switch (mat) {
+        case MatPaint: return 1.0f; case MatGlass: return 0.75f; case MatChrome: return 1.0f; case MatRim: return 0.7f;
+        case MatTrim: return 0.25f; case MatPlate: return 0.15f; case MatDark: return 0.05f; case MatTire: return 0.03f;
+        default: return -1.0f;                                                   // far / stop / sinyal: isik yayar
+        }
+    };
+    std::vector<float> buf;
+    buf.reserve(nt * 30);
+    float maxX = 0, maxY = 0;
+    for (const Vertex& p : m.verts) { maxX = std::max(maxX, std::fabs(p.x)); maxY = std::max(maxY, std::fabs(p.y)); }
+    M.halfL = maxX; M.halfW = maxY;
+    for (size_t i = 0; i < nt; ++i) {
+        const Tri& t = m.tris[i];
         float c[3]; materialColor(t.material, m.paintRGB, c);
-        for (int k = 0; k < 3; ++k) buf.insert(buf.end(), {g[k][0], g[k][1], g[k][2], nx, ny, nz, c[0], c[1], c[2]});
+        const float gl = gloss(t.material);
+        const bool smooth = t.material == MatPaint || t.material == MatGlass || t.material == MatTire;
+        for (int k : {t.a, t.b, t.c}) {
+            float n[3] = {fn[i][0], fn[i][1], fn[i][2]};
+            if (smooth) {
+                float sx = 0, sy = 0, sz = 0;
+                for (int j : adj[k]) {
+                    if (m.tris[j].material != t.material) continue;
+                    const float d = fn[j][0] * fn[i][0] + fn[j][1] * fn[i][1] + fn[j][2] * fn[i][2];
+                    if (d > 0.766f) { sx += fn[j][0]; sy += fn[j][1]; sz += fn[j][2]; }
+                }
+                const float l = std::sqrt(sx * sx + sy * sy + sz * sz);
+                if (l > 1e-6f) { n[0] = sx / l; n[1] = sy / l; n[2] = sz / l; }
+            }
+            const Vertex& p = m.verts[k];
+            // (x ileri, y sol, z yukari) -> GL (x, z, -y)
+            buf.insert(buf.end(), {p.x, p.z, -p.y, n[0], n[2], -n[1], c[0], c[1], c[2], gl});
+        }
     }
     GLuint a, b;
     glGenVertexArrays(1, &a); glGenBuffers(1, &b); M.vao = a; M.vbo = b;
     glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
     glBufferData(GL_ARRAY_BUFFER, buf.size() * sizeof(float), buf.data(), GL_STATIC_DRAW);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         glEnableVertexAttribArray(i);
-        glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(i * 3 * sizeof(float)));
+        glVertexAttribPointer(i, i == 3 ? 1 : 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(i * 3 * sizeof(float)));
     }
     glBindVertexArray(0);
-    M.count = (int)buf.size() / 9;
+    M.count = (int)buf.size() / 10;
     return M;
 }
 
@@ -301,15 +393,39 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     if (!M.count) return;
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
-    glViewport((int)x, vh_ - (int)(y + h), (int)w, (int)h);
-    const Mat4 mvp = matMul(proj, matMul(view, model));
+    const int S = scale_;
+    glViewport((int)(x * S), (vh_ - (int)(y + h)) * S, (int)(w * S), (int)(h * S));
     glUseProgram(p3d_);
+    // Kamera konumu (gorunum matrisinin tersinden): yansima ve parlama icin
+    const float* V = view.m;
+    const float ex = -(V[0] * V[12] + V[1] * V[13] + V[2] * V[14]);
+    const float ey = -(V[4] * V[12] + V[5] * V[13] + V[6] * V[14]);
+    const float ez = -(V[8] * V[12] + V[9] * V[13] + V[10] * V[14]);
+    glUniform3f(uEye_, ex, ey, ez);
+    {   // Zemin golgesi: iki kat (yumusak kenar), derinlik yazmadan, alfa karisimi
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
+        glUniform1f(uShadow_, 1.0f);
+        glBindVertexArray(vaoSh_);
+        for (int k = 0; k < 1; ++k) {
+            const float gx = M.halfL * 1.12f, gz = M.halfW * 1.25f;
+            Mat4 sc{}; sc.m[0] = gx; sc.m[5] = 1; sc.m[10] = gz; sc.m[15] = 1; sc.m[13] = 0.015f;
+            const Mat4 mm = matMul(model, sc), mvpS = matMul(proj, matMul(view, mm));
+            glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvpS.m);
+            glUniformMatrix4fv(uModel_, 1, GL_FALSE, mm.m);
+            glUniform1f(uAlpha_, 0.42f);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+        glDepthMask(GL_TRUE); glDisable(GL_BLEND);
+        glUniform1f(uShadow_, 0.0f);
+    }
+    const Mat4 mvp = matMul(proj, matMul(view, model));
     glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
     glUniformMatrix4fv(uModel_, 1, GL_FALSE, model.m);
+    glUniform1f(uAlpha_, 1.0f);
     glBindVertexArray(M.vao);
     glDrawArrays(GL_TRIANGLES, 0, M.count);
     glDisable(GL_DEPTH_TEST);
-    glViewport(0, 0, vw_, vh_);
+    glViewport(0, 0, vw_ * S, vh_ * S);
 }
 
 } // namespace zk

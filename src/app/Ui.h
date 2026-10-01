@@ -1,5 +1,6 @@
 // ZEHRA KINIK - Ortak arayuz yardimcilari (tus, para bicimi)
 #pragma once
+#include <cmath>
 #include "app/Renderer.h"
 
 #include <cctype>
@@ -15,6 +16,21 @@ struct Rect {
     float cy() const { return (y0 + y1) * 0.5f; }
 };
 
+// Arac sergi stüdyosu (garaj / galeri): koyu duvar, zemin, spot isik havuzu ve tavan isik seritleri. floorY: zemin cizgisi
+inline void studio(Renderer& r, float y0, float y1, float floorY) {
+    r.gradientV(0, y0, 360, floorY, {0.07f, 0.08f, 0.11f}, {0.13f, 0.14f, 0.18f});
+    r.gradientV(0, floorY, 360, y1, {0.20f, 0.21f, 0.25f}, {0.10f, 0.10f, 0.13f});
+    for (int k = 0; k < 3; ++k) r.rect(60.0f + k * 90.0f, y0 + 6, 120.0f + k * 90.0f, y0 + 9, {0.85f, 0.88f, 0.95f, 0.5f});   // tavan lambalari
+    const int N = 28;                                                                             // spot havuzu (elips, 3 kat)
+    for (int k = 0; k < 3; ++k) {
+        const float rx = 165.0f - k * 40.0f, ry = (y1 - floorY) * (0.55f - k * 0.13f), cy = floorY + (y1 - floorY) * 0.22f;
+        for (int i = 0; i < N; ++i) {
+            const float a0 = 6.2831853f * i / N, a1 = 6.2831853f * (i + 1) / N;
+            r.tri(180, cy, 180 + rx * std::cos(a0), cy + ry * std::sin(a0), 180 + rx * std::cos(a1), cy + ry * std::sin(a1), {0.75f, 0.78f, 0.85f, 0.06f});
+        }
+    }
+    r.rect(0, floorY, 360, floorY + 1, {0.30f, 0.32f, 0.38f});
+}
 inline void button(Renderer& r, const Rect& b, const std::string& label, Color bg, float scale = 2, Color fg = {1, 1, 1}) {
     r.rect(b.x0, b.y0, b.x1, b.y1, bg);
     r.rect(b.x0, b.y1 - 3, b.x1, b.y1, {bg.r * 0.6f, bg.g * 0.6f, bg.b * 0.6f});   // alt golge
