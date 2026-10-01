@@ -21,7 +21,7 @@ constexpr float kColX[3] = {500, 531, 562};
 constexpr float kRowTop = 266, kRowMid = 303, kRowBot = 340;
 constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 350};
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
-constexpr float kAgain[4] = {170, 262, 310, 296}, kGarage[4] = {330, 262, 470, 296};
+constexpr float kAgain[4] = {120, 262, 250, 296}, kGarage[4] = {260, 262, 390, 296}, kGraph[4] = {400, 262, 520, 296};
 constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekranin solundan 8 m sagda
 
 bool in(const float* r, float x, float y) { return x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]; }
@@ -50,6 +50,7 @@ void DragScreen::restart() {
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
     race_->setOpponentHandicap(app_.activeEvent >= 0 ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
     rewarded_ = false; prize_ = 0;
+    tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;
     knobX_ = kColX[0]; knobY_ = kRowTop; pendingGear_ = 1; pendingPaddle_ = 0;
@@ -103,6 +104,7 @@ void DragScreen::pointerDown(int id, float x, float y) {
     if (ph == RacePhase::Finished && finishedT_ > 1.5) {
         if (in(kAgain, x, y)) { restart(); return; }
         if (in(kGarage, x, y)) { app_.goGarage(); return; }
+        if (in(kGraph, x, y)) { showGraph_ = !showGraph_; return; }
     }
     if (ph == RacePhase::Burnout && in(kStageBtn, x, y)) { race_->skipBurnout(); return; }
     const Ctl c = hit(x, y);
@@ -187,6 +189,17 @@ void DragScreen::update(double dt) {
     pc_.paddle = pendingPaddle_;
     pendingPaddle_ = 0;
     race_->advance(dt, pc_);
+    if (race_->phase() == RacePhase::Run && !race_->lane(0).slip.finished && tel_.size() < 2400) {   // telemetri
+        telT_ += dt; telAcc_ += dt;
+        if (telAcc_ >= 1.0 / 30.0 || tel_.empty()) {
+            telAcc_ = 0;
+            const VehicleSim& ps = *race_->lane(0).sim;
+            double slip = 0;
+            for (int i = 0; i < 4; ++i) { const WheelSimulation& w = ps.wheel(i); if (w.Fz() > 100) slip = std::max(slip, w.omega() * w.rEff() - ps.speed()); }
+            tel_.push_back({(float)telT_, (float)ps.speed(), (float)const_cast<VehicleSim&>(ps).powertrain().rpm(), (float)(race_->lane(1).slip.finished ? -1.0 : race_->lane(1).sim->speed()),
+                            (float)slip, const_cast<VehicleSim&>(ps).powertrain().gear()});
+        }
+    }
     {
         const int g = race_->lane(0).sim->powertrain().gear();
         if (g != lastGear_) { if (lastGear_ > -2) app_.sfxShift(); lastGear_ = g; }
@@ -574,6 +587,7 @@ void DragScreen::drawResults(Renderer& r) {
         char pb[48]; std::snprintf(pb, sizeof pb, "+$%ld", prize_);
         r.text(420, 52, prize_ > 0 ? pb : "$0", 2, prize_ > 0 ? kGreen : Color{0.6f, 0.6f, 0.6f});
     }
+    if (!showGraph_) {
     r.text(250, 80, "SEN", 2, {1, 1, 1});
     r.text(390, 80, "RAKIP", 2, {1.0f, 0.75f, 0.55f});
     auto row = [&](int i, const char* label, const std::string& a, const std::string& o) {
@@ -597,10 +611,61 @@ void DragScreen::drawResults(Renderer& r) {
                         (P.slip.stalled ? "SEN: STOP " : "") + (O.slip.stalled ? "RAKIP: STOP" : "");
         r.textCentered(320, 240, n, 1, kRed);
     }
+    }
+    if (showGraph_) drawGraph(r);
+    r.rect(kGraph[0], kGraph[1], kGraph[2], kGraph[3], showGraph_ ? Color{0.75f, 0.45f, 0.1f} : Color{0.25f, 0.27f, 0.35f});
+    r.textCentered((kGraph[0] + kGraph[2]) / 2, kGraph[1] + 10, showGraph_ ? "ZAMANLAR" : "GRAFIK", 2, {1, 1, 1});
     r.rect(kAgain[0], kAgain[1], kAgain[2], kAgain[3], {0.1f, 0.55f, 0.2f});
     r.textCentered((kAgain[0] + kAgain[2]) / 2, kAgain[1] + 10, "TEKRAR", 2, {1, 1, 1});
     r.rect(kGarage[0], kGarage[1], kGarage[2], kGarage[3], {0.25f, 0.27f, 0.35f});
     r.textCentered((kGarage[0] + kGarage[2]) / 2, kGarage[1] + 10, "GARAJ", 2, {1, 1, 1});
+}
+
+// Telemetri grafigi: oyuncu hizi (beyaz), rakip hizi (turuncu), devir (yesil, ayri eksen), patinaj (kirmizi bant),
+// vites gecisleri (dikey cizgi + vites numarasi). Kalkista patinaj / gec vites / kesicide bekleme gorunur.
+void DragScreen::drawGraph(Renderer& r) {
+    const float x0 = 126, x1 = 514, y0 = 92, y1 = 236;
+    r.rect(x0, y0, x1, y1, {0.07f, 0.08f, 0.11f});
+    r.text(126, 78, "HIZ", 1, {1, 1, 1}); r.text(156, 78, "RAKIP", 1, {1.0f, 0.6f, 0.25f});
+    r.text(200, 78, "DEVIR", 1, {0.35f, 0.9f, 0.4f});
+    if (tel_.size() < 2) { r.textCentered((x0 + x1) / 2, (y0 + y1) / 2, "VERI YOK", 2, kUiDim); return; }
+    const float tMax = std::max(1.0f, tel_.back().t);
+    float vMax = 1, rMax = 1;
+    for (const TelPt& p : tel_) { vMax = std::max({vMax, p.v, p.ov}); rMax = std::max(rMax, p.rpm); }   // ov -1: rakip bitirdi
+    vMax *= 1.08f; rMax *= 1.08f;
+    auto X = [&](float t) { return x0 + (x1 - x0) * t / tMax; };
+    auto Yv = [&](float v) { return y1 - (y1 - y0) * v / vMax; };
+    auto Yr = [&](float rpm) { return y1 - (y1 - y0) * rpm / rMax; };
+    for (int k = 1; k < 4; ++k) r.rect(x0, y0 + (y1 - y0) * k / 4, x1, y0 + (y1 - y0) * k / 4 + 1, {1, 1, 1, 0.06f});
+    for (int s = 1; s < (int)tMax + 1; ++s) r.rect(X((float)s), y0, X((float)s) + 1, y1, {1, 1, 1, 0.05f});
+    auto seg = [&](float ax, float ay, float bx, float by, float w, Color c) {
+        const float dx = bx - ax, dy = by - ay, l = std::max(1e-3f, std::sqrt(dx * dx + dy * dy)), nx = -dy / l * w, ny = dx / l * w;
+        r.tri(ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny, c); r.tri(ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny, c);
+    };
+    for (size_t i = 1; i < tel_.size(); ++i) {
+        const TelPt &a = tel_[i - 1], &b = tel_[i];
+        if (b.slip > 2.5f) r.rect(X(a.t), y0, X(b.t) + 0.5f, y1, {1.0f, 0.2f, 0.15f, std::min(0.35f, 0.08f + b.slip * 0.015f)});
+        if (b.gear != a.gear && b.gear > 0) {
+            r.rect(X(b.t), y0, X(b.t) + 1, y1, {1, 1, 1, 0.25f});
+            char g[4]; std::snprintf(g, sizeof g, "%d", b.gear);
+            r.text(X(b.t) + 2, y0 + 2, g, 1, {1, 1, 1, 0.8f});
+        }
+        seg(X(a.t), Yr(a.rpm), X(b.t), Yr(b.rpm), 0.7f, {0.35f, 0.9f, 0.4f, 0.8f});
+        if (a.ov >= 0 && b.ov >= 0) seg(X(a.t), Yv(a.ov), X(b.t), Yv(b.ov), 0.8f, {1.0f, 0.6f, 0.25f, 0.85f});   // rakip bitisine kadar
+        seg(X(a.t), Yv(a.v), X(b.t), Yv(b.v), 1.1f, {1, 1, 1});
+    }
+    char b[48];
+    const double unitK = app_.settings.speedFactor();                  // m/s -> secili birim
+    std::snprintf(b, sizeof b, "%.0f %s", vMax * unitK, app_.settings.mph ? "MPH" : "KMH");
+    r.text(x0 + 4, y0 + 2, b, 1, kUiDim);
+    std::snprintf(b, sizeof b, "%.1f S", tMax);
+    r.text(x1 - r.textWidth(b, 1), y1 + 3, b, 1, kUiDim);
+    r.text(x0, y1 + 3, "0", 1, kUiDim);
+    // Ozet: kalkis patinaj suresi
+    float spin = 0;
+    for (size_t i = 1; i < tel_.size(); ++i) if (tel_[i].slip > 2.5f) spin += tel_[i].t - tel_[i - 1].t;
+    std::snprintf(b, sizeof b, "PATINAJ %.2f S", spin);
+    r.text(244, 78, b, 1, {1.0f, 0.3f, 0.25f});
 }
 
 void DragScreen::render(Renderer& r) {

@@ -86,6 +86,12 @@ private:
     bool autopilot_ = false;
     bool career_ = false, rewarded_ = false; long prize_ = 0;
     Tune tunes_[2]; bool hasTune_[2] = {false, false};
+    // Telemetri (sonuc ekrani grafigi): yesilden bitise 30 Hz ornek
+    struct TelPt { float t, v, rpm, ov, slip; int gear; };
+    std::vector<TelPt> tel_;
+    double telT_ = 0, telAcc_ = 0;
+    bool showGraph_ = false;
+    void drawGraph(Renderer& r);
     int lastGear_ = -2;                          // vites sesi icin
     // Haptik izleme (onceki kare durumu)
     int  hapGear_ = 1, hapFlat_ = 0; bool hapLeft_ = false, hapBroke_ = false, hapRed_ = false;
