@@ -61,7 +61,7 @@ private:
     void restart();
     void shifterFromPoint(float x, float y, bool release = false);
     void drawWorld(Renderer& r);
-    void drawCarAt(Renderer& r, int lane, float screenX, float groundY, float scale);
+    void drawCarAt(Renderer& r, int lane, float screenX, float groundY, float scale, float alpha = 1.0f);
     void drawHud(Renderer& r);
     void drawResults(Renderer& r);
     Ctl hit(float x, float y) const;
@@ -93,6 +93,9 @@ private:
     bool showGraph_ = false;
     void drawGraph(Renderer& r);
     void adjustLaunch(int delta);                // 2-step kalkis devri (+/- 250)
+    // Hayalet: bu yarista gosterilen onceki en iyi kosu (kopya) + bu kosunun izi
+    std::vector<float> ghost_, run_; double ghostEt_ = 0, runAcc_ = 0; bool ghostSaved_ = false;
+    double ghostTimeAt(double d) const;          // hayaletin d mesafesine vardigi sure (kalkistan)
     int lastGear_ = -2;                          // vites sesi icin
     // Haptik izleme (onceki kare durumu)
     int  hapGear_ = 1, hapFlat_ = 0; bool hapLeft_ = false, hapBroke_ = false, hapRed_ = false;

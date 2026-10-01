@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -106,6 +107,9 @@ public:
     int activeEvent = -1;                        // suren lig etkinligi (-1: yok)
     double eventHandicap = 1.6;                  // etkinlik rakibinin hata payi
     std::string eventNote;                       // lig ekranina donuste gosterilecek not (pink slip vb.)
+    // Drag hayaleti: arac basina en iyi kosunun mesafe izi (kalkistan itibaren 20 Hz), oturum boyunca
+    struct Ghost { std::vector<float> d; double et = 0; };
+    std::map<int, Ghost> ghosts;
     void goRestore();
     int junkSalt = 0;                            // hurdalik teklifleri: alimdan sonra yenilenir
     void goGallery();

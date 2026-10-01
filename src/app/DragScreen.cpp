@@ -53,6 +53,8 @@ void DragScreen::restart() {
     race_->setOpponentHandicap(app_.activeEvent >= 0 ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
+    run_.clear(); runAcc_ = 0; ghostSaved_ = false; ghost_.clear(); ghostEt_ = 0;
+    if (auto it = app_.ghosts.find(carIds_[0]); it != app_.ghosts.end()) { ghost_ = it->second.d; ghostEt_ = it->second.et; }
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;
     knobX_ = kColX[0]; knobY_ = kRowTop; pendingGear_ = 1; pendingPaddle_ = 0;
@@ -210,6 +212,24 @@ void DragScreen::update(double dt) {
     pc_.paddle = pendingPaddle_;
     pendingPaddle_ = 0;
     race_->advance(dt, pc_);
+    {   // Hayalet izi: kalkistan bitise 20 Hz mesafe; bitiste en iyiyse saklanir
+        const LaneState& L0 = race_->lane(0);
+        if (L0.left && !L0.slip.finished && run_.size() < 1200)
+            while (runAcc_ <= race_->clock() - L0.leaveTime) { run_.push_back((float)L0.sim->distance()); runAcc_ += 0.05; }
+        if (L0.slip.finished && !ghostSaved_) {
+            ghostSaved_ = true;
+            const TimeSlip& sl = L0.slip;
+            if (!sl.redLight && !sl.broke && sl.quarter > 0) {
+                App::Ghost& g = app_.ghosts[carIds_[0]];
+                if (g.et <= 0 || sl.quarter < g.et) {
+                    run_.push_back(402.336f);
+                    g.d = run_; g.et = sl.quarter;
+                    ticker_.push_back(ghostEt_ > 0 ? "YENI EN IYI KOSU: HAYALET GUNCELLENDI" : "HAYALET KAYDEDILDI: SONRAKI YARISTA KENDINLE YARIS");
+                    tickerT_ = 3.0;
+                }
+            }
+        }
+    }
     if (race_->phase() == RacePhase::Run && !race_->lane(0).slip.finished && tel_.size() < 2400) {   // telemetri
         telT_ += dt; telAcc_ += dt;
         if (telAcc_ >= 1.0 / 30.0 || tel_.empty()) {
@@ -326,7 +346,16 @@ void DragScreen::update(double dt) {
 }
 
 // ------------------------------------------------------------------ cizim
-void DragScreen::drawCarAt(Renderer& r, int lane, float sx, float groundY, float scale) {
+double DragScreen::ghostTimeAt(double d) const {
+    for (size_t i = 1; i < ghost_.size(); ++i)
+        if (ghost_[i] >= d) {
+            const double a = ghost_[i - 1], b = ghost_[i];
+            return (i - 1 + (b > a ? (d - a) / (b - a) : 0.0)) * 0.05;
+        }
+    return -1;
+}
+
+void DragScreen::drawCarAt(Renderer& r, int lane, float sx, float groundY, float scale, float alpha) {
     const LaneState& L = race_->lane(lane);
     const VehicleDef* v = L.car;
     const float px = kPx * scale;
@@ -336,10 +365,13 @@ void DragScreen::drawCarAt(Renderer& r, int lane, float sx, float groundY, float
     const Mat4 proj = matOrtho(-w / 2 / px, w / 2 / px, bottom, bottom + h / px, -20, 20);
     const Mat4 view = matLookAt(0, 2.2f, 10, 0, 0.9f, 0);
     const Suspension& su = L.sim->suspension();
-    const Mat4 model = matMul(matTranslate(0, (float)su.heave(), 0), matRotZ((float)(su.pitchDeg() * 3.14159265 / 180.0)));
-    if (lane == 0 && career_ && app_.career.car().carId == carIds_[0]) r.setCarLook(lookOf(app_.career.car()));
-    else r.setCarLook(lookOf(hasTune_[lane] ? &tunes_[lane] : nullptr));
+    const Mat4 model = alpha < 1.0f ? matTranslate(0, 0, 0) : matMul(matTranslate(0, (float)su.heave(), 0), matRotZ((float)(su.pitchDeg() * 3.14159265 / 180.0)));
+    Renderer::CarLook lk = lane == 0 && career_ && app_.career.car().carId == carIds_[0] ? lookOf(app_.career.car())
+                                                                                        : lookOf(hasTune_[lane] ? &tunes_[lane] : nullptr);
+    if (alpha < 1.0f) { lk.alpha = alpha; lk.paintOn = true; lk.paint[0] = 0.55f; lk.paint[1] = 0.85f; lk.paint[2] = 1.0f; lk.stripe = 0; }
+    r.setCarLook(lk);
     r.drawCar(v->id, sx - w / 2, y, w, h, proj, view, model);
+    if (alpha < 1.0f) return;                                            // hayalet: alev yok
 
     // Egzoz alevi: devir kesici / dogbox atesleme kesme
     const PowertrainCore& pt = L.sim->powertrain();
@@ -717,9 +749,26 @@ void DragScreen::render(Renderer& r) {
         }
     };
     drawSmoke(1);
+    const LaneState& L0 = race_->lane(0);
+    if (!ghost_.empty() && L0.left) {                                    // hayalet: onceki en iyi kosu (yari saydam, mavi)
+        const double t = race_->clock() - L0.leaveTime;
+        const size_t i = std::min(ghost_.size() - 1, (size_t)(t / 0.05));
+        const double f = std::clamp(t / 0.05 - i, 0.0, 1.0);
+        const double gd = i + 1 < ghost_.size() ? ghost_[i] + (ghost_[i + 1] - ghost_[i]) * f : ghost_.back();
+        const float gx = playerSx + (float)(gd - L0.sim->distance()) * kPx;
+        if (gx > -150 && gx < 790 && std::fabs(gx - playerSx) > 4.0f) drawCarAt(r, 0, gx, kNearGround, 1.0f, 0.32f);
+    }
     drawCarAt(r, 0, playerSx, kNearGround, 1.0f);
     drawSmoke(0);
     drawHud(r);
+    if (!ghost_.empty() && L0.left && !L0.slip.finished) {               // hayalete gore anlik fark
+        const double tg = ghostTimeAt(L0.sim->distance());
+        if (tg >= 0) {
+            const double dt = (race_->clock() - L0.leaveTime) - tg;
+            char b[48]; std::snprintf(b, sizeof b, "HAYALET %+.2f", dt);
+            r.textCentered(440, 98, b, 2, dt <= 0 ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.4f, 0.3f});
+        }
+    }
     if (race_->phase() == RacePhase::Finished && finishedT_ > 1.5) drawResults(r);
     r.flush2D();
 }

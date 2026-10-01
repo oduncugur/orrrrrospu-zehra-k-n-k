@@ -196,7 +196,7 @@ vec3 sky(vec3 r){ float y = r.y;
 void main(){
   if (uShadow > 0.5) { float d = length(max(abs(vL) - vec2(0.55), 0.0)) / 0.45;   // yuvarlatilmis dikdortgen, yumusak kenar
     o = vec4(0.0, 0.0, 0.0, uAlpha * (1.0 - smoothstep(0.0, 1.0, d))); return; }
-  if (vGloss < 0.0) { o = vec4(vCol, 1.0); return; }
+  if (vGloss < 0.0) { o = vec4(vCol, uAlpha); return; }
   vec3 n = normalize(vN); vec3 v = normalize(uEye - vP);
   if (dot(n, v) < 0.0) n = -n;
   vec3 col = vCol; float g = vGloss;
@@ -217,7 +217,7 @@ void main(){
   c = mix(c, sky(reflect(-v, n)) * uLight.y, clamp(g * (0.06 + 0.55 * fr), 0.0, 0.6));
   vec3 h = normalize(l + v);
   c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), g > 0.5 ? 70.0 : 12.0) * g * 0.9 * uLight.x;
-  o = vec4(min(c, vec3(1.0)), 1.0); })";
+  o = vec4(min(c, vec3(1.0)), uAlpha); })";
 const char* kVs2D = R"(layout(location=0) in vec2 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
 void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); })";
 const char* kFs2D = R"(precision mediump float; in vec4 vCol; out vec4 o; void main(){ o = vCol; })";
@@ -593,7 +593,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     glUniform4f(uRim_, look.rim[0], look.rim[1], look.rim[2], look.rimOn ? 1.0f : 0.0f);
     glUniform4f(uStripe_, look.stripeCol[0], look.stripeCol[1], look.stripeCol[2], (float)look.stripe);
     glUniform2f(uPG_, look.paintGloss, M.rearTop * 0.62f);
-    {   // Zemin golgesi: iki kat (yumusak kenar), derinlik yazmadan, alfa karisimi
+    if (look.alpha >= 1.0f) {   // Zemin golgesi: iki kat (yumusak kenar), derinlik yazmadan, alfa karisimi
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
         glUniform1f(uShadow_, 1.0f);
         glBindVertexArray(vaoSh_);
@@ -613,7 +613,8 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     const Mat4 mvp = matMul(proj, matMul(view, body));
     glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
     glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
-    glUniform1f(uAlpha_, 1.0f);
+    glUniform1f(uAlpha_, look.alpha);
+    if (look.alpha < 1.0f) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
     if (look.aero > 0) {
         const Mesh& K = kitMesh(carId, look.aero, look.wingH);
         if (K.count) { glBindVertexArray(K.vao); glDrawArrays(GL_TRIANGLES, 0, K.count); }
@@ -639,6 +640,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
             glDrawArrays(GL_TRIANGLES, M.wheels.back().first + M.wheels.back().count, rest);
         }
     } else glDrawArrays(GL_TRIANGLES, 0, M.count);
+    if (look.alpha < 1.0f) { glDisable(GL_BLEND); glUniform1f(uAlpha_, 1.0f); }
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, vw_ * S, vh_ * S);
 }

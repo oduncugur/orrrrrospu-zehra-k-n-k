@@ -69,6 +69,7 @@ public:
         int aero = 0;                           // aeroTable indeksi (1 on lip, 2 yan etek, 3 spoiler, 4 ducktail, 5 GT, 6 yaris, 7 difuzor, 9 ozel)
         float wingH = 0.3f;                     // ozel kanat yuksekligi (m)
         float drop = 0.0f;                      // govde alcalmasi (m; teker yerinde kalir)
+        float alpha = 1.0f;                     // < 1: yari saydam (drag hayaleti); golge cizilmez
     };
     void setCarLook(const CarLook& l) { look_ = l; }
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,
