@@ -167,3 +167,53 @@ birlikte, parça parça eklenir. Her madde fizikte gerçek bir etkiyle gelir ve 
 - [ ] Sokak yasallığı: egzoz gürültüsü, nitro, slick → polis/muayene cezası (Faz 6), "pist araçları" romorkla
 - [ ] Parça aşınması ve ömrü (turbo, debriyaj, lastik), bakım/tamir maliyeti, arızalı parça
 - [ ] Dyno ayar oturumu: harita ince ayarı, güç kazanımı ↔ risk
+
+---
+
+# KULLANICI GERİ BİLDİRİMİ — ÖNCELİKLİ (2026-10-02, oyun testinden)
+## Hatalar / his
+- [ ] **H-desen kol ile gerçek vites ayrışıyor (hata):** debriyajsız vites denenince kol 5'e gidiyor ama vites girmiyor
+      (çıtırtı). Araç düşük viteste kalıyor ("5'te ama hız transferi yok, viraja 1. viteste gibi giriyor"); debriyaja
+      basınca 5 aniden giriyor. Çözüm: vites girmezse kol gerçek vitese geri sekmeli (+ titreşim, "DEBRİYAJ!"),
+      kol her zaman gerçek vitesi göstermeli; vites göstergesi ile kol çelişmemeli.
+- [ ] **Karma: virajlı bölüme geçiş çok ani, fren mesafesi yok.** Çözüm: viraj öncesi hıza göre yaklaşım mesafesi
+      (v²/2a + pay; 200 km/h'te ~350-450 m), "VİRAJ 300/200/100 M" levhaları ve HUD uyarısı, kamera geçişinin
+      fren noktasından önce bitmesi, viraj girişinde önerilen hız göstergesi.
+- [ ] Karma: hız hissi (drag görünümünde arka plan paralaksı, rüzgâr sesi, hız çizgileri); vites/hız aktarımı hissi.
+## Arayüz / ekonomi
+- [ ] **Parça satın alma önizleme + onay:** ilk dokunuş = önizleme (yeni HP/Nm, tahmini 1/4 mil, aks riski, ağırlık
+      farkı, dyno eğrisi karşılaştırması); ikinci dokunuş = "SATIN AL $X?" onayı; geri al/iptal.
+- [ ] **Araç satma:** şu an yalnız galeride, yalnız seçili araç ve ancak 2+ araç varken (onaysız). Eklenecek:
+      garajdan sat, satış fiyatı dökümü (araç + parçalar - hasar), onay penceresi, ikinci el pazarı/açık artırma.
+
+# MODİFİYE DERİNLİĞİ — "THE STRIP" SEVİYESİ VE ÖTESİ
+Kaynak: https://www.thestrip.io/ ve App Store sayfası (300+ araç, 5 seviye, gerçek debriyaj/vites/gaz;
+"any crate engine or machine-shop build fits any car"; ayar: vites, son dişli, lastik, boost, NOS, süspansiyon,
+ECU haritası; garaj yakıt, ağırlık, yağ, motor aşınması, hasar hatırlar). Hedef: en az bu kadar, fizikte gerçek.
+## Motor atölyesi
+- [ ] **Hazır (crate) motor**: katalog motorlarını kutudan satın al, her araca tak (takoz/kablaj kiti ücreti)
+- [ ] **Atölye yapımı motor (machine shop)**: blok + kapak + krank + biyel + piston + kam + supap + emme manifoldu
+      ayrı ayrı seçilir; her parçanın "en iyi olabileceği" bir değer var, kurulum kalitesi tezgâh işçiliğine bağlı
+      (rastgele ama ustalık/zamanla iyileşen dağılım). Toleranslar → güç, devir sınırı, ömür.
+- [ ] Motor aşınması ve revizyon (var: yatak hasarı) + kompresyon testi, yağ seviyesi/kalitesi, ısınma
+## Aşırı besleme / yakıt / ECU
+- [ ] Turbo boyutu + A/R, twin/sıralı, wastegate yayı, boost kontrolcü (vitese göre boost), BOV, intercooler
+- [ ] Kompresör tipleri, kasnak çapı (boost)
+- [ ] Nitro: jet boyutu (shot +HP), kademeli, şişe basıncı/ısıtıcısı, tetikleme devri/vitesi, dolum ücreti
+- [ ] ECU haritası: AFR, avans, boost hedefi, devir sınırı, launch devri, vites kesici (flat-shift), anti-lag
+## Aktarma / şasi / lastik
+- [ ] Her vites oranı ayrı, son dişli (var), debriyaj (var) + hafif volan
+- [ ] Süspansiyon: ön/arka sertlik, amortisör (drag'de ağırlık aktarımı), yükseklik, wheelie bar
+- [ ] Lastik: tip (var), genişlik, basınç (var), ısıtma (burnout var), drag radial
+## Garaj durumu (The Strip'teki gibi kalıcı)
+- [ ] Yakıt seviyesi (ağırlık + benzinlik/pit), yağ seviyesi, motor aşınması, kaporta hasarı, parça aşınması
+- [ ] Pit stop: yakıt, yağ, nitro dolumu, lastik değişimi
+## Ekonomi / araç edinme (The Strip'ten esinle)
+- [ ] Çekilmiş araç otoparkı / açık artırma, hurdadan araç alıp restore etme (parça parça), ikinci el parça
+- [ ] Pink slip (+ 24 saat geri alma hakkı), bahisli yarış
+## İlerleme / modlar (The Strip'ten esinle)
+- [ ] Hikâye: bölgeler ve isimli rakipler, turnuvalar, "çağrı" (call-out) yarışları, prestij (sıfırla, kalıcı ün)
+- [ ] Hayalet yarış, günün pisti, sınıf bazlı merdiven (Faz 7 ile çevrim içi)
+## Kontrol / arayüz seçenekleri (The Strip'te olanlar)
+- [ ] Pedal düzeni sol/sağ el seçimi, gösterge stili (klasik ibreli / dijital), vites geçişinde titreşim (var: haptik)
+- [ ] CVT şanzıman tipi; oyun kolu tuş atama
