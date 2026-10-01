@@ -349,8 +349,8 @@ void Renderer::present(int sw, int sh) {
     glViewport(0, 0, sw, sh);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    const float sc = scaleFor(sw, sh);
-    const int w = (int)(vw_ * sc), h = (int)(vh_ * sc);
+    float sx, sy; scaleXY(sw, sh, sx, sy);
+    const int w = (int)(vw_ * sx), h = (int)(vh_ * sy);
     glViewport((sw - w) / 2, (sh - h) / 2, w, h);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
@@ -367,10 +367,19 @@ float Renderer::scaleFor(int sw, int sh) const {
     return integerScale && sc >= 1.0f ? std::floor(sc) : sc;   // pencere sanal tampondan kucukse kesirli kalir
 }
 
+void Renderer::scaleXY(int sw, int sh, float& sx, float& sy) const {
+    sx = sy = scaleFor(sw, sh);
+    if (!fillScreen || integerScale) return;
+    sx = (float)sw / vw_; sy = (float)sh / vh_;                         // gerilerek doldur
+    const float kMax = 1.35f;                                           // asiri en-boy farkinda yine bant
+    if (sx > sy * kMax) sx = sy * kMax;
+    if (sy > sx * kMax) sy = sx * kMax;
+}
+
 void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y) const {
-    const float sc = scaleFor(sw, sh);
-    const float w = vw_ * sc, h = vh_ * sc;
-    x = (px - (sw - w) * 0.5f) / sc; y = (py - (sh - h) * 0.5f) / sc;
+    float sx, sy; scaleXY(sw, sh, sx, sy);
+    const float w = vw_ * sx, h = vh_ * sy;
+    x = (px - (sw - w) * 0.5f) / sx; y = (py - (sh - h) * 0.5f) / sy;
 }
 
 void Renderer::tri(float ax, float ay, float bx, float by, float cx, float cy, Color c) {

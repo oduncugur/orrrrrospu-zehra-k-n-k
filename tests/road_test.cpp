@@ -236,6 +236,33 @@ int main() {
             CHECK(rs.prizeScale() > 1.5 && rs.prizeScale() <= 2.5, "karma odulu mesafeyle olceklenir");
         }
     }
+    std::printf("[9] Polis kovalamacasi: duran yakalanir, hizli giden kacar\n");
+    {
+        Tune t;
+        {   // oyuncu kalkmaz: polis gelir, yakalanir
+            RoadSession rs(RoadSession::Mode::Chase, 5, &t, 5, &t, 7u);
+            double t0 = 0;
+            while (rs.phase() != RoadSession::Phase::Finished && t0 < 90.0) { RoadControls c; c.brake = 1.0; rs.update(1.0 / 60.0, c); t0 += 1.0 / 60.0; }
+            std::printf("    duran oyuncu: %.1f s, yakalanma %.2f\n", t0, rs.bustLevel());
+            CHECK(rs.phase() == RoadSession::Phase::Finished && !rs.playerWon(), "duran oyuncu yakalanir");
+        }
+        {   // oyuncu cok daha guclu arac (#78), polis #5: kacmali
+            RoadSession rs(RoadSession::Mode::Chase, 78, &t, 5, &t, 7u);
+            double t0 = 0;
+            while (rs.phase() != RoadSession::Phase::Finished && t0 < 400.0) { rs.update(1.0 / 60.0, rs.player().aiControls(-rs.lane(), 0.6)); t0 += 1.0 / 60.0; }
+            std::printf("    guclu arac: %.1f s, fark %.0f m, sonuc %s\n", t0, rs.gapMeters(), rs.playerWon() ? "KACTI" : "YAKALANDI");
+            CHECK(rs.phase() == RoadSession::Phase::Finished && rs.playerWon(), "guclu arac kacar");
+        }
+        {   // ayni arac: polis takip eder (oyuncu YZ ile surse bile polis 400 m'den fazla geride kalmaz ilk 20 s)
+            RoadSession rs(RoadSession::Mode::Chase, 227, &t, 227, &t, 7u);
+            double t0 = 0, maxGap = -1e9;
+            while (t0 < 23.0 && rs.phase() != RoadSession::Phase::Finished) {
+                rs.update(1.0 / 60.0, rs.player().aiControls(-rs.lane(), 0.55)); t0 += 1.0 / 60.0; maxGap = std::max(maxGap, rs.gapMeters());
+            }
+            std::printf("    ayni arac 20 s: en buyuk fark %.0f m\n", maxGap);
+            CHECK(maxGap < RoadSession::kEscapeGap, "esit arac: polis yakin takip eder");
+        }
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

@@ -35,6 +35,7 @@ public:
     int  vw() const { return vw_; }
     int  vh() const { return vh_; }
     bool integerScale = false;         // ekrana tam sayi katla olcekle (piksel-keskin; kenarlarda bant kalabilir)
+    bool fillScreen = false;           // ekrani doldur: en-boy farki %35'e kadar gerilir (siyah bant yok)
     // Ic cozunurluk carpani: 1 = retro (sanal piksel), 2-3 = keskin 3B ve kenarlar (2D koordinatlar degismez)
     void setRenderScale(int s) { scale_ = s < 1 ? 1 : s > 3 ? 3 : s; }
     int  renderScale() const { return scale_; }
@@ -77,6 +78,7 @@ public:
 
 private:
     float scaleFor(int screenW, int screenH) const;
+    void scaleXY(int screenW, int screenH, float& sx, float& sy) const;   // doldurmada eksenler ayri
     struct WheelDraw { float cx, cy, cz; int first, count; };
     struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels;
                   float rearX = -2, frontX = 2, rearTop = 1.0f; unsigned paint = 0xC0C0C0; };

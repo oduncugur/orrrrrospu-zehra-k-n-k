@@ -34,6 +34,7 @@ struct Platform {
     float tiltLp = 0.0f;
     int rotation = 0;                // ekran donusu (Surface.ROTATION_0..270): egim ekseni buna gore
     bool rotationDirty = true;
+    int surfW = 0, surfH = 0;                // son bilinen yuzey boyutu
     bool running = false;
     int swapInterval = -99;          // uygulanan dikey esitleme (-99: henuz yok; yeni EGL yuzeyinde yeniden)
 };
@@ -364,6 +365,12 @@ void android_main(android_app* app) {
         static int rotFrames = 0;
         if (++rotFrames >= 30) { rotFrames = 0; p.rotationDirty = true; }
         if (p.rotationDirty) { p.rotation = queryRotation(jni); p.rotationDirty = false; }
+        {   // Donuste CONFIG_CHANGED eski boyutu verebiliyor: yuzey boyutu her karede okunur, degisince uyarlanir
+            EGLint w = 1, h = 1;
+            eglQuerySurface(p.dpy, p.surf, EGL_WIDTH, &w);
+            eglQuerySurface(p.dpy, p.surf, EGL_HEIGHT, &h);
+            if (w != p.surfW || h != p.surfH) { p.surfW = w; p.surfH = h; p.game->resize(w, h); }
+        }
         p.game->update(dt);
         p.game->render();
         applySwapInterval(p);

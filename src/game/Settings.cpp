@@ -51,6 +51,7 @@ std::string Settings::serialize() const {
     o << "show_fps=" << (showFps ? 1 : 0) << "\n";
     o << "fullscreen=" << (fullscreen ? 1 : 0) << "\n";
     o << "integer_scale=" << (integerScale ? 1 : 0) << "\n";
+    o << "fill_screen=" << (fillScreen ? 1 : 0) << "     # 1: ekrani doldur (gerilir), 0: siyah bantla sigdir\n";
     o << "render_scale=" << renderScale << "\n";
     o << "language=" << language << "\n";
     o << "hints_seen=" << hintsSeen << "      # ilk giris ipuclari (0: hepsini yeniden goster)\n";
@@ -88,6 +89,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "show_fps") s.showFps = v != 0;
         else if (k == "fullscreen") s.fullscreen = v != 0;
         else if (k == "integer_scale") s.integerScale = v != 0;
+        else if (k == "fill_screen") s.fillScreen = v != 0;
         else if (k == "render_scale") s.renderScale = std::clamp(v, 1, 3);
         else if (k == "language") s.language = std::clamp(v, 0, 12);
         else if (k == "hints_seen") s.hintsSeen = std::max(0, v);

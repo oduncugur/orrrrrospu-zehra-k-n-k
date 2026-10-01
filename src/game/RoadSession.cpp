@@ -20,9 +20,19 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     if (mode == Mode::Karma) road_.setWidthRange(seed, 3.4, 5.4);
     else if (kind == Kind::Touge) road_.setWidthRange(seed + 17u, 2.7, 3.5);
     else road_.setWidthRange(seed + 31u, 3.3, 6.2);
-    startS_ = kStartS;
+    startS_ = mode == Mode::Chase ? 90.0 : kStartS;
     rivalLane_ = -lane();
     player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, -lane());
+    if (mode == Mode::Chase) {
+        // Polis 55 m arkada, karsi seritte baslar (kalkista carpismasin); tam debriyaj, keskin viraj temposu
+        rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_ - 55.0, +lane());
+        rivalLane_ = +lane();
+        rivalPace_ = 0.64;
+        const EngineSpec& e = rival_->sim().engineSpec();
+        rival_->launchRpm = std::max(e.idleRpm + 800.0, 0.30 * e.redlineRpm);   // kalkis: drag devri
+        phase_ = Phase::Countdown; countdown_ = 3.0;
+        msgs_.push_back("POLIS! KAC!");
+    }
     if (mode == Mode::Race || mode == Mode::Karma) {
         // Rakip yan seritte, ayni cizgide
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
@@ -45,7 +55,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     }
     // Trafik: yol boyunca araclar (sag seritte yavas, karsi seritte gelen). Akis modunda yogun.
     const auto& cat = vehicleCatalog();
-    const int nTraffic = mode == Mode::Karma ? 0 : kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : 14;   // karma: kapali yol
+    const int nTraffic = mode == Mode::Karma ? 0 : kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : mode == Mode::Chase ? 18 : 14;   // karma: kapali yol
     const double spacing = mode == Mode::Flow ? 70.0 : 170.0;
     for (int i = 0; i < nTraffic; ++i) {
         TrafficCar t{};
@@ -133,6 +143,42 @@ RoadControls RoadSession::rivalControls() {
     return r.aiControls(rivalLane_, pace, cap);
 }
 
+// Polis: oyuncunun seridini izler (yolda kalarak), onunde trafik varsa diger seride gecer; uzaksa tam tempo
+RoadControls RoadSession::chaseControls() {
+    RoadCar& r = *rival_;
+    const double s = r.s(), v = r.sim().speed();
+    const double hw = road_.halfWidthAt(s);
+    // Hiz kazanana kadar kendi seridinde kalir (dururken serit degistirmek kalkisi bogar)
+    const double near = player_->s() - s;
+    double target = v < 15.0 && near > 45.0 ? rivalLane_ : std::clamp(player_->lateral(), -hw + 1.1, hw - 1.1);
+    auto blocked = [&](double lat) {
+        for (const TrafficCar& t : traffic_)
+            if (std::fabs(t.lane - lat) < 2.2 && t.s > s - 3.0 && t.s - s < 18.0 + 1.1 * v) return true;
+        return false;
+    };
+    if (blocked(target)) target = blocked(-lane()) ? +lane() : -lane();
+    rivalLane_ += std::clamp(target - rivalLane_, -2.5 * 0.05, 2.5 * 0.05) * 4.0;   // yumusak serit degisimi
+    const double gap = player_->s() - s;
+    const double pace = (gap > 120.0 ? 0.74 : rivalPace_) * (rain_ ? 0.88 : 1.0);
+    return r.aiControls(rivalLane_, pace);
+}
+
+void RoadSession::updateChase(double dt) {
+    if (phase_ != Phase::Run) return;
+    const double gap = player_->s() - rival_->s();
+    const double latD = std::fabs(player_->lateral() - rival_->lateral());
+    const double pv = player_->sim().speed();
+    // Yakalanma: polis dibinde (12 m) ve oyuncu yavas -> dolar; temas ani artis; uzaklasinca azalir
+    if (gap < 12.0 && gap > -6.0 && latD < 3.5) bust_ += dt * (pv < 6.0 ? 0.45 : pv < 14.0 ? 0.18 : 0.06);
+    else if (gap > 25.0) bust_ -= dt * 0.12;
+    if (contactKick_ > 0) { bust_ += std::min(0.35, 0.06 + contactKick_ * 0.03); contactKick_ = 0; }
+    bust_ = std::clamp(bust_, 0.0, 1.0);
+    escapeT_ = gap > kEscapeGap ? escapeT_ + dt : std::max(0.0, escapeT_ - dt * 2.0);
+    const bool end = player_->s() >= startS_ + raceLength();
+    if (bust_ >= 1.0) { winner_ = 1; phase_ = Phase::Finished; finishT_[0] = raceT_; msgs_.push_back("YAKALANDIN!"); }
+    else if (escapeT_ >= kEscapeHold || end) { winner_ = 0; phase_ = Phase::Finished; finishT_[0] = raceT_; msgs_.push_back("KACTIN!"); }
+}
+
 void RoadSession::update(double dt, const RoadControls& in) {
     dt = std::min(dt, 0.05);
     // Trafik hareketi + geri donusum (oyuncunun etrafinda ~1.5 km pencere)
@@ -196,7 +242,8 @@ void RoadSession::update(double dt, const RoadControls& in) {
     }
     if (mode_ == Mode::Karma && raceT_ < rivalReact_) {                 // rakip tepki suresi: henuz yesili gormedi
         RoadControls rh; rh.brake = 1.0; rh.throttle = 0.3; rival_->update(dt, rh);
-    } else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
+    } else if (mode_ == Mode::Chase) rival_->update(dt, phase_ == Phase::Run ? chaseControls() : RoadControls{0, 0, 0.6});
+    else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
     collide(*rival_, false);
     // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h)
@@ -208,10 +255,12 @@ void RoadSession::update(double dt, const RoadControls& in) {
         if (c.touching && !touching_ && c.closingSpeed > 0.5) {
             msgs_.push_back(c.closingSpeed > 6.0 ? "SERT TEMAS!" : "TEMAS!");
             crashEv_ = true;
+            if (mode_ == Mode::Chase) contactKick_ = c.closingSpeed;
         }
         touching_ = c.touching;
     }
     if (phase_ == Phase::Run || phase_ == Phase::Finished) raceT_ += (phase_ == Phase::Run) ? dt : 0.0;
+    if (mode_ == Mode::Chase) { updateChase(dt); return; }
     if (mode_ == Mode::Karma && reaction_ < 0 && player_->s() > startS_ + 0.3) {       // tepki: arac ~30 cm ilerledi
         reaction_ = raceT_;
         char m[48]; std::snprintf(m, sizeof m, "TEPKI %.3f S", reaction_);

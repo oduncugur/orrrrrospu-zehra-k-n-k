@@ -37,11 +37,11 @@ void RoadScreen::setupLayout() {
     W = land_ ? 640 : 360; H = land_ ? 360 : 640;
     if (land_) {
         free_ = {90, 100, 314, 146}; flow_ = {326, 100, 550, 146}; race_ = {90, 156, 314, 202}; touge_ = {326, 156, 550, 202};
-        karma_ = {90, 212, 550, 258};
+        karma_ = {90, 212, 314, 258}; chase_ = {326, 212, 550, 258};
         assistBtn_ = {470, 2, 576, 34}; tiltBtn_ = {362, 2, 466, 34};
     } else {
         free_ = {40, 186, 320, 234}; flow_ = {40, 244, 320, 292}; race_ = {40, 302, 320, 350}; touge_ = {40, 360, 320, 408};
-        karma_ = {40, 418, 320, 466};
+        karma_ = {40, 418, 320, 466}; chase_ = {40, 476, 320, 524};
         assistBtn_ = {252, 4, 356, 26}; tiltBtn_ = {252, 30, 356, 52};
     }
     cockpit_.setPortrait(!land_);
@@ -56,7 +56,8 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
         const std::string n = m;
-        start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : n == "karma" ? RoadSession::Mode::Karma : RoadSession::Mode::Race,
+        start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : n == "karma" ? RoadSession::Mode::Karma
+              : n == "chase" ? RoadSession::Mode::Chase : RoadSession::Mode::Race,
               n == "touge" ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
     }
     else if (autopilot_) start(RoadSession::Mode::Free);
@@ -73,7 +74,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
 
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
-    if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma) {
+    if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma || m == RoadSession::Mode::Chase) {
         const Opponent o = app_.activeEvent >= 0 ? app_.lastOpp : app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
         app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
@@ -119,6 +120,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     flash(m == RoadSession::Mode::Free ? "SERBEST SURUS"
           : m == RoadSession::Mode::Flow ? "OTOBAN AKISI: YAKIN GEC, HIZLI GIT"
           : m == RoadSession::Mode::Karma ? "KARMA: DUZDE DRAG, VIRAJDA SURUS"
+          : m == RoadSession::Mode::Chase ? "POLIS! 400 M ACIL VE TUT"
           : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM" : "YOL YARISI 4 KM", 2.5);
 }
 
@@ -137,6 +139,7 @@ void RoadScreen::finishRace() {
         else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
     }
     else if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
+    else if (ses_->mode() == RoadSession::Mode::Chase) prize_ = app_.career.recordChase(ses_->playerWon(), ses_->collisions());
     else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
                                                          ses_->prizeScale() * (app_.lastOpp.estEt > 0 && app_.lastOpp.playerEt > 0 ? prizeDifficulty(app_.lastOpp.playerEt - app_.lastOpp.estEt) : 1.0));
     else return;
@@ -259,6 +262,7 @@ void RoadScreen::update(double dt) {
         const double d = std::hypot(rv->sim().posX() - P.sim().posX(), rv->sim().posY() - P.sim().posY());
         PowertrainCore& rp = rv->sim().powertrain();
         app_.voice(1, rp.rpm(), rp.throttleEffective(), rp.limiterHit(), rp.gear() > 0, (float)std::clamp(8.0 / (d + 8.0), 0.0, 0.8));
+        app_.siren(ses_->mode() == RoadSession::Mode::Chase && ses_->phase() != RoadSession::Phase::Finished ? (float)std::clamp(25.0 / (d + 25.0), 0.05, 1.0) : 0.0f);
         app_.tire(1, 0.0);
     } else app_.tire(1, 0.0);
     if (std::getenv("ZK_ROAD_LOG")) { static double t = 0, nx = 0; t += dt; if (t >= nx) { nx += 0.5;
@@ -302,21 +306,22 @@ void RoadScreen::spawnSmoke(const RoadCar& car, double dt) {
 
 void RoadScreen::drawMenu(Renderer& r) {
     r.gradientV(0, 0, W, H, {0.10f, 0.12f, 0.2f}, {0.05f, 0.05f, 0.07f});
-    const float ty = land_ ? 30 : 110, by = karma_.y1;                   // baslik / dugmelerin alti
+    const float ty = land_ ? 30 : 110, by = chase_.y1;                   // baslik / dugmelerin alti
     r.textCentered(W / 2.0f, ty, "ACIK YOL", 4, {1.0f, 0.62f, 0.05f});
     r.textCentered(W / 2.0f, ty + 40, "ARA TASLAK", 1, {0.6f, 0.6f, 0.65f});
     button(r, free_, "SERBEST SURUS", Color{0.15f, 0.45f, 0.7f}, 2);
     button(r, flow_, "OTOBAN AKISI 2 DK", Color{0.1f, 0.5f, 0.35f}, 2);
     button(r, race_, "YOL YARISI 4 KM", kUiOrange, 2);
     button(r, touge_, "DAG YOLU 3 KM", Color{0.55f, 0.2f, 0.6f}, 2);
-    button(r, karma_, "KARMA: DRAG + VIRAJ", Color{0.7f, 0.15f, 0.15f}, 2);
+    button(r, karma_, land_ ? "KARMA" : "KARMA: DRAG + VIRAJ", Color{0.7f, 0.15f, 0.15f}, 2);
+    button(r, chase_, "POLIS KACIS", Color{0.12f, 0.2f, 0.55f}, 2);
     r.textCentered(W / 2.0f, by + 18, "AKIS: YAKIN GECIS + HIZ + VIRAJ = SKOR", 1, {0.7f, 0.7f, 0.75f});
     r.textCentered(W / 2.0f, by + 30, "YARISLAR: RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
     if (app_.career.bestFlow > 0)
         r.textCentered(W / 2.0f, by + 46, "AKIS REKORU " + money(app_.career.bestFlow).substr(1), 2, kUiGold);
 #ifndef __ANDROID__
-    r.textCentered(W / 2.0f, by + 74, land_ ? "BOSLUK SERBEST  PGDN AKIS  ENTER YARIS  PGUP DAG  1 KARMA"
-                                            : "BOSLUK SERBEST PGDN AKIS ENTER YARIS PGUP DAG 1 KARMA", 1, {0.55f, 0.75f, 1.0f});
+    r.textCentered(W / 2.0f, by + 74, land_ ? "BOSLUK SERBEST  PGDN AKIS  ENTER YARIS  PGUP DAG  1 KARMA  2 POLIS"
+                                            : "BOSLUK SERBEST PGDN AKIS ENTER YARIS PGUP DAG 1 KARMA 2 POLIS", 1, {0.55f, 0.75f, 1.0f});
 #endif
 }
 
@@ -688,7 +693,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu. z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim
-    struct Obj { double d, x, y, psi, z, pitch; int id; float spin = 0, steer = 0; };
+    struct Obj { double d, x, y, psi, z, pitch; int id; float spin = 0, steer = 0; bool police = false; };
     auto carModel = [](double x, double y, double z, double psi, double pitch) {
         return matMul(matMul(matTranslate((float)x, (float)z, (float)-y), matRotY((float)psi)), matRotZ((float)std::atan(pitch)));
     };
@@ -706,12 +711,33 @@ void RoadScreen::drawWorld(Renderer& r) {
         Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId(),
               (float)spinR_, (float)std::clamp(std::atan(rs.yawRate() * rs.vehicleLoad().wheelbase / std::max(rs.speed(), 3.0)), -0.5, 0.5)};
         o.d = (o.x - ex) * dx + (o.y - ey) * dy;
+        o.police = ses_->mode() == RoadSession::Mode::Chase;
         if (o.d > 2 && o.d < 340) objs.push_back(o);
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
         if (o.d < 3.0) continue;                                   // kameraya cok yakin / arkasinda
+        if (o.police) {
+            Renderer::CarLook pl; pl.paintOn = true; pl.paint[0] = pl.paint[1] = pl.paint[2] = 0.93f;
+            pl.stripe = 3; pl.stripeCol[0] = 0.08f; pl.stripeCol[1] = 0.12f; pl.stripeCol[2] = 0.45f;
+            r.setCarLook(pl);
+        }
         r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch), o.spin, o.steer);
+        if (o.police) {                                            // tepe lambasi: kirmizi / mavi donusumlu
+            const VehicleDef* pv = findVehicle(o.id);
+            const double hz = o.z + pv->heightM + 0.08;
+            const bool ph = std::fmod(envT_ * 5.0, 1.0) < 0.5;
+            for (int side = -1; side <= 1; side += 2) {
+                const double lx = o.x - side * 0.35 * std::sin(o.psi), ly = o.y + side * 0.35 * std::cos(o.psi);
+                const Proj q = project(vp, lx, ly, hz, W, H);
+                if (!q.ok || q.w < 1.0f) continue;
+                const bool on = (side < 0) == ph;
+                const Color c = side < 0 ? Color{1.0f, 0.15f, 0.1f} : Color{0.2f, 0.4f, 1.0f};
+                const float k = (float)pxPerM / q.w;
+                r.circle(q.x, q.y, 0.16f * k, 8, on ? c : Color{c.r * 0.3f, c.g * 0.3f, c.b * 0.3f});
+                if (on) r.circle(q.x, q.y, (night_ ? 1.6f : 0.7f) * k, 14, {c.r, c.g, c.b, night_ ? 0.22f : 0.15f});
+            }
+        }
     }
     r.setCarLook(app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_));
     r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()),
@@ -749,7 +775,27 @@ void RoadScreen::drawWorld(Renderer& r) {
     }
 }
 
+// Polis yakinken ekran kenarlarinda kirmizi / mavi cakar yansimasi (arkadaki polis gorunmese de hissedilir)
+static void policeStrobe(Renderer& r, float W, float H, double gap, double t) {
+    const float k = (float)std::clamp(1.0 - gap / 70.0, 0.0, 1.0);
+    if (k <= 0.0f) return;
+    const bool ph = std::fmod(t * 5.0, 1.0) < 0.5;
+    const Color red{1.0f, 0.1f, 0.05f, 0.0f}, blue{0.1f, 0.3f, 1.0f, 0.0f};
+    for (int side = 0; side < 2; ++side) {
+        Color c = (side == 0) == ph ? red : blue;
+        Color c0 = c; c0.a = 0.28f * k;
+        const float x0 = side ? W - W * 0.18f : 0, x1 = side ? W : W * 0.18f;
+        for (int i = 0; i < 6; ++i) {                                  // yumusak kenar: 6 kat
+            Color ci = c0; ci.a *= (6 - i) / 6.0f;
+            const float a = side ? x1 - (x1 - x0) * (i + 1) / 6.0f : x0 + (x1 - x0) * i / 6.0f;
+            r.rect(a, 0, a + (x1 - x0) / 6.0f, H, ci);
+        }
+    }
+}
+
 void RoadScreen::drawHud(Renderer& r) {
+    if (ses_->mode() == RoadSession::Mode::Chase && ses_->phase() == RoadSession::Phase::Run && ses_->gapMeters() > -5.0)
+        policeStrobe(r, (float)W, (float)H, ses_->gapMeters(), envT_);
     RoadCar& Pc = ses_->player();
     const VehicleSim& sim = Pc.sim();
     const PowertrainCore& pt = const_cast<VehicleSim&>(sim).powertrain();
@@ -791,6 +837,18 @@ void RoadScreen::drawHud(Renderer& r) {
             const float f = (float)(fl->comboLeft() / FlowScorer::kComboTime);
             r.rect(W / 2.0f - 40, infoY + 52, W / 2.0f - 40 + 80 * f, infoY + 56, kUiGold);
         }
+    } else if (ses_->mode() == RoadSession::Mode::Chase) {               // polis: mesafe, yakalanma, kacis
+        const double gap = ses_->gapMeters();
+        std::snprintf(b, sizeof b, "POLIS %+.0f M   %.1f S", -gap, ses_->raceTime());
+        r.text(x0, infoY, b, 1, gap < 40 ? Color{1.0f, 0.4f, 0.3f} : Color{0.6f, 0.75f, 1.0f});
+        const float bw = 120, by = infoY + 14;
+        r.text(x0, by, "YAKALANMA", 1, {1.0f, 0.5f, 0.45f});
+        r.rect(x0 + 62, by, x0 + 62 + bw, by + 7, {0.15f, 0.15f, 0.2f});
+        r.rect(x0 + 62, by, x0 + 62 + bw * (float)ses_->bustLevel(), by + 7, {1.0f, 0.2f, 0.15f});
+        r.text(x0, by + 11, "KACIS", 1, {0.5f, 1.0f, 0.6f});
+        r.rect(x0 + 62, by + 11, x0 + 62 + bw, by + 18, {0.15f, 0.15f, 0.2f});
+        const float ep = (float)std::max(ses_->escapeProgress(), std::clamp(gap / RoadSession::kEscapeGap, 0.0, 1.0) * 0.5);
+        r.rect(x0 + 62, by + 11, x0 + 62 + bw * ep, by + 18, {0.3f, 0.95f, 0.45f});
     } else if (ses_->hasRival()) {
         if (ses_->mode() == RoadSession::Mode::Karma) {                // bolum gostergesi: DRAG / VIRAJ
             const double s = Pc.s();
@@ -890,6 +948,13 @@ void RoadScreen::drawResults(Renderer& r) {
         std::snprintf(b, sizeof b, "EN YUKSEK HIZ %.0f %s   KARSI SERITTE %.0f S   CARPISMA %d", st.topSpeed * app_.settings.speedFactor(),
                       app_.settings.speedUnit(), st.oncomingTime, st.crashes);
         r.textCentered(W / 2.0f, 166 + oy, b, 1, {0.85f, 0.85f, 0.9f});
+    } else if (ses_->mode() == RoadSession::Mode::Chase) {
+        const bool esc = ses_->playerWon();
+        r.textCentered(W / 2.0f, 66 + oy, esc ? "KACTIN!" : "YAKALANDIN!", 3, esc ? Color{0.3f, 1.0f, 0.4f} : Color{1.0f, 0.3f, 0.2f});
+        std::snprintf(b, sizeof b, "SURE %.1f S   MESAFE %.2f KM", ses_->raceTime(), (ses_->player().s() - 90.0) / 1000.0);
+        r.textCentered(W / 2.0f, 110 + oy, b, 1, {0.85f, 0.85f, 0.9f});
+        std::snprintf(b, sizeof b, "CARPISMA %d%s", ses_->collisions(), esc && ses_->collisions() == 0 ? "   TEMIZ KACIS +%50" : "");
+        r.textCentered(W / 2.0f, 128 + oy, b, 1, {0.8f, 0.8f, 0.85f});
     } else {
         r.textCentered(W / 2.0f, 66 + oy, ses_->playerWon() ? "KAZANDIN" : "KAYBETTIN", 3, ses_->playerWon() ? Color{0.3f, 1.0f, 0.4f} : Color{1.0f, 0.3f, 0.2f});
         r.text(lx, 110 + oy, ("SEN   " + secStr(ses_->playerTime())).c_str(), 2, {1, 1, 1});
@@ -897,8 +962,9 @@ void RoadScreen::drawResults(Renderer& r) {
         std::snprintf(b, sizeof b, "CARPISMA %d", ses_->collisions());
         r.text(lx, 166 + oy, b, 1, {0.8f, 0.8f, 0.85f});
     }
-    std::snprintf(b, sizeof b, "ODUL $%ld", prize_);
-    r.textCentered(W / 2.0f, 200 + oy, b, 3, kUiGold);
+    if (prize_ < 0) std::snprintf(b, sizeof b, "CEZA $%ld", -prize_);
+    else std::snprintf(b, sizeof b, "ODUL $%ld", prize_);
+    r.textCentered(W / 2.0f, 200 + oy, b, 3, prize_ < 0 ? Color{1.0f, 0.35f, 0.3f} : kUiGold);
     if (autoClutchPenalty()) r.textCentered(W / 2.0f, 232 + oy, "OTOMATIK DEBRIYAJ: ODUL %75", 1, {0.9f, 0.6f, 0.3f});
     r.textCentered(W / 2.0f, 280 + oy, "DOKUN / ENTER: GARAJ", 1, {0.7f, 0.75f, 0.9f});
 }
@@ -920,6 +986,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
         else if (race_.hit(x, y)) start(RoadSession::Mode::Race);
         else if (touge_.hit(x, y)) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         else if (karma_.hit(x, y)) start(RoadSession::Mode::Karma);
+        else if (chase_.hit(x, y)) start(RoadSession::Mode::Chase);
         return;
     }
     if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { app_.goGarage(); return; }
@@ -951,6 +1018,7 @@ void RoadScreen::key(Key k, bool down) {
         else if (k == Key::PageUp) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         else if (k == Key::PageDown) start(RoadSession::Mode::Flow);
         else if (k == Key::Gear1) start(RoadSession::Mode::Karma);
+        else if (k == Key::Gear2) start(RoadSession::Mode::Chase);
         else if (k == Key::Back) app_.goGarage();
         return;
     }

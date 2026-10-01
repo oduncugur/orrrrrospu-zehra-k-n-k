@@ -30,6 +30,7 @@ const std::vector<AchDef>& achievements() {
         {"PINK SLIP", "RAKIBIN ARABASINI KAZAN", 3000},
         {"BOYACI", "ARACINI BOYAT", 300},
         {"GUNUN ADAMI", "UC GUNLUK GOREVI BITIR", 800},
+        {"KACAK", "POLISTEN KAC", 1500},
     };
     return a;
 }
@@ -61,6 +62,7 @@ bool achievementMet(const Career& c, int i) {
     }
     case 19: return any([](const OwnedCar& o) { return o.paint >= 0 || o.stripe > 0; });
     case 20: return c.dailyDone == 7;
+    case 21: return c.chaseEscapes >= 1;
     default: return false;
     }
 }

@@ -20,12 +20,15 @@ class RoadSession {
 public:
     // Free: serbest surus; Race: YZ rakiple yol yarisi; Flow: otoban akisi (sureli skor: yakin gecis, hiz, apex)
     // Karma: duz bolumler drag gorunumunde, virajli bolumler 3B; rakipli, trafiksiz (RoadPath::karma)
-    enum class Mode { Free, Race, Flow, Karma };
+    // Chase: polis kovalamacasi (polis arkadan baslar; 400 m acilip 4 s tut ya da 5 km'yi bitir = kactin;
+    // polis dibindeyken yavaslamak / temas yakalanma gostergesini doldurur)
+    enum class Mode { Free, Race, Flow, Karma, Chase };
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
     double raceLength() const {                       // m
         if (mode_ == Mode::Karma) return road_.length() - kStartS - 300.0;
+        if (mode_ == Mode::Chase) return 5000.0;
         return kind_ == Kind::Touge ? 3000.0 : 4000.0;
     }
     bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma; }
@@ -67,6 +70,10 @@ public:
     int    collisions() const { return collisions_; }
     // Akis modu
     const FlowScorer* flow() const { return flow_.get(); }
+    // Kovalamaca: yakalanma 0..1, kacis ilerlemesi 0..1 (400 m ustunde gecen sure / 4 s)
+    double bustLevel() const { return bust_; }
+    double escapeProgress() const { return std::clamp(escapeT_ / kEscapeHold, 0.0, 1.0); }
+    static constexpr double kEscapeGap = 400.0, kEscapeHold = 4.0;
     double flowTimeLeft() const { return std::max(0.0, kFlowTime - raceT_); }
 
     std::vector<std::string> drainMessages() { auto m = std::move(msgs_); msgs_.clear(); return m; }
@@ -80,6 +87,8 @@ private:
     void spawnTraffic(TrafficCar& t, double fromS);
     void collide(RoadCar& car, bool isPlayer);
     RoadControls rivalControls();
+    RoadControls chaseControls();
+    void updateChase(double dt);
 
     Mode mode_;
     Kind kind_;
@@ -100,6 +109,7 @@ private:
     double reaction_ = -1.0, rivalReact_ = 0.0;      // karma tepki sureleri (rakip: 0.15-0.35 s, tohumdan)
     std::vector<std::string> msgs_;
     bool crashEv_ = false, touching_ = false;
+    double bust_ = 0, escapeT_ = 0, contactKick_ = 0;
     double rnd();
 };
 

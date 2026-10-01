@@ -632,6 +632,18 @@ void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun
                  : std::clamp(c.engineWear + std::max(0.0, bearingDamage) + 0.5 * std::max(0.0, engineStress), 0.0, 1.0);
 }
 
+long Career::recordChase(bool escaped, int collisions) {
+    if (escaped) {
+        const long prize = collisions == 0 ? 1500 : 1000;
+        money += prize; earnings += prize; ++chaseEscapes;
+        dailyAdd(TaskType::Earn, prize);
+        return prize;
+    }
+    const long fine = std::min(money, 400L);                              // ceza: parayi eksiye dusurmez
+    money -= fine;
+    return -fine;
+}
+
 long Career::recordFlow(long score, bool* newRecord) {
     score = std::max(0L, score);
     const bool rec = score > bestFlow && score > 0;
@@ -782,7 +794,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\n";
     {
         char lb[160];
         std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
@@ -834,6 +846,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "earnings") c.earnings = std::max(0L, std::atol(v.c_str()));
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
         else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
+        else if (k == "chase") c.chaseEscapes = std::max(0, std::atoi(v.c_str()));
         else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
         else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);

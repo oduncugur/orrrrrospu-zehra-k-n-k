@@ -106,7 +106,7 @@ std::string SettingsScreen::value(It it) const {
         return s.vsync == VSync::Off ? "KAPALI" : s.vsync == VSync::On ? "ACIK" : "ADAPTIF";
     case It::ShowFps: return onOff(s.showFps);
     case It::Fullscreen: return onOff(s.fullscreen);
-    case It::IntScale: return s.integerScale ? "TAM SAYI" : "SIGDIR";
+    case It::IntScale: return s.integerScale ? "TAM SAYI" : s.fillScreen ? "DOLDUR" : "SIGDIR";
     case It::Graphics: return s.renderScale == 1 ? "RETRO" : s.renderScale == 2 ? "NORMAL" : "YUKSEK";
     case It::RoadView: return s.roadPortrait ? "DIKEY" : "YATAY";
     case It::Master: return pct(s.masterVol);
@@ -140,7 +140,12 @@ void SettingsScreen::change(It it, int dir) {
     }
     case It::ShowFps: s.showFps = !s.showFps; break;
     case It::Fullscreen: s.fullscreen = !s.fullscreen; break;
-    case It::IntScale: s.integerScale = !s.integerScale; break;
+    case It::IntScale: {                                   // DOLDUR -> SIGDIR -> TAM SAYI -> DOLDUR
+        const int m = s.integerScale ? 2 : s.fillScreen ? 0 : 1;
+        const int n = (m + (dir < 0 ? 2 : 1)) % 3;
+        s.fillScreen = n == 0; s.integerScale = n == 2;
+        break;
+    }
     case It::Graphics: s.renderScale = dir < 0 ? (s.renderScale + 1) % 3 + 1 : s.renderScale % 3 + 1; break;
     case It::RoadView: s.roadPortrait = !s.roadPortrait; break;
     case It::Master: s.masterVol = list(Settings::volumeOptions(), s.masterVol); break;

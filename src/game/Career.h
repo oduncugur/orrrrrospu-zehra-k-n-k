@@ -151,6 +151,9 @@ struct Career {
     // Otoban akisi sonu: odul = skor / 20 (en fazla kFlowPrizeCap); rekor kirilirsa +%50. Donus: odul
     static constexpr long kFlowPrizeCap = 4000;
     long recordFlow(long score, bool* newRecord = nullptr);
+    // Polis kovalamacasi: kacis odulu (temassiz +%50), yakalanma cezasi (donus negatif)
+    long recordChase(bool escaped, int collisions);
+    int  chaseEscapes = 0;
     long repairCost() const;                                                    // secili arac
     bool repairCurrent(std::string* why = nullptr);
 

@@ -19,6 +19,7 @@ const float kSl[4] = {292, 380, 352, 632};
 const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac varken)
 const Rect kRestoreG{8, 66, 112, 94};         // sol ust: hasar / yipranma varsa
 const Rect kPaintG{284, 100, 352, 128};       // sag ust: boyahane
+const Rect kCashG{284, 134, 352, 160};        // TEST: her basista +10.000 $ (yayin oncesi kaldirilacak)
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -106,6 +107,8 @@ void GarageScreen::render(Renderer& r) {
     r.text(8, 338, b, 2, tunedHp_ > stockHp_ + 0.5 ? Color{0.4f, 1.0f, 0.5f} : kUiText);
     r.text(8, 358, tuneSummary(oc.tune).substr(0, 46), 1, kUiGold);
     if (oc.bestEt > 0) { std::snprintf(b, sizeof b, "EN IYI 1/4: %.3f S", oc.bestEt); r.text(8, 368, b, 1, kUiDim); }
+    std::snprintf(b, sizeof b, "KESICI %.0f RPM", pt_->engine().redlineRpm);                // parcalarla devir siniri
+    r.text(280 - r.textWidth(b, 1), 370, b, 1, {1.0f, 0.45f, 0.4f});
     if (!v.streetLegal) r.text(8, 280, "YARIS ARACI - ROMORK", 2, {1.0f, 0.3f, 0.3f});
 
     // Devir testi (bosta)
@@ -156,6 +159,7 @@ void GarageScreen::render(Renderer& r) {
     if (c.cars.size() > 1) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 2);
     if (worn()) button(r, kRestoreG, "RESTORASYON", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
     button(r, kPaintG, "BOYA", Color{0.35f, 0.18f, 0.45f, 0.95f}, 2);
+    button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.95f}, 2);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
         r.textCentered(180, 258, msg_, 2, kUiGold);
@@ -182,6 +186,12 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     if (app_.career.cars.size() > 1 && kSellG.hit(x, y)) { selling_ = true; return; }
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
     if (kPaintG.hit(x, y)) { app_.goBodyShop(); return; }
+    if (kCashG.hit(x, y)) {                                      // TEST: para
+        app_.career.money += 10000;
+        app_.saveCareer();
+        msg_ = "TEST: +$10,000"; msgT_ = 1.2;
+        return;
+    }
     if (x >= kSl[0] - 10 && y >= kSl[1] - 20) {
         throttlePtr_ = id;
         throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);

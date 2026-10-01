@@ -130,6 +130,7 @@ public:
     void sfxShift() { clunk_.fetch_add(1); }                     // vites gecisi: mekanik "tok"
     void nitrousSound(bool on) { nos_ = on; }                     // nitro tislamasi
     void rainSound(bool on) { rain_ = on; }                       // yagmur ambiyansi (ekran degisince kapanir)
+    void siren(float level) { siren_ = level; }                   // polis sireni 0..1 (mesafeyle; ekran degisince 0)
 
 private:
     std::atomic<float> tilt_{0.0f};
@@ -137,6 +138,7 @@ private:
     std::atomic<float> windSpeed_{0.0f};
     float windLp1_ = 0, windLp2_ = 0, windPh_ = 0; uint32_t windRng_ = 22222;   // yalniz ses thread'i
     std::atomic<int> clunk_{0}; std::atomic<bool> nos_{false}, rain_{false};
+    std::atomic<float> siren_{0.0f}; float sirenPh_ = 0, sirenT_ = 0, sirenLv_ = 0;
     float clunkT_ = -1, nosEnv_ = 0, nosLp_ = 0, rainLp1_ = 0, rainLp2_ = 0, dripT_ = -1, dripF_ = 0; uint32_t fxRng_ = 777;
     struct Voice {
         std::unique_ptr<ProceduralEngineAudio> synth;

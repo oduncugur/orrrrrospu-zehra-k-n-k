@@ -132,8 +132,15 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
     line(py + 31, 180, "SANZIMAN", now_.gearboxLoad * 100, prev_.gearboxLoad * 100, "%%%.0f > %%%.0f", false);
     line(py + 43, 180, "ISI", now_.heatLoad * 100, prev_.heatLoad * 100, "%%%.0f > %%%.0f", false);
     line(py + 55, 180, "AKS", now_.axleRisk * 100, prev_.axleRisk * 100, "%%%.0f > %%%.0f", false);
-    r.text(16, py + 70, "1/4 MIL", 1, kUiText);
-    if (!et_ || !et_->done) r.text(72, py + 70, "HESAPLANIYOR...", 1, kUiDim);
+    line(py + 67, 16, "DEVIR", now_.redline, prev_.redline, "%.0f > %.0f", true);         // devir siniri (kesici)
+    {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
+        char t[48]; std::snprintf(t, sizeof t, "%.0f / %.0f", prev_.octane, prev_.octaneReq);
+        const Color oc = prev_.octaneReq > prev_.octane ? down : prev_.octaneReq > prev_.octane - 3 ? kUiGold : kUiDim;
+        r.text(180, py + 67, "OKTAN", 1, kUiText);
+        r.text(236, py + 67, t, 1, oc);
+    }
+    r.text(16, py + 81, "1/4 MIL", 1, kUiText);
+    if (!et_ || !et_->done) r.text(72, py + 81, "HESAPLANIYOR...", 1, kUiDim);
     else {
         auto str = [](const QuarterEstimate& e) {
             if (e.broke) return std::string("AKS!");
@@ -142,17 +149,13 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
         };
         const bool ok = et_->cur.quarter > 0 && et_->nxt.quarter > 0;
         const double d = ok ? et_->nxt.quarter - et_->cur.quarter : 0.0;
-        r.text(72, py + 70, str(et_->cur) + " > " + str(et_->nxt) + " S", 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
+        r.text(72, py + 81, str(et_->cur) + " > " + str(et_->nxt) + " S", 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
     }
-    if (prev_.engineLoad > 1.0) r.text(180, py + 70, "MOTOR DAYANMAZ!", 1, down);
-    else if (prev_.gearboxLoad > 1.0) r.text(180, py + 70, "SANZIMAN DAYANMAZ!", 1, down);
-    else if (prev_.octaneReq > prev_.octane) r.text(180, py + 70, "VURUNTU! OKTAN", 1, down);
-    else if (prev_.heatLoad > 1.15) r.text(180, py + 70, "SOGUTMA YETMEZ", 1, kUiGold);
-    {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
-        char t[64]; std::snprintf(t, sizeof t, "OKTAN %.0f / ISTENEN %.0f", prev_.octane, prev_.octaneReq);
-        const Color oc = prev_.octaneReq > prev_.octane ? down : prev_.octaneReq > prev_.octane - 3 ? kUiGold : Color{0.45f, 0.48f, 0.55f};
-        r.text(16, py + 82, t, 1, oc);
-    }
+    if (prev_.engineLoad > 1.0) r.text(180, py + 81, "MOTOR DAYANMAZ!", 1, down);
+    else if (prev_.gearboxLoad > 1.0) r.text(180, py + 81, "SANZIMAN DAYANMAZ!", 1, down);
+    else if (prev_.octaneReq > prev_.octane) r.text(180, py + 81, "VURUNTU! OKTAN", 1, down);
+    else if (prev_.heatLoad > 1.15) r.text(180, py + 81, "SOGUTMA YETMEZ", 1, kUiGold);
+
 }
 
 void PartsScreen::render(Renderer& r) {

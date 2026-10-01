@@ -79,6 +79,7 @@ void App::applySettings() {
     engineVol_ = master * settings.engineVol / 100.0f;
     tireVol_ = master * settings.tireVol / 100.0f;
     renderer_.integerScale = settings.integerScale;
+    renderer_.fillScreen = settings.fillScreen && !settings.integerScale;
     renderer_.setRenderScale(settings.renderScale);
     renderer_.lang = (Lang)settings.language;
 }
@@ -95,7 +96,7 @@ void App::shutdownGraphics() { renderer_.shutdown(); }
 void App::setScreen(std::unique_ptr<Screen> s) {
     if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(screen_->landscape()); return; }
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
-    windSpeed_ = 0.0f; nos_ = false; rain_ = false;
+    windSpeed_ = 0.0f; nos_ = false; rain_ = false; siren_ = 0.0f;
 }
 void App::goGarage() {
     setVoice(1, nullptr);
@@ -283,7 +284,8 @@ void App::renderAudio(float* out, int frames) {
     // yagmur (alcak geciren gurultu + seyrek damla tiklari)
     if (clunk_.exchange(0) > 0) clunkT_ = 0.0f;
     const bool nosOn = nos_.load(), rainOn = rain_.load();
-    if (clunkT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn) {
+    const float sirenTarget = siren_.load();
+    if (clunkT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn || sirenTarget > 0.0f || sirenLv_ > 1e-4f) {
         const float dt = 1.0f / kSampleRate;
         const float aN = 1.0f - std::exp(-6.2831853f * 2500.0f * dt), aR = 1.0f - std::exp(-6.2831853f * 1100.0f * dt);
         for (int i = 0; i < frames; ++i) {
@@ -307,6 +309,14 @@ void App::renderAudio(float* out, int frames) {
                     o += 0.05f * std::sin(6.2831853f * dripF_ * dripT_) * std::exp(-dripT_ / 0.012f) * tireVol;
                     dripT_ += dt; if (dripT_ > 0.06f) dripT_ = -1.0f;
                 }
+            }
+            sirenLv_ += (sirenTarget - sirenLv_) * 0.0005f;              // siren: "wail" 650-1350 Hz, 0.35 Hz tarama
+            if (sirenLv_ > 1e-4f) {
+                sirenT_ += dt;
+                const float f = 1000.0f + 350.0f * std::sin(6.2831853f * 0.35f * sirenT_);
+                sirenPh_ += 6.2831853f * f * dt;
+                if (sirenPh_ > 6.2831853f) sirenPh_ -= 6.2831853f;
+                o += (std::sin(sirenPh_) + 0.3f * std::sin(3.0f * sirenPh_)) * 0.10f * sirenLv_ * tireVol;
             }
             out[i] += o;
         }

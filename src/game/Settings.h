@@ -18,6 +18,7 @@ struct Settings {
     bool  showFps = true;            // FPS / fizik suresi gostergesi
     bool  fullscreen = false;        // yalniz masaustu
     bool  integerScale = false;      // piksel-keskin tam sayi olcek (kenarlarda siyah bant olabilir)
+    bool  fillScreen = true;         // ekrani doldur: en-boy farki %35'e kadar gerilir (uzun telefonda siyah bant yok)
     int   renderScale = 2;           // ic cozunurluk carpani: 1 retro (piksel), 2 normal, 3 yuksek
     bool  roadPortrait = false;      // acik yol ekrani: false yatay (640x360), true dikey (360x640)
     // Ses (yuzde, 0..100)
