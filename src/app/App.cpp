@@ -9,7 +9,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 
 namespace zk {
 
@@ -18,6 +21,7 @@ App::App(const std::string& saveDir) {
         savePath_ = saveDir;
         if (savePath_.back() != '/' && savePath_.back() != '\\') savePath_ += '/';
         settingsPath_ = savePath_ + "ayarlar.cfg";
+        ghostPath_ = savePath_ + "hayalet.zkg";
         settings = Settings::load(settingsPath_);
         savePath_ += "kariyer.zks";
         bool corrupt = false;
@@ -28,8 +32,38 @@ App::App(const std::string& saveDir) {
     }
     treePro = career.treePro;
     selectedCar = career.car().carId;
+    loadGhosts();
     applySettings();
     setScreen(std::make_unique<GarageScreen>(*this));
+}
+
+// Hayalet dosyasi: satir basina "arac ET n d0 d1 ..." (metin; bozuk satir atlanir)
+void App::loadGhosts() {
+    if (ghostPath_.empty()) return;
+    std::ifstream f(ghostPath_);
+    std::string line;
+    while (std::getline(f, line)) {
+        std::istringstream in(line);
+        int id = 0; size_t n = 0; Ghost g;
+        if (!(in >> id >> g.et >> n) || n > 2000 || g.et <= 0) continue;
+        g.d.resize(n);
+        bool ok = true;
+        for (size_t i = 0; i < n && ok; ++i) ok = (bool)(in >> g.d[i]);
+        if (ok && n > 1) ghosts[id] = std::move(g);
+    }
+}
+void App::saveGhosts() const {
+    if (ghostPath_.empty()) return;
+    std::ofstream f(ghostPath_ + ".tmp", std::ios::trunc);
+    for (const auto& [id, g] : ghosts) {
+        f << id << ' ' << g.et << ' ' << g.d.size();
+        char b[16];
+        for (float d : g.d) { std::snprintf(b, sizeof b, " %.2f", d); f << b; }
+        f << '\n';
+    }
+    f.close();
+    std::remove(ghostPath_.c_str());
+    std::rename((ghostPath_ + ".tmp").c_str(), ghostPath_.c_str());
 }
 
 void App::saveCareer() {

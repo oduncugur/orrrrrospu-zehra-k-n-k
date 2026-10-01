@@ -107,9 +107,10 @@ public:
     int activeEvent = -1;                        // suren lig etkinligi (-1: yok)
     double eventHandicap = 1.6;                  // etkinlik rakibinin hata payi
     std::string eventNote;                       // lig ekranina donuste gosterilecek not (pink slip vb.)
-    // Drag hayaleti: arac basina en iyi kosunun mesafe izi (kalkistan itibaren 20 Hz), oturum boyunca
+    // Drag hayaleti: arac basina en iyi kosunun mesafe izi (kalkistan itibaren 20 Hz); hayalet.zkg dosyasinda saklanir
     struct Ghost { std::vector<float> d; double et = 0; };
     std::map<int, Ghost> ghosts;
+    void saveGhosts() const;
     void goRestore();
     int junkSalt = 0;                            // hurdalik teklifleri: alimdan sonra yenilenir
     void goGallery();
@@ -152,7 +153,8 @@ private:
     int sw_ = 1, sh_ = 1;
     std::mutex audioLock_;
     Voice voices_[2];
-    std::string savePath_, settingsPath_;
+    std::string savePath_, settingsPath_, ghostPath_;
+    void loadGhosts();
     uint32_t raceSeed_ = 1;
     std::vector<float> mix_;
     float fade_ = 0.0f;                          // ekran gecis karartmasi (1 -> 0)
