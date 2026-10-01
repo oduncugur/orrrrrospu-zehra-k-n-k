@@ -115,6 +115,15 @@ void App::goRoad() {
     setScreen(std::make_unique<RoadScreen>(*this, oc.carId, &oc.tune));
 }
 
+void App::hint(int id, const char* text) {
+    if (id < 0 || id > 30 || ((settings.hintsSeen >> id) & 1)) return;
+    const bool test = std::getenv("ZK_START_SCREEN") || std::getenv("ZK_AUTOPILOT") || std::getenv("ZK_START_DRAG");
+    if (test && !std::getenv("ZK_HINTS")) return;
+    settings.hintsSeen |= 1 << id;
+    saveSettings();
+    hint_ = text;
+}
+
 void App::update(double dt) {
     if (!toasts_.empty() && (toastT_ += dt) > 2.6) { toasts_.erase(toasts_.begin()); toastT_ = 0; }
     if (pending_) {
@@ -124,7 +133,7 @@ void App::update(double dt) {
     }
     fade_ = std::max(0.0f, fade_ - (float)std::min(dt, 0.05) / 0.22f);
     const auto t0 = std::chrono::steady_clock::now();
-    screen_->update(std::min(dt, 0.1));
+    if (hint_.empty()) screen_->update(std::min(dt, 0.1));            // ipucu karti acikken ekran durur
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     updMs_ += (ms - updMs_) * 0.05;                          // yumusatilmis
     fpsAcc_ += dt; ++fpsFrames_;
@@ -142,10 +151,25 @@ void App::render() {
         renderer_.rect(W * 0.5f - 172, y + 28, W * 0.5f + 172, y + 30, {1.0f, 0.78f, 0.2f});
         renderer_.textCentered(W * 0.5f, y + 9, toasts_.front().substr(0, 42), 1, {1.0f, 0.85f, 0.35f});
     }
+    if (!hint_.empty()) {                                         // ilk giris ipucu karti (ortada, ekran karartilir)
+        std::vector<std::string> lines;
+        for (size_t a = 0, b; a <= hint_.size(); a = b + 1) { b = hint_.find('\n', a); if (b == std::string::npos) b = hint_.size(); lines.push_back(hint_.substr(a, b - a)); }
+        const float W = (float)renderer_.vw(), H = (float)renderer_.vh();
+        float tw = 0; for (auto& l : lines) tw = std::max(tw, renderer_.textWidth(l, 1));
+        const float cw = std::min(W - 16, std::max(240.0f, tw + 28)), ch = 44 + lines.size() * 14.0f + 20;
+        const float x0 = (W - cw) * 0.5f, y0 = (H - ch) * 0.5f;
+        renderer_.rect(0, 0, W, H, {0, 0, 0, 0.55f});
+        renderer_.rect(x0, y0, x0 + cw, y0 + ch, {0.09f, 0.10f, 0.14f});
+        renderer_.rect(x0, y0, x0 + cw, y0 + 3, {1.0f, 0.62f, 0.12f});
+        renderer_.text(x0 + 14, y0 + 12, "IPUCU", 2, {1.0f, 0.78f, 0.25f});
+        for (size_t i = 0; i < lines.size(); ++i) renderer_.text(x0 + 14, y0 + 40 + i * 14.0f, lines[i], 1, {0.92f, 0.92f, 0.96f});
+        renderer_.textCentered(W * 0.5f, y0 + ch - 16, "DOKUN: TAMAM", 1, {0.55f, 0.75f, 1.0f});
+    }
     renderer_.present(sw_, sh_);
 }
 
 void App::pointerDown(int id, float px, float py) {
+    if (!hint_.empty()) { hint_.clear(); return; }               // ipucu karti: dokunus kapatir (ekrana gecmez)
     float x, y; renderer_.toVirtual(sw_, sh_, px, py, x, y);
     screen_->pointerDown(id, x, y);
 }
@@ -154,8 +178,12 @@ void App::pointerMove(int id, float px, float py) {
     screen_->pointerMove(id, x, y);
 }
 void App::pointerUp(int id) { screen_->pointerUp(id); }
-void App::key(Key k, bool down) { screen_->key(k, down); }
+void App::key(Key k, bool down) {
+    if (!hint_.empty()) { if (down && (k == Key::Enter || k == Key::Back)) hint_.clear(); return; }
+    screen_->key(k, down);
+}
 bool App::back() {
+    if (!hint_.empty()) { hint_.clear(); return true; }
     if (auto* g = dynamic_cast<GarageScreen*>(screen_.get()); g && !g->modal() && !pending_) return false;   // garajda geri = cikis (onay penceresi acik degilse)
     screen_->key(Key::Back, true);
     return true;

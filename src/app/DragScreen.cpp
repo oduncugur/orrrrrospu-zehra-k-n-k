@@ -36,6 +36,7 @@ const Color kDim{0.18f, 0.16f, 0.12f}, kAmber{1.0f, 0.62f, 0.05f}, kGreen{0.1f, 
 
 DragScreen::DragScreen(App& app, int playerCar, int opponentCar, const Tune* playerTune, const Tune* opponentTune, bool career)
     : app_(app), seed_(1234), career_(career) {
+    app_.hint(1, "DRAG KALKISI\n1) DEBRIYAJA BAS, KOLU 1. VITESE GOTUR\n2) GAZLA DEVRI KALKIS DEVRINDE TUT\n3) YESILDE DEBRIYAJI BIRAK (COK HIZLI = PATINAJ)\n4) KIRMIZI CIZGIDE: DEBRIYAJ + SONRAKI VITES\nSONUCTA GRAFIK: PATINAJ VE VITES NOKTALARI");
     carIds_[0] = playerCar; carIds_[1] = opponentCar;
     if (playerTune) { tunes_[0] = *playerTune; hasTune_[0] = true; }
     if (opponentTune) { tunes_[1] = *opponentTune; hasTune_[1] = true; }

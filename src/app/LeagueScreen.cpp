@@ -18,6 +18,7 @@ constexpr float kRowY0 = 114, kRowH = 44;
 }
 
 LeagueScreen::LeagueScreen(App& app) : app_(app) {
+    app_.hint(4, "KARIYER\nHER LIGDE 3 GALIBIYET -> PATRON YARISI\nPATRONU YEN -> SONRAKI LIG ACILIR\nPINK SLIP: KAYBEDEN ARABASINI VERIR!\nGUNLUK GOREVLER VE BASARIMLAR: EK ODUL");
     app_.career.dailyRefresh();
     tab_ = app_.career.leagueUnlocked();
     if (!app_.eventNote.empty()) { msg_ = app_.eventNote; msgT_ = 3.5; app_.eventNote.clear(); }

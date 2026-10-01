@@ -73,6 +73,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
 
 // ================================================================== PARCA DUKKANI
 PartsScreen::PartsScreen(App& app, int cat) : app_(app), cat_(cat) {
+    app_.hint(3, "MODIFIYE\nILK DOKUNUS: ONIZLEME (GUC, YUK, 1/4 MIL)\nIKINCI DOKUNUS: SATIN AL VE TAK\nMOTOR / SANZIMAN YUKU %100'U GECMESIN\nBUYUK TURBO: YAKIT SISTEMI, ARA SOGUTUCU\nVE YUKSEK OKTAN ISTER (YOKSA VURUNTU)");
     if (cat_ >= 0) tab_ = partTab((PartCat)cat_);
     recompute();
 }

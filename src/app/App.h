@@ -96,6 +96,10 @@ public:
     void goBodyShop();
     void goAchievements();
     void toast(const std::string& msg) { toasts_.push_back(msg); }   // ust bildirim (sirayla, ~2.6 s)
+    // Ilk giris ipucu: her kimlik bir kez (ayarlarda saklanir); kart acikken ekran durur, dokunus / Enter kapatir.
+    // Satirlar '\n' ile ayrilir. Test calistirmalarinda (ZK_START_SCREEN / ZK_AUTOPILOT / ZK_START_DRAG) kapali.
+    void hint(int id, const char* text);
+    bool hintOpen() const { return !hint_.empty(); }
     void goLeague();
     // Lig etkinligi baslat: rakip (isimli ya da dengi), mod; sonuc ekranindan donus lig ekranina
     void startEvent(int idx);
@@ -149,6 +153,7 @@ private:
     std::vector<float> mix_;
     float fade_ = 0.0f;                          // ekran gecis karartmasi (1 -> 0)
     std::vector<std::string> toasts_; double toastT_ = 0;
+    std::string hint_;
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 

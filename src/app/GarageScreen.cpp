@@ -29,6 +29,7 @@ double peakHp(const EngineSpec& e) {
 } // namespace
 
 GarageScreen::GarageScreen(App& app) : app_(app) {
+    app_.hint(0, "GARAJA HOSGELDIN!\nYARIS: KARIYER LIGLERI VE ETKINLIKLER\nYOL: SERBEST SURUS, YOL YARISI, TOUGE\nPARCA: MODIFIYE (MOTOR, TURBO, SASI...)\nBOYA: RENK, SERIT, JANT\nGALERI: YENI ARAC   DYNO: GUC EGRISI");
     app_.setVoice(1, nullptr);
     select(app_.career.current);
     if (!app_.startupMsg.empty()) { msg_ = app_.startupMsg; msgT_ = 4.0; app_.startupMsg.clear(); }

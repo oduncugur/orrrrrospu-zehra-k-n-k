@@ -35,6 +35,7 @@ struct Settings {
     // Birim / oyun
     bool  mph = false;               // hiz birimi: km/h ya da mph
     int   language = 0;              // arayuz dili (app/Lang.h: 0 TR, 1 EN, ...)
+    int   hintsSeen = 0;             // gosterilmis ilk-giris ipuclari (bit)
 
 #ifdef __ANDROID__
     static constexpr int kDefaultFpsCap = 60;    // pil ve isinma

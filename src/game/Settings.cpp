@@ -53,6 +53,7 @@ std::string Settings::serialize() const {
     o << "integer_scale=" << (integerScale ? 1 : 0) << "\n";
     o << "render_scale=" << renderScale << "\n";
     o << "language=" << language << "\n";
+    o << "hints_seen=" << hintsSeen << "      # ilk giris ipuclari (0: hepsini yeniden goster)\n";
     o << "road_portrait=" << (roadPortrait ? 1 : 0) << "    # acik yol: 0 yatay, 1 dikey\n";
     o << "master_volume=" << masterVol << "\n";
     o << "engine_volume=" << engineVol << "\n";
@@ -89,6 +90,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "integer_scale") s.integerScale = v != 0;
         else if (k == "render_scale") s.renderScale = std::clamp(v, 1, 3);
         else if (k == "language") s.language = std::clamp(v, 0, 6);
+        else if (k == "hints_seen") s.hintsSeen = std::max(0, v);
         else if (k == "road_portrait") s.roadPortrait = v != 0;
         else if (k == "master_volume") s.masterVol = snap(volumeOptions(), v);
         else if (k == "engine_volume") s.engineVol = snap(volumeOptions(), v);

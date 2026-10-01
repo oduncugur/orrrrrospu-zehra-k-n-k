@@ -48,6 +48,7 @@ void RoadScreen::setupLayout() {
 }
 
 RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId_(carId) {
+    app_.hint(2, "YOL SURUSU\nDIREKSIYON: SOL / SAG (TELEFONU EGEREK DE)\nKAYAN ARAC KENDI TOPARLANMAZ: KARSI DIREKSIYON + GAZ\nGECE VE YAGMURDA TUTUS DUSER, ERKEN FRENLE\nSU 108 C USTU: GUC KAYBI (SOGUTMAYI YUKSELT)");
     setupLayout();
     if (tune) tune_ = *tune;
     app_.setVoiceTuned(0, carId, &tune_);
