@@ -122,6 +122,12 @@ cmake -B build -DCMAKE_PREFIX_PATH=$HOME/sdl3 && cmake --build build -j8 && ./bu
 | `ZK_KEYS="t:Tuş:1/0,..."` | zamanlı tuş betiği (Throttle, Clutch, Brake, Gear0..6, ShiftUp/Down, Enter) |
 | `ZK_TAPS="t:x:y,..."` | zamanlı dokunuş betiği, sanal koordinat (dikey 360×640 / yatay 640×360) |
 | `SDL_AUDIO_DRIVER=dummy` | ses cihazı olmayan ortamda |
+| `ZK_START_SCREEN=fabricate\|junk\|restore\|league\|paint\|ach` | atölye, hurdalık, restorasyon, kariyer ligleri, boyahane, başarımlar |
+| `ZK_NIGHT=1` / `ZK_RAIN=1` / `ZK_DAY=1` | yol ortamını zorla (gece / yağmur / gündüz) |
+| `ZK_TUNE="aero:6,susp:3"` / `ZK_LOOK="boya;cila;serit;renk;jant"` | seçili kariyer aracına parça / görünüm uygula |
+| `ZK_GRAPH=1` | drag sonucunda telemetri grafiği açık başlar |
+| `ZK_SHOT_FBO=1` | ekran görüntüsünü iç çözünürlükteki sanal tampondan al |
+| `ZK_HINTS=1` | test çalıştırmalarında da ilk giriş ipuçlarını göster (normalde kapalı) |
 
 Klavye: W/↑ gaz, S/↓ fren, Boşluk/Shift debriyaj (analog rampa), 1–6/N vites, E/Q vites ±,
 ←/→ (A/D) araç / direksiyon, Enter yarış/stage/tekrar, O/F1 ayarlar, F11 tam ekran, Esc geri/çıkış.
@@ -455,3 +461,26 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
 - Diller (app/Lang): ceviri Renderer::text icinde (tam cumle tablosu + kelime sozlugu); EN tam, DE/ES/FR/IT/PT
   kelime duzeyi (LangMore.inc, eksik -> EN). Ayar `language`. Kiril/Yunan harf seti ve CJK font yok.
 - Arayuz: dugme gorunumu (gecis, kenar, golge), ekran gecis karartmasi.
+
+## Guncelleme — 2026-10-03: Kariyer, harita, gorunum, efektler, modifiye derinligi, UX (ara taslak)
+- Kariyer (game/League): 5 lig (MAHALLE .. PIST, sinif siniri endeks), 33 isimli rakip + patronlar (3 galibiyet ->
+  patron -> sonraki lig), 39 etkinlik (drag / yol / touge / karma / akis), un puani, pink slip, gunluk gorevler.
+  Garajdaki YARIS -> LeagueScreen.
+- Harita (RoadScreen): 350 m bloklar halinde bolge (kir / sehir binalari + pencereler + lambalar / tunel), dagda kaya
+  duvari, reklam panolari. Ortam yaris basinda: gece %30 (Renderer::setSceneLight, far / lamba aydinligi), yagmur
+  %25 (tutus x0.72 RoadCar::gripMul, rakip temkinli, damlalar, islak asfalt).
+- Gorunum (app/Looks.h, BodyShopScreen): boya / cila / serit / jant golgelendiricide (uPaint, uRim, uStripe, uPG;
+  boya gloss 1.0, jant 0.7, krom 0.99); aero kiti / kanat kutulardan (Renderer::kitMesh), suspansiyon basikligi.
+  Kayit "look=". Rakipler kanat / basiklik gosterir.
+- Efektler: egzoz alevi (kesici / gaz kesme), carpisma kivilcimi + kamera sarsintisi, hiz titresimi. Ses: vites
+  "tok"u, nitro tislamasi, yagmur (App::renderAudio, atomik bayraklar).
+- Modifiye: vuruntu (VehicleSim: oktan / istenen oktan; sensorlu ECU guc ceker, STANDALONE / YARIS HARITASI motoru
+  dover), lastik asinmasi (tireWearGained -> recordDamage), ayarlanabilir 2-step kalkis devri (Tune::launchRpm,
+  drag'de - / +). Drag tahmin onbellegi artik tam Tune::signature (eskiden v2 parcalar ayni sonucu donduruyordu).
+- UX: drag telemetri grafigi, basarimlar (21; Career::achieved, App::toast), ilk giris ipuclari (App::hint,
+  Settings::hintsSeen), oyun kolu (SDL3 gamepad + Android NDK), burnout'ta dokunmadan bekleyince motor bogulmaz.
+- Diller: 13 (+ RU, UK, EL, PL, NL, ID; LangMore2.inc). Piksel fonta Kiril + Yunan buyuk harf, UTF-8 cizim.
+  CJK / Hint / Tay icin ayri bitmap font gerekir (yapilmadi).
+- Kalan (sonraki adaylar): kendi en iyi kosuna karsi drag (ghost), polis / trafik modlari, ikinci el parca pazari,
+  bulut kayit, bolge haritasi ekrani, gercekci arac modelleri (kullanici erteledi).
+- Cihazda dogrulanacaklar (kullanici): oyun kolu, gece / yagmur performansi, yeni dillerin okunurlugu.
