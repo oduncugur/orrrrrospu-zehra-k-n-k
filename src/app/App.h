@@ -101,6 +101,7 @@ public:
     void setVoice(int i, const VehicleDef* v, bool turboKit = false);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
     void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
+    Opponent lastOpp;                              // son kariyer rakibi (tahmini ET'ler: odul zorlugu, ekranda gosterim)
     void wind(double speed) { windSpeed_ = (float)speed; }   // m/s, ruzgar ugultusu (ekran degisince 0)
 
 private:

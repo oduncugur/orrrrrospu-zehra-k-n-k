@@ -36,6 +36,9 @@ add_executable(zehra_sim src/main.cpp)
 target_link_libraries(zehra_sim PRIVATE zk_sim)
 add_executable(zehra_garage src/garage_main.cpp)
 target_link_libraries(zehra_garage PRIVATE zk_sim)
+# Rakip dengesi: tum araclar x YZ parca setleri 1/4 mil tablosu (src/game/EtTable.inc) uretir / analiz eder
+add_executable(zehra_ettable src/ettable_main.cpp)
+target_link_libraries(zehra_ettable PRIVATE zk_sim)
 
 # Grafik masaustu istemcisi (SDL3 + OpenGL 3.3). SDL3 bulunamazsa atlanir.
 find_package(SDL3 CONFIG QUIET)

@@ -45,8 +45,18 @@ double performanceIndex(const VehicleDef& v, const Tune& t);
 int  racePrize(const VehicleDef& opponent, bool won);
 
 // Rakip: oyuncunun (parcali) performansina yakin arac + yapay zekanin parca seti (stok / sokak / drag)
-struct Opponent { int carId; Tune tune; double index; };
+// estEt: rakibin tahmini 1/4 mili (tablodan, s); playerEt: oyuncunun tahmini (eslesme ani)
+struct Opponent { int carId; Tune tune; double index; double estEt = -1, playerEt = -1; };
 Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed);
+// YZ rakip parca setleri: 0 stok, 1 sokak (emme/egzoz, yari slick, 1.5W), 2 drag (slick, ECU, ST1, aks)
+constexpr int kOpponentPresets = 3;
+Tune opponentPreset(int i);
+// Tahmini 1/4 mil (s): YZ setleri icin uretilmis tablo (EtTable.inc, yaristaki fizik); baska parca setinde lastik
+// tipine en yakin satirdan guc/agirlik endeksiyle olceklenir (ET ~ endeks^-1/3). Tablo yoksa endeks formulu.
+double estimatedEt(const VehicleDef& v, const Tune& t);
+double tableEt(int carId, int preset);              // -1: yok / tamamlayamadi
+// Odul zorluk carpani: rakip ne kadar hizliysa o kadar cok (0.5-1.8); gap = oyuncu ET - rakip ET
+double prizeDifficulty(double gapSeconds);
 // Kisa parca ozeti (HUD): "SLICK ST2 KM 1.5W T1"
 std::string tuneSummary(const Tune& t);
 
@@ -58,8 +68,11 @@ struct Career {
     int  races = 0, wins = 0;
     long earnings = 0;
     bool treePro = false;
+    int  form = 0;                         // son yaris formu -3..+3 (galibiyet +1, maglubiyet -1): rakip zorlugu
     int  lastOppId = 0, sameOppWins = 0;   // ayni rakibi tekrar tekrar yenme (odul azalir, para kasma engeli)
     long bestFlow = 0;                     // otoban akisi en iyi skoru
+    // Rakip sec: oyuncunun tahmini ET'sine (+ forma gore hedef) yakin, son rakipten farkli
+    Opponent pickOpponentFor(uint32_t seed) const;
 
     static Career newGame();
     OwnedCar& car() { return cars[current]; }

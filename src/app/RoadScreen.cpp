@@ -63,7 +63,8 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
     if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma) {
-        const Opponent o = pickOpponent(carId_, tune_, (uint32_t)(app_.career.races * 7919 + 17));
+        const Opponent o = app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
+        app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
         app_.setVoice(1, findVehicle(rival), rt.turbo > 0);
     }
@@ -103,7 +104,8 @@ void RoadScreen::finishRace() {
     rewarded_ = true;
     if (autopilot_) return;
     if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
-    else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_, ses_->prizeScale());
+    else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
+                                                         ses_->prizeScale() * (app_.lastOpp.estEt > 0 && app_.lastOpp.playerEt > 0 ? prizeDifficulty(app_.lastOpp.playerEt - app_.lastOpp.estEt) : 1.0));
     else return;
     // Otomatik debriyaj (H-desen) odul cezasi: kazanilan paranin %25'i geri alinir
     if (autoClutchPenalty() && prize_ > 0) {

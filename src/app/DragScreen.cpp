@@ -200,7 +200,9 @@ void DragScreen::update(double dt) {
         rewarded_ = true;
         const bool won = race_->winner() == 0;
         const TimeSlip& s = race_->lane(0).slip;
-        app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_);
+        const Opponent& o = app_.lastOpp;
+        const double diff = o.carId == race_->lane(1).car->id && o.estEt > 0 && o.playerEt > 0 ? prizeDifficulty(o.playerEt - o.estEt) : 1.0;
+        app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
         app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun());
         app_.saveCareer();

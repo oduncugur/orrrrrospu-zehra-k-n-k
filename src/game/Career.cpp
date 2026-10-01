@@ -143,17 +143,60 @@ double performanceIndex(const VehicleDef& v, const Tune& t) {
     return hp / s.baseMassKg() * 1000.0 * tireF * driveF;
 }
 
+namespace {
+struct EtRow { int id; double e0, e1, e2; };
+const EtRow kEtTable[] = {
+#include "EtTable.inc"
+    {0, -1, -1, -1}
+};
+const EtRow* etRow(int id) {
+    static std::vector<const EtRow*> byId;
+    if (byId.empty()) {
+        byId.assign(vehicleCatalog().size() + 2, nullptr);
+        for (const EtRow& r : kEtTable) if (r.id > 0 && r.id < (int)byId.size()) byId[r.id] = &r;
+    }
+    return id > 0 && id < (int)byId.size() ? byId[id] : nullptr;
+}
+} // namespace
+
+double tableEt(int carId, int preset) {
+    const EtRow* r = etRow(carId);
+    if (!r) return -1.0;
+    return preset == 0 ? r->e0 : preset == 1 ? r->e1 : r->e2;
+}
+
+double estimatedEt(const VehicleDef& v, const Tune& t) {
+    const double idx = performanceIndex(v, t);
+    // Lastik tipine gore en yakin YZ seti once, sonra digerleri (gecerli satir bulunana kadar)
+    const int first = t.tires == TireType::DragSlick ? 2 : t.tires == TireType::SemiSlick ? 1 : 0;
+    for (int k : {first, 1, 0, 2}) {
+        const double e = tableEt(v.id, k);
+        if (e > 0) return e * std::cbrt(performanceIndex(v, opponentPreset(k)) / std::max(idx, 1.0));
+    }
+    return 5.825 * std::cbrt(1000.0 * 2.2046 / 1.0139 / std::max(idx, 1.0)) * 1.12;   // lb/hp formulu + sokak payi
+}
+
+double prizeDifficulty(double gap) { return std::clamp(1.0 + 0.6 * gap, 0.5, 1.8); }
+
 int racePrize(const VehicleDef& opponent, bool won) {
     return won ? (int)(std::round((250.0 + carPrice(opponent) * 0.04) / 10.0) * 10.0) : 0;
+}
+
+Tune opponentPreset(int i) {
+    Tune t;
+    if (i == 1) { t.intake = 1; t.exhaust = 1; t.tires = TireType::SemiSlick; t.diff = DiffType::OneAndHalfWay; }
+    if (i == 2) {
+        t.intake = 2; t.exhaust = 2; t.ecu = 1; t.tires = TireType::DragSlick;
+        t.clutch = 1; t.axles = 1; t.diff = DiffType::OneAndHalfWay;
+    }
+    return t;
 }
 
 Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed) {
     const VehicleDef& pv = *findVehicle(playerCarId);
     const double target = performanceIndex(pv, playerTune);
-    Tune presets[3];
-    presets[1].intake = 1; presets[1].exhaust = 1; presets[1].tires = TireType::SemiSlick; presets[1].diff = DiffType::OneAndHalfWay;
-    presets[2].intake = 2; presets[2].exhaust = 2; presets[2].ecu = 1; presets[2].tires = TireType::DragSlick;
-    presets[2].clutch = 1; presets[2].axles = 1; presets[2].diff = DiffType::OneAndHalfWay;
+    Tune presets[kOpponentPresets];
+    for (int i = 0; i < kOpponentPresets; ++i) presets[i] = opponentPreset(i);
     std::vector<Opponent> all;
     for (const auto& v : vehicleCatalog()) {
         if (v.id == playerCarId || !v.streetLegal) continue;
@@ -168,6 +211,37 @@ Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed) {
     if (pool.empty()) return {playerCarId, Tune{}, target};
     uint32_t x = seed * 2654435761u + 0x9E3779B9u; x ^= x >> 15;
     return *pool[x % pool.size()];
+}
+
+// Dengeli eslesme: endeks yerine tahmini 1/4 mil (vites, kalkis, cekis dahil). Hedef = oyuncu ET'si + 0.20 s (YZ kusursuz
+// kalkar/vites atar; insan payi) - 0.10 s x form
+// (kazandikca rakipler hizlanir, kaybettikce yavaslar); bant 0.15 s'den genisler; ayni rakip ust uste gelmez.
+Opponent Career::pickOpponentFor(uint32_t seed) const {
+    const OwnedCar& oc = car();
+    const VehicleDef& pv = *findVehicle(oc.carId);
+    const double pe = estimatedEt(pv, oc.tune);
+    uint32_t x = seed * 2654435761u + 0x9E3779B9u; x ^= x >> 15;
+    const double jitter = ((x >> 8) % 1000) / 1000.0 * 0.16 - 0.08;
+    const double target = pe + 0.20 - 0.10 * std::clamp(form, -3, 3) + jitter;
+    struct Cand { int id, preset; double et; };
+    static std::vector<Cand> all;
+    if (all.empty())
+        for (const auto& v : vehicleCatalog()) {
+            if (!v.streetLegal) continue;
+            for (int k = 0; k < kOpponentPresets; ++k) if (const double e = tableEt(v.id, k); e > 0) all.push_back({v.id, k, e});
+        }
+    if (all.empty()) { Opponent o = pickOpponent(oc.carId, oc.tune, seed); o.playerEt = pe; return o; }   // tablo yok
+    std::vector<const Cand*> pool;
+    for (double band : {0.15, 0.3, 0.6, 1.2, 1e9}) {
+        pool.clear();
+        for (const Cand& c : all)
+            if (c.id != oc.carId && c.id != lastOppId && std::fabs(c.et - target) <= band) pool.push_back(&c);
+        if (pool.size() >= 6) break;
+    }
+    if (pool.empty()) return {oc.carId, Tune{}, performanceIndex(pv, oc.tune), pe, pe};
+    const Cand& c = *pool[(x >> 3) % pool.size()];
+    const Tune t = opponentPreset(c.preset);
+    return {c.id, t, performanceIndex(*findVehicle(c.id), t), c.et, pe};
 }
 
 std::string tuneSummary(const Tune& t) {
@@ -236,6 +310,7 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
     const double decay = won ? std::max(0.25, 1.0 - 0.25 * sameOppWins) : 1.0;
     const long prize = (long)(racePrize(opponent, won) * decay * prizeScale);
     if (won) ++sameOppWins;
+    form = std::clamp(form + (won ? 1 : -1), -3, 3);
     money += prize; earnings += prize;
     ++races; if (won) ++wins;
     OwnedCar& oc = car();
@@ -296,7 +371,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\n";
     char buf[256];
     for (const OwnedCar& c : cars) {
         const Tune& t = c.tune;
@@ -336,6 +411,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "earnings") c.earnings = std::max(0L, std::atol(v.c_str()));
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
         else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
+        else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
         else if (k == "streak") {
             if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;
             c.sameOppWins = std::clamp(c.sameOppWins, 0, 100);

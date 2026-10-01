@@ -1,5 +1,7 @@
 // Kariyer / ekonomi / kayit testleri
 #include "game/Career.h"
+#include "game/DragRace.h"
+#include "garage/VehicleCatalog.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -105,6 +107,39 @@ int main() {
         CHECK(b > a * 1.3, "yapimli arac endeksi belirgin yuksek");
     }
 
+    std::printf("[R] Rakip dengesi: ET tablosu guncel, eslesme ET'ye gore, form zorlugu, odul zorluk carpani\n");
+    {
+        // Tablo fizikle uyumlu mu (fizik/YZ degisince zehra_ettable gen ile yenileyin)
+        for (int id : {5, 227, 269}) {
+            const Tune t = opponentPreset(1);
+            const QuarterEstimate e = DragRace::estimateQuarter(findVehicle(id), &t);
+            char m[96]; std::snprintf(m, sizeof m, "#%d tablo %.3f = tahmin %.3f (EtTable.inc guncel)", id, tableEt(id, 1), e.quarter);
+            CHECK(std::fabs(tableEt(id, 1) - e.quarter) < 0.02, m);
+        }
+        Career c = Career::newGame();
+        const double pe = estimatedEt(*findVehicle(c.car().carId), c.car().tune);
+        double sum0 = 0, sum3 = 0; int far = 0;
+        for (uint32_t s = 1; s <= 30; ++s) {
+            c.form = 0; const Opponent a = c.pickOpponentFor(s);
+            c.form = 3; const Opponent b = c.pickOpponentFor(s);
+            sum0 += a.estEt; sum3 += b.estEt;
+            far += std::fabs(a.estEt - (pe + 0.2)) > 0.4;
+        }
+        std::printf("    Sahin tahmini %.2f s | rakip ort. form 0: %.2f s, form +3: %.2f s\n", pe, sum0 / 30, sum3 / 30);
+        CHECK(far == 0, "rakipler oyuncu ET'sine yakin (+0.2 s insan payi, 0.4 s icinde)");
+        CHECK(sum3 < sum0 - 0.15 * 30, "kazandikca rakipler hizlanir");
+        c.form = 0; c.lastOppId = 0;
+        const Opponent o = c.pickOpponentFor(7);
+        c.lastOppId = o.carId;
+        bool repeat = false;
+        for (uint32_t s = 1; s <= 20; ++s) repeat |= c.pickOpponentFor(s).carId == o.carId;
+        CHECK(!repeat, "ayni rakip ust uste gelmez");
+        c.form = 0;
+        c.recordRace(*findVehicle(5), true, 0.0); c.recordRace(*findVehicle(5), true, 0.0);
+        CHECK(c.form == 2, "galibiyet formu artirir");
+        Career d; CHECK(Career::parse(c.serialize(), d) && d.form == 2, "form kayitta korunur");
+        CHECK(prizeDifficulty(0.5) > 1.2 && prizeDifficulty(-0.5) < 0.8 && prizeDifficulty(5) == 1.8, "zor rakip daha cok odul");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

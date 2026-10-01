@@ -395,3 +395,13 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
   Test road_test [8].
 - Hiz hissi (drag gorunumu): iki katman paralaks tepe, hiz cizgileri (>12 m/s), ruzgar sesi (`App::wind`: beyaz
   gurultu, 2 kutuplu alcak geciren, genlik ~hiz^2; ekran degisince 0). Ses kulakla dinlenmedi.
+
+## Guncelleme — 2026-10-02: Rakip dengesi (ET tablosu)
+- Eski eslesme guc/agirlik endeksiyle (+-%6) yapiliyordu; gercek 1/4 mil farki %5-%95 araliginda -1.08..+1.33 s idi
+  (eslesmelerin yalniz %45'i 0.3 s icinde). Simdi `src/game/EtTable.inc`: 324 arac x 3 YZ parca seti icin yaristaki
+  fizik + YZ kalkis planiyla olculmus ET (uretim: `zehra_ettable gen`, 16 cekirdekte ~14 dk; 4 kurulum tamamlayamadi = -1).
+  `Career::pickOpponentFor`: hedef = oyuncunun tahmini ET'si + 0.20 s (insan payi) - 0.10 s x form (-3..+3, galibiyet +1,
+  maglubiyet -1, kayitta `form=`), bant 0.15 s'den genisler, son rakip tekrar gelmez. `zehra_ettable analiz`: yeni
+  eslesmede fark %5-%95 -0.17..+0.17 s, %100'u 0.3 s icinde.
+- Odul: `prizeDifficulty(oyuncuET - rakipET)` = 1 + 0.6 x fark (0.5-1.8); drag ve yol yarislarinda (App::lastOpp).
+- FIZIK YA DA YZ DEGISIRSE TABLOYU YENILEYIN: career_test [R] 3 araci estimateQuarter ile karsilastirir (0.02 s).

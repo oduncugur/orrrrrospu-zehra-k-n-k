@@ -63,7 +63,8 @@ void App::goDrag(int p, int o, bool autopilot) {
 }
 void App::goCareerRace() {
     const OwnedCar& oc = career.car();
-    const Opponent opp = pickOpponent(oc.carId, oc.tune, raceSeed_++);
+    const Opponent opp = career.pickOpponentFor((uint32_t)career.races * 7919u + raceSeed_++);
+    lastOpp = opp;
     setScreen(std::make_unique<DragScreen>(*this, oc.carId, opp.carId, &oc.tune, &opp.tune, true));
 }
 void App::goParts() { setScreen(std::make_unique<PartsScreen>(*this)); }
