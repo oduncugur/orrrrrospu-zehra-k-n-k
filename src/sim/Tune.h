@@ -21,6 +21,7 @@ struct Tune {
     int      ecu = 0;             // 0..1 (atmosferik +%5, turbolu +%12)
     int      turbo = 0;           // 0 yok/fabrika, 1 kucuk kit (+0.6 bar), 2 buyuk kit (+1.2 bar, gec spool)
     bool     drySump = false;
+    bool     absKit = false, tcKit = false;   // sonradan ABS / cekis kontrolu (ECU yukseltmesi sart)
     FuelType fuel = FuelType::Race100;
 
     static int weightKg(int level) { static const int w[4] = {0, 40, 85, 140}; return w[level < 0 ? 0 : level > 3 ? 3 : level]; }

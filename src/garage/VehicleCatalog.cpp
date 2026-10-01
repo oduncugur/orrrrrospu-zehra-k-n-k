@@ -1,5 +1,6 @@
 #include "VehicleCatalog.h"
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -50,6 +51,8 @@ unsigned paintFor(int id) {
     return pal[(id * 7 + id / 5) % (sizeof(pal) / sizeof(pal[0]))];
 }
 
+#include "SafetyTable.inc"
+
 std::vector<VehicleDef> buildCatalog() {
 #define V(br, mo, rf, yr, bo, dr, m, l, w, h, wb, fw, en, gb) Row{br, mo, rf, yr, bo, dr, m, l, w, h, wb, fw, en, gb, false}
 #define R(br, mo, rf, yr, bo, dr, m, l, w, h, wb, fw, en, gb) Row{br, mo, rf, yr, bo, dr, m, l, w, h, wb, fw, en, gb, true}
@@ -80,6 +83,8 @@ std::vector<VehicleDef> buildCatalog() {
         d.rideHeightM = (r.body == Body::SUV || r.body == Body::Pickup || r.body == Body::Van) ? 0.22
                       : r.race ? 0.08 : 0.13;
         d.paintRGB = paintFor(id);
+        d.abs = std::find(std::begin(kFactoryAbs), std::end(kFactoryAbs), id) != std::end(kFactoryAbs) && !r.race;
+        d.tc = std::find(std::begin(kFactoryTc), std::end(kFactoryTc), id) != std::end(kFactoryTc) && !r.race;
         out.push_back(d);
         ++id;
     }

@@ -23,7 +23,7 @@ struct OwnedCar {
 };
 
 // Parca kategorileri ve seviyeleri (dukkan). Her secenek Tune'da tek bir alani degistirir.
-enum class PartCat { Tires, Clutch, Axles, Diff, FinalDrive, Weight, Intake, Exhaust, Ecu, Turbo, DrySump, Fuel, Count };
+enum class PartCat { Tires, Clutch, Axles, Diff, FinalDrive, Weight, Intake, Exhaust, Ecu, Turbo, DrySump, Fuel, Electronics, Count };
 
 struct PartOption { const char* name; int basePrice; };
 const char* partCatName(PartCat c);
@@ -31,7 +31,8 @@ const std::vector<PartOption>& partOptions(PartCat c);
 int  partLevel(const Tune& t, PartCat c, const VehicleDef& v);   // takili seviye
 void setPartLevel(Tune& t, PartCat c, int level, const VehicleDef& v);
 int  partPrice(PartCat c, int level, const VehicleDef& v);      // arac sinifina gore olceklenir
-bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr);
+// t: takili parcalar (ELEKTRONIK icin ECU sarti); nullptr ise yalniz arac kosullari denetlenir
+bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr, const Tune* t = nullptr);
 
 int  carPrice(const VehicleDef& v);
 int  sellPrice(const OwnedCar& c);

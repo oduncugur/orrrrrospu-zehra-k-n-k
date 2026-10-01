@@ -14,7 +14,7 @@ namespace zk {
 // ------------------------------------------------------------------ parca katalogu
 const char* partCatName(PartCat c) {
     static const char* n[] = {"LASTIK", "DEBRIYAJ", "AKS", "DIFERANSIYEL", "SON DISLI", "HAFIFLETME",
-                              "EMME", "EGZOZ", "ECU", "TURBO KITI", "KARTER", "YAKIT"};
+                              "EMME", "EGZOZ", "ECU", "TURBO KITI", "KARTER", "YAKIT", "ELEKTRONIK"};
     return n[(int)c];
 }
 
@@ -32,6 +32,7 @@ const std::vector<PartOption>& partOptions(PartCat c) {
         {{"YOK / FABRIKA", 0}, {"KUCUK KIT", 4500}, {"BUYUK KIT", 9000}},
         {{"ISLAK", 0}, {"KURU KARTER", 3500}},
         {{"100 OKTAN", 0}, {"95 OKTAN", 0}, {"E85 + SISTEM", 1500}},
+        {{"FABRIKA", 0}, {"ABS (ECU ILE)", 1600}, {"ABS + TC (ECU ILE)", 3000}},
     };
     return t[(int)c];
 }
@@ -53,6 +54,7 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     case PartCat::Turbo: return t.turbo;
     case PartCat::DrySump: return t.drySump ? 1 : 0;
     case PartCat::Fuel: return t.fuel == FuelType::Pump95 ? 1 : t.fuel == FuelType::E85 ? 2 : 0;
+    case PartCat::Electronics: return t.tcKit ? 2 : t.absKit ? 1 : 0;
     default: return 0;
     }
 }
@@ -76,6 +78,7 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::Turbo: t.turbo = l; break;
     case PartCat::DrySump: t.drySump = l == 1; break;
     case PartCat::Fuel: t.fuel = l == 1 ? FuelType::Pump95 : l == 2 ? FuelType::E85 : FuelType::Race100; break;
+    case PartCat::Electronics: t.absKit = l >= 1; t.tcKit = l >= 2; break;
     default: break;
     }
 }
@@ -101,7 +104,13 @@ int partPrice(PartCat c, int level, const VehicleDef& v) {
     return (int)(std::round(o[level].basePrice * scale / 10.0) * 10.0);
 }
 
-bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why) {
+bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, const Tune* t) {
+    if (c == PartCat::Electronics && level > 0) {
+        // Fabrikada olan sistem tekrar takilmaz; olmayana ancak ECU yukseltmesiyle eklenir
+        if (level == 1 && v.abs) { if (why) *why = "FABRIKADA VAR"; return false; }
+        if (level == 2 && v.abs && v.tc) { if (why) *why = "FABRIKADA VAR"; return false; }
+        if (t && t->ecu < 1) { if (why) *why = "ONCE ECU GEREKLI"; return false; }
+    }
     const EngineDef& e = engineTable()[v.engine];
     if (c == PartCat::Turbo && level > 0 && e.induction == Induction::Supercharger) {
         if (why) *why = "KOMPRESORLU MOTORA TURBO YOK";
@@ -203,7 +212,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why) {
     const VehicleDef& v = *findVehicle(oc.carId);
     if (level < 0 || level >= (int)partOptions(c).size()) { if (why) *why = "GECERSIZ"; return false; }
     if (partLevel(oc.tune, c, v) == level) { if (why) *why = "ZATEN TAKILI"; return false; }
-    if (!partAvailable(c, level, v, why)) return false;
+    if (!partAvailable(c, level, v, why, &oc.tune)) return false;
     const int p = partPrice(c, level, v);
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
     money -= p;
@@ -286,6 +295,7 @@ std::string Career::serialize() const {
                       t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
         o << buf;
         if (c.damaged()) { std::snprintf(buf, sizeof buf, "dmg=%d;%.4f\n", c.axleBroken ? 1 : 0, c.engineWear); o << buf; }
+        if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
     char cs[32]; std::snprintf(cs, sizeof cs, "checksum=%08x\n", fnv1a(body));
@@ -319,6 +329,11 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "streak") {
             if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;
             c.sameOppWins = std::clamp(c.sameOppWins, 0, 100);
+        }
+        else if (k == "elx" && !c.cars.empty()) {          // onceki araca ECU ile eklenen ABS / TC
+            int a = 0, tc = 0;
+            if (std::sscanf(v.c_str(), "%d;%d", &a, &tc) != 2) return false;
+            c.cars.back().tune.absKit = a != 0; c.cars.back().tune.tcKit = tc != 0;
         }
         else if (k == "dmg" && !c.cars.empty()) {          // onceki araca ait hasar
             int ax = 0; double ew = 0;

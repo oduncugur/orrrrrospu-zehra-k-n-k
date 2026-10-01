@@ -338,3 +338,19 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
   McLaren F1 12.02 (~11.1), Sahin 18.17 (~19). 120 eslesme: 120/120 bitirdi, 0 aks kirma, ort ET 13.153 (once 13.843).
 - `tune_test` [8] guncellendi: cekis sinirinda kisa son disli 60 ft'i belirgin degistirmez (eski dump'ta kazandiriyordu).
 - Telefonda planlama ~3 s surebilir; agac basinda bitmediyse kisa takilma olur (olculmedi).
+
+## Guncelleme — 2026-10-02: Yol kokpiti (yatay/dikey), vites kollari, debriyaj modu, ABS / TC
+- `Cockpit`: analog gaz/fren/debriyaj + vites kolu (H-desen / otomatik P-N-D / sirali +/-), yatay ve dikey
+  yerlesim. Yol ekrani ayardan YATAY (varsayilan) ya da DIKEY; ekranda direksiyon tusu yok (egim / A-D).
+- DEBRIYAJ (H) ayari: OYUNCU (analog pedal; debriyajsiz vites girmez) / OTOMATIK (bedel: virajda R<350 m
+  vites degismez, 1.6 kat gec kavrar, odul %75). Sirali: dogbox 35 ms / DCT 60 ms. Otomatik: P/N/D.
+- Android egim ekseni ekran donusune gore (Display.getRotation, yarim saniyede bir).
+- ABS / TC: `SafetyTable.inc` fabrika donanimi (o yil/versiyon standart; YAKLASIK, yayin oncesi dogrula).
+  324 aracin 171'inde ABS, 91'inde TC. Olmayan araca parca dukkani ELEKTRONIK: ABS / ABS+TC (ONCE ECU GEREKLI;
+  fabrikada olan satilmaz). Kayit: `elx=abs;tc` satiri.
+- Fizik (`VehicleSim::updateElectronics`, yalniz tune'lu oyun kurulumu; regresyon ayni): ABS anlik kayma
+  < -%12'de freni orantili birakir; TC cekis kaymasi > %10'da motor torkunu (PowertrainCore::setTorqueLimit)
+  orantili keser. Olculen: Sahin+ABS 100-0 50.3 -> 38.8 m, kilitli zaman %94 -> %0; Hellcat sokak lastigi
+  TC ile kayma 5.7 -> 0.11, 2 s'de 5.5 -> 7.8 m. Acik yolda yardim dugmesi TC yoksa "TC YOK"; drag'de TC
+  YZ'de kapali, oyuncuda ayara gore. Test: `electronics_test` (ctest `abs_tc`).
+- SIRADAKI: karma yaris (duz yol drag gorunumu + virajli 3B bolum + tekrar drag), viraj-only yaris modu.

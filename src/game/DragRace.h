@@ -76,7 +76,8 @@ public:
     int winner() const { return winner_; }                   // -1 belirsiz, 0 oyuncu, 1 rakip
     std::vector<std::string> drainEvents() { auto v = std::move(events_); events_.clear(); return v; }
     void skipBurnout();                                      // burnout'tan stage'e gec
-    void setPlayerAutopilot(bool on) { autopilot_ = on; }    // oyuncu serdini yapay zeka surer (tanitim / test)
+    void setPlayerAutopilot(bool on) { autopilot_ = on; }
+    void setPlayerTractionControl(bool on) { lanes_[0].sim->setTractionControl(on); }   // aracta TC varsa    // oyuncu serdini yapay zeka surer (tanitim / test)
     TreeType tree() const { return tree_; }
 
     using LaunchPlan = zk::LaunchPlan;

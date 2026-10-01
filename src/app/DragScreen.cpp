@@ -53,6 +53,7 @@ void DragScreen::restart() {
     finishedT_ = 0; t_ = 0;
     hapGear_ = 1; hapFlat_ = 0; hapLeft_ = hapBroke_ = hapRed_ = false; hapLimiterT_ = 0;
     race_->setPlayerAutopilot(autopilot_);
+    race_->setPlayerTractionControl(app_.settings.assist);       // yalniz aracta TC varsa (fabrika / ECU kiti)
 }
 
 DragScreen::Ctl DragScreen::hit(float x, float y) const {

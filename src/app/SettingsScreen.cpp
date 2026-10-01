@@ -27,7 +27,7 @@ const char* label(It it) {
     case It::Haptics: return "TITRESIM";
     case It::Tilt: return "EGIM DIREKSIYON";
     case It::TiltSens: return "EGIM HASSASIYET";
-    case It::Assist: return "SURUS YARDIMI";
+    case It::Assist: return "CEKIS KONT.";
     case It::Gears: return "DEBRIYAJ (H)";
     case It::Speed: return "HIZ BIRIMI";
     case It::Tree: return "DRAG AGACI";
@@ -48,7 +48,7 @@ const char* help(It it) {
     case It::Haptics: return "TITRESIM GUCU. 0 = KAPALI";
     case It::Tilt: return "ACIK YOLDA TELEFONU EGEREK DIREKSIYON";
     case It::TiltSens: return "YUKSEK: DAHA AZ EGIMLE TAM DIREKSIYON";
-    case It::Assist: return "ACIK YOL: ESP + OTOMATIK DEBRIYAJ. YOLDA DA DEGISTIRILEBILIR";
+    case It::Assist: return "TC/ESP: YALNIZ ARACTA VARSA (YOKSA ECU + ELEKTRONIK PARCASI). YOLDA DA DEGISIR";
     case It::Gears: return "H-DESEN MANUEL: OTOMATIKTE VIRAJDA VITES YOK, GEC KAVRAR, ODUL %75";
     case It::Speed: return "HIZ GOSTERGESI BIRIMI";
     case It::Tree: return "PRO: 3 SARI BIRDEN, 0.4 S. SPOR: SIRALI SARILAR, 0.5 S";

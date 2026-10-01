@@ -80,10 +80,12 @@ void PartsScreen::render(Renderer& r) {
     if (cat_ < 0) {
         for (int i = 0; i < (int)PartCat::Count; ++i) {
             const PartCat c = (PartCat)i;
-            const Rect row{8, 104.0f + i * 40, 352, 140.0f + i * 40};
+            const Rect row{8, 104.0f + i * 37, 352, 137.0f + i * 37};
             r.rect(row.x0, row.y0, row.x1, row.y1, kUiPanel);
             r.text(16, row.y0 + 11, partCatName(c), 2, {1, 1, 1});
-            const std::string cur = partOptions(c)[partLevel(oc.tune, c, v)].name;
+            std::string cur = partOptions(c)[partLevel(oc.tune, c, v)].name;
+            if (c == PartCat::Electronics && partLevel(oc.tune, c, v) == 0)          // fabrika donanimi
+                cur = v.abs ? (v.tc ? "FABRIKA ABS+TC" : "FABRIKA ABS") : "YOK";
             r.text(344 - r.textWidth(cur, 1), row.y0 + 14, cur, 1, kUiGold);
         }
         button(r, kBack, "< GARAJ", kUiBtn, 2);
@@ -95,7 +97,7 @@ void PartsScreen::render(Renderer& r) {
         for (int i = 0; i < (int)opts.size(); ++i) {
             const Rect row{8, 144.0f + i * 60, 352, 196.0f + i * 60};
             std::string why;
-            const bool avail = partAvailable(c, i, v, &why);
+            const bool avail = partAvailable(c, i, v, &why, &oc.tune);
             const int price = partPrice(c, i, v);
             const bool mine = i == cur, afford = app_.career.money >= price;
             r.rect(row.x0, row.y0, row.x1, row.y1, mine ? Color{0.12f, 0.3f, 0.16f} : kUiPanel);
@@ -113,7 +115,7 @@ void PartsScreen::pointerDown(int, float x, float y) {
     if (kBack.hit(x, y)) { if (cat_ >= 0) cat_ = -1; else app_.goGarage(); return; }
     if (cat_ < 0) {
         for (int i = 0; i < (int)PartCat::Count; ++i)
-            if (Rect{8, 104.0f + i * 40, 352, 140.0f + i * 40}.hit(x, y)) { cat_ = i; return; }
+            if (Rect{8, 104.0f + i * 37, 352, 137.0f + i * 37}.hit(x, y)) { cat_ = i; return; }
         return;
     }
     const PartCat c = (PartCat)cat_;

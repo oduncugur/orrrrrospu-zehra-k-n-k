@@ -61,6 +61,7 @@ struct VehicleDef {
     int         gearbox;       // gearboxTable() indeksi
     Exhaust     exhaust;
     bool        streetLegal;   // false: yaris araci, romork/cekici zorunlu
+    bool        abs = false, tc = false;   // fabrika ABS / cekis kontrolu (SafetyTable.inc; yoksa ECU ile eklenir)
     bool        wing, hoodScoop, widebody;
     double      rideHeightM;
     unsigned    paintRGB;

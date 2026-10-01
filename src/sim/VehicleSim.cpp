@@ -66,6 +66,10 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[car->gearbox].type : Gearbox::HPattern;
+    // ABS / TC: fabrika donanimi ya da ECU kiti; yalniz oyun kurulumunda (tune var)
+    absAvail_ = car && tune && (car->abs || tune->absKit);
+    tcAvail_ = car && tune && (car->tc || tune->tcKit);
+    tcOn_ = tcAvail_;
     // Otomatik: debriyaj yerine tork konvertoru (stall devri %42 redline)
     if (boxType_ == Gearbox::TorqueConverter) pt_->setConverter(true, 0.42 * eng_.redlineRpm, PowertrainCore::kConverterTr0);
     // Cekis dagitimi: AWD'de merkez dagitim %40 on / %60 arka (sabit oranli)
@@ -152,7 +156,33 @@ double VehicleSim::defaultLaunchRpm() const {
     return cfg_.car ? std::clamp(0.55 * eng_.redlineRpm, 3000.0, 6500.0) : 6500.0;
 }
 
+// ABS: kilitlenen (kayma < -0.15) tekerlegin frenini birakir, tutunca geri basar (~10 Hz cevrim).
+// TC: cekis tekerlegi kaymasi 0.15'i asinca motor torku kesilir, tutunca geri verilir. Yalniz mevcutsa (fabrika ya
+// da ECU kiti) calisir; Faz 1 kurulumu (tune yok, zehra_sim) etkilenmez.
+void VehicleSim::updateElectronics(double dt, double brake) {
+    if (absAvail_) {
+        for (int i = 0; i < 4; ++i) {
+            // Anlik kayma (gevsemeli kappa gecikir): -%12'yi asan tekerlegin freni asimla orantili birakilir
+            const double s = (w_[i].omega() * w_[i].rEff() - speed()) / std::max(speed(), 2.0);
+            if (brake > 0.05 && speed() > 1.5 && s < -0.12) absF_[i] = std::max(0.05, absF_[i] - dt * 80.0 * std::min(-s - 0.12, 1.0));
+            else absF_[i] = std::min(1.0, absF_[i] + dt * 6.0);
+        }
+    }
+    if (tcAvail_) {
+        // Anlik kayma: tekerlek cevre hizi vs arac hizi (gevsemeli kappa dusuk hizda gecikir, kontrol salinirdi).
+        // Oransal: hedefin (0.10) asimiyla orantili hizli kesme, altinda yavas geri verme.
+        const double V = std::max(speed(), 2.0);
+        double s = 0.0;
+        for (int i = 0; i < 4; ++i)
+            if ((i < 2 && frontShare_ > 0.0) || (i >= 2 && frontShare_ < 1.0)) s = std::max(s, (w_[i].omega() * w_[i].rEff() - speed()) / V);
+        if (!tcOn_) tcLim_ = std::min(1.0, tcLim_ + dt * 4.0);
+        else tcLim_ = s > 0.10 ? std::max(0.05, tcLim_ - dt * 40.0 * std::min(s - 0.10, 1.0)) : std::min(1.0, tcLim_ + dt * 2.5);
+        pt_->setTorqueLimit(tcLim_);
+    }
+}
+
 void VehicleSim::step(double dt, const VehicleInputs& in) {
+    updateElectronics(dt, in.brake);
     if (cfg_.planar) { stepPlanar(dt, in); return; }
     PowertrainCore& pt = *pt_;
     DrivetrainFailure& fail = *fail_;
@@ -190,7 +220,7 @@ void VehicleSim::step(double dt, const VehicleInputs& in) {
         w_[i].setNormalLoad(susp_->tireLoad(i));
         const double share = i < 2 ? fs : 1.0 - fs;
         const double Ta = share * ((i % 2 == 0) ? pt.axleTorqueL() : pt.axleTorqueR());
-        w_[i].step(dt, V_, Ta, i < 2 ? bF : bR);
+        w_[i].step(dt, V_, Ta, (i < 2 ? bF : bR) * absF_[i]);
         sumFx += w_[i].Fx();
         const double h = w_[i].consumeHapticPulse();
         if (h > 0.0) haptic_ = std::max(haptic_, h);
@@ -256,7 +286,7 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
         w_[i].setNormalLoad(susp_->tireLoad(i));
         const double share = i < 2 ? fs : 1.0 - fs;
         const double Ta = share * ((i % 2 == 0) ? pt.axleTorqueL() : pt.axleTorqueR());
-        w_[i].stepPlanar(dt, vlong, vlat, Ta, i < 2 ? bF : bR);
+        w_[i].stepPlanar(dt, vlong, vlat, Ta, (i < 2 ? bF : bR) * absF_[i]);
         const double fx = w_[i].Fx(), fy = w_[i].Fy();
         const double bx = fx * cd - fy * sd, by = fx * sd + fy * cd;           // govde eksenine
         Fx += bx; Fy += by;

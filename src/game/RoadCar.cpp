@@ -130,7 +130,8 @@ void RoadCar::update(double dt, const RoadControls& c) {
         sim_->setGrade(p.grade * std::cos(sim_->heading() - p.heading));
     }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
-    if (assist && v > 3.0) {
+    sim_->setTractionControl(assist);                                   // TC yalniz aracta varsa (fabrika / ECU kiti)
+    if (assist && sim_->hasTc() && v > 3.0) {
         // ESP benzeri: arka kayarsa otomatik karsi direksiyon + gaz kesme
         const double beta = sim_->bodySlipAngle();
         // Normal virajdaki kucuk govde kaymasina (~3 deg) karismaz; yalnizca fazlasina karsi direksiyon

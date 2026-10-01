@@ -105,6 +105,12 @@ public:
     Gearbox gearboxType() const { return boxType_; }
     Drive drive() const { return drive_; }
     double defaultLaunchRpm() const;
+    // Elektronik: ABS ve cekis kontrolu (fabrika ya da ECU kiti). TC surucu tarafindan kapatilabilir; ABS hep acik.
+    bool hasAbs() const { return absAvail_; }
+    bool hasTc() const { return tcAvail_; }
+    void setTractionControl(bool on) { tcOn_ = on && tcAvail_; }
+    bool tractionControl() const { return tcOn_; }
+    bool tcActive() const { return tcLim_ < 0.98; }   // su an tork kesiyor (gosterge)
     double shiftRpm() const { return eng_.redlineRpm - 250.0; }
     double baseMassKg() const { return baseMass_; }
     double axleDiameterMm() const { return fail_->axle().diameterMm; }
@@ -114,6 +120,9 @@ public:
 
 private:
     void stepPlanar(double dt, const VehicleInputs& in);
+    void updateElectronics(double dt, double brake);
+    bool absAvail_ = false, tcAvail_ = false, tcOn_ = false;
+    double absF_[4] = {1.0, 1.0, 1.0, 1.0}, tcLim_ = 1.0;
     VehicleSimConfig cfg_;
     EngineSpec eng_; GearboxSpec gbx_;
     Gearbox boxType_ = Gearbox::HPattern;

@@ -338,7 +338,9 @@ void RoadScreen::drawHud(Renderer& r) {
     r.text(rx, 22, b, 1, {1, 1, 1});
     const bool tiltOn = app_.settings.tiltSteer;
     if (app_.tiltAvailable) button(r, tiltBtn_, tiltOn ? "EGIM ACIK" : "EGIM KAPALI", tiltOn ? Color{0.12f, 0.35f, 0.18f, 0.85f} : Color{0.25f, 0.25f, 0.28f, 0.85f}, 1);
-    button(r, assistBtn_, Pc.assist ? "YARDIM ACIK" : "YARDIM KAPALI", Pc.assist ? Color{0.12f, 0.35f, 0.18f, 0.85f} : Color{0.45f, 0.18f, 0.1f, 0.85f}, 1);
+    if (!sim.hasTc()) button(r, assistBtn_, sim.hasAbs() ? "ABS  TC YOK" : "ABS/TC YOK", Color{0.25f, 0.25f, 0.28f, 0.85f}, 1);
+    else button(r, assistBtn_, Pc.assist ? (sim.tcActive() ? "TC !" : "TC ACIK") : "TC KAPALI",
+                Pc.assist ? (sim.tcActive() ? Color{0.75f, 0.55f, 0.05f, 0.9f} : Color{0.12f, 0.35f, 0.18f, 0.85f}) : Color{0.45f, 0.18f, 0.1f, 0.85f}, 1);
     // Ikinci satir: moda gore bilgi
     if (const FlowScorer* fl = ses_->flow()) {
         const int tl = (int)std::ceil(ses_->flowTimeLeft());
@@ -435,9 +437,10 @@ void RoadScreen::pointerDown(int id, float x, float y) {
 // Yolda yapilan secimler ayarlara da yazilir (sonraki surus ayni modla baslar)
 void RoadScreen::toggleAssist() {
     RoadCar& P = ses_->player();
+    if (!P.sim().hasTc()) { flash("BU ARACTA TC YOK - ECU + ELEKTRONIK", 2.0); return; }
     P.assist = !P.assist;
     app_.settings.assist = P.assist; app_.saveSettings();
-    flash(P.assist ? "SURUS YARDIMI ACIK" : "SURUS YARDIMI KAPALI", 1.5);
+    flash(P.assist ? "CEKIS KONTROLU ACIK" : "CEKIS KONTROLU KAPALI", 1.5);
 }
 void RoadScreen::toggleTilt() {
     app_.settings.tiltSteer = !app_.settings.tiltSteer; app_.saveSettings();

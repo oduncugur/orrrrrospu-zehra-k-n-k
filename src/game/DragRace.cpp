@@ -38,6 +38,7 @@ DragRace::DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t s
         cfg.fuelLiters = 8.0;
         L.sim = std::make_unique<VehicleSim>(cfg);
         L.sim->setSurfaceMu(trackPrep(cfg.tune));
+        L.sim->setTractionControl(false);                              // drag: TC kapali (oyuncu istege bagli acar)
         L.sim->powertrain().setGear(1);
         L.sim->powertrain().setClutchPedal(1.0);
     }
@@ -259,6 +260,7 @@ DragRace::LaunchPlan DragRace::planLaunch(const VehicleDef* car, const Tune* tun
         VehicleSimConfig cfg; cfg.car = car; cfg.tune = tune ? &t : nullptr; cfg.road = "drag"; cfg.fuelLiters = 8.0;
         L.sim = std::make_unique<VehicleSim>(cfg);
         L.sim->setSurfaceMu(trackPrep(cfg.tune));
+        L.sim->setTractionControl(false);
         L.car = car; L.aiLaunchRpm = rpm; L.aiRelease = release;
         PowertrainCore& pt = L.sim->powertrain();
         pt.setGear(1); pt.setClutchPedal(1.0); pt.setThrottle(1.0); pt.setTwoStep(true, rpm);
