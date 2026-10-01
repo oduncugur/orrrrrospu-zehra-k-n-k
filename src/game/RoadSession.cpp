@@ -11,13 +11,14 @@ double RoadSession::rnd() { rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_
 
 RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed, Kind kind)
     : mode_(mode), kind_(kind),
-      road_(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
-            kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05),
+      road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04)
+            : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
+                       kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
     startS_ = kStartS;
     rivalLane_ = -lane();
     player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, -lane());
-    if (mode == Mode::Race) {
+    if (mode == Mode::Race || mode == Mode::Karma) {
         // Rakip yan seritte, ayni cizgide
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
         phase_ = Phase::Countdown; countdown_ = 3.0;
@@ -31,7 +32,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     }
     // Trafik: yol boyunca araclar (sag seritte yavas, karsi seritte gelen). Akis modunda yogun.
     const auto& cat = vehicleCatalog();
-    const int nTraffic = kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : 14;   // dag yolunda trafik seyrek
+    const int nTraffic = mode == Mode::Karma ? 0 : kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : 14;   // karma: kapali yol
     const double spacing = mode == Mode::Flow ? 70.0 : 170.0;
     for (int i = 0; i < nTraffic; ++i) {
         TrafficCar t{};
@@ -84,6 +85,7 @@ void RoadSession::collide(RoadCar& car, bool isPlayer) {
 // YZ rakip: sag seritte yavas trafik varsa karsi serit bossa sollar, degilse arkasinda bekler
 RoadControls RoadSession::rivalControls() {
     RoadCar& r = *rival_;
+    if (mode_ == Mode::Karma) return r.aiControls(+lane(), 0.6);        // kapali yol: kendi (sol) seridinde kalir
     const double s = r.s(), v = r.sim().speed();
     double cap = 1e9, blockV = -1;
     for (const TrafficCar& t : traffic_)

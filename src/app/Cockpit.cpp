@@ -15,14 +15,16 @@ struct PadLayout {
     Rect seqUp, seqDn;
     float autoY[3];   // P N D
 };
-const PadLayout kLand{{4, 40, 58, 356}, {62, 40, 116, 356}, {582, 40, 636, 356}, {494, 250, 578, 356},
+const PadLayout kLand{{62, 40, 116, 356}, {4, 40, 58, 356}, {582, 40, 636, 356}, {494, 250, 578, 356},
                    {508, 536, 564}, 264, 303, 342, {494, 250, 578, 300}, {494, 306, 578, 356}, {266, 303, 340}};
-const PadLayout kPort{{4, 420, 58, 636}, {62, 420, 116, 636}, {302, 420, 356, 636}, {214, 530, 298, 636},
+const PadLayout kPort{{62, 420, 116, 636}, {4, 420, 58, 636}, {302, 420, 356, 636}, {214, 530, 298, 636},
                    {228, 256, 284}, 544, 583, 622, {214, 530, 298, 580}, {214, 586, 298, 636}, {546, 583, 620}};
 const char* const kAutoName[3] = {"P", "N", "D"};
 
 float sliderValue(const Rect& r, float y) { return std::clamp((r.y1 - 6 - y) / (r.y1 - r.y0 - 12), 0.0f, 1.0f); }
 const PadLayout& lay(bool portrait) { return portrait ? kPort : kLand; }
+// Pedal sirasi gercek arabadaki gibi soldan: debriyaj, fren, gaz. Debriyaj yoksa fren en solda.
+Rect brakeRect(const PadLayout& L, bool clutch) { return clutch ? L.brake : L.clutch; }
 } // namespace
 
 
@@ -47,7 +49,7 @@ void Cockpit::setKnobGear(int g) {
 Cockpit::Ctl Cockpit::hit(float x, float y) const {
     const PadLayout& L = lay(portrait_);
     if (L.thr.hit(x, y)) return Ctl::Throttle;
-    if (L.brake.hit(x, y)) return Ctl::Brake;
+    if (brakeRect(L, clutchPedal_).hit(x, y)) return Ctl::Brake;
     if (clutchPedal_ && L.clutch.hit(x, y)) return Ctl::Clutch;
     if (lever_ == Lever::HPattern && L.lever.hit(x, y)) return Ctl::Shifter;
     if (lever_ == Lever::Automatic && L.lever.hit(x, y)) return Ctl::Auto;
@@ -92,7 +94,7 @@ bool Cockpit::pointerDown(int id, float x, float y) {
     touches_.push_back({id, c});
     switch (c) {
     case Ctl::Throttle: thrUi_ = sliderValue(L.thr, y); break;
-    case Ctl::Brake: brakeUi_ = sliderValue(L.brake, y); break;
+    case Ctl::Brake: brakeUi_ = sliderValue(brakeRect(L, clutchPedal_), y); break;
     case Ctl::Clutch: clutchUi_ = sliderValue(L.clutch, y); break;
     case Ctl::Shifter: shifterFromPoint(x, y); break;
     case Ctl::Auto: autoFromPoint(y); break;
@@ -108,7 +110,7 @@ void Cockpit::pointerMove(int id, float x, float y) {
     for (const Touch& t : touches_) {
         if (t.id != id) continue;
         if (t.ctl == Ctl::Throttle) thrUi_ = sliderValue(L.thr, y);
-        else if (t.ctl == Ctl::Brake) brakeUi_ = sliderValue(L.brake, y);
+        else if (t.ctl == Ctl::Brake) brakeUi_ = sliderValue(brakeRect(L, clutchPedal_), y);
         else if (t.ctl == Ctl::Clutch) clutchUi_ = sliderValue(L.clutch, y);
         else if (t.ctl == Ctl::Shifter) shifterFromPoint(x, y);
         else if (t.ctl == Ctl::Auto) autoFromPoint(y);
@@ -169,7 +171,7 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
         r.rect(rc.x0, y - 2, rc.x1, y + 2, {1, 1, 1, 0.9f});
         for (size_t i = 0; label[i]; ++i) r.textCentered(rc.cx(), rc.y0 + 8 + i * 16.0f, std::string(1, label[i]), 2, {1, 1, 1, 0.9f});
     };
-    slider(L.brake, (float)brake(), "FREN", {0.85f, 0.15f, 0.15f, 0.85f});
+    slider(brakeRect(L, clutchPedal_), (float)brake(), "FREN", {0.85f, 0.15f, 0.15f, 0.85f});
     if (clutchPedal_) {
         slider(L.clutch, (float)clutch(), "DEBRIYAJ", {0.25f, 0.55f, 0.95f, 0.85f});
         const float span = L.clutch.y1 - L.clutch.y0 - 12;                // isirma bolgesi (pedal 0.32 .. 0.62)

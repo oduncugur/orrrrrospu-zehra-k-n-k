@@ -16,7 +16,6 @@ struct Rng {
 RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfWidth, double maxGrade) : halfWidth_(halfWidth) {
     Rng r{seed ? seed : 1u};
     // Egrilik programi: [duzluk][giris klotoidi][sabit yay][cikis klotoidi] tekrarlari
-    struct Seg { double len, k0, k1; };
     std::vector<Seg> prog;
     prog.push_back({200.0, 0.0, 0.0});                           // baslangic duzlugu
     double total = 200.0;
@@ -32,6 +31,12 @@ RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfW
         prog.push_back({trans, k, 0.0});
         total += straight + 2 * trans + arc;
     }
+    integrate(prog, lengthM);
+    addElevation(seed, maxGrade, minRadius < 50 ? 250.0 : 600.0, minRadius < 50 ? 1000.0 : 2400.0);
+}
+
+// Egrilik programini 2 m adimlarla x/y/yon olarak integre eder (orta nokta)
+void RoadPath::integrate(const std::vector<Seg>& prog, double lengthM) {
     double x = 0, y = 0, h = 0, s = 0;
     pts_.push_back({x, y, h, 0.0, 0.0});
     for (const Seg& g : prog) {
@@ -45,11 +50,13 @@ RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfW
         }
         if (s >= lengthM) break;
     }
+}
+
+// Yukseklik: uc sinusun toplami olarak egim (yumusak tepe/cukur), ayri tohum (viraj programi ayni kalir).
+// Baslangic duzlugu (ilk 150 m) duz, 150-450 m arasi yumusakca girer.
+void RoadPath::addElevation(uint32_t seed, double maxGrade, double wl0, double wl1) {
     if (maxGrade <= 0.0) return;
-    // Yukseklik: uc sinusun toplami olarak egim (yumusak tepe/cukur), ayri tohum (viraj programi ayni kalir).
-    // Baslangic duzlugu (ilk 150 m) duz, 150-450 m arasi yumusakca girer.
     Rng e{(seed ? seed : 1u) * 2654435761u + 12345u};
-    const double wl0 = minRadius < 50 ? 250.0 : 600.0, wl1 = minRadius < 50 ? 1000.0 : 2400.0;
     double L[3], A[3], P[3];
     for (int k = 0; k < 3; ++k) { L[k] = e.range(wl0, wl1); A[k] = maxGrade * e.range(0.45, 0.6); P[k] = e.range(0.0, 6.2831853); }
     auto grade = [&](double ss) {
@@ -64,6 +71,44 @@ RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfW
         if (i > 0) z += 0.5 * (g + pts_[i - 1].grade) * (pts_[i].s - pts_[i - 1].s);
         pts_[i].grade = g; pts_[i].z = z;
     }
+}
+
+// Karma yaris yolu: uzun duzluk (drag) -> 1-3 virajlik blok (S olabilir) -> duzluk -> viraj blogu -> bitis duzlugu.
+// Viraj bolumu blogun ~120 m oncesinden (fren bolgesi) 60 m sonrasina kadar sayilir.
+RoadPath RoadPath::karma(uint32_t seed, double maxGrade) {
+    RoadPath p;
+    p.halfWidth_ = 3.6;
+    Rng r{seed ? seed * 2246822519u + 3u : 1u};
+    std::vector<Seg> prog;
+    double s = 0.0;
+    auto straight = [&](double len) { prog.push_back({len, 0.0, 0.0}); s += len; };
+    auto curveBlock = [&]() {
+        const double s0 = s;
+        const int n = 1 + (int)(r.uni() * 3.0);                      // 1-3 viraj
+        double sign = r.uni() < 0.5 ? 1.0 : -1.0;
+        for (int i = 0; i < n; ++i) {
+            if (i > 0) { straight(r.range(30.0, 120.0)); if (r.uni() < 0.6) sign = -sign; }   // S ihtimali
+            const double R = r.range(70.0, 220.0), k = sign / R;
+            const double trans = std::clamp(0.25 * R, 20.0, 60.0);
+            const double arc = r.range(30.0, 100.0) * 3.14159265358979 / 180.0 * R;
+            prog.push_back({trans, 0.0, k}); prog.push_back({arc, k, k}); prog.push_back({trans, k, 0.0});
+            s += 2 * trans + arc;
+        }
+        p.sections_.push_back({std::max(0.0, s0 - 120.0), s + 60.0, true});
+    };
+    straight(r.range(2800.0, 3600.0));
+    curveBlock();
+    straight(r.range(1500.0, 2500.0));
+    curveBlock();
+    straight(r.range(1000.0, 1600.0) + 300.0);                       // bitis duzlugu + bitis sonrasi yavaslama
+    p.integrate(prog, s);
+    p.addElevation(seed + 77u, maxGrade, 600.0, 2400.0);
+    return p;
+}
+
+bool RoadPath::curvyAt(double s) const {
+    for (const RoadSection& q : sections_) if (q.curvy && s >= q.s0 && s <= q.s1) return true;
+    return false;
 }
 
 RoadPoint RoadPath::at(double s) const {

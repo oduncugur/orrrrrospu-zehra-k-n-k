@@ -181,6 +181,41 @@ int main() {
         std::printf("    otomatik N'de tam gaz 2 s: %.2f m/s, %.0f rpm\n", o.sim().speed(), o.sim().powertrain().rpm());
         CHECK(o.sim().speed() < 0.3, "otomatik N: gazla ilerlemez");
     }
+    std::printf("[8] Karma yaris: duz (drag) -> viraj blogu -> duz -> viraj blogu -> bitis\n");
+    {
+        const RoadPath k = RoadPath::karma(3u, 0.04);
+        const auto& sec = k.sections();
+        std::printf("    uzunluk %.2f km, virajli bolumler:", k.length() / 1000.0);
+        for (const RoadSection& q : sec) std::printf(" [%.0f-%.0f m]", q.s0, q.s1);
+        std::printf("\n");
+        CHECK(sec.size() == 2 && sec[0].curvy && sec[1].curvy, "iki viraj blogu");
+        CHECK(sec.size() == 2 && sec[0].s0 >= 2650.0 && sec[1].s0 > sec[0].s1 + 1300.0, "once uzun duzluk (>= ~2.8 km), bloklar arasi duzluk");
+        double maxKStraight = 0, maxKCurve = 0;
+        for (const RoadPoint& p : k.points()) {
+            if (k.curvyAt(p.s)) maxKCurve = std::max(maxKCurve, std::fabs(p.curvature));
+            else maxKStraight = std::max(maxKStraight, std::fabs(p.curvature));
+        }
+        CHECK(maxKStraight < 1e-9 && maxKCurve > 1.0 / 230.0, "duz bolum gercekten duz, viraj bolumu R < 230 m");
+        // Oturum: iki YZ (oyuncu duzde serit takibi, virajda YZ), sonuclanir; ayni tohum ayni sonuc
+        double res[2][2];
+        for (int run = 0; run < 2; ++run) {
+            Tune t;
+            RoadSession rs(RoadSession::Mode::Karma, 5, &t, 227, &t, 11u);
+            double t0 = 0;
+            while (rs.phase() != RoadSession::Phase::Finished && t0 < 600.0) {
+                rs.update(1.0 / 60.0, rs.player().aiControls(-rs.lane(), 0.6));
+                t0 += 1.0 / 60.0;
+            }
+            res[run][0] = rs.playerTime(); res[run][1] = rs.rivalTime();
+            if (run == 0) {
+                std::printf("    karma (%.2f km, trafik %zu): oyuncu %.1f s, rakip %.1f s, carpisma %d\n", rs.raceLength() / 1000.0,
+                            rs.traffic().size(), rs.playerTime(), rs.rivalTime(), rs.collisions());
+                CHECK(rs.phase() == RoadSession::Phase::Finished && rs.traffic().empty(), "karma yaris sonuclandi, trafik yok (kapali yol)");
+                CHECK(rs.playerTime() > 0 || rs.rivalTime() > 0, "en az bir arac bitirdi");
+            }
+        }
+        CHECK(res[0][0] == res[1][0] && res[0][1] == res[1][1], "ayni tohum + girdi = ayni sonuc");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

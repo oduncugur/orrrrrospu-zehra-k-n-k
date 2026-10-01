@@ -190,7 +190,8 @@ private:
     Cockpit cockpit_;
     bool land_ = true;
     int W = 640, H = 360;
-    Rect free_{}, flow_{}, race_{}, touge_{}, assistBtn_{}, tiltBtn_{};
+    Rect free_{}, flow_{}, race_{}, touge_{}, karma_{}, assistBtn_{}, tiltBtn_{};
+    double camBlend_ = 1.0;                      // 0: drag gorunumu (yandan), 1: takip kamerasi (karma gecisi)
     bool menu_ = true, rewarded_ = false, record_ = false;
     long prize_ = 0;
     double steer_ = 0;

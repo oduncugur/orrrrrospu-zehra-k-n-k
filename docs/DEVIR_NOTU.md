@@ -353,4 +353,18 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
   orantili keser. Olculen: Sahin+ABS 100-0 50.3 -> 38.8 m, kilitli zaman %94 -> %0; Hellcat sokak lastigi
   TC ile kayma 5.7 -> 0.11, 2 s'de 5.5 -> 7.8 m. Acik yolda yardim dugmesi TC yoksa "TC YOK"; drag'de TC
   YZ'de kapali, oyuncuda ayara gore. Test: `electronics_test` (ctest `abs_tc`).
-- SIRADAKI: karma yaris (duz yol drag gorunumu + virajli 3B bolum + tekrar drag), viraj-only yaris modu.
+- Pedal sirasi gercek arac gibi soldan: debriyaj, fren, gaz (debriyajsizda fren en solda).
+
+## Guncelleme — 2026-10-02: KARMA yaris (drag + viraj tek yarista)
+- Kullanici tasarimi: sehirlerarasi yarista uzun duzlukte drag (ivme/son hiz), belirli mesafede oyun 3B virajli
+  bolume gecer (yavaslama + surus becerisi), virajlar bitince tekrar drag. Uc ayri yaris turu: drag (pist, DragScreen),
+  karma (RoadSession::Mode::Karma), yalniz viraj (yol yarisi 4 km / dag yolu).
+- `RoadPath::karma`: duz 2.8-3.6 km -> 1-3 virajlik blok (R 70-220 m, %60 S ihtimali) -> duz 1.5-2.5 km -> blok ->
+  bitis duzlugu; egim %4 (drag duzlugunde de yokus/inis). `sections()`, `curvyAt(s)`: blogun 120 m oncesi
+  (fren bolgesi) - 60 m sonrasi virajli. Trafik yok (kapali yol), rakip kendi (sol) seridinde.
+- Tek fizik, iki kamera (`RoadScreen::drawWorld`): duzde yandan dar acili kamera (drag gorunumu; arac seridi kendi
+  tutar, oyuncu gaz/debriyaj/vites), virajli bolumde takip kamerasi; gecis 0.9 s smoothstep kamera ucusu.
+  HUD: "DRAG VIRAJA N M" / "VIRAJ BOLUMU". Otomatik debriyaj cezasi karma'da virajli bolumde vites kilidi.
+- Test `road_test` [8]: iki blok, ilk duzluk >= ~2.8 km, duz bolum gercekten duz, yaris sonuclanir, belirlenimci.
+- Bilinen / sonraki: karma odulu normal yol yarisi odulu (mesafeye gore ayarlanmadi); YZ duzlukte de pace 0.6
+  (drag'de tam gaz ama vites/kalkis plani yok); drag gorunumunde agac (yesil isik) yerine 3-2-1 geri sayim.

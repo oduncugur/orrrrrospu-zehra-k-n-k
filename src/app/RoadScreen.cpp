@@ -35,10 +35,12 @@ void RoadScreen::setupLayout() {
     land_ = !app_.settings.roadPortrait;
     W = land_ ? 640 : 360; H = land_ ? 360 : 640;
     if (land_) {
-        free_ = {90, 110, 314, 160}; flow_ = {326, 110, 550, 160}; race_ = {90, 172, 314, 222}; touge_ = {326, 172, 550, 222};
+        free_ = {90, 100, 314, 146}; flow_ = {326, 100, 550, 146}; race_ = {90, 156, 314, 202}; touge_ = {326, 156, 550, 202};
+        karma_ = {90, 212, 550, 258};
         assistBtn_ = {470, 2, 576, 34}; tiltBtn_ = {362, 2, 466, 34};
     } else {
-        free_ = {40, 196, 320, 248}; flow_ = {40, 260, 320, 312}; race_ = {40, 324, 320, 376}; touge_ = {40, 388, 320, 440};
+        free_ = {40, 186, 320, 234}; flow_ = {40, 244, 320, 292}; race_ = {40, 302, 320, 350}; touge_ = {40, 360, 320, 408};
+        karma_ = {40, 418, 320, 466};
         assistBtn_ = {252, 4, 356, 26}; tiltBtn_ = {252, 30, 356, 52};
     }
     cockpit_.setPortrait(!land_);
@@ -52,7 +54,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
         const std::string n = m;
-        start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : RoadSession::Mode::Race,
+        start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : n == "karma" ? RoadSession::Mode::Karma : RoadSession::Mode::Race,
               n == "touge" ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
     }
     else if (autopilot_) start(RoadSession::Mode::Free);
@@ -60,7 +62,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
 
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
-    if (m == RoadSession::Mode::Race) {
+    if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma) {
         const Opponent o = pickOpponent(carId_, tune_, (uint32_t)(app_.career.races * 7919 + 17));
         rival = o.carId; rt = o.tune;
         app_.setVoice(1, findVehicle(rival), rt.turbo > 0);
@@ -89,6 +91,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     menu_ = false; rewarded_ = false; record_ = false; prize_ = 0; finT_ = 0;
     flash(m == RoadSession::Mode::Free ? "SERBEST SURUS"
           : m == RoadSession::Mode::Flow ? "OTOBAN AKISI: YAKIN GEC, HIZLI GIT"
+          : m == RoadSession::Mode::Karma ? "KARMA: DUZDE DRAG, VIRAJDA SURUS"
           : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM" : "YOL YARISI 4 KM", 2.5);
 }
 
@@ -128,6 +131,11 @@ void RoadScreen::update(double dt) {
     }
     const double rate = (std::fabs(target) > std::fabs(steer_) ? 1.0 : 2.5) * dt;
     steer_ += std::clamp(target - steer_, -rate, rate);
+    // Karma: duz bolumde drag gorunumu (yandan kamera) ve arac seridi kendi tutar; virajli bolumde 3B surus
+    const bool karma = ses_->mode() == RoadSession::Mode::Karma;
+    const bool curvy = !karma || ses_->road().curvyAt(P.s());
+    camBlend_ += std::clamp((curvy ? 1.0 : 0.0) - camBlend_, -dt / 0.9, dt / 0.9);
+    if (karma && !curvy) steer_ = P.aiControls(-ses_->lane(), 0.6).steer;
 
     RoadControls c;
     c.steer = steer_; c.throttle = cockpit_.throttle(); c.brake = cockpit_.brake();
@@ -135,7 +143,7 @@ void RoadScreen::update(double dt) {
     switch (cockpit_.lever()) {
     case Cockpit::Lever::HPattern: {
         // Otomatik debriyajda virajda vites degismez (denge): kol mevcut vitese geri oturur
-        const bool inCurve = std::fabs(ses_->road().at(P.s()).curvature) > kCurveK;
+        const bool inCurve = karma ? curvy : std::fabs(ses_->road().at(P.s()).curvature) > kCurveK;
         if (autoClutchPenalty() && inCurve && cockpit_.knobGear() != pt.gear()) {
             cockpit_.setKnobGear(pt.gear());
             flash("VIRAJDA VITES YOK (OTOMATIK DEBRIYAJ)", 1.2);
@@ -182,20 +190,21 @@ void RoadScreen::update(double dt) {
 
 void RoadScreen::drawMenu(Renderer& r) {
     r.gradientV(0, 0, W, H, {0.10f, 0.12f, 0.2f}, {0.05f, 0.05f, 0.07f});
-    const float ty = land_ ? 40 : 120, by = touge_.y1;                   // baslik / dugmelerin alti
+    const float ty = land_ ? 30 : 110, by = karma_.y1;                   // baslik / dugmelerin alti
     r.textCentered(W / 2.0f, ty, "ACIK YOL", 4, {1.0f, 0.62f, 0.05f});
     r.textCentered(W / 2.0f, ty + 40, "ARA TASLAK", 1, {0.6f, 0.6f, 0.65f});
     button(r, free_, "SERBEST SURUS", Color{0.15f, 0.45f, 0.7f}, 2);
     button(r, flow_, "OTOBAN AKISI 2 DK", Color{0.1f, 0.5f, 0.35f}, 2);
     button(r, race_, "YOL YARISI 4 KM", kUiOrange, 2);
     button(r, touge_, "DAG YOLU 3 KM", Color{0.55f, 0.2f, 0.6f}, 2);
+    button(r, karma_, "KARMA: DRAG + VIRAJ", Color{0.7f, 0.15f, 0.15f}, 2);
     r.textCentered(W / 2.0f, by + 18, "AKIS: YAKIN GECIS + HIZ + VIRAJ = SKOR", 1, {0.7f, 0.7f, 0.75f});
     r.textCentered(W / 2.0f, by + 30, "YARISLAR: RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
     if (app_.career.bestFlow > 0)
         r.textCentered(W / 2.0f, by + 46, "AKIS REKORU " + money(app_.career.bestFlow).substr(1), 2, kUiGold);
 #ifndef __ANDROID__
-    r.textCentered(W / 2.0f, by + 74, land_ ? "BOSLUK SERBEST  PGDN AKIS  ENTER YARIS  PGUP DAG  ESC GERI"
-                                            : "BOSLUK SERBEST PGDN AKIS ENTER YARIS PGUP DAG", 1, {0.55f, 0.75f, 1.0f});
+    r.textCentered(W / 2.0f, by + 74, land_ ? "BOSLUK SERBEST  PGDN AKIS  ENTER YARIS  PGUP DAG  1 KARMA"
+                                            : "BOSLUK SERBEST PGDN AKIS ENTER YARIS PGUP DAG 1 KARMA", 1, {0.55f, 0.75f, 1.0f});
 #endif
 }
 
@@ -209,14 +218,31 @@ void RoadScreen::drawWorld(Renderer& r) {
     const double cp = std::cos(camPsi_), sp = std::sin(camPsi_);
     // Kamera: arabanin 7.5 m arkasi, 2.4 m yukari; 6 m ilerisine bakar (yol yuksekligini izler)
     const double zCar = Pc.elevation(), zBack = R.at(ps - 7.5).z, zFront = R.at(ps + 6.0).z;
-    const Mat4 proj = matPerspective(fov(), (float)W / H, 0.3f, 900.0f);
-    // Dikeyde alt ceyrek kontrollerle dolu: kamera yukseltilip asagi bakar, arac ekranin ortasina cikar
+    // Takip kamerasi. Dikeyde alt ceyrek kontrollerle dolu: kamera yukseltilip asagi bakar, arac ortaya cikar
     const double camUp = land_ ? 2.4 : 3.0, lookAhead = land_ ? 6.0 : 4.0, lookUp = land_ ? 0.9 : 0.1;
-    const Mat4 view = matLookAt((float)(X - 7.5 * cp), (float)(std::max(zBack, zCar) + camUp), (float)-(Y - 7.5 * sp),
-                                (float)(X + lookAhead * cp), (float)(zFront + lookUp), (float)-(Y + lookAhead * sp));
+    double ex = X - 7.5 * cp, ey = Y - 7.5 * sp, ez = std::max(zBack, zCar) + camUp;
+    double tx = X + lookAhead * cp, ty = Y + lookAhead * sp, tz = zFront + lookUp;
+    double camFov = fov();
+    const bool sideCam = camBlend_ < 0.999;
+    if (sideCam) {
+        // Drag gorunumu: yolun sagindan 26 m, alcak, dar acili kamera (yandan profil; egim gorunur). Takip
+        // kamerasina yumusak gecis (smoothstep) -> karma yarista virajli bolume girerken kamera arkaya ucar.
+        const RoadPoint q = R.at(ps);
+        const double fx = std::cos(q.heading), fy = std::sin(q.heading), rxn = std::sin(q.heading), ryn = -std::cos(q.heading);
+        const double sex = X + 26.0 * rxn + 1.5 * fx, sey = Y + 26.0 * ryn + 1.5 * fy, sez = zCar + 5.5;
+        const double stx = X + 1.5 * fx - 1.8 * rxn, sty = Y + 1.5 * fy - 1.8 * ryn, stz = zCar + 3.2;
+        const double b = camBlend_ * camBlend_ * (3.0 - 2.0 * camBlend_);
+        ex = sex + (ex - sex) * b; ey = sey + (ey - sey) * b; ez = sez + (ez - sez) * b;
+        tx = stx + (tx - stx) * b; ty = sty + (ty - sty) * b; tz = stz + (tz - stz) * b;
+        camFov = (land_ ? 0.55 : 0.75) + (fov() - (land_ ? 0.55 : 0.75)) * b;
+    }
+    const Mat4 proj = matPerspective((float)camFov, (float)W / H, 0.3f, 900.0f);
+    const Mat4 view = matLookAt((float)ex, (float)ez, (float)-ey, (float)tx, (float)tz, (float)-ty);
     const Mat4 vp = matMul(proj, view);
-    const float pxPerM = H * 0.5f / std::tan(fov() * 0.5f);              // derinlik 1 m'de metre basina piksel
-    const Proj hz = project(vp, X + 3000 * cp, Y + 3000 * sp, zCar, W, H);
+    const float pxPerM = H * 0.5f / std::tan((float)camFov * 0.5f);      // derinlik 1 m'de metre basina piksel
+    double dx = tx - ex, dy = ty - ey;
+    { const double l = std::max(1e-6, std::hypot(dx, dy)); dx /= l; dy /= l; }
+    const Proj hz = project(vp, ex + 3000 * dx, ey + 3000 * dy, zCar, W, H);
     const float horizon = hz.ok ? std::clamp(hz.y, 0.0f, (float)H) : H * 0.4f;
     const bool mtn = ses_->kind() == RoadSession::Kind::Touge;
     const Color grass = mtn ? Color{0.2f, 0.36f, 0.2f} : Color{0.36f, 0.55f, 0.28f};
@@ -227,8 +253,8 @@ void RoadScreen::drawWorld(Renderer& r) {
     r.rect(0, horizon, W, horizon + 2, {0.35f, 0.42f, 0.38f});
 
     const double hw = R.halfWidth();
-    const int i0 = std::max(0, (int)((ps - 8.0) / RoadPath::kStep)), n = (int)R.points().size();
-    const int i1 = std::min(n - 2, i0 + 160);
+    const int i0 = std::max(0, (int)((ps - (sideCam ? 70.0 : 8.0)) / RoadPath::kStep)), n = (int)R.points().size();
+    const int i1 = std::min(n - 2, i0 + (sideCam ? 200 : 160));
     const auto& P = R.points();
     auto edge = [&](int i, double off) {
         const RoadPoint& p = P[i];
@@ -256,6 +282,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         }
         if (i % 8 == 0) {                                          // kenar agaclari / direkleri (her 16 m)
             for (int side = -1; side <= 1; side += 2) {
+                if (camBlend_ < 0.5 && side < 0) continue;            // drag gorunumu: kamera tarafindaki agaclar gorusu kapatir
                 const float h = hashf(i * 2 + (side > 0));
                 if (h < (mtn ? 0.08f : 0.35f)) continue;
                 const Proj b = edge(i, side * (hw + 5.0 + 20.0 * hashf(i * 7 + side)));
@@ -270,7 +297,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
         }
     }
-    if (ses_->mode() == RoadSession::Mode::Race) {                 // bitis cizgisi
+    if (ses_->hasRival()) {                                        // bitis cizgisi
         const double fs = RoadSession::kStartS + ses_->raceLength();
         if (fs > ps - 5 && fs < ps + 300) {
             const RoadPoint q = R.at(fs), q2 = R.at(fs + 1.5);
@@ -298,17 +325,17 @@ void RoadScreen::drawWorld(Renderer& r) {
         const RoadPoint q = R.at(t.s);
         Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
         o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
-        o.d = (o.x - X) * cp + (o.y - Y) * sp; objs.push_back(o);
+        o.d = (o.x - ex) * dx + (o.y - ey) * dy; objs.push_back(o);   // kamera bakis yonunde derinlik
     }
     if (RoadCar* rv = ses_->rival()) {
         const VehicleSim& rs = rv->sim();
         Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId()};
-        o.d = (o.x - X) * cp + (o.y - Y) * sp;
-        if (o.d > -8 && o.d < 320) objs.push_back(o);
+        o.d = (o.x - ex) * dx + (o.y - ey) * dy;
+        if (o.d > 2 && o.d < 340) objs.push_back(o);
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
-        if (o.d < -3.0) continue;                                  // kameraya cok yakin (goruntuyu kaplar)
+        if (o.d < 3.0) continue;                                   // kameraya cok yakin / arkasinda
         r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch));
     }
     r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()));
@@ -333,6 +360,7 @@ void RoadScreen::drawHud(Renderer& r) {
     r.text(x0 + 106, 4, gs, 4, Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : Color{1.0f, 0.62f, 0.05f});
     const float red = (float)sim.engineSpec().redlineRpm, fill = std::clamp((float)pt.rpm() / (red * 1.05f), 0.0f, 1.0f);
     const float rx = x0 + 136, rw = land_ ? 94.0f : 100.0f;
+    r.rect(rx, 6, rx + rw, 16, {0.15f, 0.15f, 0.18f});
     r.rect(rx, 6, rx + rw * fill, 16, pt.rpm() > red * 0.9 ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
     std::snprintf(b, sizeof b, "%5.0f RPM", pt.rpm());
     r.text(rx, 22, b, 1, {1, 1, 1});
@@ -355,7 +383,16 @@ void RoadScreen::drawHud(Renderer& r) {
             const float f = (float)(fl->comboLeft() / FlowScorer::kComboTime);
             r.rect(W / 2.0f - 40, infoY + 52, W / 2.0f - 40 + 80 * f, infoY + 56, kUiGold);
         }
-    } else if (ses_->mode() == RoadSession::Mode::Race) {
+    } else if (ses_->hasRival()) {
+        if (ses_->mode() == RoadSession::Mode::Karma) {                // bolum gostergesi: DRAG / VIRAJ
+            const double s = Pc.s();
+            double next = -1;
+            for (const RoadSection& q : ses_->road().sections()) if (q.curvy && q.s0 > s) { next = q.s0 - s; break; }
+            if (ses_->road().curvyAt(s)) std::snprintf(b, sizeof b, "VIRAJ BOLUMU");
+            else if (next > 0) std::snprintf(b, sizeof b, "DRAG  VIRAJA %.0f M", next);
+            else std::snprintf(b, sizeof b, "DRAG  BITIS DUZLUGU");
+            r.text(x0, infoY + 12, b, 1, ses_->road().curvyAt(s) ? Color{1.0f, 0.75f, 0.2f} : Color{0.5f, 0.85f, 1.0f});
+        }
         const double left = std::max(0.0, RoadSession::kStartS + ses_->raceLength() - Pc.s());
         const double gap = ses_->gapMeters();
         std::snprintf(b, sizeof b, "%s  KALAN %.2f KM  %+.0f M   %.1f S", gap >= 0 ? "1." : "2.", left / 1000.0, gap, ses_->raceTime());
@@ -373,6 +410,7 @@ void RoadScreen::drawHud(Renderer& r) {
     if (msgT_ > 0) {
         const float w = r.textWidth(msg_, 2) + 16;
         const float my = land_ ? 120 : 140;
+        r.rect(W / 2.0f - w / 2, my, W / 2.0f + w / 2, my + 22, {0.02f, 0.02f, 0.04f, 0.7f});
         r.textCentered(W / 2.0f, my + 4, msg_, 2, {1.0f, 0.85f, 0.3f});
     }
     if (ses_->phase() == RoadSession::Phase::Countdown) {
@@ -427,6 +465,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
         else if (flow_.hit(x, y)) start(RoadSession::Mode::Flow);
         else if (race_.hit(x, y)) start(RoadSession::Mode::Race);
         else if (touge_.hit(x, y)) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
+        else if (karma_.hit(x, y)) start(RoadSession::Mode::Karma);
         return;
     }
     if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { app_.goGarage(); return; }
@@ -457,6 +496,7 @@ void RoadScreen::key(Key k, bool down) {
         else if (k == Key::Enter) start(RoadSession::Mode::Race);
         else if (k == Key::PageUp) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         else if (k == Key::PageDown) start(RoadSession::Mode::Flow);
+        else if (k == Key::Gear1) start(RoadSession::Mode::Karma);
         else if (k == Key::Back) app_.goGarage();
         return;
     }

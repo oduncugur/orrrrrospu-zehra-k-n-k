@@ -19,11 +19,16 @@ struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool brakin
 class RoadSession {
 public:
     // Free: serbest surus; Race: YZ rakiple yol yarisi; Flow: otoban akisi (sureli skor: yakin gecis, hiz, apex)
-    enum class Mode { Free, Race, Flow };
+    // Karma: duz bolumler drag gorunumunde, virajli bolumler 3B; rakipli, trafiksiz (RoadPath::karma)
+    enum class Mode { Free, Race, Flow, Karma };
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
-    double raceLength() const { return kind_ == Kind::Touge ? 3000.0 : 4000.0; }   // m
+    double raceLength() const {                       // m
+        if (mode_ == Mode::Karma) return road_.length() - kStartS - 300.0;
+        return kind_ == Kind::Touge ? 3000.0 : 4000.0;
+    }
+    bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma; }
     static constexpr double kStartS = 20.0;
     static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8); dag yolunda lane()
     double lane() const { return kind_ == Kind::Touge ? 1.5 : kLane; }
