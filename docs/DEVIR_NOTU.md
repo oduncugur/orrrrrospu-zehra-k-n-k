@@ -321,5 +321,16 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 
 ### Bilinen (yeni bulunan, eski sorun)
 - **Sokak lastiginde drag ETleri gercegin ~2.5 s ustunde**, 60 ft ~3.2 s (A90 stok 15.2 s; gercek ~12.4).
-  Eski modelde de ayni (olculdu). Sokak lastigi cekisi / YZ gaz kontrolu incelenmeli.
+  Eski modelde de ayni (olculdu). Trap hizlari gercege yakin (guc dogru), sorun kalkis.
+  Olcum araci: scratchpad `street_et.cpp` (Civic #5, Mustang #227, RX-7 #78, F1 #313, Sahin #217, A90 #36 x 3 lastik)
+  ve `launch_trace.cpp` (kalkisin 0.1 s'lik izi: kayma, gaz, kavrama, Fx/Fz).
+  Bulgular (2026-10-02, denenip GERI ALINDI — sonuc karisik/kotu):
+  * YZ 120 ms dump -> cekis tekeri kayma orani 5-7 (hedef ~0.13); bir kez kayinca MF dususu yuzunden toparlanamiyor.
+  * `aiDrive` gaz alt siniri `rpm < 5500 ? 1.0 : 0.35` mutlak devir (dusuk devirli motorda hep tam gaz) — ama
+    duzeltmek (redline'a gore, 0.15 taban) ETleri kotulestirdi: biraz patinajli tam gaz kesmekten iyi.
+  * Kaymali debriyaj kontrolcusu + lastige gore kalkis devri + asimetrik/suzulmus gaz kontrolu denendi:
+    dusuk hizda kayma tepkisinin zaman sabiti ~sigma/(V+v0) = 0.15 s -> geri beslemeli kontrol salinir;
+    kalkista 2-step acik kalirsa atesleme kesmesi kaymayi titretir. Civic/Mustang yari-slickte daha kotu.
+  * Oneri: geri besleme yerine arac basina onceden hesaplanan kalkis profili (deterministik sim ~50 ms/deneme;
+    yaris oncesi 6-8 aday: kalkis devri x kavrama suresi) ya da Fx/Fz'yi dogrudan hedefleyen tork siniri.
 - Hellcat (900 Nm, RWD, sokak lastigi) YZ test surucusuyle 4 km'de 1 kez yoldan cikti.
