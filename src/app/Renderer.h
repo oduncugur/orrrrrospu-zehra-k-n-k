@@ -53,6 +53,8 @@ public:
 
     // 3D arac modeli: sanal piksel dikdortgenine (sol ust x,y) cizer
     // wheelSpin: teker donus acisi (rad, ileri +), steer: on teker sapmasi (rad, sola +)
+    // Sahne isigi: gunes ve ortam (gece ~0.15 / 0.35); yeni karede (begin) gunduze doner
+    void setSceneLight(float sun, float ambient) { sun_ = sun; amb_ = ambient; }
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,
                  float wheelSpin = 0.0f, float steer = 0.0f);
 
@@ -68,6 +70,8 @@ private:
     unsigned vaoSh_ = 0, vboSh_ = 0;    // arac golgesi (birim kare, model uzayinda olceklenir)
     int uMvp_ = -1, uModel_ = -1, uSize_ = -1, uUv_ = -1, uEye_ = -1, uAlpha_ = -1, uShadow_ = -1;
     int scale_ = 2, texSize_ = 0;
+    float sun_ = 1.0f, amb_ = 1.0f;
+    int uLight_ = -1;
     int vw_ = 360, vh_ = 640;
     bool ready_ = false;
 };

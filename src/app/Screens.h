@@ -314,9 +314,13 @@ private:
     std::string msg_; double msgT_ = 0;
     // Teker donusu (rad) ve lastik dumani (dunya koordinati)
     double spinP_ = 0, spinR_ = 0;
+    bool night_ = false, rain_ = false;          // ortam: gece / yagmur (yaris basinda tohumdan)
+    double envT_ = 0;                            // yagmur damlasi animasyonu
+    std::string msgNote_;                        // ortam notu (HUD, ilk saniyeler)
     struct Puff { double x, y, z, vx, vy, vz, life, size; };
     std::vector<Puff> smoke_;
     void spawnSmoke(const RoadCar& car, double dt);
+    int zoneAt(double s) const;                  // 0 kir, 1 sehir, 2 tunel
 };
 
 } // namespace zk

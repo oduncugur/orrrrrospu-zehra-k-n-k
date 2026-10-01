@@ -99,7 +99,7 @@ uniform mat4 uMvp; uniform mat4 uModel; out vec3 vN; out vec3 vP; out vec3 vCol;
 void main(){ vL = aPos.xz; vN = mat3(uModel) * aNrm; vP = (uModel * vec4(aPos, 1.0)).xyz; vCol = aCol; vGloss = aGloss;
   gl_Position = uMvp * vec4(aPos, 1.0); })";
 const char* kFs3D = R"(precision mediump float; in vec3 vN; in vec3 vP; in vec3 vCol; in float vGloss; in vec2 vL;
-uniform vec3 uEye; uniform float uAlpha; uniform float uShadow; out vec4 o;
+uniform vec3 uEye; uniform float uAlpha; uniform float uShadow; uniform vec2 uLight; out vec4 o;
 vec3 sky(vec3 r){ float y = r.y;
   vec3 hor = vec3(0.86, 0.80, 0.72), top = vec3(0.32, 0.48, 0.86), gnd = vec3(0.22, 0.24, 0.20);
   return y > 0.0 ? mix(hor, top, pow(y, 0.6)) : mix(hor * 0.7, gnd, pow(-y, 0.4)); }
@@ -112,11 +112,11 @@ void main(){
   vec3 l = normalize(vec3(0.35, 0.9, 0.55));
   float dif = max(dot(n, l), 0.0);
   vec3 amb = mix(vec3(0.30, 0.28, 0.25), vec3(0.62, 0.70, 0.85), n.y * 0.5 + 0.5);
-  vec3 c = vCol * (0.42 * amb + 0.72 * dif);
+  vec3 c = vCol * (0.42 * amb * uLight.y + 0.72 * dif * uLight.x);
   float fr = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
-  c = mix(c, sky(reflect(-v, n)), clamp(vGloss * (0.06 + 0.55 * fr), 0.0, 0.6));
+  c = mix(c, sky(reflect(-v, n)) * uLight.y, clamp(vGloss * (0.06 + 0.55 * fr), 0.0, 0.6));
   vec3 h = normalize(l + v);
-  c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), 70.0) * vGloss * 0.9;
+  c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), 70.0) * vGloss * 0.9 * uLight.x;
   o = vec4(min(c, vec3(1.0)), 1.0); })";
 const char* kVs2D = R"(layout(location=0) in vec2 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
 void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); })";
@@ -167,7 +167,7 @@ Mat4 matScale(float s) { Mat4 r{}; r.m[0] = r.m[5] = r.m[10] = s; r.m[15] = 1; r
 // ------------------------------------------------------------------ Renderer
 bool Renderer::init() {
     p3d_ = program(kVs3D, kFs3D); uMvp_ = glGetUniformLocation(p3d_, "uMvp"); uModel_ = glGetUniformLocation(p3d_, "uModel");
-    uEye_ = glGetUniformLocation(p3d_, "uEye"); uAlpha_ = glGetUniformLocation(p3d_, "uAlpha"); uShadow_ = glGetUniformLocation(p3d_, "uShadow");
+    uEye_ = glGetUniformLocation(p3d_, "uEye"); uLight_ = glGetUniformLocation(p3d_, "uLight"); uAlpha_ = glGetUniformLocation(p3d_, "uAlpha"); uShadow_ = glGetUniformLocation(p3d_, "uShadow");
     p2d_ = program(kVs2D, kFs2D); uSize_ = glGetUniformLocation(p2d_, "uSize");
     pBlit_ = program(kVsBlit, kFsBlit); uUv_ = glGetUniformLocation(pBlit_, "uUv");
 
@@ -232,6 +232,7 @@ void Renderer::bindTarget() { glBindFramebuffer(GL_FRAMEBUFFER, fbo_); }
 
 void Renderer::begin(int vw, int vh, Color c) {
     vw_ = std::min(vw, kFbo); vh_ = std::min(vh, kFbo);
+    sun_ = amb_ = 1.0f;
     ensureTarget();
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
     glViewport(0, 0, vw_ * scale_, vh_ * scale_);
@@ -420,6 +421,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     const float ey = -(V[4] * V[12] + V[5] * V[13] + V[6] * V[14]);
     const float ez = -(V[8] * V[12] + V[9] * V[13] + V[10] * V[14]);
     glUniform3f(uEye_, ex, ey, ez);
+    glUniform2f(uLight_, sun_, amb_);
     {   // Zemin golgesi: iki kat (yumusak kenar), derinlik yazmadan, alfa karisimi
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
         glUniform1f(uShadow_, 1.0f);

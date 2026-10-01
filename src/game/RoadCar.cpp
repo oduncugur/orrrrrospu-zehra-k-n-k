@@ -131,7 +131,7 @@ void RoadCar::update(double dt, const RoadControls& c) {
         if (c.shift != 0) { manual = true; requestShift(c.shift); }
         driverAssist(dt, c.throttle, c.neutral);
     }
-    sim_->setSurfaceMu(offRoad() ? 0.55 : 1.0);                       // cim/toprak
+    sim_->setSurfaceMu((offRoad() ? 0.55 : 1.0) * gripMul);           // cim/toprak; yagmur
     {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)
         const RoadPoint p = road_.at(s_);
         sim_->setGrade(p.grade * std::cos(sim_->heading() - p.heading));

@@ -36,6 +36,7 @@ public:
     double tireSlipSpeed() const;          // ses icin
 
     bool manual = false, assist = true;
+    double gripMul = 1.0;                  // hava durumu: yagmurda ~0.72 (islak asfalt)
     double launchRpm = 0.0;                // > 0: otomatik debriyajda kalkis devri (YZ drag kalkisi); 0: gaza gore 1500-2700
     bool slowClutch = false;               // otomatik debriyaj cezasi: kalkis ve vites gecisinde gec kavrar
     void requestShift(int dir);            // manuel: +1 / -1
