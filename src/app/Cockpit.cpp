@@ -15,11 +15,11 @@ struct PadLayout {
     Rect seqUp, seqDn;
     float autoY[3];   // P N D
 };
-const PadLayout kLand{{62, 40, 116, 356}, {4, 40, 58, 356}, {582, 40, 636, 356}, {494, 250, 578, 356},
-                   {508, 536, 564}, 264, 303, 342, {494, 250, 578, 300}, {494, 306, 578, 356}, {266, 303, 340}};
-const PadLayout kPort{{62, 420, 116, 636}, {4, 420, 58, 636}, {302, 420, 356, 636}, {214, 530, 298, 636},
-                   {228, 256, 284}, 544, 583, 622, {214, 530, 298, 580}, {214, 586, 298, 636}, {546, 583, 620}};
-const char* const kAutoName[3] = {"P", "N", "D"};
+// Kaydiricilar ekranin alt ~%57'sinde (basparmak az yol alir), 64 px genis; vites alani buyuk (kullanici geri bildirimi)
+const PadLayout kLand{{72, 150, 136, 356}, {4, 150, 68, 356}, {572, 150, 636, 356}, {404, 214, 566, 356},
+                   {432, 484, 536}, 236, 286, 336, {404, 214, 566, 282}, {404, 288, 566, 356}, {238, 286, 334}};
+const PadLayout kPort{{72, 440, 136, 636}, {4, 440, 68, 636}, {292, 440, 356, 636}, {142, 470, 286, 636},
+                   {166, 214, 262}, 492, 553, 614, {142, 470, 286, 550}, {142, 556, 286, 636}, {494, 553, 612}};const char* const kAutoName[3] = {"P", "N", "D"};
 
 float sliderValue(const Rect& r, float y) { return std::clamp((r.y1 - 6 - y) / (r.y1 - r.y0 - 12), 0.0f, 1.0f); }
 const PadLayout& lay(bool portrait) { return portrait ? kPort : kLand; }
@@ -61,23 +61,21 @@ Cockpit::Ctl Cockpit::hit(float x, float y) const {
 }
 bool Cockpit::overControl(float x, float y) const { return hit(x, y) != Ctl::None; }
 
-// H-desen: kol yalniz bos sirasinda yana kayar; sutunda yukari/asagi. Olmayan vitese girmez.
+// H-desen (kolay gecis): dokunulan/surtulen noktaya en yakin vites yuvasi secilir, kol oraya oturur; orta siranin
+// yakininda bos (N). Eskiden kol bos sirasindan yana kaydirilip tam isabetle itilmek zorundaydi (telefonda zordu).
 void Cockpit::shifterFromPoint(float x, float y) {
     const PadLayout& L = lay(portrait_);
-    const bool inNeutralRow = std::fabs(knobY_ - L.rowMid) < 5.0f;
-    if (inNeutralRow) knobX_ = std::clamp(x, L.colX[0], L.colX[2]);
+    const float midBand = (L.rowBot - L.rowTop) * 0.18f;
     int col = 0;
-    for (int c = 1; c < 3; ++c) if (std::fabs(knobX_ - L.colX[c]) < std::fabs(knobX_ - L.colX[col])) col = c;
-    const float ny = std::clamp(y, L.rowTop, L.rowBot);
-    if (std::fabs(ny - L.rowMid) >= 5.0f) {
-        const int target = col * 2 + (ny < L.rowMid ? 1 : 2);
-        if (target > gears_) { knobY_ = L.rowMid; return; }
-        knobX_ = L.colX[col];
+    for (int c = 1; c < 3; ++c) if (std::fabs(x - L.colX[c]) < std::fabs(x - L.colX[col])) col = c;
+    if (std::fabs(y - L.rowMid) < midBand) {                       // bos
+        knobGear_ = 0; knobX_ = std::clamp(x, L.colX[0], L.colX[2]); knobY_ = L.rowMid;
+        return;
     }
-    knobY_ = ny;
-    if (knobY_ <= L.rowTop + 6) knobGear_ = col * 2 + 1;
-    else if (knobY_ >= L.rowBot - 6) knobGear_ = col * 2 + 2;
-    else if (std::fabs(knobY_ - L.rowMid) < 12) knobGear_ = 0;
+    int target = col * 2 + (y < L.rowMid ? 1 : 2);
+    while (target > gears_ && target > 2) target -= 2;                 // olmayan sutun: en yakin var olan vitese
+    if (target > gears_) target = gears_;
+    setKnobGear(target);
 }
 
 void Cockpit::autoFromPoint(float y) {
@@ -173,13 +171,24 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
     };
     slider(brakeRect(L, clutchPedal_), (float)brake(), "FREN", {0.85f, 0.15f, 0.15f, 0.85f});
     if (clutchPedal_) {
-        slider(L.clutch, (float)clutch(), "DEBRIYAJ", {0.25f, 0.55f, 0.95f, 0.85f});
-        const float span = L.clutch.y1 - L.clutch.y0 - 12;                // isirma bolgesi (pedal 0.32 .. 0.62)
-        r.rect(L.clutch.x1 - 4, L.clutch.y1 - 6 - span * 0.62f, L.clutch.x1, L.clutch.y1 - 6 - span * 0.32f, {1.0f, 0.8f, 0.1f});
+        // Kavrama noktasi (ClutchSpec: pedal 0.62 = tutmaya baslar, 0.32 = tam kavrar) belirgin bant + yazi;
+        // pedal bandin icindeyken dolgu sariya doner (debriyaj tutuyor)
+        const float c = (float)clutch();
+        const bool biting = c > 0.32f && c < 0.62f;
+        slider(L.clutch, c, "", biting ? Color{1.0f, 0.78f, 0.1f, 0.9f} : Color{0.25f, 0.55f, 0.95f, 0.85f});
+        const float span = L.clutch.y1 - L.clutch.y0 - 12;
+        const float yTop = L.clutch.y1 - 6 - span * 0.62f, yBot = L.clutch.y1 - 6 - span * 0.32f;
+        r.rect(L.clutch.x0, yTop, L.clutch.x1, yBot, {1.0f, 0.8f, 0.1f, biting ? 0.35f : 0.22f});
+        r.rect(L.clutch.x0, yTop - 1, L.clutch.x1, yTop + 1, {1.0f, 0.85f, 0.2f});     // tutmaya basladigi yer
+        r.rect(L.clutch.x0, yBot - 1, L.clutch.x1, yBot + 1, {1.0f, 0.85f, 0.2f});
+        r.textCentered(L.clutch.cx(), (yTop + yBot) * 0.5f - 4, "KAVRAMA", 1, {1.0f, 0.95f, 0.7f});
+        r.textCentered(L.clutch.cx(), L.clutch.y0 + 6, "DEBRIYAJ", 1, {1, 1, 1, 0.9f});
+        r.textCentered(L.clutch.cx(), L.clutch.y1 - 14, "BIRAK", 1, {0.8f, 0.8f, 0.85f, 0.8f});
+        r.textCentered(L.clutch.cx(), L.clutch.y0 + 18, "BAS", 1, {0.8f, 0.8f, 0.85f, 0.8f});
     }
     slider(L.thr, (float)throttle(), "GAZ", {0.95f, 0.55f, 0.1f, 0.9f});
 
-    r.rect(L.lever.x0, L.lever.y0, L.lever.x1, L.lever.y1, {0.10f, 0.10f, 0.13f, 0.78f});
+    r.rect(L.lever.x0, L.lever.y0, L.lever.x1, L.lever.y1, {0.10f, 0.10f, 0.13f, 0.45f});   // yari saydam: yolu kapatmasin
     if (lever_ == Lever::HPattern) {
         r.rect(L.colX[0] - 2, L.rowMid - 2, L.colX[2] + 2, L.rowMid + 2, {0.35f, 0.35f, 0.4f});
         for (int c = 0; c < 3; ++c) {

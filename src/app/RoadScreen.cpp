@@ -418,7 +418,7 @@ void RoadScreen::drawHud(Renderer& r) {
         r.textCentered(W / 2.0f, land_ ? 150 : 220, b, 8, {1.0f, 0.2f, 0.15f});
     }
 #ifndef __ANDROID__
-    r.text(land_ ? 122 : 8, land_ ? 346 : 80, "A/D DIREKS. W GAZ S FREN BOSLUK DEBR. 1-6/N E/Q", 1, {0.55f, 0.75f, 1.0f});
+    r.text(land_ ? 142 : 8, land_ ? 346 : 80, "A/D DIREKS. W GAZ S FREN BOSLUK DEBR. 1-6/N E/Q", 1, {0.55f, 0.75f, 1.0f});
 #endif
 }
 

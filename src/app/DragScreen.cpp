@@ -13,12 +13,12 @@ namespace {
 constexpr float kPx = 22.0f;                         // piksel / metre (yakin serit)
 constexpr float kWorldTop = 30, kHorizon = 150, kWall0 = 180, kFar0 = 186, kFarGround = 211, kBarrier0 = 214,
                 kNear0 = 218, kNearGround = 252, kWorldBottom = 262;
-constexpr float kClutch[4] = {4, 36, 58, 356}, kThrottle[4] = {582, 36, 636, 356};
-constexpr float kBrake[4] = {436, 268, 496, 354};
-constexpr float kShift[4] = {500, 266, 578, 356};
-constexpr float kColX[3] = {512, 538, 564};
-constexpr float kRowTop = 274, kRowMid = 311, kRowBot = 348;
-constexpr float kPadDn[4] = {500, 280, 536, 350}, kPadUp[4] = {542, 280, 578, 350};
+constexpr float kClutch[4] = {4, 150, 58, 356}, kThrottle[4] = {582, 150, 636, 356};   // alt yari: basparmak az yol alir
+constexpr float kBrake[4] = {436, 268, 480, 354};
+constexpr float kShift[4] = {484, 250, 578, 356};   // vites alani buyutuldu
+constexpr float kColX[3] = {500, 531, 562};
+constexpr float kRowTop = 266, kRowMid = 303, kRowBot = 340;
+constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 350};
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
 constexpr float kAgain[4] = {170, 262, 310, 296}, kGarage[4] = {330, 262, 470, 296};
 constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekranin solundan 8 m sagda
@@ -69,23 +69,21 @@ DragScreen::Ctl DragScreen::hit(float x, float y) const {
     return Ctl::None;
 }
 
-// H-desen: kol yalnizca bos sirasinda yana kayar; sutunda yukari/asagi. Olmayan vitese girmez.
+// H-desen (kolay gecis): dokunulan/surtulen noktaya en yakin vites yuvasi secilir ve kol oraya oturur; orta siranin
+// yakininda bos (N). Eskiden kol bos sirasindan yana kaydirilip tam isabetle itilmek zorundaydi (telefonda zordu).
 void DragScreen::shifterFromPoint(float x, float y) {
     const int gears = race_->lane(0).sim->powertrain().gearCount();
-    const bool inNeutralRow = std::fabs(knobY_ - kRowMid) < 5.0f;
-    if (inNeutralRow) knobX_ = std::clamp(x, kColX[0], kColX[2]);
     int col = 0;
-    for (int c = 1; c < 3; ++c) if (std::fabs(knobX_ - kColX[c]) < std::fabs(knobX_ - kColX[col])) col = c;
-    const float ny = std::clamp(y, kRowTop, kRowBot);
-    if (std::fabs(ny - kRowMid) >= 5.0f) {
-        const int target = col * 2 + (ny < kRowMid ? 1 : 2);
-        if (target > gears) { knobY_ = kRowMid; return; }       // bu sutunda vites yok
-        knobX_ = kColX[col];
+    for (int c = 1; c < 3; ++c) if (std::fabs(x - kColX[c]) < std::fabs(x - kColX[col])) col = c;
+    if (std::fabs(y - kRowMid) < (kRowBot - kRowTop) * 0.18f) {    // bos
+        pendingGear_ = 0; knobX_ = std::clamp(x, kColX[0], kColX[2]); knobY_ = kRowMid;
+        return;
     }
-    knobY_ = ny;
-    if (knobY_ <= kRowTop + 6) pendingGear_ = col * 2 + 1;
-    else if (knobY_ >= kRowBot - 6) pendingGear_ = col * 2 + 2;
-    else if (std::fabs(knobY_ - kRowMid) < 12) pendingGear_ = 0;
+    int target = col * 2 + (y < kRowMid ? 1 : 2);
+    while (target > gears && target > 2) target -= 2;                // olmayan sutun: en yakin var olan vites
+    if (target > gears) target = gears;
+    pendingGear_ = target;
+    knobX_ = kColX[(target - 1) / 2]; knobY_ = (target % 2) ? kRowTop : kRowBot;
 }
 
 void DragScreen::pointerDown(int id, float x, float y) {
@@ -450,10 +448,21 @@ void DragScreen::drawHud(Renderer& r) {
         for (size_t i = 0; label[i]; ++i) r.textCentered((rc[0] + rc[2]) / 2, rc[1] + 8 + i * 16.0f, std::string(1, label[i]), 2, {1, 1, 1});
     };
     if (box == Gearbox::HPattern || box == Gearbox::Dogbox) {
-        slider(kClutch, (float)pc_.clutch, "DEBRIYAJ", {0.25f, 0.55f, 0.95f, 0.85f});
-        // Isirma bolgesi (ClutchSpec: pedal 0.32 .. 0.62)
-        const float y0 = kClutch[3] - 6 - (kClutch[3] - kClutch[1] - 12) * 0.62f, y1 = kClutch[3] - 6 - (kClutch[3] - kClutch[1] - 12) * 0.32f;
-        r.rect(kClutch[2] - 4, y0, kClutch[2], y1, {1.0f, 0.8f, 0.1f});
+        // Kavrama noktasi (ClutchSpec: pedal 0.62 tutmaya baslar, 0.32 tam kavrar): belirgin bant + yazi; pedal
+        // bandin icindeyken dolgu sariya doner
+        const float cv = (float)pc_.clutch;
+        const bool biting = cv > 0.32f && cv < 0.62f;
+        slider(kClutch, cv, "", biting ? Color{1.0f, 0.78f, 0.1f, 0.9f} : Color{0.25f, 0.55f, 0.95f, 0.85f});
+        const float span = kClutch[3] - kClutch[1] - 12;
+        const float y0 = kClutch[3] - 6 - span * 0.62f, y1 = kClutch[3] - 6 - span * 0.32f;
+        r.rect(kClutch[0], y0, kClutch[2], y1, {1.0f, 0.8f, 0.1f, biting ? 0.35f : 0.22f});
+        r.rect(kClutch[0], y0 - 1, kClutch[2], y0 + 1, {1.0f, 0.85f, 0.2f});
+        r.rect(kClutch[0], y1 - 1, kClutch[2], y1 + 1, {1.0f, 0.85f, 0.2f});
+        const float cx = (kClutch[0] + kClutch[2]) / 2;
+        r.textCentered(cx, (y0 + y1) * 0.5f - 4, "KAVRAMA", 1, {1.0f, 0.95f, 0.7f});
+        r.textCentered(cx, kClutch[1] + 6, "DEBRIYAJ", 1, {1, 1, 1});
+        r.textCentered(cx, kClutch[1] + 18, "BAS", 1, {0.8f, 0.8f, 0.85f});
+        r.textCentered(cx, kClutch[3] - 14, "BIRAK", 1, {0.8f, 0.8f, 0.85f});
     }
     slider(kThrottle, (float)pc_.throttle, "GAZ", {0.95f, 0.55f, 0.1f, 0.9f});
 
@@ -493,7 +502,7 @@ void DragScreen::drawHud(Renderer& r) {
 #endif
     // Fren
     r.rect(kBrake[0], kBrake[1], kBrake[2], kBrake[3], pc_.brake > 0 ? Color{0.8f, 0.15f, 0.15f} : Color{0.3f, 0.12f, 0.12f});
-    r.textCentered((kBrake[0] + kBrake[2]) / 2, 304, "FREN", 2, {1, 1, 1});
+    r.textCentered((kBrake[0] + kBrake[2]) / 2, 307, "FREN", 1, {1, 1, 1});
     // Vites kolu / pedallar
     r.rect(kShift[0], kShift[1], kShift[2], kShift[3], {0.13f, 0.13f, 0.16f});
     if (box == Gearbox::HPattern) {
