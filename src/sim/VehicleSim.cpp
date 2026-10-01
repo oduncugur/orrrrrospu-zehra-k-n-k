@@ -66,18 +66,22 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[car->gearbox].type : Gearbox::HPattern;
+    // Otomatik: debriyaj yerine tork konvertoru (stall devri %42 redline)
+    if (boxType_ == Gearbox::TorqueConverter) pt_->setConverter(true, 0.42 * eng_.redlineRpm, PowertrainCore::kConverterTr0);
     // Cekis dagitimi: AWD'de merkez dagitim %40 on / %60 arka (sabit oranli)
     frontShare_ = drive_ == Drive::FWD ? 1.0 : drive_ == Drive::RWD ? 0.0 : 0.40;
     dL_ = drive_ == Drive::RWD ? 2 : 0;
     // Aks capi (fabrika muhendisligi): stok debriyajin aktarabilecegi en yuksek torkta (1.7 x FABRIKA tepe
     // torku, 1. vites) stok celigin kopma dayanimimin %75'i. Stok arac stok kalkista saglam kalir; guc ve
-    // debriyaj yukseltildikce stok aksin kirilma riski gercekci bicimde dogar.
+    // debriyaj yukseltildikce stok aksin kirilma riski gercekci bicimde dogar. Otomatikte tasarim torku
+    // konvertorun stall tork carpimi (1.9 x).
     const int axleLevel = tune ? std::clamp(tune->axles, 0, 2) : (cfg.stockAxles ? 0 : 1);
     AxleSpec axle = axleLevel == 2 ? AxleSpec::Race() : axleLevel == 1 ? AxleSpec::Chromoly() : AxleSpec::Stock();
     if (car) {
         const GearboxSpec factory = buildGearbox(*car);
         const double G1 = factory.ratios.front() * factory.finalDrive;
-        const double perSide = 1.7 * TmaxFactory * G1 * factory.efficiency * 0.5 * std::max(frontShare_, 1.0 - frontShare_);
+        const double design = boxType_ == Gearbox::TorqueConverter ? PowertrainCore::kConverterTr0 : 1.7;
+        const double perSide = design * TmaxFactory * G1 * factory.efficiency * 0.5 * std::max(frontShare_, 1.0 - frontShare_);
         const double dStock = std::cbrt(16.0 * perSide / (3.14159265 * 0.75 * AxleSpec::Stock().tauUltMPa * 1e6)) * 1000.0;
         axle.diameterMm = dStock * (axleLevel == 2 ? 1.25 : axleLevel == 1 ? 1.12 : 1.0);   // yukseltme akslari kalindir
     }
@@ -144,6 +148,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
 }
 
 double VehicleSim::defaultLaunchRpm() const {
+    if (boxType_ == Gearbox::TorqueConverter) return 0.42 * eng_.redlineRpm;   // konvertor stall devri
     return cfg_.car ? std::clamp(0.55 * eng_.redlineRpm, 3000.0, 6500.0) : 6500.0;
 }
 

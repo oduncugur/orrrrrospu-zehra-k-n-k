@@ -133,6 +133,51 @@ int main() {
         CHECK(r.lane(0).slip.finished && !r.lane(0).slip.redLight, "oyuncu temiz bitirdi");
         CHECK(r.lane(1).slip.finished, "yapay zeka bitirdi");
     }
+    std::printf("[7] Tork konvertoru fizigi (#269, 6.2 V8 kompresor)\n");
+    {
+        VehicleSimConfig c; c.car = findVehicle(269); Tune t; c.tune = &t;
+        const VehicleSim sim(c);
+        const EngineSpec& e = sim.engineSpec();
+        double tmax = 0; for (const auto* cv : {&e.lowCam, &e.highCam}) for (const auto& p : *cv) tmax = std::max(tmax, p.second);
+        const double stall = 0.42 * e.redlineRpm;
+        PowertrainCore pt(e, ClutchSpec{}, DiffSpec{}, sim.gearboxSpec());
+        pt.setConverter(true, stall);
+        pt.setGear(1); pt.setClutchPedal(0.0); pt.setThrottle(1.0);
+        for (int i = 0; i < 40000; ++i) pt.step(5e-5, 0.0, 0.0, 1.0);          // frende tam gaz (brake-torque), 2 s
+        std::printf("    frende tam gaz: %.0f rpm (stall %.0f), pompa %.0f Nm, tekerlege %.0f Nm (x%.2f)\n", pt.rpm(), stall,
+                    pt.clutchTorque(), pt.axleTorqueL() + pt.axleTorqueR(), (pt.axleTorqueL() + pt.axleTorqueR()) / std::max(1.0, pt.clutchTorque() * pt.totalRatio()));
+        CHECK(std::fabs(pt.rpm() - stall) / stall < 0.08 && !pt.stalled(), "motor stall devrine yerlesir, stop etmez");
+        CHECK(std::fabs((pt.axleTorqueL() + pt.axleTorqueR()) / (pt.clutchTorque() * pt.totalRatio()) - 1.9 * 0.88) < 0.02, "stall'da tork carpimi 1.9");
+        // Vites darbesi: 6500 rpm'de hiz orani 0.6'ya duser (ust vites) -> pompa torku sinirli
+        PowertrainCore up(e, ClutchSpec{}, DiffSpec{}, sim.gearboxSpec());
+        up.setConverter(true, stall); up.setGear(2); up.setClutchPedal(1.0); up.setThrottle(1.0);
+        const double target = 0.97 * e.redlineRpm;
+        for (int i = 0; i < 200000 && up.rpm() < target; ++i) up.step(5e-5, 0.0, 0.0, 1.0);   // bosta devirlen
+        const double wWheel = 0.6 * up.engineOmega() / up.totalRatio();
+        up.setClutchPedal(0.0);
+        up.step(5e-5, wWheel, wWheel, 1.0);
+        std::printf("    %.0f rpm, SR 0.6: pompa %.0f Nm (sinirsiz K w^2 ~%.0f Nm, tepe motor %.0f Nm)\n", up.rpm(), up.clutchTorque(),
+                    pt.clutchTorque() * std::pow(up.rpm() / stall, 2.0) * (1.0 - std::pow(0.6, 6.0)), tmax);
+        CHECK(up.rpm() > 0.95 * e.redlineRpm && up.clutchTorque() > 0.9 * tmax && up.clutchTorque() <= 1.1 * tmax + 1e-6,
+              "vites darbesi kavrama kapasitesiyle sinirli (<= 1.1 x tepe tork)");
+        PowertrainCore n(e, ClutchSpec{}, DiffSpec{}, sim.gearboxSpec());
+        n.setConverter(true, stall); n.setGear(1); n.setClutchPedal(1.0); n.setThrottle(0.0);
+        n.step(5e-5, 0.0, 0.0, 1.0);
+        CHECK(n.clutchTorque() == 0.0 && n.axleTorqueL() == 0.0, "pedal basili = bos (N): tork yok");
+    }
+    std::printf("[8] YZ: stok/yukseltilmis otomatikler aks kirmadan kalkar (eski 120 ms dump kiriyordu)\n");
+    for (int id : {36, 255, 269, 318}) {
+        Tune semi; semi.tires = TireType::SemiSlick;
+        Tune drag; drag.tires = TireType::DragSlick; drag.intake = 2; drag.exhaust = 2; drag.ecu = 1;
+        for (const Tune* t : {&semi, &drag}) {
+            DragRace r(id, id, TreeType::Pro, 11, false, t, t);
+            r.setPlayerAutopilot(true);
+            PlayerControls pc; double tt = 0;
+            while (r.phase() != RacePhase::Finished && tt < 60) { r.advance(1.0 / 60.0, pc); tt += 1.0 / 60.0; }
+            char m[96]; std::snprintf(m, sizeof m, "#%d %s: ET %.3f, aks saglam", id, t == &semi ? "yari slick" : "slick+parca", r.lane(1).slip.quarter);
+            CHECK(!r.lane(0).slip.broke && !r.lane(1).slip.broke && r.lane(1).slip.finished, m);
+        }
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

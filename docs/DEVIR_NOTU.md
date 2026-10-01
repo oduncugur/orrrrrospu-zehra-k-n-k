@@ -297,3 +297,29 @@ Ardından şartnamenin kalanı: Faz 6 (intercooler ısı emme/su spreyi, termost
 - Test `contact_test` (ctest `arac_temasi`): arkadan carpmada momentum korunur, enerji artmaz, ayrilma e x 10 m/s,
   agir arac az hiz degistirir, donme yok; yan surtmede yanal itme + iki aracta yaw; ayni hizda yan yana: yalniz ayirma.
 - Trafik araclari kinematik kalir (carpinca yeniden dogar); onlara impuls yok.
+
+## Guncelleme — 2026-10-02: Tork konvertoru modeli + YZ kalkisinda aks kirma
+- Olcum (120 rastgele eslesme, YZ rakip, scratchpad `ai_axle.cpp`): once 3/120 aks kirma, ort ET 13.939 ->
+  simdi **0/120**, 120/120 bitirdi, ort ET 13.843.
+- Kok neden: otomatik sanziman surtunmeli debriyaj gibi modelliydi; YZ otomatikte de 120 ms "clutch dump"
+  yapiyordu, oyuncuda da frende motor bosta 2-step'e cikip birakinca dump oluyordu.
+- `PowertrainCore::setConverter`: akiskan kavrama. Pompa torku K w^2 (1 - SR^6), K: stall devrinde (%42 redline)
+  tam gaz motor torku; cikis = TR x pompa (TR stall'da 1.9, SR 0.85'te 1); gaz kesmede ters yonde (motor freni);
+  pompa torku tepe motor torkunun 1.1 katiyla sinirli (vites darbesini sanziman kavrama elemanlari sinirlar;
+  sinirsiz K w^2 redline'da ~4.7 kat cikiyordu). Pedal >= 0.99 = N. Debriyaj isisi yok.
+- `VehicleSim`: otomatik araclarda konvertor acik; kalkis devri = stall devri; fabrika aks boyutu 1.9 x tepe tork
+  ile (manuelde 1.7). Regresyon 9/9 ayni (regresyon araclarinda otomatik yok).
+- `DragRace`: oyuncu/YZ otomatikte frende N + devir stall'da, birakinca konvertor; YZ otomatikte vites aninda
+  (0.30 s ara, oyuncu ile ayni; eski 0.35 s "debriyajli" gecis kalkti), DCT kalkisi 150 ms (oyuncu ile ayni).
+  Manuel/dogbox/DCT'de "aks hissi": gerilme > %85 kopma ise 80 ms debriyaj kaydir + gaz 0.7.
+- `RoadCar`: otomatikte vites karari arac hizindan cikis devri (konvertor kaymasi/patinaj 5. vitese atlatmiyordu).
+  0-100 (YZ, sokak): A90 8.7 -> 7.3 s, Hellcat 9.9 -> 8.3 s, SS 454 11.4 -> 9.1 s.
+- Test `drag_race_test` [7] konvertor: frende stall devrine yerlesir, tork carpimi 1.9, vites darbesi sinirli,
+  N'de tork yok; [8] dort otomatik arac yari slick + slick/parcali kalkista aks kirmaz.
+- Stok otomatik ETleri eski modele gore esit ya da daha iyi (slick: A90 13.67 -> 12.94, Hellcat 14.01 -> 13.12;
+  SVT eskiden hic bitiremiyordu).
+
+### Bilinen (yeni bulunan, eski sorun)
+- **Sokak lastiginde drag ETleri gercegin ~2.5 s ustunde**, 60 ft ~3.2 s (A90 stok 15.2 s; gercek ~12.4).
+  Eski modelde de ayni (olculdu). Sokak lastigi cekisi / YZ gaz kontrolu incelenmeli.
+- Hellcat (900 Nm, RWD, sokak lastigi) YZ test surucusuyle 4 km'de 1 kez yoldan cikti.

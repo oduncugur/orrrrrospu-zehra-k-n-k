@@ -36,6 +36,18 @@ PowertrainCore::PowertrainCore(const EngineSpec& e, const ClutchSpec& c, const D
 }
 
 double PowertrainCore::rpm() const { return omegaE_ * kRadToRpm; }
+
+void PowertrainCore::setConverter(bool on, double stallRpm, double tr0) {
+    converter_ = on;
+    convTr0_ = tr0;
+    const double ws = stallRpm / kRadToRpm;
+    convK_ = on && ws > 1.0 ? wotTorque(stallRpm) / (ws * ws) : 0.0;
+    // Vites gecisinde hiz orani aniden duser ve K w^2 yuksek devirde motor torkunun kat kat ustune cikar; gercek
+    // sanzimanda bunu kayan kavrama elemanlari sinirlar (vites darbesi). Sinir: tepe motor torku x 1.1.
+    double tmax = 0.0;
+    for (const TorqueCurve* c : {&e_.lowCam, &e_.highCam}) for (const auto& p : *c) tmax = std::max(tmax, p.second);
+    convTiMax_ = 1.1 * tmax;
+}
 double PowertrainCore::powerHp() const { return std::max(0.0, Te_ * omegaE_) / 745.7; }
 
 double PowertrainCore::totalRatio() const {
@@ -120,9 +132,28 @@ void PowertrainCore::step(double dt, double wL, double wR, double oilFactor) {
     const double G = totalRatio();
     const double wC = G * 0.5 * (wL + wR);          // debriyaj cikis mili
     const double dW = (G != 0.0) ? (omegaE_ - wC) : 0.0;
-    Tc_ = (G != 0.0) ? Tcap * std::tanh(dW / 1.0) : 0.0;
-    if (snappedL_ && snappedR_) Tc_ = 0.0; // iki aks kopuk: sanziman cikisi bosta doner
-    clutchTemp_ += dt * (std::fabs(Tc_ * dW) * 0.9 - 8.0 * (clutchTemp_ - 40.0)) / c_.heatCap;
+    double Tout = 0.0;                              // sanziman girisine giden tork (konvertorde tork carpimi)
+    if (converter_) {
+        Tc_ = 0.0;
+        if (G != 0.0 && clutchPedal_ < 0.99) {
+            const double wE = omegaE_, wT = std::max(0.0, wC);
+            if (wT <= wE) {                         // cekis: pompa turbini surer
+                const double sr = wE > 1e-6 ? wT / wE : 1.0;
+                Tc_ = std::min(convK_ * wE * wE * (1.0 - std::pow(sr, 6.0)), convTiMax_);
+                Tout = Tc_ * (sr < 0.85 ? convTr0_ - (convTr0_ - 1.0) * sr / 0.85 : 1.0);
+            } else {                                // gaz kesme: turbin pompayi surer (motor freni), carpim yok
+                const double sr = wT > 1e-6 ? wE / wT : 1.0;
+                Tc_ = -std::min(convK_ * wT * wT * (1.0 - std::pow(sr, 6.0)), convTiMax_);
+                Tout = Tc_;
+            }
+        }
+        if (snappedL_ && snappedR_) Tc_ = Tout = 0.0;
+    } else {
+        Tc_ = (G != 0.0) ? Tcap * std::tanh(dW / 1.0) : 0.0;
+        if (snappedL_ && snappedR_) Tc_ = 0.0; // iki aks kopuk: sanziman cikisi bosta doner
+        Tout = Tc_;
+        clutchTemp_ += dt * (std::fabs(Tc_ * dW) * 0.9 - 8.0 * (clutchTemp_ - 40.0)) / c_.heatCap;
+    }
 
     omegaE_ += dt * (Te - Tc_) / e_.inertia;
     if (omegaE_ < 0.0) omegaE_ = 0.0;
@@ -132,8 +163,8 @@ void PowertrainCore::step(double dt, double wL, double wR, double oilFactor) {
     }
 
     // 1.5-Way LSD: Tbias = preload + |Tin| * k/tan(rampa); gaz kesmede daha dik rampa -> daha az kilit
-    const double eff = (Tc_ >= 0.0) ? gb_.efficiency : 1.0 / gb_.efficiency;
-    const double Tin = Tc_ * G * eff;
+    const double eff = (Tout >= 0.0) ? gb_.efficiency : 1.0 / gb_.efficiency;
+    const double Tin = Tout * G * eff;
     const double ramp = (Tin >= 0.0 ? d_.rampAccelDeg : d_.rampDecelDeg) * kPi / 180.0;
     const double Tbias = d_.preload + std::fabs(Tin) * d_.plateFactor / std::tan(ramp);
     const double Tfr = Tbias * std::tanh((wL - wR) / 0.3); // hizli donen taraftan yavasa aktarim

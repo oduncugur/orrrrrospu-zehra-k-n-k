@@ -100,11 +100,9 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
     if (box == Gearbox::DCT || box == Gearbox::TorqueConverter) {
         const bool holding = pc.brake > 0.5 && beforeLeave;
         if (box == Gearbox::TorqueConverter) {
-            // Tork konvertoru: stall devrine kadar kayar, ustunde kilitlenir
-            const double stall = 0.42 * L.sim->engineSpec().redlineRpm;
-            const double idle = L.sim->engineSpec().idleRpm;
-            const double e = std::clamp((pt.rpm() - idle) / (stall - idle), 0.0, 1.0);
-            clutch = holding ? 1.0 : 1.0 - e * e * (3 - 2 * e);
+            // Tork konvertoru (PowertrainCore): frende beklerken N + devir stall'da (brake-torque karsiligi,
+            // defaultLaunchRpm); fren birakilinca akiskan kavrama — ani kilitlenme/darbe yok
+            clutch = holding ? 1.0 : 0.0;
             if (!holding && pt.gear() < pt.gearCount() && pt.rpm() > L.sim->shiftRpm() && L.shiftT < 0) {
                 pt.setGear(pt.gear() + 1); L.shiftT = 0.0;
             }
@@ -150,8 +148,11 @@ void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {
         pt.setThrottle(0.0); pt.setClutchPedal(1.0); in.brake = 0.45;
         return;
     }
+    const bool tc = box == Gearbox::TorqueConverter;
     if (clock_ < go || phase_ == RacePhase::Burnout || phase_ == RacePhase::Staging) {
-        pt.setGear(1); pt.setClutchPedal(1.0);
+        pt.setGear(1);
+        // Debriyaj basili (otomatikte N) + 2-step; otomatikte kalkis devri stall devri (defaultLaunchRpm)
+        pt.setClutchPedal(1.0);
         pt.setThrottle(phase_ == RacePhase::Tree ? 1.0 : 0.0);
         pt.setTwoStep(true, L.sim->defaultLaunchRpm());
         in.held = true;
@@ -159,23 +160,43 @@ void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {
     }
     pt.setTwoStep(false, 0.0);
     const double t = clock_ - go;
-    double clutch = std::max(0.0, 1.0 - t / 0.12);                    // clutch dump
+    // Kalkis: manuel/dogbox 120 ms clutch dump, DCT launch control 150 ms rampa (oyuncuyla ayni), otomatik konvertor
+    double clutch = tc ? 0.0 : std::max(0.0, 1.0 - t / (box == Gearbox::DCT ? 0.15 : 0.12));
     const double kap = 0.5 * (L.sim->wheel(L.sim->drivenLeft()).kappa() + L.sim->wheel(L.sim->drivenRight()).kappa());
     if (t > 0.12) L.aiFoot = std::clamp(L.aiFoot + kStep * 8.0 * (0.12 - kap), pt.rpm() < 5500.0 ? 1.0 : 0.35, 1.0);
     double thr = L.aiFoot;
-    if (L.shiftT < 0.0 && pt.rpm() > L.sim->shiftRpm() && pt.gear() < pt.gearCount()) L.shiftT = 0.0;
     L.cutIgnition = false;
+    if (tc) {
+        // Otomatik: vites aninda, en az 0.30 s arayla (oyuncu ile ayni)
+        if (L.shiftT < 0.0 && pt.rpm() > L.sim->shiftRpm() && pt.gear() < pt.gearCount()) { pt.setGear(pt.gear() + 1); L.shiftT = 0.0; }
+        if (L.shiftT >= 0.0) { L.shiftT += kStep; if (L.shiftT > 0.30) L.shiftT = -1.0; }
+        pt.setClutchPedal(clutch);
+        pt.setThrottle(thr);
+        return;
+    }
+    // Aks hissi: kalkis/vites sonrasi aks gerilmesi kopma sinirinin %85'ini asarsa debriyaji ~80 ms kaydir,
+    // gazi hafiflet (deneyimli surucunun "feather"i). Olculdu: stok guclu araclarda aks kirilmasini azaltir.
+    {
+        const DrivetrainFailure& f = L.sim->failure();
+        const double ratio = std::max(f.shearMPa(0), f.shearMPa(1)) / f.axle().tauUltMPa;
+        if (ratio > 0.85) L.aiFeatherT = 0.08;
+        if (L.aiFeatherT > 0.0) {
+            L.aiFeatherT -= kStep;
+            clutch = std::max(clutch, 0.45);                              // isirma bolgesinde kaydir
+            thr = std::min(thr, 0.7);
+        }
+    }
+    if (L.shiftT < 0.0 && pt.rpm() > L.sim->shiftRpm() && pt.gear() < pt.gearCount()) L.shiftT = 0.0;
     if (L.shiftT >= 0.0 && (box == Gearbox::Dogbox || box == Gearbox::DCT)) {
         if (L.shiftT == 0.0) pt.setGear(pt.gear() + 1);
         const double dur = box == Gearbox::Dogbox ? 0.035 : 0.060;
         if (box == Gearbox::Dogbox) { thr = 0.0; L.cutIgnition = true; }
         L.shiftT += kStep;
         if (L.shiftT > dur) L.shiftT = -1.0;
-    } else if (L.shiftT >= 0.0) {
-        const double k = box == Gearbox::TorqueConverter ? 1.3 : 1.0;
-        if (L.shiftT < 0.10 * k)      { clutch = 1.0; thr = 0.0; }
-        else if (L.shiftT < 0.17 * k) { clutch = 1.0; thr = 0.3; if (L.shiftT - kStep < 0.10 * k) pt.setGear(pt.gear() + 1); }
-        else if (L.shiftT < 0.27 * k) { clutch = 1.0 - (L.shiftT - 0.17 * k) / (0.10 * k); }
+    } else if (L.shiftT >= 0.0) {                                       // H-desen: ~270 ms
+        if (L.shiftT < 0.10)      { clutch = 1.0; thr = 0.0; }
+        else if (L.shiftT < 0.17) { clutch = 1.0; thr = 0.3; if (L.shiftT - kStep < 0.10) pt.setGear(pt.gear() + 1); }
+        else if (L.shiftT < 0.27) { clutch = 1.0 - (L.shiftT - 0.17) / 0.10; }
         else L.shiftT = -1.0;
         if (L.shiftT >= 0.0) L.shiftT += kStep;
     }

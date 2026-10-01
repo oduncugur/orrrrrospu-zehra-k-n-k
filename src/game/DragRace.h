@@ -46,7 +46,7 @@ struct LaneState {
     double shiftT = -1; int shiftTarget = 0;
     bool   cutIgnition = false;          // dogbox/devir kesici: ses icin
     // Yapay zeka
-    double aiFoot = 1.0, aiReaction = 0.15;
+    double aiFoot = 1.0, aiReaction = 0.15, aiFeatherT = 0.0;
     double autoRelease = -1;             // DCT launch: fren birakma ani (debriyaj rampasi icin)
     bool   grind = false;                // H-desende debriyajsiz vites denemesi (dis citirtisi)
 };

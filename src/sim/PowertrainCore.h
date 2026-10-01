@@ -61,6 +61,12 @@ public:
     void setIgnitionKilled(bool k)      { killed_ = k; }          // motor kilitlendi vs.
     void restart() { stalled_ = false; omegaE_ = e_.idleRpm / 9.5493; }
     void setAxleSnapped(bool l, bool r) { snappedL_ = l; snappedR_ = r; }
+    // Tork konvertoru (otomatik sanziman): debriyaj yerine akiskan kavrama. Pompa torku K w^2 (1 - SR^6),
+    // cikis = TR(SR) x pompa (TR: kalkista tr0, SR 0.85'te 1). Stall devrinde tam gaz motor torku = K w^2.
+    // Pedal >= 0.99: bos (N). Ani kilitlenme olmaz: kalkista tork yumusak gelir.
+    void setConverter(bool on, double stallRpm, double tr0 = 1.9);
+    bool converter() const { return converter_; }
+    static constexpr double kConverterTr0 = 1.9;
 
     // Bir alt-adim: tekerlek hizlari ve yag basinci carpanindan aks torklarini uretir
     void step(double dt, double wL, double wR, double oilFactor);
@@ -98,6 +104,7 @@ private:
     int    gear_ = 0;
     bool   twoStep_ = false; double twoStepRpm_ = 4500.0;
     bool   killed_ = false, snappedL_ = false, snappedR_ = false;
+    bool   converter_ = false; double convK_ = 0.0, convTr0_ = 1.9, convTiMax_ = 0.0;
     double omegaE_;
     double Te_ = 0.0, Tc_ = 0.0, TL_ = 0.0, TR_ = 0.0;
     double clutchTemp_ = 60.0, oilBar_ = 0.0;

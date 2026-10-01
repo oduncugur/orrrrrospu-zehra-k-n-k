@@ -64,9 +64,13 @@ void RoadCar::driverAssist(double dt, double thrIn) {
         launching_ = false;
         const int gear = pt.gear();
         sinceShift_ += dt;
+        // Vites karari: otomatikte (konvertor kayar) arac hizindan cikis devri (patinaj sisirmez), digerlerinde motor devri
+        double shiftRpm = pt.rpm();
+        if (pt.converter())
+            shiftRpm = std::min(pt.rpm(), v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493);
         if (!manual && sinceShift_ > 0.8) {
-            if (pt.rpm() > sim_->shiftRpm() - 150 && gear < pt.gearCount()) { shiftT_ = 0; target_ = gear + 1; sinceShift_ = 0; }
-            else if (pt.rpm() < 0.36 * sim_->engineSpec().redlineRpm && gear > 1 && sinceShift_ > 1.5) { shiftT_ = 0; target_ = gear - 1; sinceShift_ = 0; }
+            if (shiftRpm > sim_->shiftRpm() - 150 && gear < pt.gearCount()) { shiftT_ = 0; target_ = gear + 1; sinceShift_ = 0; }
+            else if (shiftRpm < 0.36 * sim_->engineSpec().redlineRpm && gear > 1 && sinceShift_ > 1.5) { shiftT_ = 0; target_ = gear - 1; sinceShift_ = 0; }
         }
         if (gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
         if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && gear == 1) { launching_ = true; launchPedal_ = 0.6; }
