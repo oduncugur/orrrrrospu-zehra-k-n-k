@@ -94,6 +94,8 @@ public:
     void goFabricate(int cat);                   // ozel uretim atolyesi
     void goJunkyard();
     void goBodyShop();
+    void goAchievements();
+    void toast(const std::string& msg) { toasts_.push_back(msg); }   // ust bildirim (sirayla, ~2.6 s)
     void goLeague();
     // Lig etkinligi baslat: rakip (isimli ya da dengi), mod; sonuc ekranindan donus lig ekranina
     void startEvent(int idx);
@@ -146,6 +148,7 @@ private:
     uint32_t raceSeed_ = 1;
     std::vector<float> mix_;
     float fade_ = 0.0f;                          // ekran gecis karartmasi (1 -> 0)
+    std::vector<std::string> toasts_; double toastT_ = 0;
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 

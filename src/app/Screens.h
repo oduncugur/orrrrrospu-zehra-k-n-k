@@ -208,6 +208,19 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// Basarimlar: liste (kazanilan altin, odul), ilerleme
+class AchievementsScreen : public Screen {
+public:
+    explicit AchievementsScreen(App& app) : app_(app) {}
+    bool landscape() const override { return false; }
+    void update(double) override {}
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
+};
+
 // Boyahane: renk, cila, serit, jant rengi (taslak onizleme, UYGULA ile odenir).
 class BodyShopScreen : public Screen {
 public:

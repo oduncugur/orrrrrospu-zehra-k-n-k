@@ -13,6 +13,7 @@ namespace {
 const Rect kBackL{8, 596, 352, 634};
 const Rect kStartL{8, 548, 352, 590};
 const Rect kYesL{8, 548, 176, 590}, kNoL{184, 548, 352, 590};
+const Rect kAchL{262, 30, 352, 54};
 constexpr float kRowY0 = 114, kRowH = 44;
 }
 
@@ -39,6 +40,11 @@ void LeagueScreen::render(Renderer& r) {
     r.text(8, 32, b, 1, kUiText);
     const std::string m = money(c.money);
     r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
+    {
+        int n = 0; for (uint32_t a = c.achieved; a; a >>= 1) n += a & 1u;
+        std::snprintf(b, sizeof b, "BASARIM %d", n);
+        button(r, kAchL, b, {0.45f, 0.35f, 0.08f}, 1);
+    }
     // Lig sekmeleri
     const int open = c.leagueUnlocked();
     for (int l = 0; l < kLeagues; ++l) {
@@ -126,6 +132,7 @@ void LeagueScreen::pointerDown(int, float x, float y) {
         if (kNoL.hit(x, y)) { confirm_ = false; return; }
     }
     if (kBackL.hit(x, y)) { app_.activeEvent = -1; app_.goGarage(); return; }
+    if (kAchL.hit(x, y)) { app_.goAchievements(); return; }
     for (int l = 0; l < kLeagues; ++l)
         if (Rect{4.0f + l * 70.8f, 64, 72.0f + l * 70.8f, 92}.hit(x, y)) { tab_ = l; sel_ = -1; confirm_ = false; return; }
     if (sel_ >= 0 && kStartL.hit(x, y)) {

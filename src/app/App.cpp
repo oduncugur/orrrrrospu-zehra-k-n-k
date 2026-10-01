@@ -1,4 +1,6 @@
 #include "App.h"
+#include "game/Achievements.h"
+#include "Ui.h"
 #include "GLApi.h"
 #include "Screens.h"
 #include "sim/PartTables.h"
@@ -32,6 +34,8 @@ App::App(const std::string& saveDir) {
 
 void App::saveCareer() {
     career.treePro = treePro;
+    for (int i : career.checkAchievements())
+        toast("BASARIM: " + std::string(achievements()[i].name) + "  +" + money(achievements()[i].reward));
     if (!savePath_.empty()) career.save(savePath_);
 }
 App::~App() = default;
@@ -101,6 +105,7 @@ void App::goParts(int cat) { setScreen(std::make_unique<PartsScreen>(*this, cat)
 void App::goFabricate(int cat) { setScreen(std::make_unique<FabricateScreen>(*this, cat)); }
 void App::goJunkyard() { setScreen(std::make_unique<JunkyardScreen>(*this)); }
 void App::goBodyShop() { setScreen(std::make_unique<BodyShopScreen>(*this)); }
+void App::goAchievements() { setScreen(std::make_unique<AchievementsScreen>(*this)); }
 void App::goRestore() { setScreen(std::make_unique<RestoreScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
@@ -111,6 +116,7 @@ void App::goRoad() {
 }
 
 void App::update(double dt) {
+    if (!toasts_.empty() && (toastT_ += dt) > 2.6) { toasts_.erase(toasts_.begin()); toastT_ = 0; }
     if (pending_) {
         screen_ = std::move(pending_);
         if (onOrientation) onOrientation(screen_->landscape());
@@ -129,6 +135,13 @@ void App::render() {
     if (!renderer_.ready()) return;
     screen_->render(renderer_);
     if (fade_ > 0.0f) renderer_.rect(0, 0, (float)renderer_.vw(), (float)renderer_.vh(), {0.02f, 0.02f, 0.03f, fade_ * fade_});
+    if (!toasts_.empty()) {                                       // ust bildirim: kayarak iner, 2.6 s
+        const float W = (float)renderer_.vw(), k = (float)std::min({1.0, toastT_ / 0.25, (2.6 - toastT_) / 0.25});
+        const float y = -34.0f + 40.0f * std::max(0.0f, k);
+        renderer_.rect(W * 0.5f - 172, y, W * 0.5f + 172, y + 30, {0.10f, 0.08f, 0.02f, 1.0f});
+        renderer_.rect(W * 0.5f - 172, y + 28, W * 0.5f + 172, y + 30, {1.0f, 0.78f, 0.2f});
+        renderer_.textCentered(W * 0.5f, y + 9, toasts_.front().substr(0, 42), 1, {1.0f, 0.85f, 0.35f});
+    }
     renderer_.present(sw_, sh_);
 }
 

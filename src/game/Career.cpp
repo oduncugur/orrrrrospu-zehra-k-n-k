@@ -1,4 +1,5 @@
 #include "Career.h"
+#include "game/Achievements.h"
 #include "sim/PartTables.h"
 #include "sim/VehicleSim.h"
 
@@ -612,6 +613,19 @@ long Career::recordFlow(long score, bool* newRecord) {
 
 long Career::repairCost() const { return repairCostFor(car()); }
 
+std::vector<int> Career::checkAchievements() {
+    std::vector<int> got;
+    const auto& a = achievements();
+    for (int i = 0; i < (int)a.size() && i < 32; ++i) {
+        if ((achieved >> i) & 1u) continue;
+        if (!achievementMet(*this, i)) continue;
+        achieved |= 1u << i;
+        money += a[i].reward;                                          // odul kazanc sayilmaz (CEYREK MILYON zinciri olmasin)
+        got.push_back(i);
+    }
+    return got;
+}
+
 long repairCostFor(const OwnedCar& c) {
     const VehicleDef& v = *findVehicle(c.carId);
     long cost = 0;
@@ -737,7 +751,7 @@ std::string Career::serialize() const {
       << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\n";
     {
         char lb[160];
-        std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone);
+        std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
         o << lb;
     }
     char buf[256];
@@ -789,6 +803,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
         else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
+        else if (k == "ach") c.achieved = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
         else if (k == "daily") std::sscanf(v.c_str(), "%d;%ld;%ld;%ld;%d", &c.dailyDay, &c.dailyProg[0], &c.dailyProg[1], &c.dailyProg[2], &c.dailyDone);
         else if (k == "streak") {
             if (std::sscanf(v.c_str(), "%d;%d", &c.lastOppId, &c.sameOppWins) != 2) return false;

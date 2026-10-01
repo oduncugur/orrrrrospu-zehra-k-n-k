@@ -112,6 +112,9 @@ struct Career {
     int  dailyDay = -1;                    // gunluk gorevlerin gunu
     long dailyProg[3] = {0, 0, 0};
     int  dailyDone = 0;                    // tamamlanan gorev bitleri
+    uint32_t achieved = 0;                 // basarimlar (Achievements.h indeksi -> bit)
+    // Yeni kazanilan basarimlar: odulu ode, bitini isle, indeksleri dondur
+    std::vector<int> checkAchievements();
     int  leagueUnlocked() const;           // acik en yuksek lig (onceki ligin patronu yenildiyse)
     int  leagueWins(int league) const;
     bool eventWon(int idx) const { return idx >= 0 && idx < 64 && ((eventWins >> idx) & 1u); }

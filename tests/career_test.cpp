@@ -1,5 +1,6 @@
 // Kariyer / ekonomi / kayit testleri
 #include "game/Career.h"
+#include "game/Achievements.h"
 #include "game/DragRace.h"
 #include "sim/VehicleSim.h"
 #include "garage/VehicleCatalog.h"
@@ -197,6 +198,20 @@ int main() {
               && d.cars[0].stripeCol == 7 && d.cars[0].rimCol == 15, "boya / cila / serit / jant kayitta");
         Career e;
         CHECK(Career::parse(Career::newGame().serialize(), e) && e.cars[0].paint == -1 && e.cars[0].rimCol == -1, "fabrika gorunum varsayilan");
+    }
+    std::printf("[A] Basarimlar: bir kez odul, kayitta korunur\n");
+    {
+        Career c = Career::newGame();
+        CHECK(c.checkAchievements().empty(), "yeni oyunda basarim yok");
+        c.wins = 1; c.cars[0].paint = 3;
+        const long m0 = c.money;
+        const auto got = c.checkAchievements();
+        CHECK(got.size() == 2 && c.money == m0 + achievements()[0].reward + achievements()[19].reward, "ILK KAN + BOYACI odulu");
+        CHECK(c.checkAchievements().empty() && c.money == m0 + achievements()[0].reward + achievements()[19].reward, "ikinci kez odul yok");
+        c.cars[0].bestEt = 12.5;
+        CHECK(c.checkAchievements().size() == 1 && ((c.achieved >> 6) & 1u), "13 saniye alti");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.achieved == c.achieved, "basarimlar kayitta");
     }
     std::printf("[11] Satis\n");
     {
