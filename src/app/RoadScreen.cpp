@@ -255,8 +255,30 @@ void RoadScreen::drawWorld(Renderer& r) {
     const float horizon = hz.ok ? std::clamp(hz.y, 0.0f, (float)H) : H * 0.4f;
     const bool mtn = ses_->kind() == RoadSession::Kind::Touge;
     const Color grass = mtn ? Color{0.2f, 0.36f, 0.2f} : Color{0.36f, 0.55f, 0.28f};
+    const Color skyLow = mtn ? Color{0.95f, 0.55f, 0.35f} : Color{0.85f, 0.70f, 0.55f};
+    // Hava perspektifi: uzaklastikca renk ufuk rengine karisir (derinlik hissi, uzaktaki cizgiler sakinlesir)
+    const Color fogCol{skyLow.r * 0.85f + 0.10f, skyLow.g * 0.85f + 0.10f, skyLow.b * 0.85f + 0.12f};
+    auto fog = [&](Color c, float w) {
+        const float f = std::clamp((w - 40.0f) / 360.0f, 0.0f, 0.82f);
+        return Color{c.r + (fogCol.r - c.r) * f, c.g + (fogCol.g - c.g) * f, c.b + (fogCol.b - c.b) * f, c.a};
+    };
     r.rect(0, horizon, W, H, grass);
-    r.gradientV(0, 0, W, horizon, mtn ? Color{0.18f, 0.2f, 0.42f} : Color{0.30f, 0.45f, 0.85f}, mtn ? Color{0.95f, 0.55f, 0.35f} : Color{0.85f, 0.70f, 0.55f});
+    r.gradientV(0, 0, W, horizon, mtn ? Color{0.18f, 0.2f, 0.42f} : Color{0.30f, 0.45f, 0.85f}, skyLow);
+    {   // Gunes ve bulutlar: dunya yonune sabit (donuste gokyuzu doner)
+        const float yaw = (float)std::atan2(dy, dx), hfov = 2.0f * std::atan(std::tan((float)camFov * 0.5f) * W / H);
+        auto azX = [&](float az) { return W * 0.5f - std::remainder(az - yaw, 6.2831853f) / hfov * W; };
+        const float sx = azX(mtn ? 2.2f : 0.9f), sy = horizon - (mtn ? 0.12f : 0.32f) * horizon;
+        if (sx > -60 && sx < W + 60) {
+            for (int k = 3; k >= 0; --k) r.circle(sx, sy, 10.0f + k * 9.0f, 20, {1.0f, 0.92f, 0.7f, k ? 0.10f : 0.95f});
+        }
+        for (int k = 0; k < 9; ++k) {
+            const float cx = azX(k * 0.7f + 0.3f * hashf(k * 11)), cy = horizon * (0.18f + 0.5f * hashf(k * 5 + 1));
+            if (cx < -80 || cx > W + 80) continue;
+            const float w0 = 26.0f + 30.0f * hashf(k * 3);
+            for (int j = 0; j < 4; ++j)
+                r.circle(cx + (j - 1.5f) * w0 * 0.45f, cy + (j % 2) * 3.0f, w0 * (0.32f + 0.12f * (j % 3)), 14, {1.0f, 1.0f, 1.0f, 0.28f});
+        }
+    }
     if (mtn)   // uzak daglar (siluet)
         for (int k = 0; k < 10; ++k) { const float x0 = k * 70.0f - 30.0f, hh = 30.0f + 25.0f * hashf(k + 3); r.tri(x0, horizon, x0 + 100, horizon, x0 + 50, horizon - hh, {0.25f, 0.24f, 0.36f}); }
     if (sideCam) {
@@ -290,18 +312,35 @@ void RoadScreen::drawWorld(Renderer& r) {
         const bool band = ((i / 3) & 1) != 0;
         {   // Arazi: yol yuksekligini izleyen 60 m'lik cim seritleri (tepede yol havada kalmasin)
             const Proj gL0 = edge(i, hw + 60.0), gL1 = edge(j, hw + 60.0), gR0 = edge(i, -hw - 60.0), gR1 = edge(j, -hw - 60.0);
-            if (gL0.ok && gL1.ok) { r.tri(gL0.x, gL0.y, aL.x, aL.y, bL.x, bL.y, grass); r.tri(gL0.x, gL0.y, bL.x, bL.y, gL1.x, gL1.y, grass); }
-            if (gR0.ok && gR1.ok) { r.tri(aR.x, aR.y, gR0.x, gR0.y, gR1.x, gR1.y, grass); r.tri(aR.x, aR.y, gR1.x, gR1.y, bR.x, bR.y, grass); }
+            const Color gc = fog(band ? grass : Color{grass.r * 0.94f, grass.g * 0.96f, grass.b * 0.94f}, aL.w);
+            if (gL0.ok && gL1.ok) { r.tri(gL0.x, gL0.y, aL.x, aL.y, bL.x, bL.y, gc); r.tri(gL0.x, gL0.y, bL.x, bL.y, gL1.x, gL1.y, gc); }
+            if (gR0.ok && gR1.ok) { r.tri(aR.x, aR.y, gR0.x, gR0.y, gR1.x, gR1.y, gc); r.tri(aR.x, aR.y, gR1.x, gR1.y, bR.x, bR.y, gc); }
         }
-        const Color curb = mtn ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
-                               : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f});
+        const Color curb = fog(mtn ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
+                                   : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f}), aL.w);
         r.tri(aL.x, aL.y, aR.x, aR.y, bR.x, bR.y, curb); r.tri(aL.x, aL.y, bR.x, bR.y, bL.x, bL.y, curb);
         const Proj cL = edge(i, hw), cR = edge(i, -hw), dL = edge(j, hw), dR = edge(j, -hw);
-        const Color asp = band ? Color{0.30f, 0.30f, 0.32f} : Color{0.27f, 0.27f, 0.29f};
+        // Asfalt: hafif yama/renk degisimi (hash) + tekerlek izi koyulugu
+        const float patch = 0.015f * (hashf(i / 4) - 0.5f);
+        const Color asp = fog(band ? Color{0.30f + patch, 0.30f + patch, 0.32f + patch} : Color{0.27f + patch, 0.27f + patch, 0.29f + patch}, cL.w);
         r.tri(cL.x, cL.y, cR.x, cR.y, dR.x, dR.y, asp); r.tri(cL.x, cL.y, dR.x, dR.y, dL.x, dL.y, asp);
+        if (cL.w < 120.0f)                                         // tekerlek izleri (serit merkezinin iki yani)
+            for (double lo : {-ses_->lane() - 0.75, -ses_->lane() + 0.75, ses_->lane() - 0.75, ses_->lane() + 0.75}) {
+                const Proj t0 = edge(i, lo + 0.25), t1 = edge(i, lo - 0.25), t2 = edge(j, lo - 0.25), t3 = edge(j, lo + 0.25);
+                const Color tc{0.0f, 0.0f, 0.0f, 0.07f};
+                r.tri(t0.x, t0.y, t1.x, t1.y, t2.x, t2.y, tc); r.tri(t0.x, t0.y, t2.x, t2.y, t3.x, t3.y, tc);
+            }
+        {   // kenar cizgileri (beyaz, surekli)
+            const Color ec = fog({0.92f, 0.92f, 0.9f}, cL.w);
+            for (double sg : {-1.0, 1.0}) {
+                const Proj e0 = edge(i, sg * (hw - 0.12)), e1 = edge(i, sg * (hw - 0.27)), e2 = edge(j, sg * (hw - 0.27)), e3 = edge(j, sg * (hw - 0.12));
+                r.tri(e0.x, e0.y, e1.x, e1.y, e2.x, e2.y, ec); r.tri(e0.x, e0.y, e2.x, e2.y, e3.x, e3.y, ec);
+            }
+        }
         if ((i % 5) < 2) {                                         // orta kesik cizgi (4 m cizgi, 6 m bosluk)
             const Proj m0 = edge(i, 0.08), m1 = edge(i, -0.08), m2 = edge(j, 0.08), m3 = edge(j, -0.08);
-            r.tri(m0.x, m0.y, m1.x, m1.y, m3.x, m3.y, {0.95f, 0.9f, 0.6f}); r.tri(m0.x, m0.y, m3.x, m3.y, m2.x, m2.y, {0.95f, 0.9f, 0.6f});
+            const Color mc = fog({0.95f, 0.9f, 0.6f}, m0.w);
+            r.tri(m0.x, m0.y, m1.x, m1.y, m3.x, m3.y, mc); r.tri(m0.x, m0.y, m3.x, m3.y, m2.x, m2.y, mc);
         }
         if (i % 8 == 0) {                                          // kenar agaclari / direkleri (her 16 m)
             for (int side = -1; side <= 1; side += 2) {
@@ -312,10 +351,18 @@ void RoadScreen::drawWorld(Renderer& r) {
                 if (!b.ok) continue;
                 const float sc = pxPerM / b.w;
                 const float th = (5.0f + 4.0f * h) * sc, tw = (1.6f + h) * sc;
-                if (h > 0.8f) r.rect(b.x - 0.12f * sc, b.y - 7.5f * sc, b.x + 0.12f * sc, b.y, {0.35f, 0.28f, 0.2f});   // direk
-                else {
-                    r.rect(b.x - tw * 0.12f, b.y - th * 0.35f, b.x + tw * 0.12f, b.y, {0.35f, 0.24f, 0.14f});
-                    r.tri(b.x - tw, b.y - th * 0.3f, b.x + tw, b.y - th * 0.3f, b.x, b.y - th, {0.12f, 0.38f + 0.1f * h, 0.16f});
+                if (h > 0.8f) {                                      // elektrik diregi + travers
+                    const Color pc = fog({0.35f, 0.28f, 0.2f}, b.w);
+                    r.rect(b.x - 0.12f * sc, b.y - 7.5f * sc, b.x + 0.12f * sc, b.y, pc);
+                    r.rect(b.x - 0.9f * sc, b.y - 7.2f * sc, b.x + 0.9f * sc, b.y - 7.0f * sc, pc);
+                } else {                                             // cam agaci: golge + govde + iki kat yaprak (isikli / golgeli yari)
+                    const Color leaf = fog({0.12f, 0.38f + 0.1f * h, 0.16f}, b.w), leafD = fog({0.08f, 0.28f + 0.08f * h, 0.12f}, b.w);
+                    r.circle(b.x + 0.4f * sc, b.y, tw * 0.9f, 10, {0.0f, 0.0f, 0.0f, 0.18f});
+                    r.rect(b.x - tw * 0.12f, b.y - th * 0.35f, b.x + tw * 0.12f, b.y, fog({0.35f, 0.24f, 0.14f}, b.w));
+                    r.tri(b.x - tw, b.y - th * 0.28f, b.x, b.y - th * 0.28f, b.x, b.y - th * 0.78f, leafD);
+                    r.tri(b.x, b.y - th * 0.28f, b.x + tw, b.y - th * 0.28f, b.x, b.y - th * 0.78f, leaf);
+                    r.tri(b.x - tw * 0.75f, b.y - th * 0.55f, b.x, b.y - th * 0.55f, b.x, b.y - th, leafD);
+                    r.tri(b.x, b.y - th * 0.55f, b.x + tw * 0.75f, b.y - th * 0.55f, b.x, b.y - th, leaf);
                 }
             }
         }
