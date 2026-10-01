@@ -107,6 +107,29 @@ int main() {
         CHECK(ok && a.signature() == b.signature() && d.car().gearboxBroken, "v2 parcalar + atolye degerleri + sanziman hasari kayitta korunur");
         CHECK(!d.car().raceable() && d.repairCost() > 600, "kirik sanziman: yarisamaz, tamir ucretli");
     }
+    std::printf("[5] Hurdalik ve restorasyon\n");
+    {
+        Career c = Career::newGame();
+        c.money = 200000;
+        const auto offers = junkyardOffers(5);
+        bool cheap = offers.size() == 6;
+        for (const JunkCar& j : offers) cheap = cheap && j.price <= carPrice(*findVehicle(j.carId)) * 0.36;
+        CHECK(cheap, "6 hurda arac, fiyat <= degerin %36'si");
+        const JunkCar j = offers[0];
+        Tune fresh;
+        const double hpJunk = peakHp(*findVehicle(j.carId), j.tune), hpNew = peakHp(*findVehicle(j.carId), fresh);
+        std::printf("    hurda #%d: guc %.0f / yeni %.0f HP, fiyat %d, deger %d\n", j.carId, hpJunk, hpNew, j.price, carPrice(*findVehicle(j.carId)));
+        CHECK(c.buyJunk(j) && hpJunk < hpNew * 0.9, "hurda alindi; yipranmis motor guc kaybeder");
+        const int before = sellPrice(c.car());
+        int steps = 0;
+        for (int k = 0; k < kRestoreParts; ++k) while (restoreStepCost(c.car(), k) > 0 && steps < 60) { c.restoreStep(k); ++steps; }
+        const int after = sellPrice(c.car());
+        std::printf("    tam restorasyon: %d adim, satis degeri %d -> %d\n", steps, before, after);
+        CHECK(steps > kRestoreParts, "tam toparlamak birden cok adim ister");
+        CHECK(c.car().raceable() && after > before * 2, "restore edilen arac yarisir ve degerlenir");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.car().fromJunk && d.car().tune.signature() == c.car().tune.signature(), "hurda araci kayitta korunur");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

@@ -16,6 +16,7 @@ const Rect kRace{8, 516, 128, 562}, kRoad{132, 516, 188, 562}, kSettings{192, 51
 const Rect kParts{8, 570, 90, 632}, kGallery{96, 570, 178, 632}, kDyno{184, 570, 266, 632};
 const float kSl[4] = {292, 380, 352, 632};
 const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac varken)
+const Rect kRestoreG{8, 66, 112, 94};         // sol ust: hasar / yipranma varsa
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -125,9 +126,8 @@ void GarageScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "ARAC %d/%zu", c.current + 1, c.cars.size());
     r.textCentered((kPrev.x1 + kNext.x0) / 2, 482, b, 2, {1, 1, 1});
 
-    if (c.car().damaged()) {
-        std::snprintf(b, sizeof b, "TAMIR $%ld", c.repairCost());
-        button(r, kRace, b, Color{0.75f, 0.15f, 0.12f}, 1);
+    if (!c.car().raceable()) {
+        button(r, kRace, "TAMIR ET", Color{0.75f, 0.15f, 0.12f}, 2);
         std::string d = "HASAR:";
         if (c.car().axleBroken) d += " AKS KIRIK";
         if (c.car().engineWear > 0.02) { char e[32]; std::snprintf(e, sizeof e, " MOTOR YATAK %%%d", (int)(c.car().engineWear * 100 + 0.5)); d += e; }
@@ -150,6 +150,7 @@ void GarageScreen::render(Renderer& r) {
 #endif
 
     if (c.cars.size() > 1) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 2);
+    if (worn()) button(r, kRestoreG, "RESTORASYON", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
         r.textCentered(180, 258, msg_, 2, kUiGold);
@@ -174,6 +175,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
         return;
     }
     if (app_.career.cars.size() > 1 && kSellG.hit(x, y)) { selling_ = true; return; }
+    if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
     if (x >= kSl[0] - 10 && y >= kSl[1] - 20) {
         throttlePtr_ = id;
         throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);
@@ -192,11 +194,14 @@ void GarageScreen::pointerDown(int id, float x, float y) {
 // ikinci basista (tamir parasi yoksa) yine de yarisa girilir.
 void GarageScreen::raceOrRepair() {
     Career& c = app_.career;
-    if (!c.car().damaged()) { app_.goCareerRace(); return; }
-    std::string why;
-    if (c.repairCurrent(&why)) { app_.saveCareer(); refreshEngine(); msg_ = "TAMIR EDILDI"; msgT_ = 2.0; return; }
     if (c.car().raceable()) { app_.goCareerRace(); return; }
-    msg_ = why + " - YARISAMAZ"; msgT_ = 2.5;
+    app_.goRestore();                                                     // yarisamaz: restorasyon atolyesi
+}
+
+bool GarageScreen::worn() const {
+    const OwnedCar& c = app_.career.car();
+    for (int k = 0; k < kRestoreParts; ++k) if (restoreStepCost(c, k) > 0) return true;
+    return false;
 }
 
 void GarageScreen::pointerMove(int id, float, float y) {

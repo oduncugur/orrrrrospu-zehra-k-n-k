@@ -28,6 +28,7 @@ public:
 
 private:
     void raceOrRepair();
+    bool worn() const;                           // restorasyon gereken bilesen var
     void sellConfirmed();
     void select(int ownedIndex);
     void refreshEngine();
@@ -179,6 +180,37 @@ private:
     int carId_;
     Confirm confirm_ = Confirm::None;   // acik onay penceresi
     float spin_ = 0;
+    std::string msg_; double msgT_ = 0;
+};
+
+// Hurdalik: 6 hasarli arac kelepir fiyata (her yaristan sonra yenilenir); alinca restorasyona gider.
+class JunkyardScreen : public Screen {
+public:
+    explicit JunkyardScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    void reroll();
+    App& app_;
+    std::vector<JunkCar> offers_;
+    int sel_ = -1; bool confirm_ = false;
+    std::string msg_; double msgT_ = 0;
+};
+
+// Restorasyon: secili aracin bilesenleri (motor, sanziman+aks, lastik, fren, suspansiyon, kaporta, elektrik), adim adim.
+class RestoreScreen : public Screen {
+public:
+    explicit RestoreScreen(App& app) : app_(app) {}
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
     std::string msg_; double msgT_ = 0;
 };
 

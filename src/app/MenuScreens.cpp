@@ -50,6 +50,7 @@ namespace {
 const Rect kGNav[4] = {{8, 468, 88, 506}, {94, 468, 174, 506}, {186, 468, 266, 506}, {272, 468, 352, 506}};
 const int kGStep[4] = {-10, -1, +1, +10};
 const Rect kBuy{8, 512, 352, 552}, kSell{8, 558, 352, 590};
+const Rect kJunk{252, 64, 352, 92};                                    // 3B gorunumun sag ustu
 } // namespace
 
 GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {
@@ -115,6 +116,7 @@ void GalleryScreen::render(Renderer& r) {
         r.textCentered(kSell.cx(), kSell.cy() - 3, "TEK ARACIN SATILAMAZ", 1, kUiDim);
     }
     button(r, kBack, "< GARAJ", kUiBtn, 2);
+    button(r, kJunk, "HURDALIK >", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
     if (msgT_ > 0) { r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.9f}); r.textCentered(180, 258, msg_, 2, kUiGold); }
 
     // Onay penceresi (satin alma / satis): tek dokunusla para harcanmaz
@@ -179,6 +181,7 @@ void GalleryScreen::pointerDown(int, float x, float y) {
         else if (kDlgNo.hit(x, y)) confirm_ = Confirm::None;
         return;
     }
+    if (kJunk.hit(x, y)) { app_.goJunkyard(); return; }
     const int n = (int)vehicleCatalog().size();
     for (int i = 0; i < 4; ++i)
         if (kGNav[i].hit(x, y)) { carId_ = ((carId_ - 1 + kGStep[i]) % n + n) % n + 1; return; }

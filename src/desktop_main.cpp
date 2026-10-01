@@ -1,4 +1,4 @@
-// ZEHRA KINIK - Masaustu platform katmani (Windows / Linux): SDL3 pencere + OpenGL 3.3 core + SDL3 ses.
+﻿// ZEHRA KINIK - Masaustu platform katmani (Windows / Linux): SDL3 pencere + OpenGL 3.3 core + SDL3 ses.
 // Oyun/cizim mantigi Android ile ortak App'tedir.
 //   Fare: sag kizak = gaz, alttaki tuslar = arac secimi
 //   Klavye: W/YUKARI = gaz, S/ASAGI = fren, BOSLUK/SHIFT = debriyaj, 1-6/N = vites (H), E/Q = vites +/-,
@@ -133,6 +133,7 @@ int main(int argc, char** argv) {
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
         else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
+        else if (n == "junk") game.goJunkyard(); else if (n == "restore") game.goRestore();
     }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;

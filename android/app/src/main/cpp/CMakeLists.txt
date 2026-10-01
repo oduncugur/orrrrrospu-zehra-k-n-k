@@ -15,6 +15,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/DragScreen.cpp
     ${ZK_ROOT}/src/app/MenuScreens.cpp
     ${ZK_ROOT}/src/app/PartsScreen.cpp
+    ${ZK_ROOT}/src/app/JunkScreens.cpp
     ${ZK_ROOT}/src/app/RoadScreen.cpp
     ${ZK_ROOT}/src/app/SettingsScreen.cpp
     ${ZK_ROOT}/src/app/Cockpit.cpp

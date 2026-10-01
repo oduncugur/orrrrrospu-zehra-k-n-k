@@ -92,6 +92,9 @@ public:
     void goCareerRace();                        // kariyer araci + parcalari vs eslesen rakip
     void goParts(int cat = -1);                  // cat: dogrudan kategori (atolyeden donus)
     void goFabricate(int cat);                   // ozel uretim atolyesi
+    void goJunkyard();
+    void goRestore();
+    int junkSalt = 0;                            // hurdalik teklifleri: alimdan sonra yenilenir
     void goGallery();
     void goDyno();
     void goRoad();                                // acik yol (serbest surus)
