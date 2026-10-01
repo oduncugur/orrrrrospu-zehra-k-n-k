@@ -17,13 +17,31 @@ struct OwnedCar {
     int  paidParts = 0;           // takilan parcalara odenen toplam (satista kismi geri donus)
     // Kalici hasar (yarislar arasi tasinir; tamir edilene kadar kalir)
     bool   axleBroken = false;    // kirik aks: yarisamaz
-    double engineWear = 0.0;      // 0..1 krank yatagi hasari; 1 = yatak sarmis, motor revizyonu sart
-    bool damaged() const { return axleBroken || engineWear > 0.02; }
-    bool raceable() const { return !axleBroken && engineWear < 1.0; }
+    double engineWear = 0.0;      // 0..1 motor hasari (yatak / asiri zorlanma / isi); 1 = motor patlak, revizyon sart
+    bool   gearboxBroken = false; // kirik sanziman: yarisamaz
+    bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
+    bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
 };
 
-// Parca kategorileri ve seviyeleri (dukkan). Her secenek Tune'da tek bir alani degistirir.
-enum class PartCat { Tires, Clutch, Axles, Diff, FinalDrive, Weight, Intake, Exhaust, Ecu, Turbo, DrySump, Fuel, Electronics, Count };
+// Parca kategorileri (dukkan; PartTables tablolari). Her secenek Tune'da tek bir alani degistirir. Sekmeler: partTab().
+enum class PartCat {
+    // MOTOR
+    Head, Valve, Cam, Piston, Rod, Crank, Bearing, Gasket, Flywheel, EngineSwap,
+    // BESLEME
+    Intake, Exhaust, Turbo, Turbine, Wastegate, BoostCtl, Supercharger, Intercooler, Nitrous, FuelSys, Fuel,
+    // AKTARMA
+    Clutch, Gearbox, GbStrength, FinalDrive, Diff, Axles,
+    // SASI
+    Tires, Rims, Suspension, Brakes, Weight, Aero,
+    // ECU / SOGUTMA
+    Ecu, Electronics, Cooling, DrySump,
+    Count
+};
+constexpr int kPartTabs = 5;
+const char* partTabName(int tab);
+int  partTab(PartCat c);
+// Atolyede (ozel uretim) uretilebilen kategori ve ozel satir indeksi (-1: yok)
+int  customOption(PartCat c);
 
 struct PartOption { const char* name; int basePrice; };
 const char* partCatName(PartCat c);
@@ -35,6 +53,9 @@ int  partPrice(PartCat c, int level, const VehicleDef& v);      // arac sinifina
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr, const Tune* t = nullptr);
 
 int  carPrice(const VehicleDef& v);
+// Kayit: v2 parca alanlari "anahtar:deger,..." (eski surum bu satiri yok sayar)
+std::string tuneV2String(const Tune& t);
+void parseTuneV2(const std::string& v, Tune& t);
 // Satis fiyati dokumu (galeri onay penceresi): arac + parcalar - hasar = toplam
 struct SaleQuote { int car = 0, parts = 0, damage = 0, total = 0; };
 long repairCostFor(const OwnedCar& c);
@@ -84,7 +105,8 @@ struct Career {
     bool buyPart(PartCat c, int level, std::string* why = nullptr);
     // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir
     void recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut = nullptr, double prizeScale = 1.0);
-    void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun);   // yaris sonu
+    // Yaris sonu hasar: aks, motor (yatak / zorlanma 0..1, patlama), sanziman
+    void recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke = false, double engineStress = 0.0);
     // Otoban akisi sonu: odul = skor / 20 (en fazla kFlowPrizeCap); rekor kirilirsa +%50. Donus: odul
     static constexpr long kFlowPrizeCap = 4000;
     long recordFlow(long score, bool* newRecord = nullptr);

@@ -90,7 +90,8 @@ public:
     void goGarage();
     void goDrag(int playerCarId, int opponentCarId, bool autopilot = false);   // serbest (kariyer disi) yaris
     void goCareerRace();                        // kariyer araci + parcalari vs eslesen rakip
-    void goParts();
+    void goParts(int cat = -1);                  // cat: dogrudan kategori (atolyeden donus)
+    void goFabricate(int cat);                   // ozel uretim atolyesi
     void goGallery();
     void goDyno();
     void goRoad();                                // acik yol (serbest surus)
@@ -100,6 +101,8 @@ public:
     int  selectedCar = 5;                       // serbest mod / test icin
     void setVoice(int i, const VehicleDef* v, bool turboKit = false);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
+    // Parcali arac sesi: motor swap varsa takili motorun sesi, turbo / kompresor kiti sesi
+    void setVoiceTuned(int i, int carId, const Tune* tune);
     void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
     Opponent lastOpp;                              // son kariyer rakibi (tahmini ET'ler: odul zorlugu, ekranda gosterim)
     void wind(double speed) { windSpeed_ = (float)speed; }   // m/s, ruzgar ugultusu (ekran degisince 0)

@@ -1,4 +1,5 @@
 #include "Career.h"
+#include "sim/PartTables.h"
 #include "sim/VehicleSim.h"
 
 #include <algorithm>
@@ -11,78 +12,147 @@
 
 namespace zk {
 
-// ------------------------------------------------------------------ parca katalogu
+// ------------------------------------------------------------------ parca katalogu (PartTables)
+namespace {
+template <class T> std::vector<PartOption> opts(const std::vector<T>& t) {
+    std::vector<PartOption> o;
+    for (const auto& r : t) o.push_back({r.name, r.price});
+    return o;
+}
+template <class T> int clampRow(const std::vector<T>& t, int i) { return std::clamp(i, 0, (int)t.size() - 1); }
+} // namespace
+
+const char* partTabName(int tab) {
+    static const char* n[kPartTabs] = {"MOTOR", "BESLEME", "AKTARMA", "SASI", "ECU+SOGUTMA"};
+    return n[std::clamp(tab, 0, kPartTabs - 1)];
+}
+int partTab(PartCat c) {
+    const int i = (int)c;
+    return i <= (int)PartCat::EngineSwap ? 0 : i <= (int)PartCat::Fuel ? 1 : i <= (int)PartCat::Axles ? 2 : i <= (int)PartCat::Aero ? 3 : 4;
+}
+int customOption(PartCat c) {
+    switch (c) {
+    case PartCat::Turbo: return kCustomTurbo;
+    case PartCat::Cam: return kCustomCam;
+    case PartCat::Crank: return kCustomCrank;
+    case PartCat::FinalDrive: return kCustomFinal;
+    case PartCat::Gearbox: return kCustomGear;
+    case PartCat::Aero: return kCustomAero;
+    default: return -1;
+    }
+}
+
 const char* partCatName(PartCat c) {
-    static const char* n[] = {"LASTIK", "DEBRIYAJ", "AKS", "DIFERANSIYEL", "SON DISLI", "HAFIFLETME",
-                              "EMME", "EGZOZ", "ECU", "TURBO KITI", "KARTER", "YAKIT", "ELEKTRONIK"};
+    static const char* n[(int)PartCat::Count] = {
+        "SILINDIR KAPAGI", "SUPAP + YAY", "KAM MILI", "PISTON", "BIYEL", "KRANK", "YATAK", "KAPAK CONTASI", "VOLAN", "MOTOR SWAP",
+        "EMME", "EGZOZ", "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "NITRO (NOS)", "YAKIT SISTEMI", "YAKIT",
+        "DEBRIYAJ", "SANZIMAN SWAP", "SANZIMAN GUCLENDIRME", "SON DISLI", "DIFERANSIYEL", "AKS",
+        "LASTIK", "JANT", "SUSPANSIYON", "FREN", "HAFIFLETME", "AERO",
+        "ECU", "ELEKTRONIK", "SOGUTMA", "YAG / KARTER"};
     return n[(int)c];
 }
 
 const std::vector<PartOption>& partOptions(PartCat c) {
-    static const std::vector<PartOption> t[(int)PartCat::Count] = {
-        {{"SOKAK", 0}, {"YARI-SLICK", 1200}, {"DRAG SLICK", 2800}},
-        {{"STOK", 0}, {"STAGE 1", 900}, {"STAGE 2", 1800}, {"STAGE 3 METAL", 3200}},
-        {{"STOK", 0}, {"KROM-MOLY", 1500}, {"YARIS 300M", 3800}},
-        {{"ACIK", 0}, {"1.5-WAY LSD", 1400}, {"2-WAY LSD", 1700}, {"KAYNAK SPOOL", 300}},
-        {{"FABRIKA", 0}, {"KISA +%15", 700}, {"UZUN -%10", 700}},
-        {{"STOK", 0}, {"-40 KG", 600}, {"-85 KG", 1800}, {"-140 KG", 4000}},
-        {{"STOK", 0}, {"SPOR FILTRE", 350}, {"SOGUK HAVA", 900}},
-        {{"STOK", 0}, {"SPOR", 500}, {"DUZ BORU", 1200}},
-        {{"STOK", 0}, {"REMAP", 1100}},
-        {{"YOK / FABRIKA", 0}, {"KUCUK KIT", 4500}, {"BUYUK KIT", 9000}},
-        {{"ISLAK", 0}, {"KURU KARTER", 3500}},
-        {{"100 OKTAN", 0}, {"95 OKTAN", 0}, {"E85 + SISTEM", 1500}},
-        {{"FABRIKA", 0}, {"ABS (ECU ILE)", 1600}, {"ABS + TC (ECU ILE)", 3000}},
-    };
+    static std::vector<PartOption> t[(int)PartCat::Count];
+    static bool init = false;
+    if (!init) {
+        init = true;
+        t[(int)PartCat::Head] = opts(headTable());          t[(int)PartCat::Valve] = opts(valveTable());
+        t[(int)PartCat::Cam] = opts(camTable());            t[(int)PartCat::Piston] = opts(pistonTable());
+        t[(int)PartCat::Rod] = opts(rodTable());            t[(int)PartCat::Crank] = opts(crankTable());
+        t[(int)PartCat::Bearing] = opts(bearingTable());    t[(int)PartCat::Gasket] = opts(gasketTable());
+        t[(int)PartCat::Flywheel] = opts(flywheelTable());
+        {   // Motor swap: fabrika + tum motorlar (guce gore); ad: kod + duzen + guc
+            static std::vector<std::string> names;
+            names.reserve(swapEngines().size() + 1);
+            names.push_back("FABRIKA MOTORU");
+            for (int e : swapEngines()) {
+                const EngineDef& d = engineTable()[e];
+                char b[64]; std::snprintf(b, sizeof b, "%s %s %.1fL %.0fHP", d.code, layoutName(d.layout), d.displacementL, d.powerHp);
+                names.push_back(b);
+            }
+            for (size_t i = 0; i < names.size(); ++i)
+                t[(int)PartCat::EngineSwap].push_back({names[i].c_str(), i == 0 ? 0 : (int)(1500 + engineTable()[swapEngines()[i - 1]].powerHp * 22)});
+        }
+        t[(int)PartCat::Intake] = opts(intakeTable());      t[(int)PartCat::Exhaust] = opts(exhaustTable());
+        t[(int)PartCat::Turbo] = opts(turboTable());        t[(int)PartCat::Turbine] = opts(turbineTable());
+        t[(int)PartCat::Wastegate] = opts(wastegateTable()); t[(int)PartCat::BoostCtl] = opts(boostCtlTable());
+        t[(int)PartCat::Supercharger] = opts(superTable()); t[(int)PartCat::Intercooler] = opts(intercoolerTable());
+        t[(int)PartCat::Nitrous] = opts(nosTable());        t[(int)PartCat::FuelSys] = opts(fuelSysTable());
+        t[(int)PartCat::Fuel] = opts(fuelTable());          t[(int)PartCat::Clutch] = opts(clutchTable());
+        t[(int)PartCat::Gearbox] = opts(gearTable());       t[(int)PartCat::GbStrength] = opts(gbStrengthTable());
+        t[(int)PartCat::FinalDrive] = opts(finalTable());   t[(int)PartCat::Diff] = opts(diffTable());
+        t[(int)PartCat::Axles] = opts(axleTable());         t[(int)PartCat::Tires] = opts(tireTable());
+        t[(int)PartCat::Rims] = opts(rimTable());           t[(int)PartCat::Suspension] = opts(suspTable());
+        t[(int)PartCat::Brakes] = opts(brakeTable());       t[(int)PartCat::Weight] = opts(weightTable());
+        t[(int)PartCat::Aero] = opts(aeroTable());          t[(int)PartCat::Ecu] = opts(ecuTable());
+        t[(int)PartCat::Electronics] = opts(elecTable());   t[(int)PartCat::Cooling] = opts(coolingTable());
+        t[(int)PartCat::DrySump] = opts(oilTable());
+    }
     return t[(int)c];
 }
 
 int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     switch (c) {
-    case PartCat::Tires: return (int)t.tires;
-    case PartCat::Clutch: return t.clutch;
-    case PartCat::Axles: return t.axles;
-    case PartCat::Diff: return (int)t.diff;
+    case PartCat::Head: return t.head;           case PartCat::Valve: return t.valve;
+    case PartCat::Cam: return t.cam;             case PartCat::Piston: return t.piston;
+    case PartCat::Rod: return t.rod;             case PartCat::Crank: return t.crank;
+    case PartCat::Bearing: return t.bearing;     case PartCat::Gasket: return t.gasket;
+    case PartCat::Flywheel: return t.flywheel;   case PartCat::EngineSwap: return t.engineSwap;
+    case PartCat::Intake: return t.intake;       case PartCat::Exhaust: return t.exhaust;
+    case PartCat::Turbo: return t.turbo;         case PartCat::Turbine: return t.turbine;
+    case PartCat::Wastegate: return t.wastegate; case PartCat::BoostCtl: return t.boostCtl;
+    case PartCat::Supercharger: return t.superch; case PartCat::Intercooler: return t.intercooler;
+    case PartCat::Nitrous: return t.nitrous;     case PartCat::FuelSys: return t.fuelSys;
+    case PartCat::Fuel: return t.fuelSel > 0 ? t.fuelSel : t.fuel == FuelType::Pump95 ? 1 : t.fuel == FuelType::E85 ? 2 : 0;
+    case PartCat::Clutch: return t.clutch;       case PartCat::Gearbox: return t.gearSwap;
+    case PartCat::GbStrength: return t.gbStrength;
     case PartCat::FinalDrive: {
+        if (t.finalSel > 0) return t.finalSel;
         if (t.finalDrive <= 0.0) return 0;
-        return t.finalDrive > buildGearbox(v).finalDrive ? 1 : 2;
+        return t.finalDrive > buildGearbox(v).finalDrive ? 1 : 2;           // v1 kaydi (mutlak oran)
     }
-    case PartCat::Weight: return t.weight;
-    case PartCat::Intake: return t.intake;
-    case PartCat::Exhaust: return t.exhaust;
-    case PartCat::Ecu: return t.ecu;
-    case PartCat::Turbo: return t.turbo;
-    case PartCat::DrySump: return t.drySump ? 1 : 0;
-    case PartCat::Fuel: return t.fuel == FuelType::Pump95 ? 1 : t.fuel == FuelType::E85 ? 2 : 0;
-    case PartCat::Electronics: return t.tcKit ? 2 : t.absKit ? 1 : 0;
+    case PartCat::Diff: return (int)t.diff;      case PartCat::Axles: return t.axles;
+    case PartCat::Tires: return t.tireSel > 0 ? t.tireSel : (int)t.tires;
+    case PartCat::Rims: return t.rims;           case PartCat::Suspension: return t.susp;
+    case PartCat::Brakes: return t.brakes;       case PartCat::Weight: return t.weight;
+    case PartCat::Aero: return t.aero;           case PartCat::Ecu: return t.ecu;
+    case PartCat::Electronics: return t.elec > 0 ? t.elec : t.tcKit ? 2 : t.absKit ? 1 : 0;
+    case PartCat::Cooling: return t.cooling;
+    case PartCat::DrySump: return t.oil > 0 ? t.oil : t.drySump ? 1 : 0;
     default: return 0;
     }
 }
 
 void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     l = std::clamp(l, 0, (int)partOptions(c).size() - 1);
+    (void)v;
     switch (c) {
-    case PartCat::Tires: t.tires = (TireType)l; t.psi = 0; break;
-    case PartCat::Clutch: t.clutch = l; break;
-    case PartCat::Axles: t.axles = l; break;
-    case PartCat::Diff: t.diff = (DiffType)l; break;
-    case PartCat::FinalDrive: {
-        const double fd = buildGearbox(v).finalDrive;
-        t.finalDrive = l == 0 ? 0.0 : l == 1 ? fd * 1.15 : fd * 0.90;
-        break;
-    }
-    case PartCat::Weight: t.weight = l; break;
-    case PartCat::Intake: t.intake = l; break;
-    case PartCat::Exhaust: t.exhaust = l; break;
-    case PartCat::Ecu: t.ecu = l; break;
-    case PartCat::Turbo: t.turbo = l; break;
-    case PartCat::DrySump: t.drySump = l == 1; break;
-    case PartCat::Fuel: t.fuel = l == 1 ? FuelType::Pump95 : l == 2 ? FuelType::E85 : FuelType::Race100; break;
-    case PartCat::Electronics: t.absKit = l >= 1; t.tcKit = l >= 2; break;
+    case PartCat::Head: t.head = l; break;           case PartCat::Valve: t.valve = l; break;
+    case PartCat::Cam: t.cam = l; break;             case PartCat::Piston: t.piston = l; break;
+    case PartCat::Rod: t.rod = l; break;             case PartCat::Crank: t.crank = l; break;
+    case PartCat::Bearing: t.bearing = l; break;     case PartCat::Gasket: t.gasket = l; break;
+    case PartCat::Flywheel: t.flywheel = l; break;   case PartCat::EngineSwap: t.engineSwap = l; break;
+    case PartCat::Intake: t.intake = l; break;       case PartCat::Exhaust: t.exhaust = l; break;
+    case PartCat::Turbo: t.turbo = l; break;         case PartCat::Turbine: t.turbine = l; break;
+    case PartCat::Wastegate: t.wastegate = l; break; case PartCat::BoostCtl: t.boostCtl = l; break;
+    case PartCat::Supercharger: t.superch = l; break; case PartCat::Intercooler: t.intercooler = l; break;
+    case PartCat::Nitrous: t.nitrous = l; break;     case PartCat::FuelSys: t.fuelSys = l; break;
+    case PartCat::Fuel: t.fuelSel = l; t.fuel = (FuelType)fuelTable()[l].type; break;
+    case PartCat::Clutch: t.clutch = l; break;       case PartCat::Gearbox: t.gearSwap = l; break;
+    case PartCat::GbStrength: t.gbStrength = l; break;
+    case PartCat::FinalDrive: t.finalSel = l; t.finalDrive = 0.0; break;
+    case PartCat::Diff: t.diff = (DiffType)l; break; case PartCat::Axles: t.axles = l; break;
+    case PartCat::Tires: t.tireSel = l; t.tires = (TireType)tireTable()[l].type; t.psi = 0; break;
+    case PartCat::Rims: t.rims = l; break;           case PartCat::Suspension: t.susp = l; break;
+    case PartCat::Brakes: t.brakes = l; break;       case PartCat::Weight: t.weight = l; break;
+    case PartCat::Aero: t.aero = l; break;           case PartCat::Ecu: t.ecu = l; break;
+    case PartCat::Electronics: t.elec = l; t.absKit = elecTable()[l].abs; t.tcKit = elecTable()[l].tc; break;
+    case PartCat::Cooling: t.cooling = l; break;
+    case PartCat::DrySump: t.oil = l; t.drySump = oilTable()[l].dry; break;
     default: break;
     }
 }
-
 int carPrice(const VehicleDef& v) {
     const double hp = peakPowerHp(v);
     double bodyF = 1.0;
@@ -100,21 +170,34 @@ int carPrice(const VehicleDef& v) {
 int partPrice(PartCat c, int level, const VehicleDef& v) {
     const auto& o = partOptions(c);
     if (level < 0 || level >= (int)o.size()) return 0;
+    if (c == PartCat::EngineSwap) return (int)(std::round(o[level].basePrice / 10.0) * 10.0);   // motor fiyati aractan bagimsiz
     const double scale = std::clamp(0.6 + carPrice(v) / 40000.0, 0.6, 4.0);   // pahali arabanin parcasi pahali
     return (int)(std::round(o[level].basePrice * scale / 10.0) * 10.0);
 }
 
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, const Tune* t) {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
     if (c == PartCat::Electronics && level > 0) {
         // Fabrikada olan sistem tekrar takilmaz; olmayana ancak ECU yukseltmesiyle eklenir
-        if (level == 1 && v.abs) { if (why) *why = "FABRIKADA VAR"; return false; }
-        if (level == 2 && v.abs && v.tc) { if (why) *why = "FABRIKADA VAR"; return false; }
-        if (t && t->ecu < 1) { if (why) *why = "ONCE ECU GEREKLI"; return false; }
+        if (level == 1 && v.abs) return no("FABRIKADA VAR");
+        if (level == 2 && v.abs && v.tc) return no("FABRIKADA VAR");
+        if (t && t->ecu < 1) return no("ONCE ECU GEREKLI");
     }
-    const EngineDef& e = engineTable()[v.engine];
-    if (c == PartCat::Turbo && level > 0 && e.induction == Induction::Supercharger) {
-        if (why) *why = "KOMPRESORLU MOTORA TURBO YOK";
-        return false;
+    const EngineDef& e = engineTable()[effectiveEngine(v, t)];
+    const bool turboEngine = e.induction == Induction::Turbo || e.induction == Induction::TwinTurbo;
+    if (c == PartCat::Turbo && level > 0 && e.induction == Induction::Supercharger) return no("KOMPRESORLU MOTORA TURBO YOK");
+    if ((c == PartCat::Turbine || c == PartCat::Wastegate || c == PartCat::BoostCtl) && level > 0 && t && t->turbo == 0 && !turboEngine)
+        return no("ONCE TURBO GEREKLI");
+    if (c == PartCat::Intercooler && level > 0 && t && t->turbo == 0 && t->superch == 0 && !turboEngine && e.induction != Induction::Supercharger)
+        return no("ASIRI BESLEME YOK");
+    if (c == PartCat::Supercharger && level > 0 && e.induction == Induction::Supercharger) return no("FABRIKADA KOMPRESOR VAR");
+    if (c == PartCat::EngineSwap && level > 0 && swapEngines()[level - 1] == v.engine) return no("FABRIKA MOTORU");
+    // Atolye satirlari: once ozel parca uretilmeli (PARCA URET)
+    if (level > 0 && level == customOption(c) && t) {
+        const bool made = c == PartCat::Turbo ? t->custTurboMm > 0 : c == PartCat::Cam ? t->custCamDeg > 0 : c == PartCat::Crank ? t->custDisp > 0
+                        : c == PartCat::FinalDrive ? t->custFinal > 0 : c == PartCat::Aero ? t->custWingN > 0
+                        : c == PartCat::Gearbox ? (t->custGear[0] > 0 || t->custGear[1] > 0) : false;
+        if (!made) return no("ATOLYEDE URET");
     }
     return true;
 }
@@ -246,17 +329,25 @@ Opponent Career::pickOpponentFor(uint32_t seed) const {
 
 std::string tuneSummary(const Tune& t) {
     std::string s;
-    auto add = [&](const char* p) { if (!s.empty()) s += ' '; s += p; };
+    auto add = [&](const std::string& p) { if (!s.empty()) s += ' '; s += p; };
+    if (t.engineSwap > 0 && t.engineSwap <= (int)swapEngines().size()) add(std::string("SWAP:") + engineTable()[swapEngines()[t.engineSwap - 1]].code);
     if (t.tires == TireType::DragSlick) add("SLICK"); else if (t.tires == TireType::SemiSlick) add("YARI-SLICK"); else add("SOKAK");
-    if (t.clutch) add(t.clutch == 1 ? "ST1" : t.clutch == 2 ? "ST2" : "ST3");
-    if (t.axles) add(t.axles == 1 ? "KM-AKS" : "300M");
-    if (t.diff != DiffType::Open) add(t.diff == DiffType::OneAndHalfWay ? "1.5W" : t.diff == DiffType::TwoWay ? "2W" : "SPOOL");
-    if (t.turbo) add(t.turbo == 1 ? "TURBO-K" : "TURBO-B");
+    if (t.turbo) add(t.turbo == 1 ? "TURBO-K" : t.turbo == 2 ? "TURBO-B" : "TURBO");
+    if (t.superch) add("KOMPRESOR");
+    if (t.nitrous) add("NOS");
+    if (t.clutch) add(t.clutch == 1 ? "ST1" : t.clutch == 2 ? "ST2" : t.clutch == 3 ? "ST3" : "DEBR+");
+    if (t.axles) add(t.axles == 1 ? "KM-AKS" : t.axles == 2 ? "300M" : "AKS+");
+    if (t.diff != DiffType::Open) add(t.diff == DiffType::OneAndHalfWay ? "1.5W" : t.diff == DiffType::TwoWay ? "2W" : t.diff == DiffType::Spool ? "SPOOL" : "LSD");
     if (t.ecu) add("ECU");
     if (t.intake || t.exhaust) add("EMME/EGZ");
     if (t.weight) add("HAFIF");
     if (t.drySump) add("KURU-KRT");
     if (t.fuel == FuelType::E85) add("E85");
+    int more = 0;                                                  // diger parcalar
+    for (int x : {t.cam, t.valve, t.head, t.piston, t.rod, t.crank, t.bearing, t.gasket, t.flywheel, t.turbine, t.wastegate,
+                  t.boostCtl, t.intercooler, t.fuelSys, t.gbStrength, t.gearSwap, t.finalSel, t.rims, t.susp, t.brakes, t.aero, t.cooling})
+        more += x > 0;
+    if (more) add("+" + std::to_string(more) + " PARCA");
     return s;
 }
 
@@ -321,6 +412,56 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
 
 // ------------------------------------------------------------------ kayit
 namespace {
+struct IntField { const char* key; int Tune::*f; int max; };
+struct DblField { const char* key; double Tune::*f; double max; };
+const IntField kIntFields[] = {
+    {"tire", &Tune::tireSel, 29}, {"rim", &Tune::rims, 9}, {"fin", &Tune::finalSel, 11}, {"gbx", &Tune::gearSwap, 30},
+    {"eng", &Tune::engineSwap, 400}, {"cam", &Tune::cam, 11}, {"val", &Tune::valve, 9}, {"fly", &Tune::flywheel, 9},
+    {"sc", &Tune::superch, 9}, {"ic", &Tune::intercooler, 9}, {"fsy", &Tune::fuelSys, 9}, {"nos", &Tune::nitrous, 9},
+    {"head", &Tune::head, 9}, {"pis", &Tune::piston, 9}, {"rod", &Tune::rod, 9}, {"crk", &Tune::crank, 9},
+    {"brg", &Tune::bearing, 9}, {"gsk", &Tune::gasket, 9}, {"trb", &Tune::turbine, 9}, {"wg", &Tune::wastegate, 9},
+    {"bc", &Tune::boostCtl, 9}, {"gbs", &Tune::gbStrength, 9}, {"cool", &Tune::cooling, 9}, {"oil", &Tune::oil, 9},
+    {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
+};
+const DblField kDblFields[] = {
+    {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
+    {"cdisp", &Tune::custDisp, 0.4}, {"cfin", &Tune::custFinal, 7.5}, {"cwing", &Tune::custWingN, 1600},
+};
+} // namespace
+
+std::string tuneV2String(const Tune& t) {
+    std::string s;
+    char b[48];
+    for (const IntField& f : kIntFields) if (t.*(f.f)) { std::snprintf(b, sizeof b, "%s:%d,", f.key, t.*(f.f)); s += b; }
+    for (const DblField& f : kDblFields) if (t.*(f.f) > 0) { std::snprintf(b, sizeof b, "%s:%.4f,", f.key, t.*(f.f)); s += b; }
+    for (int i = 0; i < 8; ++i) if (t.custGear[i] > 0) { std::snprintf(b, sizeof b, "cg%d:%.4f,", i, t.custGear[i]); s += b; }
+    if (!s.empty()) s.pop_back();
+    return s;
+}
+
+void parseTuneV2(const std::string& v, Tune& t) {
+    size_t pos = 0;
+    while (pos < v.size()) {
+        size_t end = v.find(',', pos); if (end == std::string::npos) end = v.size();
+        const std::string item = v.substr(pos, end - pos);
+        const size_t c = item.find(':');
+        if (c != std::string::npos) {
+            const std::string k = item.substr(0, c);
+            const double x = std::atof(item.c_str() + c + 1);
+            for (const IntField& f : kIntFields) if (k == f.key) t.*(f.f) = std::clamp((int)x, 0, f.max);
+            for (const DblField& f : kDblFields) if (k == f.key) t.*(f.f) = std::clamp(x, 0.0, f.max);
+            if (k.size() == 3 && k[0] == 'c' && k[1] == 'g' && k[2] >= '0' && k[2] <= '7') t.custGear[k[2] - '0'] = std::clamp(x, 0.0, 1.5);
+        }
+        pos = end + 1;
+    }
+    // Turetilmis alanlar (tablo satirindan)
+    if (t.tireSel > 0) t.tires = (TireType)tireTable()[std::min(t.tireSel, (int)tireTable().size() - 1)].type;
+    if (t.fuelSel > 0) t.fuel = (FuelType)fuelTable()[std::min(t.fuelSel, (int)fuelTable().size() - 1)].type;
+    if (t.elec > 0) { t.absKit = elecTable()[std::min(t.elec, 9)].abs; t.tcKit = elecTable()[std::min(t.elec, 9)].tc; }
+    if (t.oil > 0) t.drySump = oilTable()[std::min(t.oil, 9)].dry;
+    if (t.engineSwap > (int)swapEngines().size()) t.engineSwap = 0;
+}
+namespace {
 uint32_t fnv1a(const std::string& s) {
     uint32_t h = 2166136261u;
     for (unsigned char ch : s) { h ^= ch; h *= 16777619u; }
@@ -328,10 +469,12 @@ uint32_t fnv1a(const std::string& s) {
 }
 } // namespace
 
-void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun) {
+void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke, double engineStress) {
     OwnedCar& c = car();
     c.axleBroken = c.axleBroken || axleBroke;
-    c.engineWear = bearingSpun ? 1.0 : std::clamp(c.engineWear + std::max(0.0, bearingDamage), 0.0, 1.0);
+    c.gearboxBroken = c.gearboxBroken || gearboxBroke;
+    c.engineWear = bearingSpun || engineStress >= 1.0 ? 1.0
+                 : std::clamp(c.engineWear + std::max(0.0, bearingDamage) + 0.5 * std::max(0.0, engineStress), 0.0, 1.0);
 }
 
 long Career::recordFlow(long score, bool* newRecord) {
@@ -355,6 +498,8 @@ long repairCostFor(const OwnedCar& c) {
                                                                        : partPrice(PartCat::Axles, 1, v) / 2)) + 120;
     // Motor: yatak degisimi; tam sarmada (1.0) krank taslama + revizyon ~ arac fiyatinin %18'i
     if (c.engineWear > 0.02) cost += (long)(250 + carPrice(v) * 0.18 * c.engineWear);
+    // Sanziman: disli seti + iscilik (guclendirme seviyesi fiyatina gore)
+    if (c.gearboxBroken) cost += 600 + partPrice(PartCat::GbStrength, std::max(1, c.tune.gbStrength), v) / 2;
     return cost;
 }
 
@@ -363,7 +508,7 @@ bool Career::repairCurrent(std::string* why) {
     if (cost <= 0) { if (why) *why = "HASAR YOK"; return false; }
     if (money < cost) { if (why) *why = "PARA YETMIYOR"; return false; }
     money -= cost;
-    car().axleBroken = false; car().engineWear = 0.0;
+    car().axleBroken = false; car().engineWear = 0.0; car().gearboxBroken = false;
     return true;
 }
 
@@ -380,6 +525,8 @@ std::string Career::serialize() const {
                       t.weight, t.intake, t.exhaust, t.ecu, t.turbo, t.drySump ? 1 : 0, (int)t.fuel);
         o << buf;
         if (c.damaged()) { std::snprintf(buf, sizeof buf, "dmg=%d;%.4f\n", c.axleBroken ? 1 : 0, c.engineWear); o << buf; }
+        if (c.gearboxBroken) o << "gbx=1\n";
+        o << "tun2=" << tuneV2String(t) << "\n";
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
@@ -427,6 +574,8 @@ bool Career::parse(const std::string& text, Career& out) {
             c.cars.back().axleBroken = ax != 0;
             c.cars.back().engineWear = std::clamp(ew, 0.0, 1.0);
         }
+        else if (k == "gbx" && !c.cars.empty()) c.cars.back().gearboxBroken = v == "1";
+        else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
             if (std::sscanf(v.c_str(), "%d;%d;%d;%lf;%d;%d;%lf;%d;%d;%d;%lf;%d;%d;%d;%d;%d;%d;%d", &oc.carId, &oc.races, &oc.wins,
@@ -436,14 +585,14 @@ bool Career::parse(const std::string& text, Career& out) {
             if (oc.carId < 1 || oc.carId > nCars) return false;
             // Aralik denetimi: disaridan degistirilmis kayitta bile fizik gecerli degerler alsin
             oc.tune.tires = (TireType)std::clamp(tires, 0, 2);
-            oc.tune.diff = (DiffType)std::clamp(diff, 0, 3);
-            oc.tune.clutch = std::clamp(oc.tune.clutch, 0, 3);
-            oc.tune.axles = std::clamp(oc.tune.axles, 0, 2);
-            oc.tune.weight = std::clamp(oc.tune.weight, 0, 3);
-            oc.tune.intake = std::clamp(oc.tune.intake, 0, 2);
-            oc.tune.exhaust = std::clamp(oc.tune.exhaust, 0, 2);
-            oc.tune.ecu = std::clamp(oc.tune.ecu, 0, 1);
-            oc.tune.turbo = std::clamp(oc.tune.turbo, 0, 2);
+            oc.tune.diff = (DiffType)clampRow(diffTable(), diff);
+            oc.tune.clutch = clampRow(clutchTable(), oc.tune.clutch);
+            oc.tune.axles = clampRow(axleTable(), oc.tune.axles);
+            oc.tune.weight = clampRow(weightTable(), oc.tune.weight);
+            oc.tune.intake = clampRow(intakeTable(), oc.tune.intake);
+            oc.tune.exhaust = clampRow(exhaustTable(), oc.tune.exhaust);
+            oc.tune.ecu = clampRow(ecuTable(), oc.tune.ecu);
+            oc.tune.turbo = clampRow(turboTable(), oc.tune.turbo);
             oc.tune.psi = std::clamp(oc.tune.psi, 0.0, 45.0);
             oc.tune.finalDrive = std::clamp(oc.tune.finalDrive, 0.0, 8.0);
             oc.tune.drySump = dry != 0;

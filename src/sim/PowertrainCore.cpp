@@ -120,7 +120,7 @@ void PowertrainCore::step(double dt, double wL, double wR, double oilFactor) {
     double Te;
     if (killed_ || stalled_) Te = -frictionTorque(r) * 3.0 * std::tanh(omegaE_);
     else if (cut_)           Te = -frictionTorque(r);
-    else                     Te = wotTorque(r) * thr - frictionTorque(r) * (1.0 - thr);
+    else                     Te = wotTorque(r) * thr - frictionTorque(r) * (1.0 - thr) + (torqueAdd_ > 0.0 ? torqueAdd_ * thr : 0.0);
     if (Te > 0.0 && torqueLimit_ < 1.0) Te *= torqueLimit_;          // cekis kontrolu (atesleme geciktirme/kesme)
     Te_ = Te;
 

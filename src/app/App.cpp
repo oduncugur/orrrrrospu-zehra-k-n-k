@@ -1,6 +1,7 @@
 #include "App.h"
 #include "GLApi.h"
 #include "Screens.h"
+#include "sim/PartTables.h"
 
 #include <algorithm>
 #include <chrono>
@@ -69,7 +70,8 @@ void App::goCareerRace() {
     lastOpp = opp;
     setScreen(std::make_unique<DragScreen>(*this, oc.carId, opp.carId, &oc.tune, &opp.tune, true));
 }
-void App::goParts() { setScreen(std::make_unique<PartsScreen>(*this)); }
+void App::goParts(int cat) { setScreen(std::make_unique<PartsScreen>(*this, cat)); }
+void App::goFabricate(int cat) { setScreen(std::make_unique<FabricateScreen>(*this, cat)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
 void App::goSettings() { setScreen(std::make_unique<SettingsScreen>(*this)); }
@@ -118,6 +120,14 @@ void App::setVoice(int i, const VehicleDef* v, bool turboKit) {
     if (s) s->setTurboKit(turboKit);
     std::lock_guard<std::mutex> g(audioLock_);
     voices_[i].synth = std::move(s);
+}
+
+void App::setVoiceTuned(int i, int carId, const Tune* tune) {
+    const VehicleDef* v = findVehicle(carId);
+    if (!v) { setVoice(i, nullptr); return; }
+    VehicleDef d = *v;
+    if (tune) { d.engine = effectiveEngine(*v, tune); d.gearbox = effectiveGearbox(*v, tune); }
+    setVoice(i, &d, tune && (tune->turbo > 0 || tune->superch > 0));        // ses kopyayi saklar (VehicleDef deger)
 }
 
 void App::voice(int i, double rpm, double thr, bool cut, bool inGear, float gain) {

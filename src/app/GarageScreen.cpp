@@ -1,6 +1,7 @@
 #include "Screens.h"
 #include "Ui.h"
 #include "garage/VehicleCatalog.h"
+#include "sim/PartTables.h"
 #include "sim/VehicleSim.h"
 
 #include <algorithm>
@@ -48,7 +49,7 @@ void GarageScreen::select(int idx) {
     c.current = ((idx % n) + n) % n;
     app_.selectedCar = c.car().carId;
     refreshEngine();
-    app_.setVoice(0, findVehicle(c.car().carId));
+    app_.setVoiceTuned(0, c.car().carId, &c.car().tune);
 }
 
 void GarageScreen::update(double dt) {
@@ -70,7 +71,7 @@ void GarageScreen::render(Renderer& r) {
     const Career& c = app_.career;
     const OwnedCar& oc = c.car();
     const VehicleDef& v = *findVehicle(oc.carId);
-    const EngineDef& e = engineTable()[v.engine];
+    const EngineDef& e = engineTable()[effectiveEngine(v, &oc.tune)];   // motor swap
     r.begin(360, 640, kUiBg);
     studio(r, 60, 296, 196);
     r.rect(0, 0, 360, 58, kUiPanel);

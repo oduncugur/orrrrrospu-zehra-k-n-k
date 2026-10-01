@@ -37,8 +37,8 @@ DragScreen::DragScreen(App& app, int playerCar, int opponentCar, const Tune* pla
     carIds_[0] = playerCar; carIds_[1] = opponentCar;
     if (playerTune) { tunes_[0] = *playerTune; hasTune_[0] = true; }
     if (opponentTune) { tunes_[1] = *opponentTune; hasTune_[1] = true; }
-    app_.setVoice(0, findVehicle(playerCar), hasTune_[0] && tunes_[0].turbo > 0);
-    app_.setVoice(1, findVehicle(opponentCar), hasTune_[1] && tunes_[1].turbo > 0);
+    app_.setVoiceTuned(0, playerCar, hasTune_[0] ? &tunes_[0] : nullptr);
+    app_.setVoiceTuned(1, opponentCar, hasTune_[1] ? &tunes_[1] : nullptr);
     restart();
 }
 
@@ -183,6 +183,7 @@ void DragScreen::update(double dt) {
         else { knobX_ = kColX[(g - 1) / 2]; knobY_ = (g % 2) ? kRowTop : kRowBot; }
         app_.haptic(60, 200);
     }
+    for (auto& e : race_->lane(0).sim->drainFailEvents()) { ticker_.push_back("SEN: " + e); tickerT_ = 3.0; app_.haptic(400, 255); }
     for (auto& e : race_->drainEvents()) {
         const bool mine = e.rfind("SEN:", 0) == 0;
         if (e == "YESIL!") { flash_ = "YESIL!"; flashColor_ = {0.2f, 1.0f, 0.3f}; flashT_ = 0.9; continue; }
@@ -204,7 +205,7 @@ void DragScreen::update(double dt) {
         const double diff = o.carId == race_->lane(1).car->id && o.estEt > 0 && o.playerEt > 0 ? prizeDifficulty(o.playerEt - o.estEt) : 1.0;
         app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
-        app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun());
+        app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress());
         app_.saveCareer();
     }
 

@@ -89,32 +89,73 @@ private:
     double hapLimiterT_ = 0;
 };
 
-// Parca dukkani: dikey. Kategori listesi -> secenekler; fiyat, takili parca, aks riski uyarisi.
+// Parca setinin ozeti (dukkan / atolye onizlemesi): yuk oranlari 1.0 = sinirda (tepe tork / dayanim, guc / sogutma)
+struct TuneStats {
+    double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0, redline = 7000;
+    double engineLoad = 0, gearboxLoad = 0, heatLoad = 0;
+    std::vector<std::pair<double, double>> hpCurve;
+};
+TuneStats tuneStats(const VehicleDef& v, const Tune& t);
+
+// Modifiye dukkani: dikey. 5 sekme (motor / besleme / aktarma / sasi / ecu+sogutma) -> kategori -> kaydirmali secenekler;
+// ilk dokunus onizleme (guc, endeks, motor/sanziman/isi yuku, 1/4 mil), ikinci dokunus onay. Atolye satiri -> FabricateScreen.
 class PartsScreen : public Screen {
 public:
-    explicit PartsScreen(App& app);
+    PartsScreen(App& app, int cat = -1);
     bool landscape() const override { return false; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
+    void pointerMove(int id, float x, float y) override;
+    void pointerUp(int id) override;
     void key(Key k, bool down) override;
 private:
-    struct Stats { double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0; std::vector<std::pair<double, double>> hpCurve; double redline = 7000; };
-    // 1/4 mil tahmini arka planda (DragRace::estimateQuarter ~1 s); ekran kapansa da is guvenle biter
     struct EtJob { std::atomic<bool> done{false}; QuarterEstimate cur, nxt; };
-    Stats statsFor(const Tune& t) const;
+    void drawStatsBar(Renderer& r);
     void drawPreview(Renderer& r, float py);
     void recompute();
-    void select(int option);       // onizleme: secili parca takilirsa degerler
+    void select(int option);
     void buySelected();
+    void tap(float x, float y);
     App& app_;
-    int cat_ = -1;                 // -1: kategori listesi
-    int sel_ = -1;                 // onizlenen secenek (-1: yok)
-    bool confirm_ = false;         // "SATIN AL?" onay cubugu acik
-    Stats prev_, now_;
+    int tab_ = 0, cat_ = -1, sel_ = -1;
+    bool confirm_ = false;
+    float scroll_ = 0;
+    int dragId_ = -1; bool dragging_ = false; float downX_ = 0, downY_ = 0, lastX_ = 0, lastY_ = 0;
+    TuneStats prev_, now_;
     std::shared_ptr<EtJob> et_;
     std::string msg_; double msgT_ = 0;
-    double hpNow_ = 0, nmNow_ = 0, idx_ = 0, axleRisk_ = 0, massNow_ = 0;
+};
+
+// Ozel uretim atolyesi: kategoriye gore kaydiricilar (turbo kompresor capi + A/R, kam suresi, stroker, son disli,
+// vites oranlari, kanat baski kuvveti); canli sonuc (guc, yukler); "URET VE TAK" onayla.
+class FabricateScreen : public Screen {
+public:
+    FabricateScreen(App& app, int cat);
+    bool landscape() const override { return false; }
+    void update(double dt) override;
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void pointerMove(int id, float x, float y) override;
+    void pointerUp(int id) override;
+    void key(Key k, bool down) override;
+private:
+    struct Slider { const char* name; double lo, hi, step; const char* fmt; };
+    std::vector<Slider> sliders() const;
+    Tune built() const;
+    int price() const;
+    void refresh();
+    void nudge(int i, int dir);
+    void make();
+    App& app_;
+    int cat_;
+    Tune t_;
+    std::vector<double> vals_;
+    TuneStats now_, next_;
+    bool confirm_ = false;
+    int ptr_ = -1, held_ = -1, heldDir_ = 0, dragSlider_ = -1;
+    double holdT_ = 0;
+    std::string msg_; double msgT_ = 0;
 };
 
 // Ortak onay penceresi (dikey ekranlar): evet / vazgec dugmeleri ve arac satis dokumu (galeri + garaj)

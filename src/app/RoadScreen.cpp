@@ -49,7 +49,7 @@ void RoadScreen::setupLayout() {
 RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId_(carId) {
     setupLayout();
     if (tune) tune_ = *tune;
-    app_.setVoice(0, findVehicle(carId), tune_.turbo > 0);
+    app_.setVoiceTuned(0, carId, &tune_);
     app_.setVoice(1, nullptr);
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
@@ -66,7 +66,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
         const Opponent o = app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
         app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
-        app_.setVoice(1, findVehicle(rival), rt.turbo > 0);
+        app_.setVoiceTuned(1, rival, &rt);
     }
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
@@ -113,7 +113,7 @@ void RoadScreen::finishRace() {
         app_.career.money -= cut; app_.career.earnings -= cut; prize_ -= cut;
     }
     const VehicleSim& ps = ses_->player().sim();
-    app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun());
+    app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress());
     app_.saveCareer();
 }
 
@@ -176,6 +176,7 @@ void RoadScreen::update(double dt) {
         app_.haptic(60, 200);
     }
     for (auto& m : ses_->drainMessages()) flash(m);
+    for (auto& m : P.sim().drainFailEvents()) { flash(m, 3.0); app_.haptic(400, 255); }
     if (ses_->takeCrash()) app_.haptic(220, 255);
     if (ses_->mode() != RoadSession::Mode::Free && ses_->phase() == RoadSession::Phase::Finished) {
         finT_ += dt;
@@ -543,6 +544,19 @@ void RoadScreen::drawHud(Renderer& r) {
         r.text((land_ ? 576 : W - 4) - r.textWidth(b, 1), land_ ? 40 : 78, b, 1, {0.45f, 0.5f, 0.45f});
     }
     if (Pc.offRoad()) r.textCentered(W / 2.0f, land_ ? 104 : 110, "YOL DISI", 2, {1.0f, 0.4f, 0.2f});
+    {   // Su sicakligi ve nitro (varsa): ust seridin altinda kucuk gostergeler
+        const float gx = land_ ? 470.0f : W - 120.0f, gy = land_ ? 54.0f : 82.0f;
+        const double T = sim.coolantC();
+        std::snprintf(b, sizeof b, "SU %3.0fC", T);
+        r.text(gx, gy, b, 1, T > 108 ? Color{1.0f, 0.3f, 0.2f} : T > 100 ? kUiGold : Color{0.6f, 0.75f, 0.9f});
+        if (sim.hasNitrous()) {
+            r.rect(gx + 56, gy, gx + 106, gy + 7, {0.15f, 0.15f, 0.2f});
+            r.rect(gx + 56, gy, gx + 56 + 50 * (float)sim.nitrousLeft(), gy + 7, sim.nitrousActive() ? Color{0.3f, 0.7f, 1.0f} : Color{0.2f, 0.45f, 0.8f});
+            r.text(gx + 56, gy + 9, "NOS", 1, {0.5f, 0.75f, 1.0f});
+        }
+        if (sim.engineBlown()) r.textCentered(W / 2.0f, land_ ? 90 : 96, "MOTOR PATLADI", 2, {1.0f, 0.25f, 0.2f});
+        else if (sim.gearboxBroken()) r.textCentered(W / 2.0f, land_ ? 90 : 96, "SANZIMAN KIRIK", 2, {1.0f, 0.25f, 0.2f});
+    }
     if (msgT_ > 0) {
         const float w = r.textWidth(msg_, 2) + 16;
         const float my = land_ ? 120 : 140;

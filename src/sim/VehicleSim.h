@@ -117,10 +117,32 @@ public:
     double rideFreqHz() const { return fRide_; }
     const RoadProfile& road() const { return *road_; }
     const VehicleSimConfig& config() const { return cfg_; }
+    // Nitro (NOS): tam gaz + 3000 rpm ustu + viteste otomatik; tup suresi (s) biter
+    bool hasNitrous() const { return nosHp_ > 0.0; }
+    bool nitrousActive() const { return nosActive_; }
+    double nitrousLeft() const { return nosBottle_ > 0 ? nosLeft_ / nosBottle_ : 0.0; }
+    double downforceN() const { return dfK_ * speed() * speed(); }
+    // Motor isisi (C) ve zorlanma: 0..1 (1 = patladi / kirildi); dayanim N*m
+    double coolantC() const { return coolT_; }
+    double engineStress() const { return std::min(1.0, stress_); }
+    double gearboxStress() const { return std::min(1.0, gbStress_); }
+    bool engineBlown() const { return engBlown_; }
+    bool gearboxBroken() const { return gbBroken_; }
+    double engineRatingNm() const { return engRating_; }
+    double gearboxRatingNm() const { return gbRating_; }
+    std::vector<std::string> drainFailEvents() { auto v = std::move(failEvents_); failEvents_.clear(); return v; }
 
 private:
     void stepPlanar(double dt, const VehicleInputs& in);
     void updateElectronics(double dt, double brake);
+    void updateNitrous(double dt);
+    void updateHeatAndStress(double dt);
+    double coolCap_ = 0, coolLow_ = 0.4, coolT_ = 88.0, heatLim_ = 1.0, teF_ = 0, stress_ = 0, gbStress_ = 0;
+    double engRating_ = 0, gbRating_ = 0;
+    bool engBlown_ = false, gbBroken_ = false;
+    std::vector<std::string> failEvents_;
+    double nosHp_ = 0, nosLeft_ = 0, nosBottle_ = 0, dfK_ = 0, tcSlip_ = 0.10, absSlip_ = 0.12;
+    bool nosActive_ = false;
     bool absAvail_ = false, tcAvail_ = false, tcOn_ = false;
     double absF_[4] = {1.0, 1.0, 1.0, 1.0}, tcLim_ = 1.0;
     VehicleSimConfig cfg_;

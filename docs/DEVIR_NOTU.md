@@ -419,3 +419,26 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
 - Garaj/galeri stüdyo arka plani (`studio()`); font '?' ve kesme isareti.
 - Test kancalari: `ZK_SHOT_FBO=1` ekran goruntusunu ic cozunurlukten alir; galeride `ZK_GALLERY_CAR=id`,
   `ZK_SHEET=1|2` (6 aracin 3/4 ya da yandan model tablosu).
+
+## Guncelleme — 2026-10-02: Modifiye sistemi v2 (The Strip seviyesi, ara taslak)
+- `src/sim/PartTables.*`: 37 kategori, 5 sekme (MOTOR: kapak, supap+yay, kam, piston, biyel, krank/stroker, yatak, conta,
+  volan, motor swap | BESLEME: emme, egzoz, turbo (30), turbin, wastegate, boost kontrol, kompresor, intercooler, nitro,
+  yakit sistemi, yakit | AKTARMA: debriyaj, sanziman swap (29 gercek kutu + ozel oran), sanziman guclendirme, son disli,
+  diferansiyel, aks | SASI: lastik (30), jant, suspansiyon, fren, hafifletme, aero | ECU+SOGUTMA: ECU, elektronik,
+  sogutma, yag/karter). Her kategori >= 10 secenek; motor swap 280 motor (guce gore). Tablolarin ilk satirlari v1
+  seviyeleri (bit duzeyinde ayni fizik): YZ setleri, EtTable.inc, regresyon degismedi.
+- Fizik (VehicleSim kurucusu): egri bicimi (emme/egzoz/kam/kapak dusuk-yuksek devir carpani), devir siniri (supap/kam/
+  ECU/kapak; egri uzatilir), stroker hacim, volan/biyel/krank ataleti, turbo (bar + spool, turbin A/R, wastegate, boost
+  kontrol; fabrika turbolu motorda fabrika boostu artar), kompresor (roots/twin-screw/santrifuj), intercooler,
+  yakit sistemi siniri (fabrika HP x cap; v1 turbo kitleri 3.5), nitro (tam gaz + 3000 rpm ustu, tup suresi,
+  PowertrainCore::setTorqueAdd), sanziman swap + ozel oranlar, lastik tutus/kutle, jant kutlesi, alcaltma (CoG),
+  yay frekansi, fren, aero (CdA + baski kuvveti: tekerlek yukune), elektronik esikleri (TC/ABS kayma).
+- Dayanim (`durability`): motor = takili motorun fabrika torku x 1.30 x en zayif (piston/biyel/krank) x yatak
+  [x conta, asiri beslemede]; sanziman = fabrika torku x 1.9 (swap: kutunun Nm degeri) x guclendirme. Suzulmus tork
+  sinir ustundeyse hasar birikir: 1.0'da MOTOR PATLADI / SANZIMAN KIRILDI (kariyerde kalici, tamir ucretli).
+- Isi: su sicakligi (isil kutle 250 kJ/K, isinma gucun %33'u, sogutma fabrika gucune gore x radyator/fan); 108 C
+  ustu guc kaybi, 125 C ustu motor hasari. Yalniz oyun kurulumunda (tune var); zehra_sim referansi degismez.
+- Arayuz: PartsScreen.cpp (sekmeler, kaydirmali liste, onizlemede motor/sanziman/isi/aks yuku + 1/4 mil),
+  FabricateScreen (atolye: turbo capi + A/R, kam suresi, stroker %, son disli, vites oranlari, kanat baski kuvveti).
+  Yol HUD'unda su sicakligi ve NOS cubugu; garajda takili motor bilgisi ve sesi (App::setVoiceTuned).
+- Kayit: `tun2=anahtar:deger,...` (eski surum yok sayar), `gbx=1` kirik sanziman. Test parts_test.

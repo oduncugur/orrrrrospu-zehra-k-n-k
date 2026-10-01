@@ -169,8 +169,10 @@ static TorqueCurve synthCurve(const EngineDef& e, bool lowCam) {
     return c;
 }
 
-EngineSpec buildEngineSpec(const VehicleDef& v) {
-    const EngineDef& e = engineTable()[v.engine];
+EngineSpec buildEngineSpec(const VehicleDef& v) { return buildEngineSpecFor(v.engine); }
+
+EngineSpec buildEngineSpecFor(int engineIdx) {
+    const EngineDef& e = engineTable()[engineIdx];
     EngineSpec s;
     s.name = std::string(e.code) + " " + layoutName(e.layout) + " " + inductionName(e.induction);
     s.cylinders = e.cylinders;
@@ -194,8 +196,10 @@ EngineSpec buildEngineSpec(const VehicleDef& v) {
     return s;
 }
 
-GearboxSpec buildGearbox(const VehicleDef& v) {
-    const GearboxDef& g = gearboxTable()[v.gearbox];
+GearboxSpec buildGearbox(const VehicleDef& v) { return buildGearboxFor(v.gearbox); }
+
+GearboxSpec buildGearboxFor(int gearboxIdx) {
+    const GearboxDef& g = gearboxTable()[gearboxIdx];
     GearboxSpec s;
     s.ratios = g.ratios;
     s.finalDrive = g.finalDrive;

@@ -26,6 +26,7 @@ add_library(zk_sim STATIC
   src/game/Contact.cpp
   src/garage/VehicleCatalog.cpp
   src/garage/LowPolyModel.cpp
+  src/sim/PartTables.cpp
   src/audio/ProceduralEngineAudio.cpp
   src/audio/TireAudio.cpp)
 target_include_directories(zk_sim PUBLIC src)
@@ -44,7 +45,7 @@ target_link_libraries(zehra_ettable PRIVATE zk_sim)
 find_package(SDL3 CONFIG QUIET)
 if(SDL3_FOUND)
   add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp
-                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/Cockpit.cpp src/app/GLApi.cpp)
+                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/PartsScreen.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/Cockpit.cpp src/app/GLApi.cpp)
   target_include_directories(zehra_game PRIVATE src third_party/khronos)
   if(TARGET SDL3::SDL3-static)
     target_link_libraries(zehra_game PRIVATE zk_sim SDL3::SDL3-static)
@@ -87,6 +88,9 @@ add_test(NAME otoban_akisi COMMAND flow_test)
 add_executable(contact_test tests/contact_test.cpp)
 target_link_libraries(contact_test PRIVATE zk_sim)
 add_test(NAME arac_temasi COMMAND contact_test)
+add_executable(parts_test tests/parts_test.cpp)
+target_link_libraries(parts_test PRIVATE zk_sim)
+add_test(NAME modifiye COMMAND parts_test)
 add_executable(model_test tests/model_test.cpp)
 target_link_libraries(model_test PRIVATE zk_sim)
 add_test(NAME arac_modelleri COMMAND model_test)

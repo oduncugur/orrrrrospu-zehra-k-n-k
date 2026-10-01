@@ -1,4 +1,5 @@
 #include "VehicleSim.h"
+#include "sim/PartTables.h"
 #include <algorithm>
 #include <cmath>
 
@@ -16,6 +17,38 @@ double turboMul(double rpm, const void* c) {
     return 1.0 + (t.full - 1.0) * x * x * (3 - 2 * x);
 }
 double constMul(double, const void* c) { return *static_cast<const double*>(c); }
+// Egri bicimi: dusuk devir (<= %40 redline) carpani -> yuksek devir (>= %75) carpani
+struct ShapeCtx { double red, low, high; };
+double shapeMul(double rpm, const void* c) {
+    const ShapeCtx& s = *static_cast<const ShapeCtx*>(c);
+    const double x = std::clamp((rpm / s.red - 0.40) / 0.35, 0.0, 1.0);
+    return s.low + (s.high - s.low) * x;
+}
+// Kompresor: roots / twin-screw dusuk devirden tam boost (parazitik kayip artar), santrifuj devirle karesel
+struct SuperCtx { double red, base, bar; int type; };
+double superMul(double rpm, const void* c) {
+    const SuperCtx& s = *static_cast<const SuperCtx*>(c);
+    const double f = rpm / s.red;
+    double g, loss;
+    if (s.type == 2) { g = std::min(1.0, f * f); loss = 0.02 * f; }
+    else { const double x = std::clamp((f - 0.10) / 0.22, 0.0, 1.0); g = x * x * (3 - 2 * x); loss = (s.type == 0 ? 0.045 : 0.03) * f; }
+    return (1.0 + s.base + s.bar * g) / (1.0 + s.base) - loss;
+}
+// Devir siniri yukseltildiyse egriyi yeni sinira uzat (son egimle, nefessizlik artarak)
+void extendCurve(TorqueCurve& c, double newMax) {
+    if (c.size() < 2) return;
+    while (c.back().first < newMax) {
+        const auto a = c[c.size() - 2], b = c.back();
+        const double slope = std::min((b.second - a.second) / (b.first - a.first), -b.second * 0.00006);
+        c.push_back({b.first + 250.0, std::max(0.0, b.second + slope * 250.0 * 1.15)});
+    }
+}
+double peakHp(const EngineSpec& e) {
+    double m = 0.0;
+    for (auto* c : {&e.lowCam, &e.highCam}) for (auto& pr : *c) if (pr.first <= e.redlineRpm) m = std::max(m, pr.second * pr.first / 7120.9);
+    return m;
+}
+template <class T> const T& row(const std::vector<T>& t, int i) { return t[std::clamp(i, 0, (int)t.size() - 1)]; }
 double curveMax(const EngineSpec& e) {
     double m = 0.0;
     for (auto* c : {&e.lowCam, &e.highCam}) for (auto& pr : *c) m = std::max(m, pr.second);
@@ -27,45 +60,115 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     const VehicleDef* car = cfg.car;
     const Tune* tune = cfg.tune;
     if (tune) { cfg_.drySump = tune->drySump; cfg_.fuel = tune->fuel; }
-    eng_ = car ? buildEngineSpec(*car) : EngineSpec::K20Default();
-    gbx_ = car ? buildGearbox(*car) : GearboxSpec{};
+    const int engIdx = car ? effectiveEngine(*car, tune) : -1, gbIdx = car ? effectiveGearbox(*car, tune) : -1;
+    eng_ = car ? buildEngineSpecFor(engIdx) : EngineSpec::K20Default();
+    gbx_ = car ? buildGearboxFor(gbIdx) : GearboxSpec{};
     eng_.gasketMm = cfg_.gasketMm; eng_.fuel = cfg_.fuel;
     if (!car) {
         eng_.valvetrain = cfg.valvetrain;
         if (cfg.plenum) { eng_.intake = IntakeType::Plenum; eng_.name = "K20A (Plenum, 16V i-VTEC)"; }
     }
-    const double TmaxFactory = curveMax(eng_);          // aks capi fabrika torkuna gore boyutlanir
+    const double TmaxFactory = car ? curveMax(buildEngineSpec(*car)) : curveMax(eng_);   // aks capi fabrika torkuna gore
     DiffSpec diff;
     if (tune) {
-        // ---- parcalar ----
-        const EngineDef* ed = car ? &engineTable()[car->engine] : nullptr;
+        // ---- parcalar (PartTables; ilk satirlar v1 seviyeleri, ayni islem sirasi) ----
+        const EngineDef* ed = car ? &engineTable()[engIdx] : nullptr;
         const bool forced = ed && (ed->induction == Induction::Turbo || ed->induction == Induction::TwinTurbo ||
                                    ed->induction == Induction::Supercharger);
-        double mul = (1.0 + 0.03 * tune->intake) * (1.0 + 0.03 * tune->exhaust) *
-                     (1.0 + tune->ecu * ((forced || tune->turbo) ? 0.12 : 0.05));
-        scaleCurves(eng_, constMul, &mul);
+        const double hp0 = peakHp(eng_), red0 = eng_.redlineRpm;
+        const IntakeOpt& IT = row(intakeTable(), tune->intake);
+        const ShapeOpt& EX = row(exhaustTable(), tune->exhaust);
+        const EcuOpt& EC = row(ecuTable(), tune->ecu);
+        const double ecuMul = (forced || tune->turbo || tune->superch) ? EC.forced : EC.na;
+        if (IT.low == IT.high && EX.low == EX.high) {
+            double mul = IT.low * EX.low * ecuMul;
+            scaleCurves(eng_, constMul, &mul);
+        } else {
+            ShapeCtx a{red0, IT.low, IT.high}, b{red0, EX.low, EX.high};
+            scaleCurves(eng_, shapeMul, &a); scaleCurves(eng_, shapeMul, &b);
+            double m = ecuMul; scaleCurves(eng_, constMul, &m);
+        }
+        const double ic = row(intercoolerTable(), tune->intercooler).eff;
+        const TurbineOpt& TB = row(turbineTable(), tune->turbine);
+        const double gate = row(wastegateTable(), tune->wastegate).mul * (1.0 + row(boostCtlTable(), tune->boostCtl).extra);
         if (tune->turbo > 0) {
-            const double baseBoost = ed ? ed->boostBar : 0.0, add = 0.6 * tune->turbo;
-            TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (0.32 + 0.08 * tune->turbo),
-                       eng_.redlineRpm * (0.55 + 0.07 * tune->turbo)};
+            const TurboOpt T = tune->turbo == kCustomTurbo ? customTurbo(*tune) : row(turboTable(), tune->turbo);
+            const double baseBoost = ed ? ed->boostBar : 0.0;
+            const double add = (tune->turbine || tune->wastegate || tune->boostCtl) ? T.bar * ic * TB.top * gate : T.bar * ic;
+            TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (T.spoolLo - EC.spool + TB.spool),
+                       eng_.redlineRpm * (T.spoolHi - EC.spool + TB.spool)};
+            scaleCurves(eng_, turboMul, &t);
+        } else if (ed && ed->boostBar > 0.0 && (tune->turbine || tune->wastegate || tune->boostCtl)) {
+            // Fabrika turbosu: wastegate / boost kontrol / turbin fabrika boostunu yukseltir (spool fabrika egrisinde)
+            const double b0 = ed->boostBar, b1 = b0 * gate * TB.top * ic;
+            TurboCtx t{(1.0 + b1) / (1.0 + b0), eng_.redlineRpm * (0.25 + TB.spool), eng_.redlineRpm * (0.45 + TB.spool)};
             scaleCurves(eng_, turboMul, &t);
         }
-        if (tune->finalDrive > 0.0) gbx_.finalDrive = tune->finalDrive;
-        switch (tune->diff) {
-        case DiffType::Open: diff.preload = 0.0; diff.plateFactor = 0.0; break;
-        case DiffType::OneAndHalfWay: break;                                   // 45/60 rampa (varsayilan)
-        case DiffType::TwoWay: diff.rampDecelDeg = 45.0; diff.preload = 80.0; break;
-        // Spool (kaynakli): tam kilide yakin; 2500 Nm, 50 us adimda sayisal kararlilik siniri icinde
-        case DiffType::Spool: diff.preload = 2500.0; diff.plateFactor = 1.0; break;
+        if (tune->superch > 0) {
+            const SuperOpt& S = row(superTable(), tune->superch);
+            SuperCtx sc{red0, ed ? ed->boostBar : 0.0, S.bar * ic, S.type};
+            scaleCurves(eng_, superMul, &sc);
         }
+        const CamOpt C = tune->cam == kCustomCam ? customCam(*tune) : row(camTable(), tune->cam);
+        if (tune->cam > 0) { ShapeCtx c{red0, C.low, C.high}; scaleCurves(eng_, shapeMul, &c); }
+        const HeadOpt& HD = row(headTable(), tune->head);
+        if (tune->head > 0) { ShapeCtx h{red0, HD.low, HD.high}; scaleCurves(eng_, shapeMul, &h); }
+        const PistonOpt& PI = row(pistonTable(), tune->piston);
+        if (PI.mul != 1.0) { double m = PI.mul; scaleCurves(eng_, constMul, &m); }
+        const CrankOpt& CR = row(crankTable(), tune->crank);
+        const double disp = tune->crank == kCustomCrank ? 1.0 + std::clamp(tune->custDisp, 0.0, 0.40) : CR.disp;
+        const double inRed = (tune->crank == kCustomCrank ? -1500.0 * std::clamp(tune->custDisp, 0.0, 0.40) : CR.redline) + HD.redline;
+        if (disp != 1.0) { double d = disp; scaleCurves(eng_, constMul, &d); eng_.inertia *= std::sqrt(disp); }
+        eng_.inertia *= CR.inertia * row(rodTable(), tune->rod).inertia;
+        const GasketOpt& GK = row(gasketTable(), tune->gasket);
+        if (GK.mm > 0.0) { eng_.gasketMm = GK.mm; cfg_.gasketMm = GK.mm; }
+        const FuelOpt& FU = row(fuelTable(), tune->fuelSel);
+        if (FU.mul != 1.0) { double f = FU.mul; scaleCurves(eng_, constMul, &f); }
+        // Devir siniri: supap + kam + ECU + motor ici (stroker dusurur)
+        const double redAdd = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + EC.redline + inRed;
+        if (redAdd != 0.0) {
+            eng_.redlineRpm = std::max(eng_.idleRpm + 2500.0, red0 + redAdd);
+            extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);
+        }
+        eng_.inertia *= row(flywheelTable(), tune->flywheel).inertia;
+        // Yakit sistemi siniri: fabrika gucunun cap katini asan tork kirpilir (buyuk turbo / kompresor yakit ister).
+        // v1 turbo kitleri yakit yukseltmesini icerir.
+        double cap = row(fuelSysTable(), tune->fuelSys).cap;
+        if (tune->turbo == 1 || tune->turbo == 2) cap = std::max(cap, 3.5);
+        const double capHp = hp0 * cap;
+        for (auto* c : {&eng_.lowCam, &eng_.highCam})
+            for (auto& pr : *c) if (pr.first > 800.0) pr.second = std::min(pr.second, capHp * 7120.9 / pr.first);
+        // Sanziman: ozel vites oranlari (fabrika oranina carpan)
+        if (tune->gearSwap == kCustomGear)
+            for (size_t i = 0; i < gbx_.ratios.size() && i < 8; ++i) if (tune->custGear[i] > 0) gbx_.ratios[i] *= std::clamp(tune->custGear[i], 0.6, 1.5);
+        if (tune->finalSel > 0) {
+            gbx_.finalDrive = tune->finalSel == kCustomFinal ? std::clamp(tune->custFinal > 0 ? tune->custFinal : gbx_.finalDrive, 2.0, 7.5)
+                                                              : gbx_.finalDrive * row(finalTable(), tune->finalSel).mul;
+        } else if (tune->finalDrive > 0.0) gbx_.finalDrive = tune->finalDrive;
+        const DiffOpt& D = row(diffTable(), (int)tune->diff);
+        diff.preload = D.preload; diff.plateFactor = D.plate; diff.rampAccelDeg = D.rampA; diff.rampDecelDeg = D.rampD;
+        const NosOpt& N = row(nosTable(), tune->nitrous);
+        nosHp_ = N.hp; nosLeft_ = nosBottle_ = N.bottleS;
+        const ElecOpt& E = row(elecTable(), tune->elec);
+        if (tune->elec > 0) { tcSlip_ = E.tcSlip; absSlip_ = E.absSlip; }
     }
     double Tmax = curveMax(eng_);
     ClutchSpec clutch;
     if (car) clutch.maxTorque = Tmax * 1.7;          // sokak baskisi: motor torkunun ~1.7 kati
-    if (tune) { static const double cm[4] = {1.0, 1.3, 1.6, 2.0}; clutch.maxTorque *= cm[std::clamp(tune->clutch, 0, 3)]; }
+    if (tune) clutch.maxTorque *= row(clutchTable(), tune->clutch).mul;
+    // Dayanim ve sogutma: sinir ustu tork hasar biriktirir; isi modeli fabrika gucune gore boyutlu radyator
+    if (car && tune) {                                                         // yalniz oyun kurulumu (zehra_sim referansi degismez)
+        const Durability du = durability(*car, tune);
+        engRating_ = du.engineNm; gbRating_ = du.gearboxNm;
+        const double factoryW = peakHp(buildEngineSpec(*car)) * 745.7;
+        const CoolOpt& CO = row(coolingTable(), tune ? tune->cooling : 0);
+        coolCap_ = factoryW * 0.33 / 105.0 * CO.cap;                         // W/K (tam yuk, 40 m/s'de 105 C dengesi)
+        coolLow_ = CO.lowSpeed;
+        if (tune && tune->oil > 0) coolCap_ *= 1.06;                          // yag sogutucu / genis karter
+    }
     pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
     drive_ = car ? car->drive : Drive::FWD;
-    boxType_ = car ? gearboxTable()[car->gearbox].type : Gearbox::HPattern;
+    boxType_ = car ? gearboxTable()[gbIdx].type : Gearbox::HPattern;
     // ABS / TC: fabrika donanimi ya da ECU kiti; yalniz oyun kurulumunda (tune var)
     absAvail_ = car && tune && (car->abs || tune->absKit);
     tcAvail_ = car && tune && (car->tc || tune->tcKit);
@@ -79,7 +182,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     // torku, 1. vites) stok celigin kopma dayanimimin %75'i. Stok arac stok kalkista saglam kalir; guc ve
     // debriyaj yukseltildikce stok aksin kirilma riski gercekci bicimde dogar. Otomatikte tasarim torku
     // konvertorun stall tork carpimi (1.9 x).
-    const int axleLevel = tune ? std::clamp(tune->axles, 0, 2) : (cfg.stockAxles ? 0 : 1);
+    const AxleOpt& AX = row(axleTable(), tune ? tune->axles : (cfg.stockAxles ? 0 : 1));
+    const int axleLevel = AX.spec;
     AxleSpec axle = axleLevel == 2 ? AxleSpec::Race() : axleLevel == 1 ? AxleSpec::Chromoly() : AxleSpec::Stock();
     if (car) {
         const GearboxSpec factory = buildGearbox(*car);
@@ -87,9 +191,11 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double design = boxType_ == Gearbox::TorqueConverter ? PowertrainCore::kConverterTr0 : 1.7;
         const double perSide = design * TmaxFactory * G1 * factory.efficiency * 0.5 * std::max(frontShare_, 1.0 - frontShare_);
         const double dStock = std::cbrt(16.0 * perSide / (3.14159265 * 0.75 * AxleSpec::Stock().tauUltMPa * 1e6)) * 1000.0;
-        axle.diameterMm = dStock * (axleLevel == 2 ? 1.25 : axleLevel == 1 ? 1.12 : 1.0);   // yukseltme akslari kalindir
+        axle.diameterMm = dStock * AX.dia;                                    // yukseltme akslari kalindir
     }
-    fail_ = std::make_unique<DrivetrainFailure>(axle, LubeSpec{cfg_.drySump, cfg.oilLiters, 3.0});
+    double oilL = cfg.oilLiters;
+    if (tune && tune->oil > 0) { const OilOpt& O = row(oilTable(), tune->oil); cfg_.drySump = cfg_.drySump || O.dry; oilL = O.liters; }
+    fail_ = std::make_unique<DrivetrainFailure>(axle, LubeSpec{cfg_.drySump, oilL, 3.0});
 
     const double ambient = 25.0;
     const bool fDriven = frontShare_ > 0.0, rDriven = frontShare_ < 1.0;
@@ -109,6 +215,10 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         TireParams semi;   semi.muPeak = 1.25;   semi.B = 11.0;   semi.wheelMass = 15.0;
         semi.tempIdeal = 75.0;   semi.tempWidth = 0.00007;
         TireParams slick;  // 1.45, dovme jant
+        // Kesin lastik (tireTable): sinifin tutus carpani + teker kutlesi; jant kutlesi
+        const TireOpt& TR = row(tireTable(), tune->tireSel > 0 ? tune->tireSel : (int)tune->tires);
+        const double wkg = TR.wheelKg + row(rimTable(), tune->rims).wheelKg;
+        for (TireParams* p : {&street, &semi, &slick}) { p->muPeak *= TR.grip; p->wheelMass += wkg; }
         const TireParams* dt = tune->tires == TireType::DragSlick ? &slick : tune->tires == TireType::SemiSlick ? &semi : &street;
         const double defPsi = tune->tires == TireType::DragSlick ? 16.0 : tune->tires == TireType::SemiSlick ? 26.0 : 32.0;
         const double defTemp = tune->tires == TireType::DragSlick ? 55.0 : tune->tires == TireType::SemiSlick ? 45.0 : 35.0;
@@ -123,8 +233,10 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
 
     fuelDensity_ = (cfg_.fuel == FuelType::E85) ? 0.785 : 0.745;
     baseMass_ = (car ? car->massKg : 1080.0) + 75.0 - (tune ? Tune::weightKg(tune->weight) : 0);   // kuru arac + surucu - hafifletme
+    if (tune && car) baseMass_ += swapMassDelta(*car, *tune);
     fuelKg_ = cfg.fuelLiters * fuelDensity_;
-    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0);
+    const SuspOpt& SU = row(suspTable(), tune ? tune->susp : 0);
+    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0) - SU.lowerMm * 0.0008;
     vl_ = VehicleLoad{baseMass_ + fuelKg_, car ? car->wheelbaseM : 2.62, car ? car->widthM * 0.85 : 1.50, hCoG,
                       car ? car->frontWeight : 0.62};
     // Suspansiyon: kasa tipine gore dogal frekans (Hz); yaris araclari sert
@@ -136,6 +248,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         case Body::Sedan: case Body::Wagon: fRide_ = 1.45; break; default: fRide_ = 1.7; break;
         }
         if (!car->streetLegal) fRide_ = 2.8;
+        fRide_ *= SU.ride;
     }
     susp_ = std::make_unique<Suspension>(SuspensionSetup::fromVehicle(vl_.mass, vl_.wheelbase, vl_.track, vl_.hCoG,
                                                                       vl_.frontStatic, fRide_, fRide_ * 1.1, 0.30, 0.60));
@@ -147,6 +260,12 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         CdA_ = cd * car->widthM * car->heightM * 0.85;
     }
     brakeTotal_ = 7000.0 * (baseMass_ / 1155.0);
+    if (tune) {
+        brakeTotal_ *= row(brakeTable(), tune->brakes).mul;
+        const AeroOpt A = tune->aero == kCustomAero ? customAero(*tune) : row(aeroTable(), tune->aero);
+        CdA_ *= A.cd;
+        dfK_ = A.downforce / (27.78 * 27.78);                               // N / (m/s)^2
+    }
     // Yaw ataleti: ~ m * (dingil/2)^2 * 1.1 (tipik binek: 1200 kg, 2.6 m -> ~2200 kg m^2)
     Iz_ = vl_.mass * std::pow(0.5 * vl_.wheelbase, 2.0) * 1.1 + 0.08 * vl_.mass * vl_.track * vl_.track;
 }
@@ -164,7 +283,7 @@ void VehicleSim::updateElectronics(double dt, double brake) {
         for (int i = 0; i < 4; ++i) {
             // Anlik kayma (gevsemeli kappa gecikir): -%12'yi asan tekerlegin freni asimla orantili birakilir
             const double s = (w_[i].omega() * w_[i].rEff() - speed()) / std::max(speed(), 2.0);
-            if (brake > 0.05 && speed() > 1.5 && s < -0.12) absF_[i] = std::max(0.05, absF_[i] - dt * 80.0 * std::min(-s - 0.12, 1.0));
+            if (brake > 0.05 && speed() > 1.5 && s < -absSlip_) absF_[i] = std::max(0.05, absF_[i] - dt * 80.0 * std::min(-s - absSlip_, 1.0));
             else absF_[i] = std::min(1.0, absF_[i] + dt * 6.0);
         }
     }
@@ -176,13 +295,44 @@ void VehicleSim::updateElectronics(double dt, double brake) {
         for (int i = 0; i < 4; ++i)
             if ((i < 2 && frontShare_ > 0.0) || (i >= 2 && frontShare_ < 1.0)) s = std::max(s, (w_[i].omega() * w_[i].rEff() - speed()) / V);
         if (!tcOn_) tcLim_ = std::min(1.0, tcLim_ + dt * 4.0);
-        else tcLim_ = s > 0.10 ? std::max(0.05, tcLim_ - dt * 40.0 * std::min(s - 0.10, 1.0)) : std::min(1.0, tcLim_ + dt * 2.5);
-        pt_->setTorqueLimit(tcLim_);
+        else tcLim_ = s > tcSlip_ ? std::max(0.05, tcLim_ - dt * 40.0 * std::min(s - tcSlip_, 1.0)) : std::min(1.0, tcLim_ + dt * 2.5);
     }
+    pt_->setTorqueLimit((tcAvail_ ? tcLim_ : 1.0) * heatLim_);
+}
+
+void VehicleSim::updateNitrous(double dt) {
+    if (nosHp_ <= 0.0) return;
+    PowertrainCore& pt = *pt_;
+    const double r = pt.rpm();
+    nosActive_ = nosLeft_ > 0.0 && pt.throttle() > 0.9 && r > 3000.0 && r < eng_.redlineRpm && pt.gear() >= 1;
+    pt.setTorqueAdd(nosActive_ ? nosHp_ * 7120.9 / std::max(r, 3000.0) : 0.0);
+    if (nosActive_) nosLeft_ = std::max(0.0, nosLeft_ - dt);
+}
+
+// Motor isisi ve mekanik zorlanma: sogutma suyu sicakligi (isinma: gucun ~%33'u; sogutma: kapasite x hava akisi),
+// 108 C ustu guc kaybi (vuruntu geri avansi), 125 C ustu hasar. Dayanim ustu tork motor / sanziman hasari biriktirir.
+void VehicleSim::updateHeatAndStress(double dt) {
+    if (coolCap_ <= 0.0) return;
+    PowertrainCore& pt = *pt_;
+    const double P = std::max(0.0, pt.engineTorque()) * pt.rpm() / 9.5493;
+    const double air = coolLow_ + std::min(1.0, speed() / 40.0) * (1.4 - coolLow_);
+    coolT_ += dt * (P * 0.33 + 1500.0 - coolCap_ * air * (coolT_ - 30.0)) / 250000.0;   // blok + su + radyator isil kutlesi
+    coolT_ = std::max(coolT_, 85.0);                                          // termostat
+    heatLim_ = coolT_ > 108.0 ? std::clamp(1.0 - (coolT_ - 108.0) * 0.025, 0.55, 1.0) : 1.0;
+    if (coolT_ > 125.0) stress_ += dt * 0.02 * (coolT_ - 125.0);
+    teF_ += (pt.engineTorque() - teF_) * std::min(1.0, dt / 0.12);
+    if (engRating_ > 0 && teF_ > engRating_ && !engBlown_) stress_ += dt * 0.6 * (teF_ / engRating_ - 1.0);
+    if (gbRating_ > 0 && teF_ > gbRating_ && !gbBroken_) gbStress_ += dt * 0.8 * (teF_ / gbRating_ - 1.0);
+    if (stress_ >= 1.0 && !engBlown_) { engBlown_ = true; failEvents_.push_back("MOTOR PATLADI! (BIYEL / PISTON)"); }
+    if (gbStress_ >= 1.0 && !gbBroken_) { gbBroken_ = true; failEvents_.push_back("SANZIMAN KIRILDI!"); }
+    if (engBlown_) pt.setIgnitionKilled(true);
+    if (gbBroken_) pt.setAxleSnapped(true, true);
 }
 
 void VehicleSim::step(double dt, const VehicleInputs& in) {
     updateElectronics(dt, in.brake);
+    updateNitrous(dt);
+    updateHeatAndStress(dt);
     if (cfg_.planar) { stepPlanar(dt, in); return; }
     PowertrainCore& pt = *pt_;
     DrivetrainFailure& fail = *fail_;
@@ -217,7 +367,7 @@ void VehicleSim::step(double dt, const VehicleInputs& in) {
     const double bR = in.brake * brakeTotal_ * (1 - bias) * 0.5 + in.handbrake * 1500.0;
     double sumFx = 0.0;
     for (int i = 0; i < 4; ++i) {
-        w_[i].setNormalLoad(susp_->tireLoad(i));
+        w_[i].setNormalLoad(susp_->tireLoad(i) + 0.25 * dfK_ * V_ * V_);
         const double share = i < 2 ? fs : 1.0 - fs;
         const double Ta = share * ((i % 2 == 0) ? pt.axleTorqueL() : pt.axleTorqueR());
         w_[i].step(dt, V_, Ta, (i < 2 ? bF : bR) * absF_[i]);

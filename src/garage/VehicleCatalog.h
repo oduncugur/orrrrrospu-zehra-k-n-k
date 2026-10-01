@@ -84,6 +84,8 @@ const char* gearboxName(Gearbox g);
 // Simulasyon koprusu
 EngineSpec  buildEngineSpec(const VehicleDef& v);
 GearboxSpec buildGearbox(const VehicleDef& v);
+EngineSpec  buildEngineSpecFor(int engineIdx);      // motor swap
+GearboxSpec buildGearboxFor(int gearboxIdx);       // sanziman swap
 double      peakPowerHp(const VehicleDef& v);
 
 } // namespace zk

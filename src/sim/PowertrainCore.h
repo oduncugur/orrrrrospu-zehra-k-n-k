@@ -63,6 +63,7 @@ public:
     void setAxleSnapped(bool l, bool r) { snappedL_ = l; snappedR_ = r; }
     // Cekis kontrolu: pozitif motor torku carpani (1 = mudahale yok)
     void setTorqueLimit(double f) { torqueLimit_ = f; }
+    void setTorqueAdd(double nm) { torqueAdd_ = nm; }      // nitro: gazla orantili ek tork
     double torqueLimit() const { return torqueLimit_; }
     // Tork konvertoru (otomatik sanziman): debriyaj yerine akiskan kavrama. Pompa torku K w^2 (1 - SR^6),
     // cikis = TR(SR) x pompa (TR: kalkista tr0, SR 0.85'te 1). Stall devrinde tam gaz motor torku = K w^2.
@@ -107,7 +108,7 @@ private:
     int    gear_ = 0;
     bool   twoStep_ = false; double twoStepRpm_ = 4500.0;
     bool   killed_ = false, snappedL_ = false, snappedR_ = false;
-    double torqueLimit_ = 1.0;
+    double torqueLimit_ = 1.0, torqueAdd_ = 0.0;
     bool   converter_ = false; double convK_ = 0.0, convTr0_ = 1.9, convTiMax_ = 0.0;
     double omegaE_;
     double Te_ = 0.0, Tc_ = 0.0, TL_ = 0.0, TR_ = 0.0;

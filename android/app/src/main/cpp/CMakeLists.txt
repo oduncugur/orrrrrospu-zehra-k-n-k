@@ -14,6 +14,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/GarageScreen.cpp
     ${ZK_ROOT}/src/app/DragScreen.cpp
     ${ZK_ROOT}/src/app/MenuScreens.cpp
+    ${ZK_ROOT}/src/app/PartsScreen.cpp
     ${ZK_ROOT}/src/app/RoadScreen.cpp
     ${ZK_ROOT}/src/app/SettingsScreen.cpp
     ${ZK_ROOT}/src/app/Cockpit.cpp
@@ -33,6 +34,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/Contact.cpp
     ${ZK_ROOT}/src/garage/VehicleCatalog.cpp
     ${ZK_ROOT}/src/garage/LowPolyModel.cpp
+    ${ZK_ROOT}/src/sim/PartTables.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp
     ${ZK_ROOT}/src/audio/TireAudio.cpp)
 target_include_directories(zehra PRIVATE ${ZK_ROOT}/src)

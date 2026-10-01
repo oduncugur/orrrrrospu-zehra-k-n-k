@@ -1,6 +1,7 @@
 // Kariyer / ekonomi / kayit testleri
 #include "game/Career.h"
 #include "game/DragRace.h"
+#include "sim/VehicleSim.h"
 #include "garage/VehicleCatalog.h"
 #include <cstdio>
 #include <cmath>
@@ -43,7 +44,8 @@ int main() {
     CHECK(c.buyPart(PartCat::Tires, 2) && c.money == before - slickPrice && c.car().tune.tires == TireType::DragSlick, "slick takildi, para dustu");
     CHECK(!c.buyPart(PartCat::Tires, 2, &why) && why == "ZATEN TAKILI", "ayni parca tekrar alinmaz");
     c.buyPart(PartCat::FinalDrive, 1); c.buyPart(PartCat::Turbo, 1); c.buyPart(PartCat::Diff, 1); c.buyPart(PartCat::Fuel, 2);
-    CHECK(c.car().tune.finalDrive > 3.73 * 1.1 && c.car().tune.fuel == FuelType::E85, "son disli ve E85 dogru uygulandi");
+    { VehicleSimConfig vc; vc.car = findVehicle(227); vc.tune = &c.car().tune; const VehicleSim vs(vc);
+      CHECK(vs.gearboxSpec().finalDrive > 3.73 * 1.1 && c.car().tune.fuel == FuelType::E85, "son disli ve E85 dogru uygulandi"); }
     // Kompresorlu motor (Hellcat #280 civari): turbo kiti yok
     int scCar = 0;
     for (const auto& v : vehicleCatalog()) if (engineTable()[v.engine].induction == Induction::Supercharger) { scCar = v.id; break; }
@@ -85,7 +87,7 @@ int main() {
         Career f;
         const bool okf = Career::parse(body + cs, f);
         const Tune& t = okf ? f.car().tune : Tune{};
-        CHECK(okf && f.money == 0 && f.current == 0 && (int)t.tires == 2 && t.clutch == 3 && t.turbo == 2 && t.psi == 45.0,
+        CHECK(okf && f.money == 0 && f.current == 0 && (int)t.tires == 2 && t.clutch == 9 && t.turbo == 9 && t.psi == 45.0,
               "negatif para 0, seviyeler en yuksek gecerli degere kirpildi");
     }
 
