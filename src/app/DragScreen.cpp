@@ -46,6 +46,7 @@ void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
+    race_->setOpponentHandicap(true);                    // rakip insan gibi hata yapar (manuel debriyaj avantajli)
     rewarded_ = false; prize_ = 0;
     smoke_.clear(); ticker_.clear(); touches_.clear();
     clutchUi_ = throttleUi_ = 0; brakeBtn_ = false;

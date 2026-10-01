@@ -311,7 +311,7 @@ Opponent Career::pickOpponentFor(uint32_t seed) const {
     const double pe = estimatedEt(pv, oc.tune);
     uint32_t x = seed * 2654435761u + 0x9E3779B9u; x ^= x >> 15;
     const double jitter = ((x >> 8) % 1000) / 1000.0 * 0.16 - 0.08;
-    const double target = pe + 0.20 - 0.10 * std::clamp(form, -3, 3) + jitter;
+    const double target = pe + 0.05 - 0.10 * std::clamp(form, -3, 3) + jitter;   // rakip yarista hata payli (DragRace)
     struct Cand { int id, preset; double et; };
     static std::vector<Cand> all;
     if (all.empty())

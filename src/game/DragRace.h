@@ -54,6 +54,7 @@ struct LaneState {
     // Yapay zeka
     double aiFoot = 1.0, aiReaction = 0.15, aiFeatherT = 0.0;
     double aiLaunchRpm = -1.0, aiRelease = 0.12;   // kalkis plani (-1: henuz planlanmadi)
+    double aiSlow = 1.0;                            // hata payi: debriyaj birakma ve H-desen vites suresi carpani
     std::shared_future<LaunchPlan> plan;            // arka planda hesaplanan plan (rakip seridi)
     double autoRelease = -1;             // DCT launch: fren birakma ani (debriyaj rampasi icin)
     bool   grind = false;                // H-desende debriyajsiz vites denemesi (dis citirtisi)
@@ -81,6 +82,9 @@ public:
     void setPlayerAutopilot(bool on) { autopilot_ = on; }
     void setPlayerTractionControl(bool on) { lanes_[0].sim->setTractionControl(on); }   // aracta TC varsa    // oyuncu serdini yapay zeka surer (tanitim / test)
     TreeType tree() const { return tree_; }
+    // Rakibe insan hata payi (kariyer): otomatik debriyajli oyuncu gibi gec tepki, yavas debriyaj ve vites.
+    // Boylece manuel debriyaji iyi kullanan oyuncu avantajli (kullanici istegi). Plan / ET tablosu etkilenmez.
+    void setOpponentHandicap(bool on);
 
     using LaunchPlan = zk::LaunchPlan;
     static LaunchPlan planLaunch(const VehicleDef* car, const Tune* tune);

@@ -26,6 +26,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     if (mode == Mode::Race || mode == Mode::Karma) {
         // Rakip yan seritte, ayni cizgide
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
+        rival_->slowClutch = true;                   // otomatik debriyajli oyuncu gibi gec kavrar (hata payi)
         phase_ = Phase::Countdown; countdown_ = 3.0;
         if (mode == Mode::Karma) {
             // Drag kalkisi: kalkis devri kirmizi cizginin %30'u (acik yolda olculdu: 0/30/40/50/60% arasinda en iyi

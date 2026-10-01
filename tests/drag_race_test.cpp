@@ -199,6 +199,20 @@ int main() {
         const double ms2 = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
         CHECK(ms2 < 5.0, "ikinci cagri onbellekten");
     }
+    std::printf("[10] Rakip hata payi (kariyer): otomatik debriyajli oyuncu gibi, yaris suresi uzar\n");
+    {
+        double t[2];
+        for (int h = 0; h < 2; ++h) {
+            DragRace r(227, 227, TreeType::Pro, 11, false, nullptr, nullptr);
+            if (h) r.setOpponentHandicap(true);
+            r.setPlayerAutopilot(true);
+            PlayerControls pc; double tt = 0;
+            while (r.phase() != RacePhase::Finished && tt < 60) { r.advance(1.0 / 60.0, pc); tt += 1.0 / 60.0; }
+            t[h] = r.lane(1).slip.reaction + r.lane(1).slip.quarter;
+        }
+        std::printf("    Mustang rakip: kusursuz %.3f s, hata payli %.3f s (tepki + ET)\n", t[0], t[1]);
+        CHECK(t[1] > t[0] + 0.15, "hata payli rakip belirgin yavas");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

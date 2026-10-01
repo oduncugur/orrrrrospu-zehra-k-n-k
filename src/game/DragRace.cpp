@@ -159,6 +159,12 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
     pt.setClutchPedal(clutch);
 }
 
+void DragRace::setOpponentHandicap(bool on) {
+    LaneState& L = lanes_[1];
+    L.aiSlow = on ? 1.6 : 1.0;                                            // otomatik debriyaj cezasiyla ayni (RoadCar slowClutch)
+    if (on) L.aiReaction = 0.18 + (rnd() % 1000) / 1000.0 * 0.17;          // .180 - .350 (insan)
+}
+
 void DragRace::aiDrive(LaneState& L, VehicleInputs& in) {
     PowertrainCore& pt = L.sim->powertrain();
     const Gearbox box = L.sim->gearboxType();
@@ -196,7 +202,7 @@ void DragRace::aiRun(LaneState& L, double t) {
     pt.setTwoStep(false, 0.0);
     // Kalkis: manuel/dogbox plandaki surede debriyaj birakma (pedal 1 -> 0; kavrama bolgesi bunun ~%30'u),
     // DCT launch control 150 ms rampa (oyuncuyla ayni), otomatik konvertor
-    double clutch = tc ? 0.0 : std::max(0.0, 1.0 - t / (box == Gearbox::DCT ? 0.15 : L.aiRelease));
+    double clutch = tc ? 0.0 : std::max(0.0, 1.0 - t / (box == Gearbox::DCT ? 0.15 : L.aiRelease * L.aiSlow));
     const double kap = 0.5 * (L.sim->wheel(L.sim->drivenLeft()).kappa() + L.sim->wheel(L.sim->drivenRight()).kappa());
     if (t > 0.12) L.aiFoot = std::clamp(L.aiFoot + kStep * 8.0 * (0.12 - kap), pt.rpm() < 5500.0 ? 1.0 : 0.35, 1.0);
     double thr = L.aiFoot;
@@ -228,10 +234,11 @@ void DragRace::aiRun(LaneState& L, double t) {
         if (box == Gearbox::Dogbox) { thr = 0.0; L.cutIgnition = true; }
         L.shiftT += kStep;
         if (L.shiftT > dur) L.shiftT = -1.0;
-    } else if (L.shiftT >= 0.0) {                                       // H-desen: ~270 ms
-        if (L.shiftT < 0.10)      { clutch = 1.0; thr = 0.0; }
-        else if (L.shiftT < 0.17) { clutch = 1.0; thr = 0.3; if (L.shiftT - kStep < 0.10) pt.setGear(pt.gear() + 1); }
-        else if (L.shiftT < 0.27) { clutch = 1.0 - (L.shiftT - 0.17) / 0.10; }
+    } else if (L.shiftT >= 0.0) {                                       // H-desen: ~270 ms (hata payiyla x aiSlow)
+        const double k = L.aiSlow;
+        if (L.shiftT < 0.10 * k)      { clutch = 1.0; thr = 0.0; }
+        else if (L.shiftT < 0.17 * k) { clutch = 1.0; thr = 0.3; if (L.shiftT - kStep < 0.10 * k) pt.setGear(pt.gear() + 1); }
+        else if (L.shiftT < 0.27 * k) { clutch = 1.0 - (L.shiftT - 0.17 * k) / (0.10 * k); }
         else L.shiftT = -1.0;
         if (L.shiftT >= 0.0) L.shiftT += kStep;
     }
