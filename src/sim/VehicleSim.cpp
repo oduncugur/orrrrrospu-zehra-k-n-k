@@ -90,23 +90,30 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         }
         const double ic = row(intercoolerTable(), tune->intercooler).eff;
         const TurbineOpt& TB = row(turbineTable(), tune->turbine);
+        boostFac_ = boostTot_ = ed ? ed->boostBar : 0.0;
+        icCredit_ = (ic - 1.0) * 60.0;                                         // soguk sarj: 1.12 -> ~7 oktan
+        ecuAgg_ = boostFac_ > 0 || tune->turbo > 0 || tune->superch > 0 ? (EC.forced - 1.0) * 20.0 : (EC.na - 1.0) * 30.0;
+        knockSensor_ = !(tune->ecu == 4 || tune->ecu == 9);                    // standalone / yaris haritasi: koruma yok
         const double gate = row(wastegateTable(), tune->wastegate).mul * (1.0 + row(boostCtlTable(), tune->boostCtl).extra);
         if (tune->turbo > 0) {
             const TurboOpt T = tune->turbo == kCustomTurbo ? customTurbo(*tune) : row(turboTable(), tune->turbo);
             const double baseBoost = ed ? ed->boostBar : 0.0;
             const double add = (tune->turbine || tune->wastegate || tune->boostCtl) ? T.bar * ic * TB.top * gate : T.bar * ic;
+            boostTot_ = baseBoost + add / ic;
             TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (T.spoolLo - EC.spool + TB.spool),
                        eng_.redlineRpm * (T.spoolHi - EC.spool + TB.spool)};
             scaleCurves(eng_, turboMul, &t);
         } else if (ed && ed->boostBar > 0.0 && (tune->turbine || tune->wastegate || tune->boostCtl)) {
             // Fabrika turbosu: wastegate / boost kontrol / turbin fabrika boostunu yukseltir (spool fabrika egrisinde)
             const double b0 = ed->boostBar, b1 = b0 * gate * TB.top * ic;
+            boostTot_ = b1 / ic;
             TurboCtx t{(1.0 + b1) / (1.0 + b0), eng_.redlineRpm * (0.25 + TB.spool), eng_.redlineRpm * (0.45 + TB.spool)};
             scaleCurves(eng_, turboMul, &t);
         }
         if (tune->superch > 0) {
             const SuperOpt& S = row(superTable(), tune->superch);
             SuperCtx sc{red0, ed ? ed->boostBar : 0.0, S.bar * ic, S.type};
+            boostTot_ += S.bar;
             scaleCurves(eng_, superMul, &sc);
         }
         const CamOpt C = tune->cam == kCustomCam ? customCam(*tune) : row(camTable(), tune->cam);
@@ -172,6 +179,13 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         if (tune && tune->oil > 0) coolCap_ *= 1.06;                          // yag sogutucu / genis karter
     }
     pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
+    tmax_ = std::max(1.0, Tmax);
+    if (car && tune) {   // oktan: secilen yakit; istenen: fabrika ~90 + sikistirma + fabrika ustu boost + ECU - ara sogutucu
+        static const double kOct[10] = {100, 95, 105, 98, 102, 104, 110, 116, 101, 112};
+        octane_ = tune->fuelSel > 0 && tune->fuelSel < 10 ? kOct[tune->fuelSel]
+                : tune->fuel == FuelType::Pump95 ? 95.0 : tune->fuel == FuelType::E85 ? 105.0 : 100.0;
+        knockReq_ = 90.0 + 2.2 * (pt_->compressionRatio() - 10.5) + 8.0 * std::max(0.0, boostTot_ - boostFac_) + ecuAgg_ - icCredit_;
+    }
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[gbIdx].type : Gearbox::HPattern;
     // ABS / TC: fabrika donanimi ya da ECU kiti; yalniz oyun kurulumunda (tune var)
@@ -328,6 +342,20 @@ void VehicleSim::updateHeatAndStress(double dt) {
     heatLim_ = coolT_ > 108.0 ? std::clamp(1.0 - (coolT_ - 108.0) * 0.025, 0.55, 1.0) : 1.0;
     if (coolT_ > 125.0) stress_ += dt * 0.02 * (coolT_ - 125.0);
     teF_ += (pt.engineTorque() - teF_) * std::min(1.0, dt / 0.12);
+    {   // Vuruntu: yuksek yukte oktan acigi. Sensorlu ECU %2.5/oktan avans geri ceker; korumasiz ECU motoru dover
+        const double deficit = knockReq_ + std::max(0.0, coolT_ - 100.0) * 0.25 - octane_;
+        const double load = teF_ / tmax_;
+        knockNow_ = deficit > 0.0 && load > 0.6 && pt.rpm() > 2000.0 && !engBlown_;
+        double target = 1.0;
+        if (knockNow_) {
+            const double sev = deficit * std::min(1.0, (load - 0.6) / 0.4);
+            if (knockSensor_) target = std::clamp(1.0 - 0.025 * sev, 0.65, 1.0);
+            else stress_ += dt * 0.006 * sev;
+            if (!knockWarned_) { knockWarned_ = true; failEvents_.push_back(knockSensor_ ? "VURUNTU: ECU AVANSI GERI CEKTI (OKTAN DUSUK)" : "VURUNTU! MOTOR DOVULUYOR (OKTAN DUSUK)"); }
+        }
+        knockLim_ += (target - knockLim_) * std::min(1.0, dt / (target < knockLim_ ? 0.15 : 1.5));
+        heatLim_ *= knockLim_;
+    }
     if (engRating_ > 0 && teF_ > engRating_ && !engBlown_) stress_ += dt * 0.6 * (teF_ / engRating_ - 1.0);
     if (gbRating_ > 0 && teF_ > gbRating_ && !gbBroken_) gbStress_ += dt * 0.8 * (teF_ / gbRating_ - 1.0);
     if (stress_ >= 1.0 && !engBlown_) { engBlown_ = true; failEvents_.push_back("MOTOR PATLADI! (BIYEL / PISTON)"); }

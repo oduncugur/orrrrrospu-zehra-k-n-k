@@ -96,6 +96,7 @@ private:
 struct TuneStats {
     double hp = 0, nm = 0, idx = 0, axleRisk = 0, mass = 0, redline = 7000;
     double engineLoad = 0, gearboxLoad = 0, heatLoad = 0;
+    double octane = 100, octaneReq = 0;          // yakit oktani / motorun istedigi (vuruntu)
     std::vector<std::pair<double, double>> hpCurve;
 };
 TuneStats tuneStats(const VehicleDef& v, const Tune& t);

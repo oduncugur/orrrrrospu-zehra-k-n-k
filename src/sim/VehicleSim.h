@@ -124,6 +124,11 @@ public:
     double downforceN() const { return dfK_ * speed() * speed(); }
     // Motor isisi (C) ve zorlanma: 0..1 (1 = patladi / kirildi); dayanim N*m
     double coolantC() const { return coolT_; }
+    // Vuruntu: yakitin oktani, motorun istedigi oktan (boost, sikistirma, ECU haritasi, ara sogutucu; sicakta artar).
+    // Yetmezse vuruntu sensorlu ECU avansi geri ceker (guc duser); STANDALONE / YARIS HARITASI korumaz -> motor hasari.
+    double octane() const { return octane_; }
+    double octaneRequired() const { return knockReq_; }
+    bool knocking() const { return knockNow_; }
     double engineStress() const { return std::min(1.0, stress_); }
     double gearboxStress() const { return std::min(1.0, gbStress_); }
     bool engineBlown() const { return engBlown_; }
@@ -138,6 +143,8 @@ private:
     void updateNitrous(double dt);
     void updateHeatAndStress(double dt);
     double coolCap_ = 0, coolLow_ = 0.4, coolT_ = 88.0, heatLim_ = 1.0, teF_ = 0, stress_ = 0, gbStress_ = 0;
+    double octane_ = 100, knockReq_ = 0, knockLim_ = 1.0, tmax_ = 1.0, boostTot_ = 0, boostFac_ = 0, icCredit_ = 0, ecuAgg_ = 0;
+    bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;
     std::vector<std::string> failEvents_;

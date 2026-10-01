@@ -90,6 +90,26 @@ int main() {
         std::printf("    ayni arac yaris sogutma: su %.0f C\n", h2.coolantC());
         CHECK(h.coolantC() > T0 + 5 && h2.coolantC() < h.coolantC() - 5, "sogutma yukseltmesi motoru serin tutar");
     }
+    std::printf("[3b] Vuruntu: oktan / boost / ECU korumasi\n");
+    {
+        Tune k95; k95.turbo = 2; k95.fuelSel = 1; k95.clutch = 9; k95.axles = 9; k95.tireSel = 25; k95.tires = TireType::DragSlick;
+        k95.piston = 9; k95.rod = 9; k95.crank = 4; k95.bearing = 9; k95.gbStrength = 9;
+        Tune k116 = k95; k116.fuelSel = 7;
+        Tune stock;
+        RoadCar* a = runWot(sahin, k95, 10.0); RoadCar* b = runWot(sahin, k116, 10.0); RoadCar* c = runWot(sahin, stock, 3.0);
+        std::printf("    95 oktan: istenen %.1f, vuruntu %d, %.1f m/s | 116 oktan: istenen %.1f, %.1f m/s | stok istenen %.1f / %.0f\n",
+                    a->sim().octaneRequired(), a->sim().knocking() ? 1 : 0, a->sim().speed(), b->sim().octaneRequired(), b->sim().speed(),
+                    c->sim().octaneRequired(), c->sim().octane());
+        CHECK(a->sim().octaneRequired() > 95.0 && b->sim().octaneRequired() < 116.0, "buyuk turbo 95 oktana fazla, 116 yeter");
+        CHECK(c->sim().octaneRequired() < 95.0, "stok motor pompa benzinine razi");
+        CHECK(b->sim().speed() > a->sim().speed() + 0.3, "vuruntuda ECU avansi ceker: dusuk oktan yavas");
+        Tune sa = k95; sa.ecu = 4;                       // standalone: vuruntu korumasi yok
+        Tune sb = k116; sb.ecu = 4;
+        RoadCar* d = runWot(sahin, sa, 12.0); RoadCar* e = runWot(sahin, sb, 12.0);
+        std::printf("    standalone stres: 95 oktan %.3f, 116 oktan %.3f\n", d->sim().engineStress(), e->sim().engineStress());
+        CHECK(d->sim().engineStress() > e->sim().engineStress() + 0.02, "korumasiz ECU + dusuk oktan motoru dover");
+        delete a; delete b; delete c; delete d; delete e;
+    }
     std::printf("[4] Atolye ve kayit\n");
     {
         Career c = Career::newGame();

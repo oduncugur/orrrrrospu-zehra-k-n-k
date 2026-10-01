@@ -52,6 +52,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
     const NosOpt& n = nosTable()[std::clamp(t.nitrous, 0, (int)nosTable().size() - 1)];
     s.idx = performanceIndex(v, t);
     s.mass = sim.baseMassKg();
+    s.octane = sim.octane(); s.octaneReq = sim.octaneRequired();
     const double peakT = s.nm + (n.hp > 0 ? n.hp * 7120.9 / 4000.0 : 0.0);   // nitro tepe tork (~4000 rpm)
     s.engineLoad = peakT / std::max(1.0, sim.engineRatingNm());
     s.gearboxLoad = peakT / std::max(1.0, sim.gearboxRatingNm());
@@ -143,8 +144,13 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
     }
     if (prev_.engineLoad > 1.0) r.text(180, py + 70, "MOTOR DAYANMAZ!", 1, down);
     else if (prev_.gearboxLoad > 1.0) r.text(180, py + 70, "SANZIMAN DAYANMAZ!", 1, down);
+    else if (prev_.octaneReq > prev_.octane) r.text(180, py + 70, "VURUNTU! OKTAN", 1, down);
     else if (prev_.heatLoad > 1.15) r.text(180, py + 70, "SOGUTMA YETMEZ", 1, kUiGold);
-    r.text(16, py + 82, "(YUZDE: TEPE TORK / DAYANIM, GUC / SOGUTMA)", 1, {0.45f, 0.48f, 0.55f});
+    {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
+        char t[64]; std::snprintf(t, sizeof t, "OKTAN %.0f / ISTENEN %.0f", prev_.octane, prev_.octaneReq);
+        const Color oc = prev_.octaneReq > prev_.octane ? down : prev_.octaneReq > prev_.octane - 3 ? kUiGold : Color{0.45f, 0.48f, 0.55f};
+        r.text(16, py + 82, t, 1, oc);
+    }
 }
 
 void PartsScreen::render(Renderer& r) {
