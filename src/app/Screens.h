@@ -129,7 +129,7 @@ private:
     void drawPreview(Renderer& r, float py);
     void recompute();
     void select(int option);
-    void buySelected();
+    void buySelected(bool used = false);
     void tap(float x, float y);
     App& app_;
     int tab_ = 0, cat_ = -1, sel_ = -1;

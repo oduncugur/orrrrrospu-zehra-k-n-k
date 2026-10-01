@@ -17,6 +17,7 @@ namespace {
 constexpr double kHpK = 2.0 * 3.14159265358979 / 60.0 / 745.7;
 const Rect kBackP{8, 596, 352, 634};
 const Rect kYesP{8, 548, 176, 590}, kNoP{184, 548, 352, 590};
+const Rect kNewP{8, 548, 124, 590}, kUsedP{128, 548, 244, 590}, kNo3P{248, 548, 352, 590};   // yeni / ikinci el / vazgec
 constexpr float kListY0 = 132, kListY1 = 446, kRowH = 40;
 
 std::vector<std::pair<double, double>> effCurve(const EngineSpec& e) {
@@ -218,21 +219,37 @@ void PartsScreen::render(Renderer& r) {
         }
         if (sel_ >= 0) drawPreview(r, 450);
         if (confirm_ && sel_ >= 0) {
-            char t[64]; std::snprintf(t, sizeof t, "SATIN AL %s?", money(partPrice(c, sel_, v)).c_str());
-            r.rect(0, 544, 360, 596, {0.03f, 0.03f, 0.05f, 0.95f});
-            button(r, kYesP, std::string("EVET ") + money(partPrice(c, sel_, v)), kUiGreen, 2);
-            button(r, kNoP, "VAZGEC", kUiRed, 2);
+            r.rect(0, 540, 360, 596, {0.03f, 0.03f, 0.05f, 0.95f});
+            const int np = partPrice(c, sel_, v);
+            if (usedAvailable(c, sel_) && np > 0) {                       // yeni / ikinci el
+                button(r, kNewP, "YENI", kUiGreen, 2);
+                r.textCentered(kNewP.cx(), kNewP.y1 - 11, money(np), 1, {0.85f, 1.0f, 0.85f});
+                button(r, kUsedP, "2. EL", {0.55f, 0.40f, 0.12f}, 2);
+                r.textCentered(kUsedP.cx(), kUsedP.y1 - 11, money(usedPrice(np)) + " YIPRANMIS", 1, {1.0f, 0.9f, 0.7f});
+                button(r, kNo3P, "VAZGEC", kUiRed, 2);
+            } else {
+                button(r, kYesP, std::string("EVET ") + money(np), kUiGreen, 2);
+                button(r, kNoP, "VAZGEC", kUiRed, 2);
+            }
+            const int old = partLevel(oc.tune, c, v);
+            if (old > 0 && old != customOption(c)) {
+                char t[64]; std::snprintf(t, sizeof t, "ESKI PARCA SATILIR: +%s", money((long)partPrice(c, old, v) * 35 / 100 / 10 * 10).c_str());
+                r.textCentered(180, 532, t, 1, {0.6f, 0.85f, 0.65f});
+            }
         } else if (sel_ >= 0) r.textCentered(180, 566, "TEKRAR DOKUN: SATIN AL", 1, {0.7f, 0.75f, 0.9f});
         button(r, kBackP, "< KATEGORILER", kUiBtn, 2);
     }
     if (msgT_ > 0) { r.rect(0, 500, 360, 528, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 507, msg_, 2, kUiGold); }
 }
 
-void PartsScreen::buySelected() {
+void PartsScreen::buySelected(bool used) {
     const PartCat c = (PartCat)cat_;
     std::string why;
-    if (app_.career.buyPart(c, sel_, &why)) {
-        msg_ = std::string(partOptions(c)[sel_].name).substr(0, 22) + " TAKILDI"; msgT_ = 1.8;
+    long back = 0;
+    if (app_.career.buyPart(c, sel_, &why, used, &back)) {
+        msg_ = std::string(partOptions(c)[sel_].name).substr(0, 18) + (used ? " (2. EL)" : " TAKILDI");
+        if (back > 0) msg_ += " +" + money(back);
+        msgT_ = 2.0;
         app_.saveCareer();
         recompute();
     } else { msg_ = why; msgT_ = 1.8; confirm_ = false; }
@@ -240,8 +257,16 @@ void PartsScreen::buySelected() {
 
 void PartsScreen::tap(float x, float y) {
     if (cat_ >= 0 && confirm_ && sel_ >= 0) {
-        if (kYesP.hit(x, y)) { buySelected(); return; }
-        if (kNoP.hit(x, y)) { confirm_ = false; return; }
+        const OwnedCar& o = app_.career.car();
+        const bool usedOk = usedAvailable((PartCat)cat_, sel_) && partPrice((PartCat)cat_, sel_, *findVehicle(o.carId)) > 0;
+        if (usedOk) {
+            if (kNewP.hit(x, y)) { buySelected(false); return; }
+            if (kUsedP.hit(x, y)) { buySelected(true); return; }
+            if (kNo3P.hit(x, y)) { confirm_ = false; return; }
+        } else {
+            if (kYesP.hit(x, y)) { buySelected(false); return; }
+            if (kNoP.hit(x, y)) { confirm_ = false; return; }
+        }
     }
     if (kBackP.hit(x, y)) { if (cat_ >= 0) { cat_ = -1; sel_ = -1; confirm_ = false; } else app_.goGarage(); return; }
     const OwnedCar& oc = app_.career.car();
@@ -273,7 +298,8 @@ void PartsScreen::tap(float x, float y) {
     if (!partAvailable(c, i, v, &why, &oc.tune)) { msg_ = why; msgT_ = 1.8; return; }
     if (sel_ != i) select(i);
     else {
-        if (app_.career.money < partPrice(c, i, v)) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
+        const int np = partPrice(c, i, v);
+        if (app_.career.money < (usedAvailable(c, i) ? usedPrice(np) : np)) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
         confirm_ = true;
     }
 }

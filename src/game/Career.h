@@ -45,6 +45,9 @@ enum class PartCat {
 constexpr int kPartTabs = 5;
 const char* partTabName(int tab);
 int  partTab(PartCat c);
+bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
+int  usedPrice(int newPrice);               // %55
+void applyUsedWear(Tune& t, PartCat c);     // ikinci el parcanin yipranmasi
 // Atolyede (ozel uretim) uretilebilen kategori ve ozel satir indeksi (-1: yok)
 int  customOption(PartCat c);
 
@@ -136,7 +139,9 @@ struct Career {
     // Islemler (basarisizsa false + neden)
     bool buyCar(int carId, std::string* why = nullptr);
     bool sellCurrent(std::string* why = nullptr);
-    bool buyPart(PartCat c, int level, std::string* why = nullptr);
+    // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).
+    // Sokulen eski (stok olmayan) parca %35'e satilir: refund (verildiyse) ciktisi.
+    bool buyPart(PartCat c, int level, std::string* why = nullptr, bool used = false, long* refund = nullptr);
     bool buyJunk(const JunkCar& j, std::string* why = nullptr);
     bool restoreStep(int comp, std::string* why = nullptr);  // secili arac: bir restorasyon adimi
     // prizeScale: yaris uzunluguna gore odul carpani (karma uzun yol), tekrar-galibiyet azalmasindan sonra uygulanir

@@ -213,6 +213,22 @@ int main() {
         Career d;
         CHECK(Career::parse(c.serialize(), d) && d.achieved == c.achieved, "basarimlar kayitta");
     }
+    std::printf("[U] Ikinci el parca + eski parca satisi\n");
+    {
+        Career c = Career::newGame();
+        c.money = 100000; c.dailyDay = todayIndex(); c.dailyDone = 7;   // gunluk gorev odulu karismasin
+        const VehicleDef& v = *findVehicle(c.car().carId);
+        const int p3 = partPrice(PartCat::Brakes, 3, v), p4 = partPrice(PartCat::Brakes, 4, v);
+        long back = -1; std::string why;
+        long m0 = c.money;
+        CHECK(c.buyPart(PartCat::Brakes, 3, &why, true, &back) && c.money == m0 - usedPrice(p3) && back == 0, "ikinci el fren %55");
+        CHECK(std::fabs(c.car().tune.wearBrakes - 0.25) < 1e-9, "ikinci el fren yipranmis gelir");
+        m0 = c.money;
+        CHECK(c.buyPart(PartCat::Brakes, 4, &why, false, &back) && back == (long)p3 * 35 / 100 / 10 * 10 && c.money == m0 - p4 + back,
+              "yeni parca: eskisi %35'e satilir");
+        CHECK(!c.buyPart(PartCat::Gearbox, 2, &why, true) && why == "IKINCI EL YOK", "aktarma parcasi ikinci el yok");
+        CHECK(c.buyPart(PartCat::Tires, 5, &why, true) && c.car().tune.wearTires >= 0.40, "ikinci el lastik yarim dis");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

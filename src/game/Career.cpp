@@ -388,17 +388,50 @@ bool Career::sellCurrent(std::string* why) {
     return true;
 }
 
-bool Career::buyPart(PartCat c, int level, std::string* why) {
+bool usedAvailable(PartCat c, int level) {
+    if (partTab(c) == 2 || level <= 0 || level == customOption(c)) return false;   // aktarma: ikinci el yok
+    return true;
+}
+int usedPrice(int newPrice) { return newPrice * 55 / 100 / 10 * 10; }
+void applyUsedWear(Tune& t, PartCat c) {
+    auto add = [](double& w, double d) { w = std::clamp(w + d, 0.0, 1.0); };
+    switch (c) {
+    case PartCat::Tires: t.wearTires = std::max(t.wearTires, 0.40); return;          // yarim dis
+    case PartCat::Brakes: add(t.wearBrakes, 0.25); return;
+    case PartCat::Suspension: add(t.wearSusp, 0.20); return;
+    case PartCat::Rims: case PartCat::Weight: case PartCat::Aero: add(t.wearBody, 0.08); return;
+    default: break;
+    }
+    switch (partTab(c)) {
+    case 0: add(t.wearEngine, 0.10); break;                                       // motor ic aksami
+    case 1: add(t.wearEngine, 0.06); break;                                       // besleme
+    case 4: add(t.wearElec, 0.08); break;                                         // ecu / sogutma
+    default: break;
+    }
+}
+
+bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* refund) {
     OwnedCar& oc = car();
     const VehicleDef& v = *findVehicle(oc.carId);
+    if (refund) *refund = 0;
     if (level < 0 || level >= (int)partOptions(c).size()) { if (why) *why = "GECERSIZ"; return false; }
     if (partLevel(oc.tune, c, v) == level) { if (why) *why = "ZATEN TAKILI"; return false; }
     if (!partAvailable(c, level, v, why, &oc.tune)) return false;
-    const int p = partPrice(c, level, v);
+    if (used && !usedAvailable(c, level)) { if (why) *why = "IKINCI EL YOK"; return false; }
+    const int p = used ? usedPrice(partPrice(c, level, v)) : partPrice(c, level, v);
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
+    const int old = partLevel(oc.tune, c, v);
+    const int oldPrice = old > 0 && old != customOption(c) ? partPrice(c, old, v) : 0;
     money -= p;
     oc.paidParts += p;
+    if (oldPrice > 0) {                                                       // sokulen parca satilir
+        const long back = (long)oldPrice * 35 / 100 / 10 * 10;
+        money += back;
+        oc.paidParts = std::max(0, oc.paidParts - oldPrice);
+        if (refund) *refund = back;
+    }
     setPartLevel(oc.tune, c, level, v);
+    if (used) applyUsedWear(oc.tune, c);
     dailyAdd(TaskType::BuyParts, 1);
     return true;
 }
