@@ -89,3 +89,81 @@ oyun içi ekran görüntüsü/ölçüm ile doğrulanır, CI yeşil ve indirme li
 - [x] FPS sınırı (ölçüldü: 30/60/144 hedefe ±%0.5), dikey eşitleme (sürücü reddederse yazılımla ekran hızına sınır),
   FPS göstergesi, tam ekran, tam sayı ölçek, ses kanalları, titreşim, eğim, sürüş yardımı/vites varsayılanı,
   km/h-mph, drag ağacı (`tests/settings_test`)
+
+## Genel: Kontroller, karma yarış, ABS/TC (yapıldı, ara taslak)
+- [x] Yol ekranı yatay/dikey, analog gaz/fren/debriyaj, şanzımana göre vites kolu (H-desen / P-N-D / sıralı)
+- [x] Debriyaj modu: oyuncu / otomatik (bedeli: virajda vites yok, geç kavrama, ödül %75)
+- [x] ABS / TC yalnız gerçekte olan araçlarda; olmayana ECU + ELEKTRONİK parçası (`tests/electronics_test`)
+- [x] Karma yarış: düzde drag görünümü, virajlı bölümde 3B sürüş, tek yarışta (`tests/road_test` [8])
+- [ ] Karma: kalkışta drag ağacı, mesafeye göre ödül, YZ'nin düzlükte drag kalkış planı
+
+---
+
+# SIRADAKİ PLAN (kullanıcı onayıyla, "söyleyince" başlanacak)
+Sıra: **1) Oyun döngüsü / kariyer yapısı → 2) Harita detayı → 3) Görsel + ses.** Modifiye derinliği bunlarla
+birlikte, parça parça eklenir. Her madde fizikte gerçek bir etkiyle gelir ve testle kilitlenir.
+
+## 1. Oyun döngüsü / kariyer yapısı
+- [ ] Hedef ve ilerleme: ligler / şehir bölgeleri (mahalle → şehir → şehirlerarası → dağ → pist), kilitli araçlar/parçalar
+- [ ] Rakipler: isimli rakipler ve "patron" yarışları, rakibin bilinen arabası ve parça seti, tekrar maçı
+- [ ] Yarış takvimi / "sıradaki yarış" önerisi; günlük/haftalık etkinlikler
+- [ ] İtibar (ün) puanı: kazanınca artar, yeni yarışlar ve satıcılar açılır
+- [ ] Ekonomi dengesi oyun testiyle (ödül, parça, tamir, yakıt); ikinci el parça alım-satım
+- [ ] Bahisli yarış, pink slip (arabasına yarış) — Faz 7 öncesi tek oyunculu sürüm
+
+## 2. Harita detayı ("dümdüz boşlukta yarış yok")
+- [ ] Ortamlar: şehir içi (binalar, kavşak, kaldırım, sokak lambası), şehirlerarası (bariyer, tabela, köprü, tünel,
+      gişe), dağ yolu (kaya duvar, uçurum bariyeri, viraj levhaları), sahil yolu, sanayi bölgesi
+- [ ] Yol detayları: şerit çizgileri, kasis, rögar, yama asfalt, ıslak zemin/su birikintisi (tutuş), toprak banket
+- [ ] Gün saati ve hava: gece (far, sokak lambası), yağmur (tutuş düşer), sis
+- [ ] Mesafe hissi: dağ/silüet katmanları, ağaç ve bina yoğunluğu, kilometre taşları
+- [ ] Bölge haritası ekranı: yarışların yeri, garaj, parça dükkânı, galeri, dyno
+
+## 3. Görsel + ses
+- [ ] Araç modelleri (kullanıcı isteğiyle en sona): daha doğru kasa, jant, far/stop, kapı çizgileri
+- [ ] Kişiselleştirme görselleri: boya, jant, body kit, kanat, sticker, cam filmi, yükseklik
+- [ ] Efektler: duman, kıvılcım, egzoz alevi (anti-lag/patlama), hız bulanıklığı, kamera sarsıntısı
+- [ ] Ses: motor sesleri kulakla ayar (v2 geri bildirimi bekliyor), turbo/BOV, vites, lastik, rüzgâr, çarpışma, ortam
+
+## Modifiye listesi (motor swap ve benzeri; kullanıcı isteği)
+### Motor
+- [ ] **Motor swap**: kataloğun 280 motorundan farklı araca motor nakli (motor takozu/kablaj kiti, ağırlık ve
+      ağırlık dağılımı değişir, şanzıman uyumu/adaptör plakası, soğutma yeterliliği)
+- [ ] **Frankenstein (blok + kapak)**: farklı blok ve silindir kapağı birleştirme (ör. B18 blok + B16 kapak);
+      hacim, sıkıştırma oranı, kam/supap uyumu fizikte (şartname Faz 3.5)
+- [ ] Motor revizyonu / stroker: hacim büyütme (strok/çap), dövme piston-biyel (devir ve boost sınırı)
+- [ ] Kam mili profilleri (rölanti kalitesi ↔ üst devir gücü), supap yayları ve devir sınırı yükseltme
+- [ ] Silindir kapağı porting/polish, büyük supap, ITB dönüşümü (gaz tepkisi + ses)
+- [ ] Sıkıştırma oranı / kapak contası kalınlığı (vuruntu riski, yakıt oktanıyla ilişkili)
+- [ ] Hafif volan (devir hızlı yükselir, rölanti/kalkış zorlaşır), dengeli krank
+- [ ] Yağ sistemi: yağ soğutucu, karter bafılı, kuru karter (var)
+- [ ] Soğutma: radyatör, termostat, fan (motor ısısı — Faz 6)
+### Aşırı besleme ve yakıt
+- [ ] Turbo seçimi: boyut (spool ↔ tepe güç), twin/sıralı turbo, ball-bearing, wastegate ve boost kontrolcüsü,
+      vitese göre boost, blow-off valfi (ses), intercooler (ısı emme — Faz 6), su/metanol püskürtme
+- [ ] Kompresör kiti: roots / twin-screw / santrifüj (anlık tork ↔ üst devir)
+- [ ] Nitro (NOS): kuru / ıslak / kademeli, şişe basıncı ve ısısı, devir/vites penceresi, motor hasarı riski
+- [ ] Yakıt sistemi: enjektör, pompa, regülatör, E85 / yarış benzini (kısmen var), flex-fuel
+### ECU ve elektronik
+- [ ] ECU harita ekranı: 16×16 AFR ve avans tablosu, vuruntu (Faz 6), devir sınırı, kesici tipi
+- [ ] Launch control / 2-step ayarı, anti-lag (egzoz patlamaları, turbo ömrü), flat-shift (gazı kesmeden vites)
+- [ ] ABS / TC (var), shift light, datalogger (yarış sonrası telemetri grafiği)
+### Aktarma
+- [ ] **Şanzıman swap**: H-desen → sıralı dogbox / DCT, 5 → 6 vites, otomatik → manuel dönüşümü
+- [ ] Vites oranlarını tek tek ayarlama (yakın oranlı kutu), son dişli (var)
+- [ ] Debriyaj (var): + çift/üç plaka, seramik balata; quick shifter
+- [ ] Diferansiyel (var): + ön/arka ayrı LSD, AWD merkez dağılım ayarı
+- [ ] **Çekiş dönüşümü**: FWD → AWD / RWD (ağırlık, kayıp, fiyat), kardan mili, aks (var)
+### Şasi, süspansiyon, fren
+- [ ] Coilover: yay sertliği, yükseklik, amortisör (bump/rebound); viraj denge çubukları
+- [ ] Kamber / kaster / toe ayarı (şartname 2.6), drag için ön-arka yük aktarımı ayarı
+- [ ] Wheelie bar ve paraşüt (drag), ağırlık transferi; akü bagaja (ağırlık dağılımı)
+- [ ] Şasi güçlendirme: strut bar, roll cage (sertlik + ağırlık + güvenlik), karbon kaput/bagaj, lexan cam
+- [ ] Fren: büyük disk/kaliper, balata tipi (ısı ve fade), fren dağılımı ayarı, hidrolik el freni (drift)
+### Lastik, jant, aero
+- [ ] Lastik ölçüsü/genişliği, drag radial, lastik sınıfı (sokak/yarı-slick/slick var), dövme jant (dönen kütle)
+- [ ] Widebody (geniş lastik sığar), kanat/spoiler (downforce ↔ hava direnci), splitter, difüzör
+### Yasallık ve bakım
+- [ ] Sokak yasallığı: egzoz gürültüsü, nitro, slick → polis/muayene cezası (Faz 6), "pist araçları" romorkla
+- [ ] Parça aşınması ve ömrü (turbo, debriyaj, lastik), bakım/tamir maliyeti, arızalı parça
+- [ ] Dyno ayar oturumu: harita ince ayarı, güç kazanımı ↔ risk
