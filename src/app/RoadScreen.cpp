@@ -123,8 +123,11 @@ void RoadScreen::update(double dt) {
     RoadCar& P = ses_->player();
     const double v = P.sim().speed();
     cockpit_.update(dt);
+    if (cockpit_.takeSeated()) app_.haptic(18, 160);                     // vites yuvaya oturdu: kisa "tik"
     // Direksiyon: hiza gore sinirli (kinematik yanal ivme ~1.1 g), rampali; klavye ya da telefon egimi
-    const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0), 0.035, 0.50);
+    // Hiza gore sinir + kayma payi: arka kayarken (govde kayma acisi) karsi direksiyon icin tam aci acilir
+    const double slipAllow = std::min(0.45, std::fabs(P.sim().bodySlipAngle()) * 1.3);
+    const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0) + slipAllow, 0.035, 0.50);
     double target = (kL_ ? maxSteer : 0.0) - (kR_ ? maxSteer : 0.0);
     if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer) {   // olu bolge %6
         const double t = std::clamp(app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0), dz = 0.06;
@@ -168,6 +171,13 @@ void RoadScreen::update(double dt) {
         P.manual = false; P.slowClutch = false;
     }
     ses_->update(dt, c);
+    // Teker donusu ve lastik dumani
+    spinP_ += P.sim().wheel(0).omega() * dt;
+    if (RoadCar* rv = ses_->rival()) spinR_ += rv->sim().wheel(0).omega() * dt;
+    spawnSmoke(P, dt);
+    if (RoadCar* rv = ses_->rival()) spawnSmoke(*rv, dt);
+    for (Puff& p : smoke_) { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz *= 0.98; p.life -= dt; p.size += dt * 1.6; }
+    smoke_.erase(std::remove_if(smoke_.begin(), smoke_.end(), [](const Puff& p) { return p.life <= 0; }), smoke_.end());
     if (P.grinding()) {
         // Debriyajsiz vites girmedi: kol gercek vitese geri seker (kol ile gercek vites hic ayrismasin; eskiden kol
         // 5'te kalip arac alt viteste gidiyor, debriyaja basinca 5 aniden giriyordu)
@@ -196,6 +206,28 @@ void RoadScreen::update(double dt) {
     } else app_.tire(1, 0.0);
     if (std::getenv("ZK_ROAD_LOG")) { static double t = 0, nx = 0; t += dt; if (t >= nx) { nx += 0.5;
         std::printf("t=%.1f v=%.1f g%d s=%.1f lat=%.2f gap=%.1f phase=%d\n", t, v, pt.gear(), P.s(), P.lateral(), ses_->gapMeters(), (int)ses_->phase()); } }
+}
+
+// Lastik dumani: tahrikli / kayan tekerlerin kayma hizi 5 m/s ustunde; yogunluk kaymayla artar
+void RoadScreen::spawnSmoke(const RoadCar& car, double dt) {
+    const VehicleSim& sm = car.sim();
+    const double slip = car.tireSlipSpeed();
+    if (slip < 5.0 || car.offRoad()) return;
+    const double rate = std::min(40.0, (slip - 5.0) * 6.0);                       // puf / s
+    static double acc = 0;
+    acc += rate * dt;
+    const double c = std::cos(sm.heading()), sn = std::sin(sm.heading());
+    const double back = -0.32 * sm.vehicleLoad().wheelbase - 0.3, half = 0.75;
+    while (acc >= 1.0 && smoke_.size() < 220) {
+        acc -= 1.0;
+        const double side = (smoke_.size() & 1) ? half : -half;
+        const double jx = ((smoke_.size() * 37) % 11) / 11.0 - 0.5;
+        Puff p;
+        p.x = sm.posX() + back * c - side * sn; p.y = sm.posY() + back * sn + side * c; p.z = car.elevation() + 0.25;
+        p.vx = sm.speed() * 0.15 * c + jx; p.vy = sm.speed() * 0.15 * sn + jx; p.vz = 0.6 + 0.4 * (jx + 0.5);
+        p.life = 1.6; p.size = 0.6;
+        smoke_.push_back(p);
+    }
 }
 
 void RoadScreen::drawMenu(Renderer& r) {
@@ -306,13 +338,18 @@ void RoadScreen::drawWorld(Renderer& r) {
         const RoadPoint& p = P[i];
         return project(vp, p.x - off * std::sin(p.heading), p.y + off * std::cos(p.heading), p.z, W, H);
     };
+    // Kenara gore ofset: kenar (|off| >= hw - 0.3) noktanin kendi genisligine kayar (yol daralir / genisler)
+    auto edgeW = [&](int i, double off, double fromEdge) {
+        const double w = P[i].hw - fromEdge;
+        return edge(i, off >= 0 ? w : -w);
+    };
     for (int i = i1; i >= i0; --i) {
         const int j = i + 1;
-        const Proj aL = edge(i, hw + 1.0), aR = edge(i, -hw - 1.0), bL = edge(j, hw + 1.0), bR = edge(j, -hw - 1.0);
+        const Proj aL = edgeW(i, 1, -1.0), aR = edgeW(i, -1, -1.0), bL = edgeW(j, 1, -1.0), bR = edgeW(j, -1, -1.0);
         if (!aL.ok || !aR.ok || !bL.ok || !bR.ok) continue;
         const bool band = ((i / 3) & 1) != 0;
         {   // Arazi: yol yuksekligini izleyen 60 m'lik cim seritleri (tepede yol havada kalmasin)
-            const Proj gL0 = edge(i, hw + 60.0), gL1 = edge(j, hw + 60.0), gR0 = edge(i, -hw - 60.0), gR1 = edge(j, -hw - 60.0);
+            const Proj gL0 = edgeW(i, 1, -60.0), gL1 = edgeW(j, 1, -60.0), gR0 = edgeW(i, -1, -60.0), gR1 = edgeW(j, -1, -60.0);
             const Color gc = fog(band ? grass : Color{grass.r * 0.94f, grass.g * 0.96f, grass.b * 0.94f}, aL.w);
             if (gL0.ok && gL1.ok) { r.tri(gL0.x, gL0.y, aL.x, aL.y, bL.x, bL.y, gc); r.tri(gL0.x, gL0.y, bL.x, bL.y, gL1.x, gL1.y, gc); }
             if (gR0.ok && gR1.ok) { r.tri(aR.x, aR.y, gR0.x, gR0.y, gR1.x, gR1.y, gc); r.tri(aR.x, aR.y, gR1.x, gR1.y, bR.x, bR.y, gc); }
@@ -320,7 +357,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         const Color curb = fog(mtn ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
                                    : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f}), aL.w);
         r.tri(aL.x, aL.y, aR.x, aR.y, bR.x, bR.y, curb); r.tri(aL.x, aL.y, bR.x, bR.y, bL.x, bL.y, curb);
-        const Proj cL = edge(i, hw), cR = edge(i, -hw), dL = edge(j, hw), dR = edge(j, -hw);
+        const Proj cL = edgeW(i, 1, 0.0), cR = edgeW(i, -1, 0.0), dL = edgeW(j, 1, 0.0), dR = edgeW(j, -1, 0.0);
         // Asfalt: hafif yama/renk degisimi (hash) + tekerlek izi koyulugu
         const float patch = 0.015f * (hashf(i / 4) - 0.5f);
         const Color asp = fog(band ? Color{0.30f + patch, 0.30f + patch, 0.32f + patch} : Color{0.27f + patch, 0.27f + patch, 0.29f + patch}, cL.w);
@@ -334,8 +371,16 @@ void RoadScreen::drawWorld(Renderer& r) {
         {   // kenar cizgileri (beyaz, surekli)
             const Color ec = fog({0.92f, 0.92f, 0.9f}, cL.w);
             for (double sg : {-1.0, 1.0}) {
-                const Proj e0 = edge(i, sg * (hw - 0.12)), e1 = edge(i, sg * (hw - 0.27)), e2 = edge(j, sg * (hw - 0.27)), e3 = edge(j, sg * (hw - 0.12));
+                const Proj e0 = edgeW(i, sg, 0.12), e1 = edgeW(i, sg, 0.27), e2 = edgeW(j, sg, 0.27), e3 = edgeW(j, sg, 0.12);
                 r.tri(e0.x, e0.y, e1.x, e1.y, e2.x, e2.y, ec); r.tri(e0.x, e0.y, e2.x, e2.y, e3.x, e3.y, ec);
+            }
+        }
+        if (P[i].hw > 5.0 && (i % 5) < 2) {                        // genis yol (2x2): ek serit kesik cizgileri
+            const Color wc = fog({0.92f, 0.92f, 0.9f}, cL.w);
+            for (double sg : {-1.0, 1.0}) {
+                const double o = sg * P[i].hw * 0.5, o2 = sg * P[j].hw * 0.5;
+                const Proj m0 = edge(i, o + 0.07), m1 = edge(i, o - 0.07), m2 = edge(j, o2 + 0.07), m3 = edge(j, o2 - 0.07);
+                r.tri(m0.x, m0.y, m1.x, m1.y, m3.x, m3.y, wc); r.tri(m0.x, m0.y, m3.x, m3.y, m2.x, m2.y, wc);
             }
         }
         if ((i % 5) < 2) {                                         // orta kesik cizgi (4 m cizgi, 6 m bosluk)
@@ -348,7 +393,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 if (camBlend_ < 0.5 && side < 0) continue;            // drag gorunumu: kamera tarafindaki agaclar gorusu kapatir
                 const float h = hashf(i * 2 + (side > 0));
                 if (h < (mtn ? 0.08f : 0.35f)) continue;
-                const Proj b = edge(i, side * (hw + 5.0 + 20.0 * hashf(i * 7 + side)));
+                const Proj b = edge(i, side * (P[i].hw + 5.0 + 20.0 * hashf(i * 7 + side)));
                 if (!b.ok) continue;
                 const float sc = pxPerM / b.w;
                 const float th = (5.0f + 4.0f * h) * sc, tw = (1.6f + h) * sc;
@@ -437,9 +482,16 @@ void RoadScreen::drawWorld(Renderer& r) {
             r.rect(x, y, x + len, y + 1.5f, {1.0f, 1.0f, 1.0f, 0.15f + 0.3f * k});
         }
     }
+    for (const Puff& p : smoke_) {                                       // lastik dumani (araclardan once: arkada kalir)
+        const Proj q = project(vp, p.x, p.y, p.z + p.size * 0.5, W, H);
+        if (!q.ok || q.w < 1.0f) continue;
+        const float rad = (float)p.size * pxPerM / q.w;
+        const float a = (float)std::clamp(p.life / 1.6, 0.0, 1.0) * 0.32f;
+        r.circle(q.x, q.y, rad, 12, {0.86f, 0.86f, 0.88f, a});
+    }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu. z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim
-    struct Obj { double d, x, y, psi, z, pitch; int id; };
+    struct Obj { double d, x, y, psi, z, pitch; int id; float spin = 0, steer = 0; };
     auto carModel = [](double x, double y, double z, double psi, double pitch) {
         return matMul(matMul(matTranslate((float)x, (float)z, (float)-y), matRotY((float)psi)), matRotZ((float)std::atan(pitch)));
     };
@@ -449,20 +501,23 @@ void RoadScreen::drawWorld(Renderer& r) {
         const RoadPoint q = R.at(t.s);
         Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
         o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
+        o.spin = (float)((t.oncoming ? -t.s : t.s) / 0.31);
         o.d = (o.x - ex) * dx + (o.y - ey) * dy; objs.push_back(o);   // kamera bakis yonunde derinlik
     }
     if (RoadCar* rv = ses_->rival()) {
         const VehicleSim& rs = rv->sim();
-        Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId()};
+        Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId(),
+              (float)spinR_, (float)std::clamp(std::atan(rs.yawRate() * rs.vehicleLoad().wheelbase / std::max(rs.speed(), 3.0)), -0.5, 0.5)};
         o.d = (o.x - ex) * dx + (o.y - ey) * dy;
         if (o.d > 2 && o.d < 340) objs.push_back(o);
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
         if (o.d < 3.0) continue;                                   // kameraya cok yakin / arkasinda
-        r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch));
+        r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch), o.spin, o.steer);
     }
-    r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()));
+    r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()),
+              (float)spinP_, (float)steer_);
 }
 
 void RoadScreen::drawHud(Renderer& r) {

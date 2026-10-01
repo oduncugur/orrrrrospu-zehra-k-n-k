@@ -182,54 +182,86 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double xFront = L * 0.5 - overhangF, xRear = xFront - v.wheelbaseM;
     const double sFront = (L * 0.5 - xFront) / L, sRear = (L * 0.5 - xRear) / L;
 
-    // ---- istasyonlar: duzgun aralik + profil anahtarlari + teker merkezleri ----
+    // ---- istasyonlar: uclarda sik (kosinus dagilimi) + profil anahtarlari + teker merkezleri ----
     std::vector<double> ss;
-    for (int i = 0; i <= 30; ++i) ss.push_back(i / 30.0);
-    for (double k : {0.012, 0.03, A.cowlX, A.roofFX, A.roofRX, A.backX, 0.97, 0.988, sFront, sRear}) ss.push_back(std::clamp(k, 0.0, 1.0));
+    const int NS = 46;
+    for (int i = 0; i <= NS; ++i) ss.push_back(0.5 - 0.5 * std::cos(kPi * i / NS));
+    for (double k : {A.cowlX, A.roofFX, A.roofRX, A.backX, sFront, sRear}) ss.push_back(std::clamp(k, 0.0, 1.0));
     std::sort(ss.begin(), ss.end());
-    ss.erase(std::unique(ss.begin(), ss.end(), [](double a, double b) { return std::fabs(a - b) < 0.008; }), ss.end());
+    ss.erase(std::unique(ss.begin(), ss.end(), [](double a, double b) { return std::fabs(a - b) < 0.006; }), ss.end());
 
-    // ---- kesit halkalari: 14 nokta (sol 0..6, sag 7..13 ayna) ----
-    // 0 alt, 1 marsbiyel, 2 en genis, 3 omuz, 4 bel, 5 cam ustu / tavan rayi, 6 tavan kenari
-    const int R = 14;
+    // ---- kesit halkalari: 24 nokta (sol 0..11, sag 23..12 ayna) ----
+    // 0 taban kenari, 1 marspiyel, 2-4 bombeli yan, 5 omuz, 6 ust kenar, 7 bel, 8-9 yan cam, 10 tavan rayi, 11 tavan
+    const int R = 24, RH = 12;
     double flareF = 0.015, flareR = 0.02;                                         // camurluk siskinligi (W orani)
     if (sh.arch == BEETLE) flareF = flareR = 0.07;
     else if (sh.arch == P911) { flareF = 0.025; flareR = 0.05; }
     else if (sh.arch == MUSCLE_NOTCH || sh.arch == MUSCLE_FAST || sh.arch == FRONT_LONG) flareR = 0.035;
     else if (sh.arch == MID_ENGINE || sh.arch == WEDGE) flareR = 0.04;
     if (v.widebody) { flareF += 0.03; flareR += 0.035; }
+    // Ustten gorunus: burun ve kuyruk yumusak daralir (modern araclarda daha cok), camurluklarda siskinlik
+    const double noseW = classic ? 0.86 : 0.78, tailW = classic ? 0.90 : 0.84;
     auto halfW = [&](double s) {
-        const double endT = std::min(s, 1.0 - s);
-        const double e = smooth(endT / 0.07);
+        const double f = s < 0.5 ? noseW + (1.0 - noseW) * std::sqrt(smooth(s / 0.13)) : tailW + (1.0 - tailW) * std::sqrt(smooth((1.0 - s) / 0.11));
         const double gF = (s - sFront) / 0.085, gR = (s - sRear) / 0.095;
         const double flare = flareF * std::exp(-gF * gF) + flareR * std::exp(-gR * gR);
-        return 0.5 * W * (0.86 + 0.14 * std::sqrt(e)) * (1.0 - std::max(flareF, flareR) * 0.6 + flare);
+        return 0.5 * W * f * (1.0 - std::max(flareF, flareR) * 0.6 + flare);
     };
+    // Yan profil yuvarlatma: kaput on kenari ve kuyruk ust kenari asagi kivrilir
+    auto topZ = [&](double s) {
+        double z = H * P.belt(s);
+        if (s < 0.035) z -= H * 0.05 * (1.0 - smooth(s / 0.035));
+        if (s > 0.975) z -= H * 0.04 * smooth((s - 0.975) / 0.025);
+        return z;
+    };
+    const double bulge = classic ? 0.02 : 0.04, bulgeP = classic ? 4.0 : 2.0;     // yan bombe (klasik: duz yan)
     std::vector<std::array<int, R>> rings;
     for (double s : ss) {
         const double x = L * (0.5 - s);
         const double endT = std::min(s, 1.0 - s);
         const double hw = halfW(s);
-        const double zs = ride + 0.04 + (1.0 - smooth(endT / 0.05)) * 0.07;
-        const double zb = H * P.belt(s);
+        const double zs = ride + 0.04 + (1.0 - smooth(endT / 0.06)) * 0.08;
         const bool cab = P.cabin(s);
-        const double zr = cab ? H * P.roof(s) : zb + 0.015;
-        const double tumble = cab ? std::clamp((zr - zb) / (0.35 * H), 0.0, 1.0) : 0.0;
-        const double cw = cab ? hw * (A.roofW + (1.0 - A.roofW) * (1.0 - tumble) * 0.6) : hw * A.beltW * 0.96;
+        const double zU = topZ(s);
+        const double zR = cab ? std::max(zU, H * P.roof(s)) : zU;
         const double bw = hw * A.beltW;
-        const double zmid = zs + 0.50 * (zb - zs);
-        const double pts[7][2] = {
-            {hw * 0.84, zs}, {hw * 0.95, zs + 0.06 * H}, {hw, zmid}, {hw * 0.975, zb - shoulder * H},
-            {bw, zb}, {cw, cab ? zr - 0.05 * H * tumble : zb + 0.012}, {cw * 0.82, zr}};
+        const double tumble = cab ? std::clamp((zR - zU) / (0.35 * H), 0.0, 1.0) : 0.0;
+        const double cw = cab ? hw * (A.roofW + (1.0 - A.roofW) * (1.0 - tumble) * 0.6) : bw;
+        const double zSh = zU - (classic ? 0.03 : 0.05) * H;
+        double pts[RH][2];
+        pts[0][0] = hw * 0.80; pts[0][1] = zs;
+        pts[1][0] = hw * 0.93; pts[1][1] = zs + 0.025 * H;
+        for (int k = 0; k < 3; ++k) {
+            const double t = (k - 1) * 0.6;                                        // -0.6, 0, 0.6
+            pts[2 + k][0] = hw * (1.0 - bulge * std::pow(std::fabs(t), bulgeP));
+            pts[2 + k][1] = zs + 0.06 * H + (k + 1) / 4.0 * (zSh - zs - 0.06 * H);
+        }
+        pts[5][0] = hw * 0.985; pts[5][1] = zSh;
+        pts[6][0] = hw * 0.95;  pts[6][1] = zU - 0.008 * H;
+        pts[7][0] = bw;         pts[7][1] = zU;
+        if (cab && zR > zU + 0.02 * H) {
+            const double zRail = zR - 0.03 * H * tumble;
+            for (int k = 0; k < 2; ++k) {
+                const double f = (k + 1) / 3.0;
+                pts[8 + k][0] = bw + (cw - bw) * std::pow(f, 0.8);
+                pts[8 + k][1] = zU + (zRail - zU) * f;
+            }
+            pts[10][0] = cw;        pts[10][1] = zRail;
+            pts[11][0] = cw * 0.55; pts[11][1] = zR;
+        } else {                                                                  // kaput / bagaj: hafif kubbeli ust yuzey
+            const double ww[4] = {0.70, 0.50, 0.30, 0.12}, zz[4] = {0.008, 0.012, 0.015, 0.016};
+            const double top = cab ? zR : zU;
+            for (int k = 0; k < 4; ++k) { pts[8 + k][0] = hw * ww[k]; pts[8 + k][1] = top + zz[k] * H * (cab ? 0.3 : 1.0); }
+        }
         std::array<int, R> ring;
-        for (int i = 0; i < 7; ++i) ring[i] = B.v(x, pts[i][0], pts[i][1]);
-        for (int i = 0; i < 7; ++i) ring[13 - i] = B.v(x, -pts[i][0], pts[i][1]);
+        for (int i = 0; i < RH; ++i) ring[i] = B.v(x, pts[i][0], pts[i][1]);
+        for (int i = 0; i < RH; ++i) ring[R - 1 - i] = B.v(x, -pts[i][0], pts[i][1]);
         rings.push_back(ring);
     }
     for (size_t k = 0; k + 1 < rings.size(); ++k) {
         const auto& a = rings[k]; const auto& b = rings[k + 1];
         const double s0 = ss[k], s1 = ss[k + 1], sm = 0.5 * (s0 + s1);
-        const bool cab = P.cabin(s0) && P.cabin(s1);
+        const bool cab = P.cabin(s0) && P.cabin(s1) && P.roof(sm) * H > topZ(sm) + 0.02 * H;
         const bool steep = cab && P.steep(s0, s1, L, H);
         const double rearLen = A.backX - A.roofRX;
         const double sideEnd = rearLen > 0.15 ? A.roofRX + 0.30 * rearLen : A.backX;      // fastback: C direk yelkeni
@@ -238,21 +270,28 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const bool rearSlope = sm > A.roofRX;
         const bool glassHigh = !rearSlope || rearLen < 0.15 || rm > bm + 0.45 * (1.0 - bm);   // arka cam ust bolum
         const bool bedOpen = A.bed && sm > A.backX + 0.01 && sm < 0.985;
+        const bool windshield = cab && sm < A.roofFX;                             // konuma gore (egim degil): seritsiz cam
+        const bool rearGlass = cab && sm > A.roofRX && glassHigh;
+        (void)steep;
         for (int i = 0; i < R; ++i) {
             const int j = (i + 1) % R;
+            const int side = i < RH ? i : R - 2 - i;                              // sol indekse esle (ayna)
             int mat = MatPaint;
-            if (i == 13) mat = MatDark;                                            // taban
-            else if (sideGlass && (i == 4 || i == 8)) mat = MatGlass;              // yan camlar
-            else if (cab && i == 6 && steep && glassHigh) mat = MatGlass;          // on / arka cam (direkler boyali kalir)
-            else if (cab && (i == 5 || i == 7) && steep) mat = modern ? MatDark : MatPaint;   // A / C direk
-            if (bedOpen && i >= 4 && i <= 8) mat = MatDark;                        // kamyonet kasasi ici
+            if (i == R - 1) mat = MatDark;                                        // taban
+            else if ((i == RH - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
+            else if (side == 9 && (windshield || rearGlass)) mat = modern ? MatDark : MatPaint;   // A / C direk
+            else if (sideGlass && side >= 7 && side <= 9) mat = MatGlass;        // yan camlar
+            if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
             B.quad(a[i], b[i], b[j], a[j], mat);
         }
     }
-    auto cap = [&](const std::array<int, R>& ring, bool front) {
-        for (int i = 1; i < R - 1; ++i) {
-            if (front) B.tri(ring[0], ring[i + 1], ring[i], MatPaint);
-            else       B.tri(ring[0], ring[i], ring[i + 1], MatPaint);
+    auto cap = [&](const std::array<int, R>& ring, bool front) {                  // uc kapak: merkezden yelpaze
+        float cx = 0, cy = 0, cz = 0;
+        for (int i : ring) { cx += m.verts[i].x; cy += m.verts[i].y; cz += m.verts[i].z; }
+        const int c = B.v(cx / R, cy / R, cz / R);
+        for (int i = 0; i < R; ++i) {
+            const int j = (i + 1) % R;
+            if (front) B.tri(c, ring[j], ring[i], MatPaint); else B.tri(c, ring[i], ring[j], MatPaint);
         }
     };
     cap(rings.front(), true); cap(rings.back(), false);
@@ -438,7 +477,11 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
 
     // ---- tekerler ----
     for (double x : {xFront, xRear})
-        for (double sg : {-1.0, 1.0}) B.wheel(x, sg * track, r, r, tw, sh.rim);
+        for (double sg : {1.0, -1.0}) {
+            const size_t t0 = m.tris.size();
+            B.wheel(x, sg * track, r, r, tw, sh.rim);
+            m.wheels.push_back({(float)x, (float)(sg * track), (float)r, (float)r, t0, m.tris.size()});
+        }
     return m;
 }
 

@@ -58,7 +58,7 @@ private:
     struct Touch { int id; Ctl ctl; };
     struct Smoke { float x, lane, y, vx, vy, life, size; };
     void restart();
-    void shifterFromPoint(float x, float y);
+    void shifterFromPoint(float x, float y, bool release = false);
     void drawWorld(Renderer& r);
     void drawCarAt(Renderer& r, int lane, float screenX, float groundY, float scale);
     void drawHud(Renderer& r);
@@ -75,6 +75,7 @@ private:
     bool keyThr_ = false, keyClutch_ = false, keyBrake_ = false, brakeBtn_ = false;
     float keyClutchVal_ = 0, keyThrVal_ = 0;       // klavye analog rampalari
     float knobX_ = 460, knobY_ = 311;              // H-desen vites kolu
+    bool knobDrag_ = false; float dragX_ = 0, dragY_ = 0, lastShX_ = 0, lastShY_ = 0;   // surukleme (gorsel)
     int pendingGear_ = -1, pendingPaddle_ = 0;
     std::vector<Smoke> smoke_;
     std::vector<std::string> ticker_;              // son olaylar
@@ -262,6 +263,11 @@ private:
     bool autopilot_ = false;
     double camPsi_ = 0, finT_ = 0;
     std::string msg_; double msgT_ = 0;
+    // Teker donusu (rad) ve lastik dumani (dunya koordinati)
+    double spinP_ = 0, spinR_ = 0;
+    struct Puff { double x, y, z, vx, vy, vz, life, size; };
+    std::vector<Puff> smoke_;
+    void spawnSmoke(const RoadCar& car, double dt);
 };
 
 } // namespace zk

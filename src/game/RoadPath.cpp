@@ -14,6 +14,7 @@ struct Rng {
 }
 
 RoadPath::RoadPath(uint32_t seed, double lengthM, double minRadius, double halfWidth, double maxGrade) : halfWidth_(halfWidth) {
+    struct HwFill { RoadPath* p; double hw; ~HwFill() { for (RoadPoint& q : p->pts_) q.hw = hw; } } fill{this, halfWidth};
     Rng r{seed ? seed : 1u};
     // Egrilik programi: [duzluk][giris klotoidi][sabit yay][cikis klotoidi] tekrarlari
     std::vector<Seg> prog;
@@ -119,7 +120,20 @@ RoadPoint RoadPath::at(double s) const {
     const double f = (s - pts_[i].s) / kStep;
     const RoadPoint &a = pts_[i], &b = pts_[i + 1];
     return {a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.heading + (b.heading - a.heading) * f,
-            a.curvature + (b.curvature - a.curvature) * f, s, a.z + (b.z - a.z) * f, a.grade + (b.grade - a.grade) * f};
+            a.curvature + (b.curvature - a.curvature) * f, s, a.z + (b.z - a.z) * f, a.grade + (b.grade - a.grade) * f,
+            a.hw + (b.hw - a.hw) * f};
+}
+
+void RoadPath::setWidthRange(uint32_t seed, double hwMin, double hwMax) {
+    Rng r{seed ? seed * 747796405u + 11u : 7u};
+    halfWidth_ = hwMin;
+    double s0 = 0.0, w0 = hwMin + (hwMax - hwMin) * 0.3;
+    double s1 = r.range(400.0, 1100.0), w1 = hwMin + (hwMax - hwMin) * r.uni();
+    for (RoadPoint& p : pts_) {
+        while (p.s > s1) { s0 = s1; w0 = w1; s1 += r.range(400.0, 1100.0); w1 = hwMin + (hwMax - hwMin) * r.uni(); }
+        const double t = std::clamp((p.s - (s1 - 120.0)) / 120.0, 0.0, 1.0);   // bolum sonunda 120 m gecis
+        p.hw = w0 + (w1 - w0) * t * t * (3.0 - 2.0 * t);
+    }
 }
 
 void RoadPath::project(double x, double y, int& hint, double& s, double& lateral) const {

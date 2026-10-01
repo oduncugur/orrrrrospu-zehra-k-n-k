@@ -61,21 +61,31 @@ Cockpit::Ctl Cockpit::hit(float x, float y) const {
 }
 bool Cockpit::overControl(float x, float y) const { return hit(x, y) != Ctl::None; }
 
-// H-desen (kolay gecis): dokunulan/surtulen noktaya en yakin vites yuvasi secilir, kol oraya oturur; orta siranin
-// yakininda bos (N). Eskiden kol bos sirasindan yana kaydirilip tam isabetle itilmek zorundaydi (telefonda zordu).
-void Cockpit::shifterFromPoint(float x, float y) {
+// H-desen: gercek kol gibi. Surukleme sirasinda kol parmagi kanal (H) icinde izler; vites ancak kol yuvanin
+// dibine (%60 yol) oturunca takilir (titresim); parmak kalkinca en yakin yuvaya oturur, orta bantta birakilirsa bos.
+// Eskiden surukleme yolundaki her yuva (bos dahil) aninda istek olarak gidiyordu: 2->3 gecisinde araya bos / citirti
+// girip vites "tam oturmuyordu" (kullanici geri bildirimi).
+void Cockpit::shifterFromPoint(float x, float y, bool release) {
     const PadLayout& L = lay(portrait_);
-    const float midBand = (L.rowBot - L.rowTop) * 0.18f;
+    const float half = (L.rowBot - L.rowTop) * 0.5f, midBand = half * 0.30f;
     int col = 0;
     for (int c = 1; c < 3; ++c) if (std::fabs(x - L.colX[c]) < std::fabs(x - L.colX[col])) col = c;
-    if (std::fabs(y - L.rowMid) < midBand) {                       // bos
-        knobGear_ = 0; knobX_ = std::clamp(x, L.colX[0], L.colX[2]); knobY_ = L.rowMid;
-        return;
-    }
     int target = col * 2 + (y < L.rowMid ? 1 : 2);
     while (target > gears_ && target > 2) target -= 2;                 // olmayan sutun: en yakin var olan vitese
     if (target > gears_) target = gears_;
-    setKnobGear(target);
+    const float depth = std::fabs(y - L.rowMid);
+    if (release) {
+        knobDrag_ = false;
+        if (depth < midBand) { knobGear_ = 0; knobX_ = std::clamp(x, L.colX[0], L.colX[2]); knobY_ = L.rowMid; return; }
+        if (target != knobGear_) ++seatedEv_;
+        setKnobGear(target);
+        return;
+    }
+    // Gorsel kol: orta bantta yatay serbest, kanalda sutuna kilitli
+    knobDrag_ = true;
+    if (depth < midBand) { dragX_ = std::clamp(x, L.colX[0], L.colX[2]); dragY_ = std::clamp(y, L.rowTop, L.rowBot); }
+    else { dragX_ = L.colX[(target - 1) / 2]; dragY_ = std::clamp(y, L.rowTop, L.rowBot); }
+    if (depth > half * 0.60f && target != knobGear_) { setKnobGear(target); ++seatedEv_; }   // yuvaya oturdu
 }
 
 void Cockpit::autoFromPoint(float y) {
@@ -94,7 +104,7 @@ bool Cockpit::pointerDown(int id, float x, float y) {
     case Ctl::Throttle: thrUi_ = sliderValue(L.thr, y); break;
     case Ctl::Brake: brakeUi_ = sliderValue(brakeRect(L, clutchPedal_), y); break;
     case Ctl::Clutch: clutchUi_ = sliderValue(L.clutch, y); break;
-    case Ctl::Shifter: shifterFromPoint(x, y); break;
+    case Ctl::Shifter: shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; break;
     case Ctl::Auto: autoFromPoint(y); break;
     case Ctl::Up: shift_ = +1; break;
     case Ctl::Down: shift_ = -1; break;
@@ -110,7 +120,7 @@ void Cockpit::pointerMove(int id, float x, float y) {
         if (t.ctl == Ctl::Throttle) thrUi_ = sliderValue(L.thr, y);
         else if (t.ctl == Ctl::Brake) brakeUi_ = sliderValue(brakeRect(L, clutchPedal_), y);
         else if (t.ctl == Ctl::Clutch) clutchUi_ = sliderValue(L.clutch, y);
-        else if (t.ctl == Ctl::Shifter) shifterFromPoint(x, y);
+        else if (t.ctl == Ctl::Shifter) { shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; }
         else if (t.ctl == Ctl::Auto) autoFromPoint(y);
     }
 }
@@ -122,6 +132,7 @@ void Cockpit::pointerUp(int id) {
         case Ctl::Throttle: thrUi_ = 0; break;
         case Ctl::Brake: brakeUi_ = 0; break;
         case Ctl::Clutch: clutchUi_ = 0; break;
+        case Ctl::Shifter: shifterFromPoint(lastShX_, lastShY_, true); break;   // birakinca en yakin yuvaya otur
         default: break;
         }
         touches_.erase(touches_.begin() + i);
@@ -197,7 +208,11 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
             if (has) r.text(L.colX[c] - 2, L.rowTop - 9, std::to_string(c * 2 + 1), 1, {0.85f, 0.85f, 0.85f});
             if (c * 2 + 2 <= gears_) r.text(L.colX[c] - 2, L.rowBot + 3, std::to_string(c * 2 + 2), 1, {0.85f, 0.85f, 0.85f});
         }
-        r.circle(knobX_, knobY_, 8, 12, grind ? Color{1.0f, 0.15f, 0.1f} : Color{0.92f, 0.92f, 0.95f});
+        // Takili vites yuvasi vurgusu + kol (surukleme sirasinda parmagi izler)
+        if (knobGear_ > 0) r.circle(L.colX[(knobGear_ - 1) / 2], (knobGear_ % 2) ? L.rowTop : L.rowBot, 11, 14, {0.3f, 0.8f, 0.4f, 0.35f});
+        const float kx = knobDrag_ ? dragX_ : knobX_, ky = knobDrag_ ? dragY_ : knobY_;
+        r.circle(kx, ky, 10, 14, {0.05f, 0.05f, 0.06f, 0.6f});
+        r.circle(kx, ky, 8, 14, grind ? Color{1.0f, 0.15f, 0.1f} : Color{0.92f, 0.92f, 0.95f});
     } else if (lever_ == Lever::Automatic) {
         r.rect(L.lever.cx() - 2, L.autoY[0], L.lever.cx() + 2, L.autoY[2], {0.35f, 0.35f, 0.4f});
         for (int i = 0; i < 3; ++i) {

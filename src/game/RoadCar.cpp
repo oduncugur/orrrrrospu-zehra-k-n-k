@@ -57,7 +57,14 @@ void RoadCar::playerClutch(const RoadControls& c) {
     } else launching_ = false;
     grind_ = false;
     if (c.gear >= 0 && c.gear != pt.gear()) {
-        if (c.clutch >= 0.55 || c.gear == 0) pt.setGear(std::min(c.gear, pt.gearCount()));   // bosa almak debriyajsiz olur
+        // Debriyaj %40 basili yeterli; bosa almak debriyajsiz olur; gaz kesik ve devir uyumluysa (+-%15) debriyajsiz gecer
+        bool matched = false;
+        if (c.gear > 0 && c.gear <= pt.gearCount() && c.throttle < 0.15) {
+            const double wheelRpm = sim_->speed() / sim_->wheel(sim_->drivenLeft()).rEff() * 9.5493;
+            const double target = wheelRpm * sim_->gearboxSpec().ratios[c.gear - 1] * sim_->gearboxSpec().finalDrive;
+            matched = target > 900.0 && std::fabs(pt.rpm() - target) < 0.15 * target;
+        }
+        if (c.clutch >= 0.40 || c.gear == 0 || matched) pt.setGear(std::min(c.gear, pt.gearCount()));
         else grind_ = true;
     }
     pt.setClutchPedal(c.clutch);
@@ -144,7 +151,7 @@ void RoadCar::update(double dt, const RoadControls& c) {
     while (acc_ >= kStep) { sim_->step(kStep, in); acc_ -= kStep; }
     sim_->drainFailureEvents();
     road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
-    offT_ = std::fabs(lat_) > road_.halfWidth() + 12.0 ? offT_ + dt : 0.0;
+    offT_ = std::fabs(lat_) > road_.halfWidthAt(s_) + 12.0 ? offT_ + dt : 0.0;
     if (offT_ > 1.5) recover();
 }
 

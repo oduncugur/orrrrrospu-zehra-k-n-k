@@ -50,11 +50,14 @@ public:
     void flush2D();
 
     // 3D arac modeli: sanal piksel dikdortgenine (sol ust x,y) cizer
-    void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model);
+    // wheelSpin: teker donus acisi (rad, ileri +), steer: on teker sapmasi (rad, sola +)
+    void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,
+                 float wheelSpin = 0.0f, float steer = 0.0f);
 
 private:
     float scaleFor(int screenW, int screenH) const;
-    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0; float halfL = 2, halfW = 0.9f; };
+    struct WheelDraw { float cx, cy, cz; int first, count; };
+    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels; };
     const Mesh& mesh(int carId);
     void ensureTarget();                // FBO boyutu = kFbo x olcek (olcek degisince yeniden)
     std::vector<float> batch_;   // x y r g b a

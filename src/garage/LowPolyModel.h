@@ -12,9 +12,12 @@ struct Vertex { float x, y, z; };        // x: ileri, y: sol, z: yukari (m)
 struct Tri    { int a, b, c; int material; };
 enum Material { MatPaint = 0, MatGlass, MatTire, MatRim, MatLight, MatTail, MatTrim, MatDark, MatPlate, MatChrome, MatIndicator, MatCount };
 
+// Teker parcasi: ucgen araligi + merkez (oyunda doner / on tekerler direksiyonla sapar). Sira: on sol, on sag, arka sol, arka sag
+struct WheelPart { float cx, cy, cz, r; size_t triBegin, triEnd; };
 struct LowPolyMesh {
     std::vector<Vertex> verts;
     std::vector<Tri>    tris;
+    std::vector<WheelPart> wheels;
     unsigned paintRGB = 0xC0C0C0;
 };
 

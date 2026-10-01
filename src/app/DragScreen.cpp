@@ -71,19 +71,28 @@ DragScreen::Ctl DragScreen::hit(float x, float y) const {
 
 // H-desen (kolay gecis): dokunulan/surtulen noktaya en yakin vites yuvasi secilir ve kol oraya oturur; orta siranin
 // yakininda bos (N). Eskiden kol bos sirasindan yana kaydirilip tam isabetle itilmek zorundaydi (telefonda zordu).
-void DragScreen::shifterFromPoint(float x, float y) {
+// Gercek kol gibi (Cockpit ile ayni): surukleme sirasinda kol kanalda parmagi izler, vites yuvanin dibine oturunca
+// ya da parmak kalkinca takilir; aradan gecerken bos / baska vites istegi gitmez.
+void DragScreen::shifterFromPoint(float x, float y, bool release) {
     const int gears = race_->lane(0).sim->powertrain().gearCount();
+    const float half = (kRowBot - kRowTop) * 0.5f, midBand = half * 0.30f;
     int col = 0;
     for (int c = 1; c < 3; ++c) if (std::fabs(x - kColX[c]) < std::fabs(x - kColX[col])) col = c;
-    if (std::fabs(y - kRowMid) < (kRowBot - kRowTop) * 0.18f) {    // bos
-        pendingGear_ = 0; knobX_ = std::clamp(x, kColX[0], kColX[2]); knobY_ = kRowMid;
-        return;
-    }
     int target = col * 2 + (y < kRowMid ? 1 : 2);
     while (target > gears && target > 2) target -= 2;                // olmayan sutun: en yakin var olan vites
     if (target > gears) target = gears;
-    pendingGear_ = target;
-    knobX_ = kColX[(target - 1) / 2]; knobY_ = (target % 2) ? kRowTop : kRowBot;
+    const float depth = std::fabs(y - kRowMid);
+    auto seat = [&](int g) {
+        if (g != pendingGear_) app_.haptic(18, 160);
+        pendingGear_ = g;
+        if (g == 0) { knobX_ = std::clamp(x, kColX[0], kColX[2]); knobY_ = kRowMid; }
+        else { knobX_ = kColX[(g - 1) / 2]; knobY_ = (g % 2) ? kRowTop : kRowBot; }
+    };
+    if (release) { knobDrag_ = false; seat(depth < midBand ? 0 : target); return; }
+    knobDrag_ = true;
+    if (depth < midBand) { dragX_ = std::clamp(x, kColX[0], kColX[2]); dragY_ = std::clamp(y, kRowTop, kRowBot); }
+    else { dragX_ = kColX[(target - 1) / 2]; dragY_ = std::clamp(y, kRowTop, kRowBot); }
+    if (depth > half * 0.60f && target != pendingGear_) seat(target);
 }
 
 void DragScreen::pointerDown(int id, float x, float y) {
@@ -99,7 +108,7 @@ void DragScreen::pointerDown(int id, float x, float y) {
     case Ctl::Clutch: clutchUi_ = sliderValue(kClutch, y); break;
     case Ctl::Throttle: throttleUi_ = sliderValue(kThrottle, y); break;
     case Ctl::Brake: brakeBtn_ = true; break;
-    case Ctl::Shifter: shifterFromPoint(x, y); break;
+    case Ctl::Shifter: shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; break;
     case Ctl::PaddleUp: pendingPaddle_ = +1; break;
     case Ctl::PaddleDown: pendingPaddle_ = -1; break;
     default: break;
@@ -111,7 +120,7 @@ void DragScreen::pointerMove(int id, float x, float y) {
         if (t.id != id) continue;
         if (t.ctl == Ctl::Clutch) clutchUi_ = sliderValue(kClutch, y);
         else if (t.ctl == Ctl::Throttle) throttleUi_ = sliderValue(kThrottle, y);
-        else if (t.ctl == Ctl::Shifter) shifterFromPoint(x, y);
+        else if (t.ctl == Ctl::Shifter) { shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; }
     }
 }
 
@@ -122,6 +131,7 @@ void DragScreen::pointerUp(int id) {
         case Ctl::Clutch: clutchUi_ = 0.0f; break;      // ayak pedaldan kalkti
         case Ctl::Throttle: throttleUi_ = 0.0f; break;
         case Ctl::Brake: brakeBtn_ = false; break;
+        case Ctl::Shifter: shifterFromPoint(lastShX_, lastShY_, true); break;   // birakinca yuvaya otur
         default: break;
         }
         touches_.erase(touches_.begin() + i);
@@ -525,7 +535,9 @@ void DragScreen::drawHud(Renderer& r) {
             if (c * 2 + 1 <= gears) r.text(kColX[c] - 2, kRowTop - 8, std::to_string(c * 2 + 1), 1, {0.8f, 0.8f, 0.8f});
             if (c * 2 + 2 <= gears) r.text(kColX[c] - 2, kRowBot + 2, std::to_string(c * 2 + 2), 1, {0.8f, 0.8f, 0.8f});
         }
-        r.circle(knobX_, knobY_, 8, 12, P.grind ? kRed : Color{0.9f, 0.9f, 0.92f});
+        { const float kx = knobDrag_ ? dragX_ : knobX_, ky = knobDrag_ ? dragY_ : knobY_;
+          r.circle(kx, ky, 10, 14, {0.05f, 0.05f, 0.06f, 0.6f});
+          r.circle(kx, ky, 8, 14, P.grind ? kRed : Color{0.9f, 0.9f, 0.92f}); }
     } else if (box == Gearbox::TorqueConverter) {
         r.textCentered(539, 300, "OTO", 2, {0.8f, 0.8f, 0.9f});
     } else {

@@ -342,7 +342,7 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     for (size_t i = 0; i < nt; ++i) for (int k : {m.tris[i].a, m.tris[i].b, m.tris[i].c}) adj[k].push_back((int)i);
     auto gloss = [](int mat) {
         switch (mat) {
-        case MatPaint: return 1.0f; case MatGlass: return 0.75f; case MatChrome: return 1.0f; case MatRim: return 0.7f;
+        case MatPaint: return 1.0f; case MatGlass: return 0.45f; case MatChrome: return 1.0f; case MatRim: return 0.7f;
         case MatTrim: return 0.25f; case MatPlate: return 0.15f; case MatDark: return 0.05f; case MatTire: return 0.03f;
         default: return -1.0f;                                                   // far / stop / sinyal: isik yayar
         }
@@ -352,7 +352,23 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     float maxX = 0, maxY = 0;
     for (const Vertex& p : m.verts) { maxX = std::max(maxX, std::fabs(p.x)); maxY = std::max(maxY, std::fabs(p.y)); }
     M.halfL = maxX; M.halfW = maxY;
-    for (size_t i = 0; i < nt; ++i) {
+    // Govde ucgenleri once, sonra her teker ayri aralikta (kendi donusumuyle cizilir)
+    std::vector<size_t> order;
+    order.reserve(nt);
+    const size_t bodyEnd = m.wheels.empty() ? nt : m.wheels.front().triBegin;
+    for (size_t i = 0; i < bodyEnd; ++i) order.push_back(i);
+    for (const WheelPart& w : m.wheels) for (size_t i = w.triBegin; i < w.triEnd; ++i) order.push_back(i);
+    for (size_t i = m.wheels.empty() ? nt : m.wheels.back().triEnd; i < nt; ++i) order.push_back(i);
+    M.bodyCount = (int)bodyEnd * 3;
+    {
+        int first = (int)bodyEnd * 3;
+        for (const WheelPart& w : m.wheels) {
+            const int cnt = (int)(w.triEnd - w.triBegin) * 3;
+            M.wheels.push_back({w.cx, w.cz, -w.cy, first, cnt});               // GL (x, z, -y)
+            first += cnt;
+        }
+    }
+    for (size_t i : order) {
         const Tri& t = m.tris[i];
         float c[3]; materialColor(t.material, m.paintRGB, c);
         const float gl = gloss(t.material);
@@ -387,7 +403,8 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     return M;
 }
 
-void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4& proj, const Mat4& view, const Mat4& model) {
+void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4& proj, const Mat4& view, const Mat4& model,
+                       float wheelSpin, float steer) {
     flush2D();
     const Mesh& M = mesh(carId);
     if (!M.count) return;
@@ -423,7 +440,26 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     glUniformMatrix4fv(uModel_, 1, GL_FALSE, model.m);
     glUniform1f(uAlpha_, 1.0f);
     glBindVertexArray(M.vao);
-    glDrawArrays(GL_TRIANGLES, 0, M.count);
+    if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f)) {
+        glDrawArrays(GL_TRIANGLES, 0, M.bodyCount);
+        for (size_t k = 0; k < 4; ++k) {
+            const WheelDraw& wd = M.wheels[k];
+            // model * T(merkez) * sapma (dikey eksen, yalniz on) * donus (aks = GL z) * T(-merkez)
+            Mat4 wm = matMul(model, matTranslate(wd.cx, wd.cy, wd.cz));
+            if (k < 2 && steer != 0.0f) wm = matMul(wm, matRotY(steer));
+            wm = matMul(matMul(wm, matRotZ(-wheelSpin)), matTranslate(-wd.cx, -wd.cy, -wd.cz));
+            const Mat4 wmvp = matMul(proj, matMul(view, wm));
+            glUniformMatrix4fv(uMvp_, 1, GL_FALSE, wmvp.m);
+            glUniformMatrix4fv(uModel_, 1, GL_FALSE, wm.m);
+            glDrawArrays(GL_TRIANGLES, wd.first, wd.count);
+        }
+        const int rest = M.count - (M.wheels.back().first + M.wheels.back().count);
+        if (rest > 0) {
+            glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
+            glUniformMatrix4fv(uModel_, 1, GL_FALSE, model.m);
+            glDrawArrays(GL_TRIANGLES, M.wheels.back().first + M.wheels.back().count, rest);
+        }
+    } else glDrawArrays(GL_TRIANGLES, 0, M.count);
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, vw_ * S, vh_ * S);
 }

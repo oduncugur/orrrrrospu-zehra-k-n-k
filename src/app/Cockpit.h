@@ -31,6 +31,7 @@ public:
     double brake() const { return std::max(brakeUi_, keyBrake_); }
     double clutch() const { return std::max(clutchUi_, keyClutch_); }   // 1 = basili
     int  knobGear() const { return knobGear_; }    // H-desen: kolun gosterdigi vites (0 = bos)
+    bool takeSeated() { const bool e = seatedEv_ != 0; seatedEv_ = 0; return e; }   // vites yuvaya oturdu (titresim)
     int  takeShift() { const int s = shift_; shift_ = 0; return s; }   // sirali: +1 / -1 darbe
     AutoPos autoPos() const { return autoPos_; }
     void setKnobGear(int g);                        // kolu bir vitese oturt (klavye, baslangic)
@@ -40,7 +41,7 @@ private:
     enum class Ctl { None, Throttle, Brake, Clutch, Shifter, Up, Down, Auto };
     struct Touch { int id; Ctl ctl; };
     Ctl hit(float x, float y) const;
-    void shifterFromPoint(float x, float y);
+    void shifterFromPoint(float x, float y, bool release = false);
     void autoFromPoint(float y);
 
     bool portrait_ = false;
@@ -52,6 +53,9 @@ private:
     float keyThr_ = 0, keyBrake_ = 0, keyClutch_ = 0;
     bool kThr_ = false, kBrake_ = false, kClutch_ = false;
     float knobX_ = 0, knobY_ = 0;
+    // Surukleme: kol parmagi vites kanali icinde izler (gorsel), vites yalniz yuvaya oturunca / birakinca takilir
+    bool knobDrag_ = false; float dragX_ = 0, dragY_ = 0, lastShX_ = 0, lastShY_ = 0;
+    int seatedEv_ = 0;                             // yeni oturma olayi (titresim icin, okununca sifir)
     int knobGear_ = 1, shift_ = 0;
     AutoPos autoPos_ = AutoPos::D;
 };

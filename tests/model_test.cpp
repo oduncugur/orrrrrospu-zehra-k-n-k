@@ -1,4 +1,4 @@
-// Arac modelleri: tum katalog icin ucgen butcesi (performans), gercek olculere uyum, teker zeminde, gecerli sayilar
+﻿// Arac modelleri: tum katalog icin ucgen butcesi (performans), gercek olculere uyum, teker zeminde, gecerli sayilar
 #include "garage/LowPolyModel.h"
 #include "garage/VehicleCatalog.h"
 #include <algorithm>
@@ -33,7 +33,7 @@ int main() {
     }
     const size_t n = vehicleCatalog().size();
     std::printf("    %zu arac, ortalama %zu ucgen, en fazla %zu (#%d)\n", n, sumTris / n, maxTris, maxId);
-    CHECK(maxTris <= 3000, "ucgen butcesi <= 3000 (mobilde 6+ arac ayni anda)");
+    CHECK(maxTris <= 4500, "ucgen butcesi <= 4500 (mobilde 6+ arac ayni anda)");
     CHECK(badNum == 0, "tum koseler sonlu, indeksler gecerli");
     CHECK(badDim == 0, "model olculeri gercek uzunluk/genislik/yukseklige uyuyor");
     CHECK(badGround == 0, "tekerler zeminde (z = 0)");

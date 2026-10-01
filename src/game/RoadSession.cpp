@@ -16,6 +16,10 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
             : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
                        kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
+    // Yol genisligi cesitliligi: otoban / sehirlerarasi 2x1 ile 2x2 genislik arasi, dag yolu dar, karma orta
+    if (mode == Mode::Karma) road_.setWidthRange(seed, 3.4, 5.4);
+    else if (kind == Kind::Touge) road_.setWidthRange(seed + 17u, 2.7, 3.5);
+    else road_.setWidthRange(seed + 31u, 3.3, 6.2);
     startS_ = kStartS;
     rivalLane_ = -lane();
     player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, -lane());

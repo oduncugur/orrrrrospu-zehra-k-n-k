@@ -7,7 +7,8 @@
 namespace zk {
 
 // z: yukseklik (m), grade: boyuna egim (dz/ds, yokus yukari +)
-struct RoadPoint { double x, y, heading, curvature, s, z = 0.0, grade = 0.0; };
+// hw: o noktadaki yol yari genisligi (m; yol boyunca daralir / genisler)
+struct RoadPoint { double x, y, heading, curvature, s, z = 0.0, grade = 0.0, hw = 3.6; };
 // Karma yarista yol bolumu: virajli (3B surus) ya da duz (drag gorunumu)
 // entry: ilk virajin gercek basladigi yer; minR: bloktaki en dar yaricap (onerilen giris hizi icin)
 struct RoadSection { double s0, s1; bool curvy; double entry = 0.0, minR = 0.0; };
@@ -26,7 +27,10 @@ public:
 
     const std::vector<RoadPoint>& points() const { return pts_; }
     double length() const { return pts_.back().s; }
-    double halfWidth() const { return halfWidth_; }
+    double halfWidth() const { return halfWidth_; }              // en dar yari genislik (serit yerlesimi)
+    double halfWidthAt(double s) const { return at(s).hw; }
+    // Genislik degisimi: yol boyunca 400-1100 m'lik bolumler [hwMin, hwMax] arasinda, 120 m'lik gecislerle
+    void setWidthRange(uint32_t seed, double hwMin, double hwMax);
     // s'deki nokta (dogrusal ara degerleme); s sinirlara kirpilir
     RoadPoint at(double s) const;
     // (x,y) icin en yakin yol koordinati. hint: onceki indeks (yerel arama, O(1)); guncellenir
