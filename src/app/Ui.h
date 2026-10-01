@@ -1,5 +1,6 @@
 // ZEHRA KINIK - Ortak arayuz yardimcilari (tus, para bicimi)
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include "app/Renderer.h"
 
@@ -31,10 +32,17 @@ inline void studio(Renderer& r, float y0, float y1, float floorY) {
     }
     r.rect(0, floorY, 360, floorY + 1, {0.30f, 0.32f, 0.38f});
 }
+// Dugme: dikey renk gecisi (ust acik), ince kenar, alt golge; yazi golgeli (okunurluk)
 inline void button(Renderer& r, const Rect& b, const std::string& label, Color bg, float scale = 2, Color fg = {1, 1, 1}) {
-    r.rect(b.x0, b.y0, b.x1, b.y1, bg);
-    r.rect(b.x0, b.y1 - 3, b.x1, b.y1, {bg.r * 0.6f, bg.g * 0.6f, bg.b * 0.6f});   // alt golge
-    r.textCentered(b.cx(), b.cy() - 3.5f * scale, label, scale, fg);
+    auto mul = [&](float k) { return Color{std::min(1.0f, bg.r * k), std::min(1.0f, bg.g * k), std::min(1.0f, bg.b * k), bg.a}; };
+    r.rect(b.x0 + 1, b.y0 + 2, b.x1 + 1, b.y1 + 2, {0, 0, 0, 0.35f * bg.a});           // dusen golge
+    r.gradientV(b.x0, b.y0, b.x1, b.y1, mul(1.18f), mul(0.92f));
+    r.rect(b.x0, b.y0, b.x1, b.y0 + 1, mul(1.45f));                                   // ust parlak kenar
+    r.rect(b.x0, b.y1 - 3, b.x1, b.y1, mul(0.6f));                                    // alt kalinlik
+    r.rect(b.x0, b.y0, b.x0 + 1, b.y1, mul(0.75f)); r.rect(b.x1 - 1, b.y0, b.x1, b.y1, mul(0.75f));
+    const float ty = b.cy() - 3.5f * scale - 1.0f;
+    r.textCentered(b.cx() + scale * 0.5f, ty + scale * 0.5f, label, scale, {0, 0, 0, 0.45f});
+    r.textCentered(b.cx(), ty, label, scale, fg);
 }
 
 inline std::string money(long v) {

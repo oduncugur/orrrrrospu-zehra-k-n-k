@@ -133,6 +133,7 @@ private:
     std::string savePath_, settingsPath_;
     uint32_t raceSeed_ = 1;
     std::vector<float> mix_;
+    float fade_ = 0.0f;                          // ekran gecis karartmasi (1 -> 0)
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 

@@ -87,7 +87,9 @@ void App::update(double dt) {
     if (pending_) {
         screen_ = std::move(pending_);
         if (onOrientation) onOrientation(screen_->landscape());
+        fade_ = 1.0f;                                         // ekran gecisi: karartmadan acilir
     }
+    fade_ = std::max(0.0f, fade_ - (float)std::min(dt, 0.05) / 0.22f);
     const auto t0 = std::chrono::steady_clock::now();
     screen_->update(std::min(dt, 0.1));
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
@@ -99,6 +101,7 @@ void App::update(double dt) {
 void App::render() {
     if (!renderer_.ready()) return;
     screen_->render(renderer_);
+    if (fade_ > 0.0f) renderer_.rect(0, 0, (float)renderer_.vw(), (float)renderer_.vh(), {0.02f, 0.02f, 0.03f, fade_ * fade_});
     renderer_.present(sw_, sh_);
 }
 
