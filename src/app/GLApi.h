@@ -35,7 +35,7 @@ inline bool zkLoadGL(void* (*)(const char*)) { return true; }
     X(PFNGLUNIFORM2FPROC, glUniform2f) X(PFNGLBLENDFUNCPROC, glBlendFunc)                                      \
     X(PFNGLUNIFORM1FPROC, glUniform1f) X(PFNGLUNIFORM3FPROC, glUniform3f) X(PFNGLDEPTHMASKPROC, glDepthMask)  \
     X(PFNGLDELETEFRAMEBUFFERSPROC, glDeleteFramebuffers) X(PFNGLDELETETEXTURESPROC, glDeleteTextures)          \
-    X(PFNGLDELETERENDERBUFFERSPROC, glDeleteRenderbuffers)
+    X(PFNGLDELETERENDERBUFFERSPROC, glDeleteRenderbuffers) X(PFNGLUNIFORM4FPROC, glUniform4f)
 
 // Isim cakismasini onlemek icin (opengl32 / libGL disa aktarimlari) zk_ onekli isaretciler
 #define ZK_GL_DECLARE(type, name) extern type zk_##name;
@@ -87,6 +87,7 @@ ZK_GL_FUNCS(ZK_GL_DECLARE)
 #define glDeleteFramebuffers zk_glDeleteFramebuffers
 #define glDeleteTextures zk_glDeleteTextures
 #define glDeleteRenderbuffers zk_glDeleteRenderbuffers
+#define glUniform4f zk_glUniform4f
 
 bool zkLoadGL(void* (*getProc)(const char*));
 #endif

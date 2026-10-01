@@ -100,6 +100,7 @@ void App::goCareerRace() {
 void App::goParts(int cat) { setScreen(std::make_unique<PartsScreen>(*this, cat)); }
 void App::goFabricate(int cat) { setScreen(std::make_unique<FabricateScreen>(*this, cat)); }
 void App::goJunkyard() { setScreen(std::make_unique<JunkyardScreen>(*this)); }
+void App::goBodyShop() { setScreen(std::make_unique<BodyShopScreen>(*this)); }
 void App::goRestore() { setScreen(std::make_unique<RestoreScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }

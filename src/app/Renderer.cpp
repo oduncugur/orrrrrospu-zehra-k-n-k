@@ -95,11 +95,12 @@ GLuint program(const char* vs, const char* fs) {
 // (Fresnel). aGloss: 0 mat (lastik) .. 1 boya/cam/krom; < 0 isik yayan (far, stop). uShadow: zemin golgesi (siyah, alfa).
 const char* kVs3D = R"(layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec3 aCol;
 layout(location=3) in float aGloss;
-uniform mat4 uMvp; uniform mat4 uModel; out vec3 vN; out vec3 vP; out vec3 vCol; out float vGloss; out vec2 vL;
-void main(){ vL = aPos.xz; vN = mat3(uModel) * aNrm; vP = (uModel * vec4(aPos, 1.0)).xyz; vCol = aCol; vGloss = aGloss;
+uniform mat4 uMvp; uniform mat4 uModel; out vec3 vN; out vec3 vP; out vec3 vCol; out float vGloss; out vec2 vL; out vec3 vLp;
+void main(){ vL = aPos.xz; vLp = aPos; vN = mat3(uModel) * aNrm; vP = (uModel * vec4(aPos, 1.0)).xyz; vCol = aCol; vGloss = aGloss;
   gl_Position = uMvp * vec4(aPos, 1.0); })";
-const char* kFs3D = R"(precision mediump float; in vec3 vN; in vec3 vP; in vec3 vCol; in float vGloss; in vec2 vL;
+const char* kFs3D = R"(precision mediump float; in vec3 vN; in vec3 vP; in vec3 vCol; in float vGloss; in vec2 vL; in vec3 vLp;
 uniform vec3 uEye; uniform float uAlpha; uniform float uShadow; uniform vec2 uLight; out vec4 o;
+uniform vec4 uPaint; uniform vec4 uRim; uniform vec4 uStripe; uniform vec2 uPG;
 vec3 sky(vec3 r){ float y = r.y;
   vec3 hor = vec3(0.86, 0.80, 0.72), top = vec3(0.32, 0.48, 0.86), gnd = vec3(0.22, 0.24, 0.20);
   return y > 0.0 ? mix(hor, top, pow(y, 0.6)) : mix(hor * 0.7, gnd, pow(-y, 0.4)); }
@@ -109,14 +110,24 @@ void main(){
   if (vGloss < 0.0) { o = vec4(vCol, 1.0); return; }
   vec3 n = normalize(vN); vec3 v = normalize(uEye - vP);
   if (dot(n, v) < 0.0) n = -n;
+  vec3 col = vCol; float g = vGloss;
+  if (g > 0.995) {                                       // boya (gloss 1.0): renk / serit / cila
+    if (uPaint.a > 0.5) col = uPaint.rgb;
+    float z = abs(vLp.z);
+    bool st = uStripe.a > 2.5 ? (abs(n.y) < 0.6 && abs(vLp.y - uPG.y) < 0.045)
+            : uStripe.a > 1.5 ? (n.y > 0.5 && z > 0.07 && z < 0.17)
+            : uStripe.a > 0.5 ? (n.y > 0.5 && z < 0.16) : false;
+    if (st) col = uStripe.rgb;
+    g = uPG.x;
+  } else if (abs(g - 0.7) < 0.005 && uRim.a > 0.5) col = uRim.rgb;   // jant
   vec3 l = normalize(vec3(0.35, 0.9, 0.55));
   float dif = max(dot(n, l), 0.0);
   vec3 amb = mix(vec3(0.30, 0.28, 0.25), vec3(0.62, 0.70, 0.85), n.y * 0.5 + 0.5);
-  vec3 c = vCol * (0.42 * amb * uLight.y + 0.72 * dif * uLight.x);
+  vec3 c = col * (0.42 * amb * uLight.y + 0.72 * dif * uLight.x);
   float fr = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
-  c = mix(c, sky(reflect(-v, n)) * uLight.y, clamp(vGloss * (0.06 + 0.55 * fr), 0.0, 0.6));
+  c = mix(c, sky(reflect(-v, n)) * uLight.y, clamp(g * (0.06 + 0.55 * fr), 0.0, 0.6));
   vec3 h = normalize(l + v);
-  c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), 70.0) * vGloss * 0.9 * uLight.x;
+  c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), g > 0.5 ? 70.0 : 12.0) * g * 0.9 * uLight.x;
   o = vec4(min(c, vec3(1.0)), 1.0); })";
 const char* kVs2D = R"(layout(location=0) in vec2 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
 void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); })";
@@ -167,7 +178,9 @@ Mat4 matScale(float s) { Mat4 r{}; r.m[0] = r.m[5] = r.m[10] = s; r.m[15] = 1; r
 // ------------------------------------------------------------------ Renderer
 bool Renderer::init() {
     p3d_ = program(kVs3D, kFs3D); uMvp_ = glGetUniformLocation(p3d_, "uMvp"); uModel_ = glGetUniformLocation(p3d_, "uModel");
-    uEye_ = glGetUniformLocation(p3d_, "uEye"); uLight_ = glGetUniformLocation(p3d_, "uLight"); uAlpha_ = glGetUniformLocation(p3d_, "uAlpha"); uShadow_ = glGetUniformLocation(p3d_, "uShadow");
+    uEye_ = glGetUniformLocation(p3d_, "uEye"); uLight_ = glGetUniformLocation(p3d_, "uLight");
+    uPaint_ = glGetUniformLocation(p3d_, "uPaint"); uRim_ = glGetUniformLocation(p3d_, "uRim");
+    uStripe_ = glGetUniformLocation(p3d_, "uStripe"); uPG_ = glGetUniformLocation(p3d_, "uPG"); uAlpha_ = glGetUniformLocation(p3d_, "uAlpha"); uShadow_ = glGetUniformLocation(p3d_, "uShadow");
     p2d_ = program(kVs2D, kFs2D); uSize_ = glGetUniformLocation(p2d_, "uSize");
     pBlit_ = program(kVsBlit, kFsBlit); uUv_ = glGetUniformLocation(pBlit_, "uUv");
 
@@ -196,12 +209,12 @@ bool Renderer::init() {
         }
     }
     glBindVertexArray(0);
-    meshes_.clear();
+    meshes_.clear(); kits_.clear();
     ready_ = true;
     return true;
 }
 
-void Renderer::shutdown() { ready_ = false; meshes_.clear(); batch_.clear(); texSize_ = 0; fbo_ = tex_ = depth_ = 0; }
+void Renderer::shutdown() { ready_ = false; meshes_.clear(); kits_.clear(); batch_.clear(); texSize_ = 0; fbo_ = tex_ = depth_ = 0; }
 
 void Renderer::ensureTarget() {
     const int want = kFbo * scale_;
@@ -344,7 +357,7 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     for (size_t i = 0; i < nt; ++i) for (int k : {m.tris[i].a, m.tris[i].b, m.tris[i].c}) adj[k].push_back((int)i);
     auto gloss = [](int mat) {
         switch (mat) {
-        case MatPaint: return 1.0f; case MatGlass: return 0.45f; case MatChrome: return 1.0f; case MatRim: return 0.7f;
+        case MatPaint: return 1.0f; case MatGlass: return 0.45f; case MatChrome: return 0.99f; case MatRim: return 0.7f;
         case MatTrim: return 0.25f; case MatPlate: return 0.15f; case MatDark: return 0.05f; case MatTire: return 0.03f;
         default: return -1.0f;                                                   // far / stop / sinyal: isik yayar
         }
@@ -353,7 +366,15 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     buf.reserve(nt * 30);
     float maxX = 0, maxY = 0;
     for (const Vertex& p : m.verts) { maxX = std::max(maxX, std::fabs(p.x)); maxY = std::max(maxY, std::fabs(p.y)); }
-    M.halfL = maxX; M.halfW = maxY;
+    M.halfL = maxX; M.halfW = maxY; M.paint = m.paintRGB;
+    {   // arka uc / bagaj ustu yuksekligi (kit ve kanat yerlesimi icin; GL: x ileri, y yukari)
+        float rx = 0, fx = 0;
+        for (const Vertex& p : m.verts) { rx = std::min(rx, p.x); fx = std::max(fx, p.x); }
+        float top = 0.3f;
+        for (const Tri& t : m.tris) if (t.material == MatPaint)
+            for (int k : {t.a, t.b, t.c}) if (m.verts[k].x < rx + 0.45f) top = std::max(top, m.verts[k].z);
+        M.rearX = rx; M.frontX = fx; M.rearTop = top;
+    }
     // Govde ucgenleri once, sonra her teker ayri aralikta (kendi donusumuyle cizilir)
     std::vector<size_t> order;
     order.reserve(nt);
@@ -405,9 +426,66 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     return M;
 }
 
+// Govde kiti / kanat: kutulardan (arac olcusune gore yerlesim). Boya parcalari gloss 1.0 (boya rengini alir), karbon 0.3.
+const Renderer::Mesh& Renderer::kitMesh(int carId, int aero, float wingH) {
+    const long key = (long)carId * 64 + aero * 4 + (aero == 9 ? std::clamp((int)(wingH * 10), 0, 3) : 0);
+    auto it = kits_.find(key);
+    if (it != kits_.end()) return it->second;
+    Mesh& K = kits_[key];
+    const Mesh& M = mesh(carId);
+    std::vector<float> buf;
+    const float pr = ((M.paint >> 16) & 255) / 255.f, pg = ((M.paint >> 8) & 255) / 255.f, pb = (M.paint & 255) / 255.f;
+    auto box = [&](float x0, float x1, float y0, float y1, float z0, float z1, bool paint) {
+        const float c[3] = {paint ? pr : 0.06f, paint ? pg : 0.06f, paint ? pb : 0.07f};
+        const float gl = paint ? 1.0f : 0.3f;
+        const float P[8][3] = {{x0, y0, z0}, {x1, y0, z0}, {x1, y1, z0}, {x0, y1, z0}, {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}};
+        const int F[6][4] = {{0, 1, 2, 3}, {5, 4, 7, 6}, {4, 0, 3, 7}, {1, 5, 6, 2}, {3, 2, 6, 7}, {4, 5, 1, 0}};
+        const float N[6][3] = {{0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, -1, 0}};
+        for (int f = 0; f < 6; ++f)
+            for (int k : {0, 1, 2, 0, 2, 3}) {
+                const float* q = P[F[f][k]];
+                buf.insert(buf.end(), {q[0], q[1], q[2], N[f][0], N[f][1], N[f][2], c[0], c[1], c[2], gl});
+            }
+    };
+    const float rx = M.rearX, top = M.rearTop, hw = M.halfW * 0.93f, L = M.halfL;
+    switch (aero) {
+    case 1: box(M.frontX - 0.28f, M.frontX + 0.03f, 0.10f, 0.14f, -hw * 0.95f, hw * 0.95f, false); break;          // on lip
+    case 2: for (float sg : {-1.0f, 1.0f}) box(-L * 0.5f, L * 0.45f, 0.13f, 0.24f, sg > 0 ? hw - 0.02f : -hw - 0.04f, sg > 0 ? hw + 0.04f : -hw + 0.02f, true); break;
+    case 3: box(rx + 0.04f, rx + 0.30f, top - 0.01f, top + 0.07f, -hw * 0.82f, hw * 0.82f, true); break;          // spoiler
+    case 4: box(rx + 0.02f, rx + 0.24f, top - 0.02f, top + 0.12f, -hw * 0.88f, hw * 0.88f, true); break;          // ducktail
+    case 7: box(rx - 0.06f, rx + 0.35f, 0.10f, 0.22f, -hw * 0.8f, hw * 0.8f, false);                                 // difuzor
+            for (int k = -2; k <= 2; ++k) box(rx - 0.06f, rx + 0.2f, 0.2f, 0.32f, k * hw * 0.3f - 0.012f, k * hw * 0.3f + 0.012f, false);
+            break;
+    case 5: case 6: case 9: {                                                                                         // kanat
+        const float H = aero == 5 ? 0.24f : aero == 6 ? 0.38f : std::clamp(wingH, 0.15f, 0.45f);
+        const float chord = aero == 6 ? 0.42f : 0.32f, span = aero == 6 ? hw * 1.0f : hw * 0.9f;
+        for (float sg : {-1.0f, 1.0f}) box(rx + 0.16f, rx + 0.24f, top - 0.02f, top + H, sg * span * 0.5f - 0.02f, sg * span * 0.5f + 0.02f, false);
+        box(rx - 0.04f, rx - 0.04f + chord, top + H, top + H + 0.035f, -span, span, false);
+        for (float sg : {-1.0f, 1.0f}) box(rx - 0.08f, rx + chord, top + H - 0.10f, top + H + 0.08f, sg * span - 0.012f, sg * span + 0.012f, false);
+        if (aero == 6) box(rx - 0.02f, rx + chord * 0.5f, top + H + 0.06f, top + H + 0.085f, -span, span, false);   // ikinci kat
+        break;
+    }
+    default: break;
+    }
+    if (buf.empty()) return K;
+    GLuint a, b;
+    glGenVertexArrays(1, &a); glGenBuffers(1, &b); K.vao = a; K.vbo = b;
+    glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
+    glBufferData(GL_ARRAY_BUFFER, buf.size() * sizeof(float), buf.data(), GL_STATIC_DRAW);
+    for (int i = 0; i < 4; ++i) {
+        glEnableVertexAttribArray(i);
+        glVertexAttribPointer(i, i == 3 ? 1 : 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(i * 3 * sizeof(float)));
+    }
+    glBindVertexArray(0);
+    K.count = (int)buf.size() / 10;
+    return K;
+}
+
 void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4& proj, const Mat4& view, const Mat4& model,
                        float wheelSpin, float steer) {
     flush2D();
+    const CarLook look = look_;
+    look_ = CarLook{};                                                        // gorunum yalniz bu cizim icin
     const Mesh& M = mesh(carId);
     if (!M.count) return;
     glEnable(GL_DEPTH_TEST);
@@ -422,6 +500,10 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     const float ez = -(V[8] * V[12] + V[9] * V[13] + V[10] * V[14]);
     glUniform3f(uEye_, ex, ey, ez);
     glUniform2f(uLight_, sun_, amb_);
+    glUniform4f(uPaint_, look.paint[0], look.paint[1], look.paint[2], look.paintOn ? 1.0f : 0.0f);
+    glUniform4f(uRim_, look.rim[0], look.rim[1], look.rim[2], look.rimOn ? 1.0f : 0.0f);
+    glUniform4f(uStripe_, look.stripeCol[0], look.stripeCol[1], look.stripeCol[2], (float)look.stripe);
+    glUniform2f(uPG_, look.paintGloss, M.rearTop * 0.62f);
     {   // Zemin golgesi: iki kat (yumusak kenar), derinlik yazmadan, alfa karisimi
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
         glUniform1f(uShadow_, 1.0f);
@@ -438,12 +520,17 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
         glDepthMask(GL_TRUE); glDisable(GL_BLEND);
         glUniform1f(uShadow_, 0.0f);
     }
-    const Mat4 mvp = matMul(proj, matMul(view, model));
+    const Mat4 body = look.drop != 0.0f ? matMul(model, matTranslate(0, -look.drop, 0)) : model;   // basiklik: teker yerinde
+    const Mat4 mvp = matMul(proj, matMul(view, body));
     glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
-    glUniformMatrix4fv(uModel_, 1, GL_FALSE, model.m);
+    glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
     glUniform1f(uAlpha_, 1.0f);
+    if (look.aero > 0) {
+        const Mesh& K = kitMesh(carId, look.aero, look.wingH);
+        if (K.count) { glBindVertexArray(K.vao); glDrawArrays(GL_TRIANGLES, 0, K.count); }
+    }
     glBindVertexArray(M.vao);
-    if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f)) {
+    if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f || look.drop != 0.0f)) {
         glDrawArrays(GL_TRIANGLES, 0, M.bodyCount);
         for (size_t k = 0; k < 4; ++k) {
             const WheelDraw& wd = M.wheels[k];
@@ -459,7 +546,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
         const int rest = M.count - (M.wheels.back().first + M.wheels.back().count);
         if (rest > 0) {
             glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
-            glUniformMatrix4fv(uModel_, 1, GL_FALSE, model.m);
+            glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
             glDrawArrays(GL_TRIANGLES, M.wheels.back().first + M.wheels.back().count, rest);
         }
     } else glDrawArrays(GL_TRIANGLES, 0, M.count);

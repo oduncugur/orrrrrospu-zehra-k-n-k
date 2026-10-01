@@ -127,13 +127,18 @@ int main(int argc, char** argv) {
         }
     }
     size_t tapPos = 0;
+    if (const char* tv = std::getenv("ZK_TUNE")) parseTuneV2(tv, game.career.cars[game.career.current].tune);   // test: "aero:6,susp:3"
+    if (const char* lk = std::getenv("ZK_LOOK")) {                // test: "boya;cila;serit;seritRenk;jant"
+        OwnedCar& oc = game.career.cars[game.career.current];
+        std::sscanf(lk, "%d;%d;%d;%d;%d", &oc.paint, &oc.finish, &oc.stripe, &oc.stripeCol, &oc.rimCol);
+    }
     if (const char* ss = std::getenv("ZK_START_SCREEN")) {       // test: dogrudan bir ekran
         const std::string n = ss;
         if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
         else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
-        else if (n == "junk") game.goJunkyard(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore();
+        else if (n == "junk") game.goJunkyard(); else if (n == "paint") game.goBodyShop(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore();
     }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;

@@ -200,6 +200,24 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// Boyahane: renk, cila, serit, jant rengi (taslak onizleme, UYGULA ile odenir).
+class BodyShopScreen : public Screen {
+public:
+    explicit BodyShopScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; spin_ += (float)dt * 0.5f; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    int cost() const;
+    void apply();
+    App& app_;
+    int paint_ = -1, finish_ = 0, stripe_ = 0, stripeCol_ = 0, rimCol_ = -1;
+    float spin_ = 0.6f;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Hurdalik: 6 hasarli arac kelepir fiyata (her yaristan sonra yenilenir); alinca restorasyona gider.
 class JunkyardScreen : public Screen {
 public:

@@ -1,5 +1,6 @@
 #include "Screens.h"
 #include "Ui.h"
+#include "app/Looks.h"
 #include "garage/VehicleCatalog.h"
 #include "sim/PartTables.h"
 #include "sim/VehicleSim.h"
@@ -17,6 +18,7 @@ const Rect kParts{8, 570, 90, 632}, kGallery{96, 570, 178, 632}, kDyno{184, 570,
 const float kSl[4] = {292, 380, 352, 632};
 const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac varken)
 const Rect kRestoreG{8, 66, 112, 94};         // sol ust: hasar / yipranma varsa
+const Rect kPaintG{284, 100, 352, 128};       // sag ust: boyahane
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -91,6 +93,7 @@ void GarageScreen::render(Renderer& r) {
     const float L = (float)v.lengthM;
     const Mat4 proj = matPerspective(0.75f, 360.0f / 230.0f, 0.1f, 50.0f);
     const Mat4 view = matLookAt(0.0f, 1.1f + 0.2f * L, 1.35f * L + 1.2f, 0.0f, 0.55f, 0.0f);
+    r.setCarLook(lookOf(oc));
     r.drawCar(v.id, 0, 64, 360, 230, proj, view, matRotY(spin_));
 
     std::snprintf(b, sizeof b, "%d %s %s %.0fKG", v.year, bodyName(v.body), driveName(v.drive), v.massKg - Tune::weightKg(oc.tune.weight));
@@ -151,6 +154,7 @@ void GarageScreen::render(Renderer& r) {
 
     if (c.cars.size() > 1) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 2);
     if (worn()) button(r, kRestoreG, "RESTORASYON", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
+    button(r, kPaintG, "BOYA", Color{0.35f, 0.18f, 0.45f, 0.95f}, 2);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
         r.textCentered(180, 258, msg_, 2, kUiGold);
@@ -176,6 +180,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     }
     if (app_.career.cars.size() > 1 && kSellG.hit(x, y)) { selling_ = true; return; }
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
+    if (kPaintG.hit(x, y)) { app_.goBodyShop(); return; }
     if (x >= kSl[0] - 10 && y >= kSl[1] - 20) {
         throttlePtr_ = id;
         throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);

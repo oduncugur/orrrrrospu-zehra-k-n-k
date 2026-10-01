@@ -749,6 +749,10 @@ std::string Career::serialize() const {
         if (c.damaged()) { std::snprintf(buf, sizeof buf, "dmg=%d;%.4f\n", c.axleBroken ? 1 : 0, c.engineWear); o << buf; }
         if (c.gearboxBroken) o << "gbx=1\n";
         if (c.fromJunk) o << "junk=1\n";
+        if (c.paint >= 0 || c.finish || c.stripe || c.rimCol >= 0) {
+            std::snprintf(buf, sizeof buf, "look=%d;%d;%d;%d;%d\n", c.paint, c.finish, c.stripe, c.stripeCol, c.rimCol);
+            o << buf;
+        }
         o << "tun2=" << tuneV2String(t) << "\n";
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
@@ -802,6 +806,10 @@ bool Career::parse(const std::string& text, Career& out) {
         }
         else if (k == "gbx" && !c.cars.empty()) c.cars.back().gearboxBroken = v == "1";
         else if (k == "junk" && !c.cars.empty()) c.cars.back().fromJunk = v == "1";
+        else if (k == "look" && !c.cars.empty()) {
+            OwnedCar& oc = c.cars.back();
+            if (std::sscanf(v.c_str(), "%d;%d;%d;%d;%d", &oc.paint, &oc.finish, &oc.stripe, &oc.stripeCol, &oc.rimCol) != 5) return false;
+        }
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;

@@ -188,6 +188,16 @@ int main() {
         CHECK(Career::parse(c.serialize(), d) && d.rep == c.rep && d.eventWins == c.eventWins && d.dailyDone == 7 && d.leagueUnlocked() == 1,
               "un, etkinlikler ve gorevler kayitta korunur");
     }
+    std::printf("[G] Gorunum (boyahane) kayitta korunur\n");
+    {
+        Career c = Career::newGame();
+        c.cars[0].paint = 11; c.cars[0].finish = 2; c.cars[0].stripe = 3; c.cars[0].stripeCol = 7; c.cars[0].rimCol = 15;
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.cars[0].paint == 11 && d.cars[0].finish == 2 && d.cars[0].stripe == 3
+              && d.cars[0].stripeCol == 7 && d.cars[0].rimCol == 15, "boya / cila / serit / jant kayitta");
+        Career e;
+        CHECK(Career::parse(Career::newGame().serialize(), e) && e.cars[0].paint == -1 && e.cars[0].rimCol == -1, "fabrika gorunum varsayilan");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

@@ -93,6 +93,7 @@ public:
     void goParts(int cat = -1);                  // cat: dogrudan kategori (atolyeden donus)
     void goFabricate(int cat);                   // ozel uretim atolyesi
     void goJunkyard();
+    void goBodyShop();
     void goLeague();
     // Lig etkinligi baslat: rakip (isimli ya da dengi), mod; sonuc ekranindan donus lig ekranina
     void startEvent(int idx);

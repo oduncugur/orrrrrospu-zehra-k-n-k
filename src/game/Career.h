@@ -21,6 +21,9 @@ struct OwnedCar {
     double engineWear = 0.0;      // 0..1 motor hasari (yatak / asiri zorlanma / isi); 1 = motor patlak, revizyon sart
     bool   gearboxBroken = false; // kirik sanziman: yarisamaz
     bool   fromJunk = false;      // hurdaliktan alindi (restorasyon ekrani)
+    // Gorunum (boyahane): renk paleti indeksi (-1 fabrika), cila (0 parlak 1 metalik 2 mat 3 sedef), serit (0 yok 1 orta
+    // 2 cift 3 yan) ve rengi, jant rengi (-1 fabrika)
+    int paint = -1, finish = 0, stripe = 0, stripeCol = 0, rimCol = -1;
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
 };

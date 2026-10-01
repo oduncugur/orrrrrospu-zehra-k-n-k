@@ -1,4 +1,5 @@
 #include "Screens.h"
+#include "app/Looks.h"
 #include "garage/VehicleCatalog.h"
 
 #include <algorithm>
@@ -297,6 +298,8 @@ void DragScreen::drawCarAt(Renderer& r, int lane, float sx, float groundY, float
     const Mat4 view = matLookAt(0, 2.2f, 10, 0, 0.9f, 0);
     const Suspension& su = L.sim->suspension();
     const Mat4 model = matMul(matTranslate(0, (float)su.heave(), 0), matRotZ((float)(su.pitchDeg() * 3.14159265 / 180.0)));
+    if (lane == 0 && career_ && app_.career.car().carId == carIds_[0]) r.setCarLook(lookOf(app_.career.car()));
+    else r.setCarLook(lookOf(hasTune_[lane] ? &tunes_[lane] : nullptr));
     r.drawCar(v->id, sx - w / 2, y, w, h, proj, view, model);
 
     // Egzoz alevi: devir kesici / dogbox atesleme kesme

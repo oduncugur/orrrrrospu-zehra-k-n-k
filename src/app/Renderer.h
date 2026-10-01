@@ -55,14 +55,31 @@ public:
     // wheelSpin: teker donus acisi (rad, ileri +), steer: on teker sapmasi (rad, sola +)
     // Sahne isigi: gunes ve ortam (gece ~0.15 / 0.35); yeni karede (begin) gunduze doner
     void setSceneLight(float sun, float ambient) { sun_ = sun; amb_ = ambient; }
+    // Arac gorunumu (yalniz siradaki drawCar icin; sonra fabrikaya doner): boya, cila, serit, jant rengi,
+    // govde kiti / kanat (aero), basiklik (suspansiyon). Renkler golgelendiricide degisir: mesh yeniden kurulmaz.
+    struct CarLook {
+        bool paintOn = false; float paint[3] = {1, 1, 1};
+        float paintGloss = 1.0f;                // 0.12 mat .. 1.0 parlak .. 1.3 metalik
+        int stripe = 0; float stripeCol[3] = {1, 1, 1};   // 0 yok, 1 orta genis, 2 cift ince, 3 yan
+        bool rimOn = false; float rim[3] = {0.6f, 0.6f, 0.6f};
+        int aero = 0;                           // aeroTable indeksi (1 on lip, 2 yan etek, 3 spoiler, 4 ducktail, 5 GT, 6 yaris, 7 difuzor, 9 ozel)
+        float wingH = 0.3f;                     // ozel kanat yuksekligi (m)
+        float drop = 0.0f;                      // govde alcalmasi (m; teker yerinde kalir)
+    };
+    void setCarLook(const CarLook& l) { look_ = l; }
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,
                  float wheelSpin = 0.0f, float steer = 0.0f);
 
 private:
     float scaleFor(int screenW, int screenH) const;
     struct WheelDraw { float cx, cy, cz; int first, count; };
-    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels; };
+    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels;
+                  float rearX = -2, frontX = 2, rearTop = 1.0f; unsigned paint = 0xC0C0C0; };
     const Mesh& mesh(int carId);
+    const Mesh& kitMesh(int carId, int aero, float wingH);   // govde kiti / kanat (arac olcusune gore)
+    std::map<long, Mesh> kits_;
+    CarLook look_;
+    int uPaint_ = -1, uRim_ = -1, uStripe_ = -1, uPG_ = -1;
     void ensureTarget();                // FBO boyutu = kFbo x olcek (olcek degisince yeniden)
     std::vector<float> batch_;   // x y r g b a
     std::map<int, Mesh> meshes_;

@@ -3,6 +3,7 @@
 // masaustunde klavye (ekranda sag/sol tusu yok).
 #include "Screens.h"
 #include "Ui.h"
+#include "app/Looks.h"
 #include "garage/VehicleCatalog.h"
 #include "sim/VehicleSim.h"
 
@@ -673,6 +674,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         if (o.d < 3.0) continue;                                   // kameraya cok yakin / arkasinda
         r.drawCar(o.id, 0, 0, W, H, proj, view, carModel(o.x, o.y, o.z, o.psi, o.pitch), o.spin, o.steer);
     }
+    r.setCarLook(app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_));
     r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()),
               (float)spinP_, (float)steer_);
     if (rain_) {                                                       // yagmur: egik damla cizgileri (hizla egilir)
