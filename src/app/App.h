@@ -101,6 +101,7 @@ public:
     void goBodyShop();
     void goAchievements();
     void goEcu();
+    void goSetup();                              // kurulum (suspansiyon / lastik / profiller)
     void goSaveCode();
     // Pano (platform baglar: masaustu SDL, Android ClipboardManager). Yoksa bos / etkisiz.
     std::function<void(const std::string&)> onSetClipboard;

@@ -634,6 +634,27 @@ void applyUsedWear(Tune& t, PartCat c) {
     }
 }
 
+// Kurulum profili: ayarlanabilir alanlar (lastik basinci, suspansiyon, LSD, NOS memesi, kalkis devri, dyno ECU ayari)
+std::string setupString(const Tune& t) {
+    char b[160];
+    std::snprintf(b, sizeof b, "%.1f;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", t.psi, t.setRide, t.setSpring, t.setDamp, t.setArbF, t.setArbR,
+                  t.setPreload, t.setNos, t.launchRpm, t.ecuTiming, t.ecuAfr, t.ecuBoost);
+    return b;
+}
+bool applySetupString(const std::string& s, Tune& t) {
+    Tune n = t;
+    if (std::sscanf(s.c_str(), "%lf;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", &n.psi, &n.setRide, &n.setSpring, &n.setDamp, &n.setArbF, &n.setArbR,
+                    &n.setPreload, &n.setNos, &n.launchRpm, &n.ecuTiming, &n.ecuAfr, &n.ecuBoost) != 12) return false;
+    n.psi = std::clamp(n.psi, 0.0, 45.0);
+    n.ecuTiming = std::clamp(n.ecuTiming, -4, 6); n.ecuAfr = n.ecuAfr ? std::clamp(n.ecuAfr, 115, 135) : 0; n.ecuBoost = std::clamp(n.ecuBoost, -3, 5);
+    n.launchRpm = std::clamp(n.launchRpm, 0, 12000);
+    clampSetup(n);                                                     // o anki parcalarin izin verdigi kadar
+    t = n;
+    return true;
+}
+void Career::saveProfile(int k) { if (k >= 0 && k < 3) car().profile[k] = setupString(car().tune); }
+bool Career::loadProfile(int k) { return k >= 0 && k < 3 && !car().profile[k].empty() && applySetupString(car().profile[k], car().tune); }
+
 bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* refund) {
     OwnedCar& oc = car();
     const VehicleDef& v = *findVehicle(oc.carId);
@@ -655,6 +676,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
         if (refund) *refund = back;
     }
     setPartLevel(oc.tune, c, level, v);
+    clampSetup(oc.tune);                                               // parca degisti: gecersiz kurulum ayari sifirlanir
     if (used) applyUsedWear(oc.tune, c);
     dailyAdd(TaskType::BuyParts, 1);
     return true;
@@ -808,6 +830,8 @@ const IntField kIntFields[] = {
     {"wch", &Tune::weightChassis, 4}, {"aef", &Tune::aeroFront, 4}, {"aes", &Tune::aeroSide, 4}, {"aeu", &Tune::aeroUnder, 4},
     {"fan", &Tune::fan, 5}, {"cmsc", &Tune::coolMisc, 4}, {"oclr", &Tune::oilCooler, 4}, {"opmp", &Tune::oilPump, 4},
     {"etim", &Tune::ecuTiming, 6, -4}, {"eafr", &Tune::ecuAfr, 135, 0}, {"ebst", &Tune::ecuBoost, 5, -3},
+    {"kri", &Tune::setRide, 20, -40}, {"ksp", &Tune::setSpring, 5, -5}, {"kdm", &Tune::setDamp, 5, -5}, {"karf", &Tune::setArbF, 3, -3},
+    {"karr", &Tune::setArbR, 3, -3}, {"kpl", &Tune::setPreload, 5, -5}, {"knos", &Tune::setNos, 95},
 };
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
@@ -1050,6 +1074,7 @@ std::string Career::serialize() const {
             o << buf;
         }
         o << "tun2=" << tuneV2String(t) << "\n";
+        for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
@@ -1114,6 +1139,7 @@ bool Career::parse(const std::string& text, Career& out) {
             if (std::sscanf(v.c_str(), "%d;%d;%d;%d;%d", &oc.paint, &oc.finish, &oc.stripe, &oc.stripeCol, &oc.rimCol) != 5) return false;
         }
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
+        else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
             oc.tune.partsVer = 1;                                  // "pv" yoksa eski kayit: tek liste secimleri donusturulur

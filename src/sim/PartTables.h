@@ -107,6 +107,10 @@ const std::vector<EcuHwOpt>& ecuHwTable();
 enum EcuSw { SwMap = 0, SwRev, SwLaunch, SwFlat, SwAntiLag, SwFlex, SwKnock, SwTcu, SwCount };
 struct EcuSwDef { const char* name; const char* desc; int price[10]; };
 const EcuSwDef& ecuSwDef(int sw);
+// Kurulum ayarlarinin acilmasi: ayarli suspansiyon (coilover / havali / drift / rally / pist), plakali LSD, NOS kiti
+bool suspAdjustable(const Tune& t);
+bool lsdAdjustable(const Tune& t);
+void clampSetup(Tune& t);                  // parca degisince gecersiz kalan ayarlar sifirlanir / sinirlanir
 int  ecuSwLevel(const Tune& t, int sw);
 void setEcuSwLevel(Tune& t, int sw, int lv);
 int  ecuSwMax(const Tune& t, int sw);               // takili ECU'nun izin verdigi en yuksek seviye

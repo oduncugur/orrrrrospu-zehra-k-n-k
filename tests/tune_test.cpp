@@ -1,5 +1,7 @@
 // Parca etkisi testleri: iki serit ayni arac + ayni yapay zeka surucu, tek fark incelenen parca.
 #include "game/DragRace.h"
+#include "game/Career.h"
+#include "sim/PartTables.h"
 #include <cmath>
 #include <cstdio>
 
@@ -98,6 +100,36 @@ int main() {
         // Slick + planli kalkista Mustang cekis sinirinda: kisa disli fazla torku patinaja harcar, 60 ft'i belirgin
         // degistirmez (eski 120 ms dump'ta kisa disli kazandiriyordu). Kaba hata yakalayici: fark <= 0.05 s.
         CHECK(std::fabs(r.a.sixtyFt - r.b.sixtyFt) <= 0.05, "cekis sinirinda kisa son disli 60 ft'i belirgin degistirmez");
+    }
+    std::printf("[K] Kurulum: parca kilidi, yukseklik, NOS memesi, LSD on yuku, profiller\n");
+    {
+        const VehicleDef* v = findVehicle(5);
+        auto sim = [&](const Tune& t) { VehicleSimConfig c; c.car = v; c.tune = &t; return VehicleSim(c); };
+        Tune base; base.susp = 0; base.setRide = -30;                       // stok suspansiyon: ayar etkisiz
+        Tune stock;
+        CHECK(std::fabs(sim(base).vehicleLoad().hCoG - sim(stock).vehicleLoad().hCoG) < 1e-12, "ayarli suspansiyon yoksa yukseklik etkisiz");
+        Tune co; co.susp = 3; Tune lo = co; lo.setRide = -30; Tune hi = co; hi.setRide = 20;
+        const double h0 = sim(co).vehicleLoad().hCoG, hl = sim(lo).vehicleLoad().hCoG, hh = sim(hi).vehicleLoad().hCoG;
+        std::printf("    agirlik merkezi: coilover %.3f, -30 mm %.3f, +20 mm %.3f\n", h0, hl, hh);
+        CHECK(hl < h0 && hh > h0, "coilover ile alcaltma / yukseltme agirlik merkezini oynatir");
+        Tune n; n.nitrous = 4; Tune nj = n; nj.setNos = 50;
+        CHECK(std::fabs(sim(nj).nosHp() - 0.5 * sim(n).nosHp()) < 1e-6 && std::fabs(sim(nj).nosBottleS() - 2.0 * sim(n).nosBottleS()) < 1e-6,
+              "NOS memesi %50: yari guc, iki kat tup suresi");
+        Tune d; d.diff = DiffType::OneAndHalfWay; d.setPreload = 3; clampSetup(d);
+        Tune o; o.diff = DiffType::Open; o.setPreload = 3; clampSetup(o);
+        CHECK(d.setPreload == 3 && o.setPreload == 0, "LSD on yuku yalniz plakali LSD'de");
+        Tune pre = co; pre.setRide = 0;
+        CHECK(pre.signature() != lo.signature(), "kurulum imzaya (onbellek anahtari) girer");
+        CHECK(stock.signature() == Tune{}.signature(), "ayarsiz arac imzasi degismedi");
+        Career c = Career::newGame();
+        c.cars[c.current].tune.susp = 3; c.cars[c.current].tune.setRide = -20; c.cars[c.current].tune.psi = 18;
+        c.saveProfile(0);
+        c.cars[c.current].tune.setRide = 10; c.cars[c.current].tune.psi = 30;
+        CHECK(c.loadProfile(0) && c.car().tune.setRide == -20 && c.car().tune.psi == 18, "profil kaydet / yukle");
+        Career r;
+        CHECK(Career::parse(c.serialize(), r) && r.car().profile[0] == c.car().profile[0] && r.car().tune.setRide == -20, "profil ve kurulum kayitta");
+        c.cars[c.current].tune.susp = 0; clampSetup(c.cars[c.current].tune);
+        CHECK(c.car().tune.setRide == 0 && !c.loadProfile(1), "parca sokulunce ayar sifirlanir; bos profil yuklenmez");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;

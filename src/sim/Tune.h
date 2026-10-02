@@ -45,6 +45,10 @@ struct Tune {
     int aeroFront = 0, aeroSide = 0, aeroUnder = 0, fan = 0, coolMisc = 0, oilCooler = 0, oilPump = 0;
     // Dyno ECU ince ayari (plug-in ECU ve ustu): avans (derece, -4..+6), AFR x10 (115..135; 0 = 12.5), boost x10 bar (-3..+5)
     int ecuTiming = 0, ecuAfr = 0, ecuBoost = 0;
+    // Kurulum (KURULUM ekrani; 0 = orta / fabrika): yukseklik mm (-40..+20, ayarli suspansiyon), yay ve amortisor
+    // (-5..+5, %5 / %8 adim), viraj demiri on / arka (-3..+3, %20 adim), LSD on yuku (-5..+5, %15 adim; plakali LSD),
+    // NOS memesi (% guc; 0 = %100, 50..95: daha az guc, daha uzun tup)
+    int setRide = 0, setSpring = 0, setDamp = 0, setArbF = 0, setArbR = 0, setPreload = 0, setNos = 0;
     int partsVer = 2;                         // parca tablolari surumu (eski kayit < 2: tek liste secimleri bilesenlere cevrilir)
     int totalWeightKg() const;                // ic + kaporta + cam + sasi hafifletmesi
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi

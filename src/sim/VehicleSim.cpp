@@ -188,9 +188,11 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
                                                               : gbx_.finalDrive * row(finalTable(), tune->finalSel).mul;
         } else if (tune->finalDrive > 0.0) gbx_.finalDrive = tune->finalDrive;
         const DiffOpt& D = row(diffTable(), (int)tune->diff);
-        diff.preload = D.preload; diff.plateFactor = D.plate; diff.rampAccelDeg = D.rampA; diff.rampDecelDeg = D.rampD;
+        diff.preload = D.preload * (lsdAdjustable(*tune) ? 1.0 + 0.15 * std::clamp(tune->setPreload, -5, 5) : 1.0);   // kurulum: on yuk
+        diff.plateFactor = D.plate; diff.rampAccelDeg = D.rampA; diff.rampDecelDeg = D.rampD;
         const NosOpt& N = row(nosTable(), tune->nitrous);
-        nosHp_ = N.hp; nosLeft_ = nosBottle_ = N.bottleS;
+        const double jet = tune->setNos >= 50 ? std::min(tune->setNos, 95) / 100.0 : 1.0;     // kucuk meme: az guc, uzun tup
+        nosHp_ = N.hp * jet; nosLeft_ = nosBottle_ = N.bottleS / jet;
         const ElecOpt& E = row(elecTable(), tune->elec);
         if (tune->elec > 0) { tcSlip_ = E.tcSlip; absSlip_ = E.absSlip; }
     }
@@ -285,7 +287,9 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     if (tune && car) baseMass_ += swapMassDelta(*car, *tune) + 45.0 * std::clamp(tune->wearBody, 0.0, 1.0);   // pas / macun
     fuelKg_ = cfg.fuelLiters * fuelDensity_;
     const SuspOpt& SU = row(suspTable(), tune ? tune->susp : 0);
-    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0) - SU.lowerMm * 0.0008;
+    const bool adj = tune && suspAdjustable(*tune);                         // kurulum ayarlari (ayarli suspansiyon)
+    const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0) - SU.lowerMm * 0.0008
+                      + (adj ? std::clamp(tune->setRide, -40, 20) * 0.0008 : 0.0);   // yukseklik: kucuk = alcak agirlik merkezi
     vl_ = VehicleLoad{baseMass_ + fuelKg_, car ? car->wheelbaseM : 2.62, car ? car->widthM * 0.85 : 1.50, hCoG,
                       car ? car->frontWeight : 0.62};
     // Suspansiyon: kasa tipine gore dogal frekans (Hz); yaris araclari sert
@@ -298,9 +302,15 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         }
         if (!car->streetLegal) fRide_ = 2.8;
         fRide_ *= SU.ride * (tune ? 1.0 - 0.30 * std::clamp(tune->wearSusp, 0.0, 1.0) : 1.0);   // bitik amortisor: yumusak
+        if (adj) fRide_ *= 1.0 + 0.05 * std::clamp(tune->setSpring, -5, 5);
     }
-    susp_ = std::make_unique<Suspension>(SuspensionSetup::fromVehicle(vl_.mass, vl_.wheelbase, vl_.track, vl_.hCoG,
-                                                                      vl_.frontStatic, fRide_, fRide_ * 1.1, 0.30, 0.60));
+    {
+        const double dz = adj ? 1.0 + 0.08 * std::clamp(tune->setDamp, -5, 5) : 1.0;
+        SuspensionSetup ss = SuspensionSetup::fromVehicle(vl_.mass, vl_.wheelbase, vl_.track, vl_.hCoG, vl_.frontStatic,
+                                                          fRide_, fRide_ * 1.1, 0.30 * dz, 0.60 * dz);
+        if (adj) { ss.arbFront *= 1.0 + 0.2 * std::clamp(tune->setArbF, -3, 3); ss.arbRear *= 1.0 + 0.2 * std::clamp(tune->setArbR, -3, 3); }
+        susp_ = std::make_unique<Suspension>(ss);
+    }
     for (int i = 0; i < 4; ++i) susp_->setTirePressure(i, w_[i].psi());
     road_ = std::make_unique<RoadProfile>(RoadProfile::preset(cfg.road));
     if (car) {

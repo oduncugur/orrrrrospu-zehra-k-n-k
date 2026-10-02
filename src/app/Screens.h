@@ -258,6 +258,21 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// Kurulum: lastik basinci, ayarli suspansiyon, LSD on yuku, NOS memesi; DRAG / YOL / PIST profilleri
+class SetupScreen : public Screen {
+public:
+    explicit SetupScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    void change(int row, int dir);
+    App& app_;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Basarimlar: liste (kazanilan altin, odul), ilerleme
 class AchievementsScreen : public Screen {
 public:

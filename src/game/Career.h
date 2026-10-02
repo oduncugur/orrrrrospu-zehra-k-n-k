@@ -10,6 +10,9 @@
 
 namespace zk {
 
+std::string setupString(const Tune& t);                    // kurulum profili metni
+bool applySetupString(const std::string& s, Tune& t);    // profil metnini uygula (parcalara gore sinirlar)
+
 struct OwnedCar {
     int  carId = 0;
     Tune tune;
@@ -24,6 +27,9 @@ struct OwnedCar {
     // Gorunum (boyahane): renk paleti indeksi (-1 fabrika), cila (0 parlak 1 metalik 2 mat 3 sedef), serit (0 yok 1 orta
     // 2 cift 3 yan) ve rengi, jant rengi (-1 fabrika)
     int paint = -1, finish = 0, stripe = 0, stripeCol = 0, rimCol = -1;
+    // Kurulum profilleri (DRAG / YOL / PIST): kurulum alanlari tuneV2String bicimiyle; bos = kayitli degil
+    std::string profile[3];
+    bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
 };
@@ -149,6 +155,9 @@ struct Career {
     bool sellCurrent(std::string* why = nullptr);
     // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).
     // Sokulen eski (stok olmayan) parca %35'e satilir: refund (verildiyse) ciktisi.
+    // Kurulum profilleri (0 DRAG, 1 YOL, 2 PIST): kaydet / yukle (gecerli parcalara gore sinirlanir)
+    void saveProfile(int k);
+    bool loadProfile(int k);
     bool buyPart(PartCat c, int level, std::string* why = nullptr, bool used = false, long* refund = nullptr);
     // ECU yazilimi: modulu bir seviye yukselt (yuva / ECU siniri / para) ya da bir seviye dusur (iade yok)
     bool buyEcuSoftware(int sw, std::string* why = nullptr);

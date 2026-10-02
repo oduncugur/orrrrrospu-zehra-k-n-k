@@ -17,7 +17,7 @@ if len(sys.argv) > 2:
         for t, z, j in rows: o.write('    {"%s", "%s", "%s"},\n' % (t, z, j))
         o.write('};\n')
 cps = set()
-for f in ['src/app/LangCJK.inc', 'src/app/Lang.cpp']:
+for f in ['src/app/LangCJK.inc', 'src/app/LangMore3.inc', 'src/app/Lang.cpp']:
     for ch in open(os.path.join(root, f), encoding='utf-8').read():
         if ord(ch) >= 0x2E80: cps.add(ord(ch))
 glyph = {}

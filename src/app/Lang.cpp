@@ -392,6 +392,7 @@ const Entry kEnWords[] = {
 #include "LangMore.inc"
 #include "LangMore2.inc"
 #include "LangCJK.inc"
+#include "LangMore3.inc"
 
 struct Table { std::unordered_map<std::string, std::string> phrases, words; };
 
@@ -410,6 +411,7 @@ Table buildMulti(int col, const Table& en) {
         const char* w[5] = {m.de, m.es, m.fr, m.it, m.pt};
         t.words[m.tr] = w[col];
     }
+    for (const Multi4& m : kMulti4) t.words[m.w[0]] = m.w[2 + col];
     return t;
 }
 
@@ -420,6 +422,7 @@ Table buildMulti2(int col, const Table& en) {
         const char* w[6] = {m.ru, m.uk, m.el, m.pl, m.nl, m.id};
         t.words[m.tr] = w[col];
     }
+    for (const Multi4& m : kMulti4) t.words[m.w[0]] = m.w[7 + col];
     return t;
 }
 
@@ -427,6 +430,7 @@ const Table* tableFor(Lang l) {
     static const Table en = [] {
         Table t = build(kEnPhrases, sizeof kEnPhrases / sizeof *kEnPhrases, kEnWords, sizeof kEnWords / sizeof *kEnWords);
         for (int i = 0; i < HintCount; ++i) t.phrases[hintTexts()[i]] = hintTextsEn()[i];   // ilk giris ipuclari
+        for (const Multi4& m : kMulti4) t.words[m.w[0]] = m.w[1];
         return t;
     }();
     static const Table more[5] = {buildMulti(0, en), buildMulti(1, en), buildMulti(2, en), buildMulti(3, en), buildMulti(4, en)};
@@ -442,8 +446,8 @@ const Table* tableFor(Lang l) {
         return &extra[(int)l - (int)Lang::RU];
     }
     case Lang::ZH: case Lang::JA: {
-        static const Table cjk[2] = {[&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.zh; return t; }(),
-                                     [&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.ja; return t; }()};
+        static const Table cjk[2] = {[&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.zh; for (const Multi4& m : kMulti4) t.words[m.w[0]] = m.w[13]; return t; }(),
+                                     [&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.ja; for (const Multi4& m : kMulti4) t.words[m.w[0]] = m.w[14]; return t; }()};
         return &cjk[(int)l - (int)Lang::ZH];
     }
     default: return nullptr;
