@@ -62,6 +62,7 @@ std::string Settings::serialize() const {
     o << "haptics=" << haptics << "\n";
     o << "tilt_steer=" << (tiltSteer ? 1 : 0) << "\n";
     o << "tilt_sensitivity=" << tiltSens << "\n";
+    o << "tilt_invert=" << (tiltInvert ? 1 : 0) << "\n";
     o << "assist=" << (assist ? 1 : 0) << "\n";
     o << "manual_gears=" << (manualGears ? 1 : 0) << "\n";
     o << "auto_clutch=" << (autoClutch ? 1 : 0) << "      # H-desen: 0 oyuncu debriyaji, 1 otomatik (odul %75)\n";
@@ -91,7 +92,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "integer_scale") s.integerScale = v != 0;
         else if (k == "fill_screen") s.fillScreen = v != 0;
         else if (k == "render_scale") s.renderScale = std::clamp(v, 1, 3);
-        else if (k == "language") s.language = std::clamp(v, 0, 12);
+        else if (k == "language") s.language = std::clamp(v, 0, 14);   // Lang::Count - 1 (TR .. JA)
         else if (k == "hints_seen") s.hintsSeen = std::max(0, v);
         else if (k == "road_portrait") s.roadPortrait = v != 0;
         else if (k == "master_volume") s.masterVol = snap(volumeOptions(), v);
@@ -100,6 +101,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "haptics") s.haptics = snap(hapticOptions(), v);
         else if (k == "tilt_steer") s.tiltSteer = v != 0;
         else if (k == "tilt_sensitivity") s.tiltSens = snap(tiltSensOptions(), v);
+        else if (k == "tilt_invert") s.tiltInvert = v != 0;
         else if (k == "assist") s.assist = v != 0;
         else if (k == "manual_gears") s.manualGears = v != 0;
         else if (k == "auto_clutch") s.autoClutch = v != 0;

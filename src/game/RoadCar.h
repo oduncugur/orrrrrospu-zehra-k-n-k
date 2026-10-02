@@ -15,6 +15,8 @@ struct RoadControls {
     int    gear = -1;       // H-desen kolu: istenen vites (0 = bos); -1: istek yok
     int    shift = 0;       // sirali vites darbesi (+1 / -1)
     bool   neutral = false; // otomatik sanziman N / P (P'de durunca fren de tutar)
+    int    autoMode = -1;   // otomatik sanziman: 0 D, 1 S (spor), 2 M (elle +/-, shift ile); -1: otomatik kol yok
+    bool   reverse = false; // otomatik R: geri vites
 };
 
 class RoadCar {
@@ -39,6 +41,7 @@ public:
     double gripMul = 1.0;                  // hava durumu: yagmurda ~0.72 (islak asfalt)
     double launchRpm = 0.0;                // > 0: otomatik debriyajda kalkis devri (YZ drag kalkisi); 0: gaza gore 1500-2700
     bool slowClutch = false;               // otomatik debriyaj cezasi: kalkis ve vites gecisinde gec kavrar
+    int autoMode = 0;                      // otomatik sanziman: 0 D, 1 S, 2 M (elle; vites yalniz requestShift)
     void requestShift(int dir);            // manuel: +1 / -1
     void requestGear(int g);               // H-desen (otomatik debriyaj): dogrudan vites (0 = bos)
     bool grinding() const { return grind_; }   // oyuncu debriyajsiz vites denedi (dis citirtisi)
@@ -59,6 +62,7 @@ private:
     int hint_ = 0; double s_ = 0, lat_ = 0, lane_ = -1.8;
     double launchPedal_ = 1.0; bool launching_ = true;
     double shiftT_ = -1, sinceShift_ = 0; int target_ = 1;
+    void autoShift(int gear, double rpm, double thr);   // otomatik: gaza gore vites noktasi, kickdown, S / M
     double acc_ = 0, offT_ = 0;
     bool recovered_ = false, stalledEv_ = false;
 };

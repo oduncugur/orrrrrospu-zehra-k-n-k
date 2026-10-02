@@ -561,10 +561,10 @@ void FabricateScreen::key(Key k, bool down) {
 // ---------------------------------------------------------------- ECU yazilim
 // Donanim: yuva sayisi + modul seviye siniri. Her modul satiri: seviye, etki, [-] dusur (iade yok), [+] bir seviye al.
 namespace {
-constexpr float kSwY0 = 132, kSwH = 56;
+constexpr float kSwY0 = 130, kSwH = 52;
 const Rect kBackE{8, 596, 352, 634};
-Rect swMinus(int i) { return {214, kSwY0 + i * kSwH + 16, 254, kSwY0 + i * kSwH + 46}; }
-Rect swPlus(int i) { return {258, kSwY0 + i * kSwH + 16, 352, kSwY0 + i * kSwH + 46}; }
+Rect swMinus(int i) { return {214, kSwY0 + i * kSwH + 14, 254, kSwY0 + i * kSwH + 42}; }
+Rect swPlus(int i) { return {258, kSwY0 + i * kSwH + 14, 352, kSwY0 + i * kSwH + 42}; }
 }
 
 EcuScreen::EcuScreen(App& app) : app_(app) {
@@ -601,7 +601,7 @@ void EcuScreen::render(Renderer& r) {
         if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 250);
         else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
         r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
-        r.text(16, y + 33, std::string(d.desc).substr(0, 30), 1, kUiDim);
+        r.text(16, y + 31, std::string(d.desc).substr(0, 30), 1, kUiDim);
         if (mx <= 0) continue;
         if (lv > 0) button(r, swMinus(i), "-", kUiBtn, 2);
         if (lv < mx) {

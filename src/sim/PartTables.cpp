@@ -410,19 +410,19 @@ double fuelCap(const Tune& t) {
     return std::min(pump, inj) * fuelLineTable()[std::clamp(t.fuelLine, 0, 9)].cap;
 }
 
-// ECU donanimi: yuva, modul seviye siniri {harita, devir(+250 adim), launch, flat, anti-lag, flex, vuruntu}
+// ECU donanimi: yuva, modul seviye siniri {harita, devir(+250 adim), launch, flat, anti-lag, flex, vuruntu, tcu}
 const std::vector<EcuHwOpt>& ecuHwTable() {
     static const std::vector<EcuHwOpt> t = {
-        {"STOK ECU", 0, 1, {1, 0, 0, 0, 0, 0, 0}, true},
-        {"CHIP (EPROM)", 350, 1, {2, 1, 0, 0, 0, 0, 0}, true},
-        {"PIGGYBACK", 600, 2, {1, 2, 0, 0, 0, 1, 0}, true},
-        {"PIGGYBACK PRO", 900, 3, {2, 2, 1, 0, 0, 1, 0}, true},
-        {"PLUG-IN ECU", 1400, 3, {2, 4, 1, 1, 0, 1, 0}, true},
-        {"PLUG-IN PRO", 1900, 4, {3, 4, 1, 1, 0, 1, 0}, true},
-        {"STANDALONE", 2800, 5, {3, 6, 1, 1, 1, 1, 1}, false},
-        {"STANDALONE PRO", 3600, 6, {3, 7, 1, 1, 1, 1, 1}, false},
-        {"YARIS ECU", 5200, 7, {3, 8, 1, 1, 1, 1, 0}, true},
-        {"TAKIM YARIS ECU", 7500, 8, {3, 10, 1, 1, 1, 1, 0}, true},
+        {"STOK ECU", 0, 1, {1, 0, 0, 0, 0, 0, 0, 0}, true},
+        {"CHIP (EPROM)", 350, 1, {2, 1, 0, 0, 0, 0, 0, 1}, true},
+        {"PIGGYBACK", 600, 2, {1, 2, 0, 0, 0, 1, 0, 1}, true},
+        {"PIGGYBACK PRO", 900, 3, {2, 2, 1, 0, 0, 1, 0, 1}, true},
+        {"PLUG-IN ECU", 1400, 3, {2, 4, 1, 1, 0, 1, 0, 2}, true},
+        {"PLUG-IN PRO", 1900, 4, {3, 4, 1, 1, 0, 1, 0, 2}, true},
+        {"STANDALONE", 2800, 5, {3, 6, 1, 1, 1, 1, 1, 2}, false},
+        {"STANDALONE PRO", 3600, 6, {3, 7, 1, 1, 1, 1, 1, 2}, false},
+        {"YARIS ECU", 5200, 7, {3, 8, 1, 1, 1, 1, 0, 2}, true},
+        {"TAKIM YARIS ECU", 7500, 8, {3, 10, 1, 1, 1, 1, 0, 2}, true},
     };
     return t;
 }
@@ -435,6 +435,7 @@ const EcuSwDef& ecuSwDef(int sw) {
         {"ANTI-LAG", "TURBO ERKEN DOLAR (SPOOL)", {1500}},
         {"FLEX FUEL", "E85 / METANOLDE +%5 GUC", {800}},
         {"VURUNTU KONTROL", "STANDALONE VURUNTU KORUMASI", {500}},
+        {"TCU YAZILIMI", "OTOMATIK: HIZLI VITES, SPOR HARITA", {600, 900}},
     };
     return d[std::clamp(sw, 0, SwCount - 1)];
 }
@@ -442,7 +443,7 @@ namespace {
 int* swRef(Tune& t, int sw) {
     switch (sw) {
     case SwMap: return &t.swMap; case SwRev: return &t.swRev; case SwLaunch: return &t.swLaunch; case SwFlat: return &t.swFlat;
-    case SwAntiLag: return &t.swAntiLag; case SwFlex: return &t.swFlex; default: return &t.swKnock;
+    case SwAntiLag: return &t.swAntiLag; case SwFlex: return &t.swFlex; case SwTcu: return &t.swTcu; default: return &t.swKnock;
     }
 }
 }
@@ -719,6 +720,7 @@ std::string Tune::signature() const {
         std::snprintf(e, sizeof e, "|F%d,%d,%d|E%d,%d,%d,%d,%d,%d,%d,%d", fuelPump, injector, fuelLine, ecuHw, swMap, swRev, swLaunch, swFlat,
                       swAntiLag, swFlex, swKnock);
         out += e;
+        if (swTcu) { char g[16]; std::snprintf(g, sizeof g, "|T%d", swTcu); out += g; }
     }
     return out;
 }

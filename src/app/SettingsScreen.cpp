@@ -50,7 +50,7 @@ const char* help(It it) {
     case It::Engine: return "MOTOR, EGZOZ, TURBO SESI";
     case It::Tire: return "LASTIK CIGLIGI VE BURNOUT SESI";
     case It::Haptics: return "TITRESIM GUCU. 0 = KAPALI";
-    case It::Tilt: return "ACIK YOLDA TELEFONU EGEREK DIREKSIYON";
+    case It::Tilt: return "TELEFONU EGEREK DIREKSIYON; TERS: YON CEVRILIR";
     case It::TiltSens: return "YUKSEK: DAHA AZ EGIMLE TAM DIREKSIYON";
     case It::Assist: return "TC/ESP: YALNIZ ARACTA VARSA (YOKSA ECU + ELEKTRONIK PARCASI). YOLDA DA DEGISIR";
     case It::Gears: return "H-DESEN MANUEL: OTOMATIKTE VIRAJDA VITES YOK, GEC KAVRAR, ODUL %75";
@@ -113,7 +113,7 @@ std::string SettingsScreen::value(It it) const {
     case It::Engine: return pct(s.engineVol);
     case It::Tire: return pct(s.tireVol);
     case It::Haptics: return s.haptics > 0 ? pct(s.haptics) : "KAPALI";
-    case It::Tilt: return onOff(s.tiltSteer);
+    case It::Tilt: return !s.tiltSteer ? onOff(false) : s.tiltInvert ? std::string("TERS") : onOff(true);
     case It::TiltSens: return pct(s.tiltSens);
     case It::Assist: return onOff(s.assist);
     case It::Gears: return s.autoClutch ? "OTOMATIK" : "OYUNCU";
@@ -155,7 +155,9 @@ void SettingsScreen::change(It it, int dir) {
         s.haptics = list(Settings::hapticOptions(), s.haptics);
         app_.haptic(40, 200);                                  // yeni gucu hissettir
         break;
-    case It::Tilt: s.tiltSteer = !s.tiltSteer; break;
+    case It::Tilt:                                   // KAPALI -> ACIK -> TERS (yon) -> KAPALI
+        if (!s.tiltSteer) { s.tiltSteer = true; s.tiltInvert = false; } else if (!s.tiltInvert) s.tiltInvert = true; else { s.tiltSteer = false; s.tiltInvert = false; }
+        break;
     case It::TiltSens: s.tiltSens = list(Settings::tiltSensOptions(), s.tiltSens); break;
     case It::Assist: s.assist = !s.assist; break;
     case It::Gears: s.autoClutch = !s.autoClutch; break;

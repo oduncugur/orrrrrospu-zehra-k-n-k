@@ -164,6 +164,7 @@ void RoadScreen::update(double dt) {
     RoadCar& P = ses_->player();
     const double v = P.sim().speed();
     cockpit_.update(dt);
+    cockpit_.setPadPedals(app_.padThrottle(), app_.padBrake());
     if (cockpit_.takeSeated()) app_.haptic(18, 160);                     // vites yuvaya oturdu: kisa "tik"
     // Direksiyon: hiza gore sinirli (kinematik yanal ivme ~1.1 g), rampali; klavye ya da telefon egimi
     // Hiza gore sinir + kayma payi: arka kayarken (govde kayma acisi) karsi direksiyon icin tam aci acilir
@@ -171,7 +172,7 @@ void RoadScreen::update(double dt) {
     const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0) + slipAllow, 0.035, 0.50);
     double target = (kL_ ? maxSteer : 0.0) - (kR_ ? maxSteer : 0.0);
     if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer) {   // olu bolge %6
-        const double t = std::clamp(app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0), dz = 0.06;
+        const double t = std::clamp((app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0), dz = 0.06;
         const double u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);
         target = u * maxSteer;
     }
@@ -199,10 +200,15 @@ void RoadScreen::update(double dt) {
         break;
     }
     case Cockpit::Lever::Sequential: c.shift = cockpit_.takeShift(); break;
-    case Cockpit::Lever::Automatic:
-        c.neutral = cockpit_.autoPos() != Cockpit::AutoPos::D;
-        if (cockpit_.autoPos() == Cockpit::AutoPos::P && v < 0.5) c.brake = std::max(c.brake, 0.6);   // park kilidi
+    case Cockpit::Lever::Automatic: {
+        const Cockpit::AutoPos ap = cockpit_.autoPos();
+        c.neutral = ap == Cockpit::AutoPos::P || ap == Cockpit::AutoPos::N;
+        c.reverse = ap == Cockpit::AutoPos::R;
+        c.autoMode = ap == Cockpit::AutoPos::S ? 1 : ap == Cockpit::AutoPos::M ? 2 : 0;
+        c.shift = cockpit_.takeShift();
+        if (ap == Cockpit::AutoPos::P && std::fabs(v) < 0.5) c.brake = std::max(c.brake, 0.6);   // park kilidi
         break;
+    }
     }
     if (autopilot_) {
         double cap = 1e9;
@@ -815,8 +821,14 @@ void RoadScreen::drawHud(Renderer& r) {
     const int gear = pt.gear();
     const bool autoBox = cockpit_.lever() == Cockpit::Lever::Automatic;
     std::string gs = gear == 0 ? "N" : std::to_string(gear);
-    if (autoBox && cockpit_.autoPos() != Cockpit::AutoPos::D) gs = cockpit_.autoPos() == Cockpit::AutoPos::P ? "P" : "N";
-    r.text(x0 + 106, 4, gs, 4, Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : Color{1.0f, 0.62f, 0.05f});
+    Color gc = {1.0f, 0.62f, 0.05f};
+    if (autoBox) {
+        const Cockpit::AutoPos ap = cockpit_.autoPos();
+        if (ap == Cockpit::AutoPos::P) gs = "P"; else if (ap == Cockpit::AutoPos::R) gs = "R"; else if (ap == Cockpit::AutoPos::N) gs = "N";
+        else if (ap == Cockpit::AutoPos::S) gc = {1.0f, 0.3f, 0.25f};          // spor: kirmizi
+        else if (ap == Cockpit::AutoPos::M) gc = {0.45f, 0.8f, 1.0f};          // elle: mavi
+    }
+    r.text(x0 + 106, 4, gs, 4, Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : gc);
     const float red = (float)sim.engineSpec().redlineRpm, fill = std::clamp((float)pt.rpm() / (red * 1.05f), 0.0f, 1.0f);
     const float rx = x0 + 136, rw = land_ ? 94.0f : 100.0f;
     r.rect(rx, 6, rx + rw, 16, {0.15f, 0.15f, 0.18f});

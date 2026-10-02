@@ -13,13 +13,17 @@ struct PadLayout {
     Rect brake, clutch, thr, lever;
     float colX[3], rowTop, rowMid, rowBot;
     Rect seqUp, seqDn;
-    float autoY[3];   // P N D
+    float autoY[5];   // P R N D S (S en ustte: D'den ileri itince)
+    Rect gateUp, gateDn;   // otomatik M kapisi: + / -
 };
 // Kaydiricilar ekranin alt ~%57'sinde (basparmak az yol alir), 64 px genis; vites alani buyuk (kullanici geri bildirimi)
 const PadLayout kLand{{72, 150, 136, 356}, {4, 150, 68, 356}, {572, 150, 636, 356}, {404, 214, 566, 356},
-                   {432, 484, 536}, 236, 286, 336, {404, 214, 566, 282}, {404, 288, 566, 356}, {238, 286, 334}};
+                   {432, 484, 536}, 236, 286, 336, {404, 214, 566, 282}, {404, 288, 566, 356}, {340, 312, 284, 256, 228},
+                   {496, 214, 566, 282}, {496, 288, 566, 356}};
 const PadLayout kPort{{72, 440, 136, 636}, {4, 440, 68, 636}, {292, 440, 356, 636}, {142, 470, 286, 636},
-                   {166, 214, 262}, 492, 553, 614, {142, 470, 286, 550}, {142, 556, 286, 636}, {494, 553, 612}};const char* const kAutoName[3] = {"P", "N", "D"};
+                   {166, 214, 262}, 492, 553, 614, {142, 470, 286, 550}, {142, 556, 286, 636}, {618, 586, 554, 522, 490},
+                   {220, 470, 286, 550}, {220, 556, 286, 636}};
+const char* const kAutoName[5] = {"P", "R", "N", "D", "S"};
 
 float sliderValue(const Rect& r, float y) { return std::clamp((r.y1 - 6 - y) / (r.y1 - r.y0 - 12), 0.0f, 1.0f); }
 const PadLayout& lay(bool portrait) { return portrait ? kPort : kLand; }
@@ -52,6 +56,7 @@ Cockpit::Ctl Cockpit::hit(float x, float y) const {
     if (brakeRect(L, clutchPedal_).hit(x, y)) return Ctl::Brake;
     if (clutchPedal_ && L.clutch.hit(x, y)) return Ctl::Clutch;
     if (lever_ == Lever::HPattern && L.lever.hit(x, y)) return Ctl::Shifter;
+    if (lever_ == Lever::Automatic && (L.gateUp.hit(x, y) || L.gateDn.hit(x, y))) return Ctl::Gate;
     if (lever_ == Lever::Automatic && L.lever.hit(x, y)) return Ctl::Auto;
     if (lever_ == Lever::Sequential) {
         if (L.seqUp.hit(x, y)) return Ctl::Up;
@@ -91,7 +96,7 @@ void Cockpit::shifterFromPoint(float x, float y, bool release) {
 void Cockpit::autoFromPoint(float y) {
     const PadLayout& L = lay(portrait_);
     int best = 0;
-    for (int i = 1; i < 3; ++i) if (std::fabs(y - L.autoY[i]) < std::fabs(y - L.autoY[best])) best = i;
+    for (int i = 1; i < 5; ++i) if (std::fabs(y - L.autoY[i]) < std::fabs(y - L.autoY[best])) best = i;
     autoPos_ = (AutoPos)best;
 }
 
@@ -106,6 +111,10 @@ bool Cockpit::pointerDown(int id, float x, float y) {
     case Ctl::Clutch: clutchUi_ = sliderValue(L.clutch, y); break;
     case Ctl::Shifter: shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; break;
     case Ctl::Auto: autoFromPoint(y); break;
+    case Ctl::Gate:                              // M kapisi: ilk dokunus M'ye alir, sonra + / - vites
+        if (autoPos_ != AutoPos::M) autoPos_ = AutoPos::M;
+        else shift_ = L.gateUp.hit(x, y) ? +1 : -1;
+        break;
     case Ctl::Up: shift_ = +1; break;
     case Ctl::Down: shift_ = -1; break;
     default: break;
@@ -155,11 +164,15 @@ void Cockpit::key(Key k, bool down) {
     } else if (lever_ == Lever::Sequential) {
         if (k == Key::ShiftUp) shift_ = +1;
         if (k == Key::ShiftDown) shift_ = -1;
-    } else {
-        if (k == Key::ShiftUp) autoPos_ = (AutoPos)std::min(2, (int)autoPos_ + 1);
-        if (k == Key::ShiftDown) autoPos_ = (AutoPos)std::max(0, (int)autoPos_ - 1);
+    } else {                                     // otomatik: +/- yalniz M'de vites; kol tuslarla: 0 N, 1 D, 2 S, 3 M, 5 R, 6 P
+        if (autoPos_ == AutoPos::M && k == Key::ShiftUp) shift_ = +1;
+        if (autoPos_ == AutoPos::M && k == Key::ShiftDown) shift_ = -1;
         if (k == Key::Gear0) autoPos_ = AutoPos::N;
-        if (k >= Key::Gear1 && k <= Key::Gear6) autoPos_ = AutoPos::D;
+        if (k == Key::Gear1) autoPos_ = AutoPos::D;
+        if (k == Key::Gear2) autoPos_ = AutoPos::S;
+        if (k == Key::Gear3) autoPos_ = AutoPos::M;
+        if (k == Key::Gear5) autoPos_ = AutoPos::R;
+        if (k == Key::Gear6) autoPos_ = AutoPos::P;
     }
 }
 
@@ -215,13 +228,20 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
         r.circle(kx, ky, 10, 14, {0.05f, 0.05f, 0.06f, 0.6f});
         r.circle(kx, ky, 8, 14, grind ? Color{1.0f, 0.15f, 0.1f} : Color{0.92f, 0.92f, 0.95f});
     } else if (lever_ == Lever::Automatic) {
-        r.rect(L.lever.cx() - 2, L.autoY[0], L.lever.cx() + 2, L.autoY[2], {0.35f, 0.35f, 0.4f});
-        for (int i = 0; i < 3; ++i) {
+        const float cx = L.lever.x0 + 44;                // ana kanal (solda); M kapisi sagda
+        r.rect(cx - 2, L.autoY[4], cx + 2, L.autoY[0], {0.35f, 0.35f, 0.4f});
+        r.rect(cx, (L.autoY[3] + L.autoY[4]) * 0.5f - 2, L.gateUp.x0 + 4, (L.autoY[3] + L.autoY[4]) * 0.5f + 2, {0.35f, 0.35f, 0.4f});   // D/S -> M gecidi
+        for (int i = 0; i < 5; ++i) {
             const bool on = (int)autoPos_ == i;
             r.text(L.lever.x0 + 8, L.autoY[i] - 7, kAutoName[i], 2, on ? kUiGold : kUiDim);
         }
-        r.rect(L.lever.cx() - 12, L.autoY[(int)autoPos_] - 6, L.lever.cx() + 12, L.autoY[(int)autoPos_] + 6, {0.92f, 0.92f, 0.95f});
-        if (autoPos_ == AutoPos::D && gear > 0) r.text(L.lever.x1 - 18, L.autoY[2] - 7, std::to_string(gear), 2, {0.6f, 0.9f, 1.0f});
+        const bool m = autoPos_ == AutoPos::M;
+        button(r, L.gateUp, m ? "+" : "M", m ? Color{0.22f, 0.30f, 0.42f, 0.85f} : Color{0.18f, 0.18f, 0.22f, 0.7f}, 3);
+        button(r, L.gateDn, m ? "-" : "M", m ? Color{0.22f, 0.30f, 0.42f, 0.85f} : Color{0.18f, 0.18f, 0.22f, 0.7f}, 3);
+        const float ky = m ? (L.autoY[3] + L.autoY[4]) * 0.5f : L.autoY[(int)autoPos_], kx = m ? L.gateUp.x0 - 8 : cx;
+        r.rect(kx - 12, ky - 6, kx + 12, ky + 6, {0.92f, 0.92f, 0.95f});
+        if ((autoPos_ == AutoPos::D || autoPos_ == AutoPos::S) && gear > 0)
+            r.text(kx + 16, ky - 7, std::to_string(gear), 2, {0.6f, 0.9f, 1.0f});
     } else {
         button(r, L.seqUp, "+", Color{0.22f, 0.24f, 0.3f, 0.85f}, 3);
         button(r, L.seqDn, "-", Color{0.22f, 0.24f, 0.3f, 0.85f}, 3);

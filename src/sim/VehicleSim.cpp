@@ -529,6 +529,7 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
     const double drag = 0.5 * 1.20 * CdA_ * V * V;
     if (V > 1e-6) { Fx -= drag * vx_ / V; Fy -= drag * vy_ / V; }
 
+    if (reverse_ && revThr_ > 0.0 && vx_ > -4.5) Fx -= revThr_ * vl_.mass * 2.8 * std::clamp((vx_ + 4.5) / 1.5, 0.0, 1.0);   // geri cekis
     if (in.held) { vx_ = vy_ = r_ = 0.0; axRaw_ = ayRaw_ = 0.0; }
     else {
         const double m = vl_.mass;
@@ -539,7 +540,7 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
         vx_ += (axRaw_ - gAlong + r_ * vy_) * dt;
         vy_ += (ayRaw_ - r_ * vx_) * dt;
         r_ += Mz / Iz_ * dt;
-        if (vx_ < 0.0) vx_ = 0.0;                                              // geri vites yok
+        if (vx_ < vxMin()) vx_ = vxMin();                                      // geri vites yoksa geri gitmez
         // Duran arac: kalinti yanal hiz ve yaw sonumlenir (statik surtunme)
         if (vx_ < 0.3 && std::fabs(vy_) < 0.3) { vy_ *= 0.999; r_ *= 0.999; }
     }

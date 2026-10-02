@@ -801,7 +801,7 @@ const IntField kIntFields[] = {
     {"lrpm", &Tune::launchRpm, 12000},
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
     {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 10}, {"slc", &Tune::swLaunch, 1},
-    {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1},
+    {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1}, {"stcu", &Tune::swTcu, 1},
     {"pv", &Tune::partsVer, 9}, {"thr", &Tune::throttleBody, 9}, {"imf", &Tune::intakeMani, 9}, {"hdr", &Tune::header, 9},
     {"cat", &Tune::catalyst, 5}, {"meth", &Tune::meth, 5}, {"stud", &Tune::headStud, 4}, {"msup", &Tune::mainSupport, 5},
     {"bdsc", &Tune::brakeDisc, 8}, {"bcal", &Tune::brakeCaliper, 5}, {"wbdy", &Tune::weightBody, 6}, {"wgls", &Tune::weightGlass, 4},

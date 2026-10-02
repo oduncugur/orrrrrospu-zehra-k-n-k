@@ -53,6 +53,7 @@ public:
     const std::vector<SuspEvent>& suspEvents() const { return suspEvents_; }
 
     // Durum
+    double vx() const { return vx_; }                    // boylamsal hiz (geri viteste negatif)
     double speed() const { return cfg_.planar ? std::sqrt(vx_ * vx_ + vy_ * vy_) : V_; }
     // Duzlemsel durum (dunya: X ileri baslangic yonu, Y sola; psi sola donus +)
     double posX() const { return X_; }
@@ -83,7 +84,7 @@ public:
         vx_ += (jx * c + jy * s) / m;
         vy_ += (-jx * s + jy * c) / m;
         r_ += (rx * jy - ry * jx) / Iz_;
-        if (vx_ < 0.0) vx_ = 0.0;                     // geri vites yok (planar adimla ayni kural)
+        if (vx_ < vxMin()) vx_ = vxMin();             // geri vites yoksa geri gitmez (planar adimla ayni kural)
         V_ = vx_;
     }
     void scaleVelocity(double f) { vx_ *= f; vy_ *= f; r_ *= f; V_ = vx_; }   // carpisma: hiz kaybi
@@ -92,6 +93,10 @@ public:
     // Yol egimi arac burnu yonunde (dz/ds, yokus yukari +); yalnizca duzlemsel modda (drag 1B fizigi duz kalir)
     void setGrade(double g) { grade_ = std::clamp(g, -0.3, 0.3); }
     double grade() const { return grade_; }
+    // Geri vites (otomatik R): motor bos, gaz ile en fazla ~16 km/h geri cekis (basit tahrik)
+    void setReverse(bool on, double thr) { reverse_ = on; revThr_ = on ? std::clamp(thr, 0.0, 1.0) : 0.0; }
+    bool reverse() const { return reverse_; }
+    double vxMin() const { return reverse_ ? -4.5 : 0.0; }
     int drivenLeft() const { return dL_; }
     int drivenRight() const { return dL_ + 1; }
     const DrivetrainFailure& failure() const { return *fail_; }
@@ -148,6 +153,7 @@ private:
     double octane_ = 100, knockReq_ = 0, knockLim_ = 1.0, tmax_ = 1.0, boostTot_ = 0, boostFac_ = 0, icCredit_ = 0, ecuAgg_ = 0;
     bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
     double tireWear_ = 0, valveSafeRpm_ = 0, fineKnock_ = 0, heatMul_ = 1.0;
+    bool reverse_ = false; double revThr_ = 0.0;
     bool valveWarned_ = false;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;

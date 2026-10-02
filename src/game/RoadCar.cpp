@@ -32,6 +32,33 @@ void RoadCar::recover(double backM) {
 
 void RoadCar::bump(double f) { sim_->scaleVelocity(f); }
 
+// Otomatik vites karari. D: vites noktasi gaza oranli (hafif gazda verimli devir ~%40 kesici, tam gazda kesici - 500);
+// asagi vites, alt viteste devir yukari vites noktasinin %80'inin altinda kaliyorsa (gidip gelme yok). Tam gazda kickdown:
+// alt vites kesiciye 700 kala sigiyorsa hemen. S: hep yuksek devir. M: yalniz oyuncu (+/-); stop etmesin diye alt vites.
+// TCU yazilimi (0-2): verimli devir ve tam gaz noktasi yukari, vitesler arasi bekleme kisa.
+void RoadCar::autoShift(int gear, double rpm, double thr) {
+    const PowertrainCore& pt = sim_->powertrain();
+    const double red = sim_->engineSpec().redlineRpm, idle = sim_->engineSpec().idleRpm;
+    const int tcu = hasTune_ ? std::clamp(tune_.swTcu, 0, 2) : 0;
+    auto shift = [&](int to) { shiftT_ = 0; target_ = to; sinceShift_ = 0; };
+    if (autoMode == 2) {
+        if (gear > 1 && rpm < idle + 300.0 && sinceShift_ > 0.5) shift(gear - 1);
+        return;
+    }
+    const bool sport = autoMode == 1;
+    const double eff = std::max(idle + 1300.0, (0.40 + 0.04 * tcu) * red);
+    const double top = red - (sport ? 250.0 : 500.0 - 100.0 * tcu);
+    const double k = std::clamp((thr - 0.15) / 0.70, 0.0, 1.0);
+    const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : eff + (top - eff) * std::pow(k, 1.3);
+    if (sinceShift_ < 0.8 - 0.2 * tcu && !(thr > 0.85 && sinceShift_ > 0.35)) return;
+    // Yukari: cikis devri (konvertor kaymasiz) vites noktasini gecti ya da motor kesiciye dayandi (kayma ile)
+    if ((rpm > up || pt.rpm() > red - 120.0) && gear < pt.gearCount()) { shift(gear + 1); return; }
+    if (gear <= 1) return;
+    const double rLow = rpm * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3);
+    if (thr > 0.85 && rLow < red - 700.0 && rpm < top - 400.0) { shift(gear - 1); return; }   // kickdown
+    if (sinceShift_ > 1.0 && rLow < up * 0.80 && rpm < (sport ? 0.55 * red : std::max(idle + 700.0, eff * 0.72))) shift(gear - 1);
+}
+
 void RoadCar::requestShift(int dir) {
     if (shiftT_ >= 0) return;
     PowertrainCore& pt = sim_->powertrain();
@@ -78,7 +105,8 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
     const double v = sim_->speed();
     const Gearbox box = sim_->gearboxType();
     const bool seq = box == Gearbox::Dogbox || box == Gearbox::DCT;
-    const double k = slowClutch ? 1.6 : 1.0;                            // otomatik debriyaj cezasi: gec kavrar
+    // otomatik debriyaj cezasi: gec kavrar; TCU yazilimi tork konvertorlu otomatikte gecisi kisaltir (seviye basina %22)
+    const double k = (slowClutch ? 1.6 : 1.0) * (pt.converter() && hasTune_ ? 1.0 - 0.22 * std::clamp(tune_.swTcu, 0, 2) : 1.0);
     double clutch = 0.0, thr = thrIn;
     if (pt.stalled()) { pt.restart(); pt.setGear(manual ? std::max(pt.gear(), 1) : 1); launching_ = true; launchPedal_ = 1.0; stalledEv_ = true; }
     const bool launchGear = manual ? pt.gear() >= 1 : pt.gear() == 1;
@@ -111,10 +139,7 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
         double shiftRpm = pt.rpm();
         if (pt.converter())
             shiftRpm = std::min(pt.rpm(), v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493);
-        if (!manual && sinceShift_ > 0.8) {
-            if (shiftRpm > sim_->shiftRpm() - 150 && gear < pt.gearCount()) { shiftT_ = 0; target_ = gear + 1; sinceShift_ = 0; }
-            else if (shiftRpm < 0.36 * sim_->engineSpec().redlineRpm && gear > 1 && sinceShift_ > 1.5) { shiftT_ = 0; target_ = gear - 1; sinceShift_ = 0; }
-        }
+        if (!manual) autoShift(gear, shiftRpm, thrIn);
         if (!manual && gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
         if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && (manual ? gear >= 1 : gear == 1)) { launching_ = true; launchPedal_ = 0.6; }
     }
@@ -128,8 +153,10 @@ void RoadCar::update(double dt, const RoadControls& c) {
     if (c.clutch >= 0.0) playerClutch(c);
     else {
         if (c.gear >= 0) requestGear(c.gear);
-        if (c.shift != 0) { manual = true; requestShift(c.shift); }
-        driverAssist(dt, c.throttle, c.neutral);
+        if (c.autoMode >= 0) { autoMode = c.autoMode; manual = false; if (c.shift != 0 && autoMode == 2) requestShift(c.shift); }
+        else if (c.shift != 0) { manual = true; requestShift(c.shift); }
+        sim_->setReverse(c.reverse, c.throttle);
+        driverAssist(dt, c.reverse ? 0.0 : c.throttle, c.neutral || c.reverse);
     }
     sim_->setSurfaceMu((offRoad() ? 0.55 : 1.0) * gripMul);           // cim/toprak; yagmur
     {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)

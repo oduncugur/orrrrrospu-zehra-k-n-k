@@ -93,6 +93,7 @@ public:
     bool   limiterHit()  const { return cut_; }
     int    gear()        const { return gear_; }
     int    gearCount()   const { return (int)gb_.ratios.size(); }
+    double gearRatio(int g) const { return g >= 1 && g <= gearCount() ? gb_.ratios[g - 1] : 0.0; }
     double totalRatio()  const;
     const EngineSpec& engine() const { return e_; }
     // olay mesajlari (VTEC gecisi, stop etme vb.)

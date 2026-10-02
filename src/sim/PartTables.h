@@ -101,10 +101,10 @@ const std::vector<FuelSysOpt>& injectorTable();
 const std::vector<FuelSysOpt>& fuelLineTable();
 double fuelCap(const Tune& t);
 // ECU donanimi: yazilim yuvasi ve modul seviye sinirlari
-struct EcuHwOpt { const char* name; int price; int slots; int maxLv[7]; bool knockBuiltin; };
+struct EcuHwOpt { const char* name; int price; int slots; int maxLv[8]; bool knockBuiltin; };
 const std::vector<EcuHwOpt>& ecuHwTable();
 // Yazilim modulleri (sira: harita, devir, launch, flat shift, anti-lag, flex fuel, vuruntu kontrol)
-enum EcuSw { SwMap = 0, SwRev, SwLaunch, SwFlat, SwAntiLag, SwFlex, SwKnock, SwCount };
+enum EcuSw { SwMap = 0, SwRev, SwLaunch, SwFlat, SwAntiLag, SwFlex, SwKnock, SwTcu, SwCount };
 struct EcuSwDef { const char* name; const char* desc; int price[10]; };
 const EcuSwDef& ecuSwDef(int sw);
 int  ecuSwLevel(const Tune& t, int sw);

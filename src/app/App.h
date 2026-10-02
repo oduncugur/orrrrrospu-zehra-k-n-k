@@ -63,6 +63,10 @@ public:
     // Egim (ivmeolcer) direksiyonu: platform yazar (-1 sag .. +1 sol); yoksa tiltAvailable=false
     void setTilt(float t) { tilt_ = t; tiltAvailable = true; }
     float tilt() const { return tilt_; }
+    // Oyun kolu tetikleri (analog 0..1): platform yazar; gaz / fren pedali tetige oranli
+    void setPadPedals(float thr, float brk) { padThr_ = thr; padBrk_ = brk; }
+    float padThrottle() const { return padThr_; }
+    float padBrake() const { return padBrk_; }
     bool tiltAvailable = false;
     bool treePro = false;                         // agac tipi (ayarlarda secilir, kariyer kaydinda saklanir)
     std::string startupMsg;                       // acilista garajda bir kez gosterilir
@@ -141,7 +145,7 @@ public:
     void siren(float level) { siren_ = level; }                   // polis sireni 0..1 (mesafeyle; ekran degisince 0)
 
 private:
-    std::atomic<float> tilt_{0.0f};
+    std::atomic<float> tilt_{0.0f}, padThr_{0.0f}, padBrk_{0.0f};
     std::atomic<float> engineVol_{1.0f}, tireVol_{1.0f};   // ses thread'i okur (ana ses x kanal)
     std::atomic<float> windSpeed_{0.0f};
     float windLp1_ = 0, windLp2_ = 0, windPh_ = 0; uint32_t windRng_ = 22222;   // yalniz ses thread'i

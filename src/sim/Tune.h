@@ -38,7 +38,7 @@ struct Tune {
     // Yakit sistemi (ayri parcalar; sinir = en zayif halka): pompa, enjektor, hat / regulator. Eski fuelSys yalniz eski kayit.
     int fuelPump = 0, injector = 0, fuelLine = 0;
     // ECU donanimi (yazilim yuvasi + modul seviye siniri) ve yazilim modulleri. Eski ecu alani: rakip paketleri / eski kayit.
-    int ecuHw = 0, swMap = 0, swRev = 0, swLaunch = 0, swFlat = 0, swAntiLag = 0, swFlex = 0, swKnock = 0;
+    int ecuHw = 0, swMap = 0, swRev = 0, swLaunch = 0, swFlat = 0, swAntiLag = 0, swFlex = 0, swKnock = 0, swTcu = 0;
     // Bilesen parcalari (ayni anda takilabilen gercek parcalar; etkiler carpilir / toplanir)
     int throttleBody = 0, intakeMani = 0, header = 0, catalyst = 0, meth = 0, headStud = 0, mainSupport = 0;
     int brakeDisc = 0, brakeCaliper = 0, weightBody = 0, weightGlass = 0, weightChassis = 0;

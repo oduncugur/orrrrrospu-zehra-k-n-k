@@ -4,6 +4,7 @@
 #include "garage/VehicleCatalog.h"
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 using namespace zk;
 static int failures = 0;
@@ -266,6 +267,69 @@ int main() {
             }
             std::printf("    ayni arac 20 s: en buyuk fark %.0f m\n", maxGap);
             CHECK(maxGap < RoadSession::kEscapeGap, "esit arac: polis yakin takip eder");
+        }
+    }
+    std::printf("[A] Otomatik sanziman: gaza oranli vites, kickdown, S, M, geri vites\n");
+    {
+        const RoadPath road3(20250930u, 20000.0, 90.0);
+        const VehicleDef* sup = nullptr;
+        for (int i = 0; i < 1000 && !sup; ++i) if (const VehicleDef* d = findVehicle(i); d && d->ref == std::string("Toyota GR Supra A90")) sup = d;
+        CHECK(sup != nullptr, "otomatik (ZF 8HP) test araci bulundu");
+        // Ilk yukari vitesin devri: verilen gaz ve mod ile duzde kalkis
+        auto firstShiftRpm = [&](double thr, int mode) {
+            RoadCar a(sup, nullptr, road3, 0.0, -1.8);
+            RoadControls k; k.throttle = thr; k.autoMode = mode;
+            double peak = 0;
+            for (double t = 0; t < 20.0; t += 1.0 / 60.0) {
+                const int g = a.sim().powertrain().gear();
+                a.update(1.0 / 60.0, k);
+                if (g == 1) peak = std::max(peak, a.sim().powertrain().rpm());
+                if (a.sim().powertrain().gear() >= 2) return peak;
+            }
+            return -1.0;
+        };
+        const double red = RoadCar(sup, nullptr, road3, 0.0, -1.8).sim().engineSpec().redlineRpm;
+        const double light = firstShiftRpm(0.30, 0), full = firstShiftRpm(1.0, 0), sport = firstShiftRpm(0.30, 1);
+        std::printf("    1->2 devri: %%30 gaz D %.0f, tam gaz D %.0f, %%30 gaz S %.0f (kesici %.0f)\n", light, full, sport, red);
+        CHECK(light > 0 && light < 0.62 * red, "hafif gazda verimli devirde vites atar");
+        CHECK(full > red - 800 && full <= red + 50, "tam gazda kesiciye ~500 kala vites atar");
+        CHECK(sport > light + 1000, "S modunda ayni gazda daha yuksek devirde vites");
+        {   // kickdown: hafif gazla 4. vitese kadar, sonra tam gaz -> en az bir vites asagi
+            RoadCar a(sup, nullptr, road3, 0.0, -1.8);
+            RoadControls k; k.throttle = 0.30;
+            double t = 0;
+            for (; t < 40.0 && a.sim().powertrain().gear() < 4; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const int g0 = a.sim().powertrain().gear();
+            k.throttle = 1.0;
+            int gMin = g0;
+            for (double u = 0; u < 1.0; u += 1.0 / 60.0) { a.update(1.0 / 60.0, k); gMin = std::min(gMin, a.sim().powertrain().gear()); }
+            std::printf("    kickdown: %d. viteste tam gaz -> %d\n", g0, gMin);
+            CHECK(g0 >= 4 && gMin < g0, "tam gazda kickdown (vites dusurur)");
+        }
+        {   // M: oyuncu vites atmadikca 1. viteste kalir; + ile 2'ye gecer
+            RoadCar a(sup, nullptr, road3, 0.0, -1.8);
+            RoadControls k; k.throttle = 1.0; k.autoMode = 2;
+            for (double t = 0; t < 4.0; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const int g1 = a.sim().powertrain().gear();
+            k.shift = 1; a.update(1.0 / 60.0, k); k.shift = 0;
+            for (double t = 0; t < 0.5; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const int g2 = a.sim().powertrain().gear();
+            std::printf("    M modu: 4 s tam gazda vites %d, + sonrasi %d\n", g1, g2);
+            CHECK(g1 == 1 && g2 == 2, "M modunda vitesi yalniz oyuncu atar");
+        }
+        {   // R: geri gider, ~16 km/h ile sinirli; D'ye donunce ileri gider
+            RoadCar a(sup, nullptr, road3, 500.0, -1.8);
+            RoadControls k; k.throttle = 1.0; k.reverse = true; k.autoMode = 0;
+            for (double t = 0; t < 5.0; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const double vr = a.sim().vx();
+            k.reverse = false; k.throttle = 0.0; k.brake = 1.0;
+            for (double t = 0; t < 2.0; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            k.brake = 0.0; k.throttle = 0.6;
+            for (double t = 0; t < 4.0; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const double vf = a.sim().speed();
+            std::printf("    geri vites: %.1f km/h, sonra D: %.0f km/h\n", vr * 3.6, vf * 3.6);
+            CHECK(vr < -2.0 && vr > -4.6 && std::isfinite(vr), "R ile geri gider (hiz sinirli)");
+            CHECK(vf > 10.0, "D'ye donunce ileri gider");
         }
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
