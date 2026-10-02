@@ -157,6 +157,12 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double redAdd = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + EC.redline + inRed;
         // Supap siniri: ECU disindaki parcalarin kaldirabilecegi devir + 300 pay; ECU ile ustune cikilirsa supap atar
         valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 300.0);
+        // Mekanik devir artisi (supap / kam / kafa / krank): guc tepesi de yukari kayar, motor yeni kesiciye kadar ceker.
+        // Yalniz ECU ile acilan devir uzatilmis (dusen) egride kalir.
+        if (const double mech = redAdd - EC.redline; mech > 0.0) {
+            const double piv = 0.45 * red0, k = (red0 + mech - piv) / (red0 - piv);
+            for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) if (pr.first > piv) pr.first = piv + (pr.first - piv) * k;
+        }
         if (redAdd != 0.0) {
             eng_.redlineRpm = std::max(eng_.idleRpm + 2500.0, red0 + redAdd);
             extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);

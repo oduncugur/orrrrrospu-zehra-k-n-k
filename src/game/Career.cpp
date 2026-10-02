@@ -618,7 +618,7 @@ bool usedAvailable(PartCat c, int level) {
 }
 int usedPrice(int newPrice) { return newPrice * 55 / 100 / 10 * 10; }
 void applyUsedWear(Tune& t, PartCat c) {
-    auto add = [](double& w, double d) { w = std::clamp(w + d, 0.0, 1.0); };
+    auto add = [](double& w, double d) { w = std::max(w, d); };   // birikmez: ikinci el parca en fazla kendi yipranmasini getirir
     switch (c) {
     case PartCat::Tires: t.wearTires = std::max(t.wearTires, 0.40); return;          // yarim dis
     case PartCat::Brakes: case PartCat::BrakeDisc: case PartCat::BrakeCaliper: add(t.wearBrakes, 0.25); return;
@@ -627,8 +627,8 @@ void applyUsedWear(Tune& t, PartCat c) {
     default: break;
     }
     switch (partTab(c)) {
-    case 0: add(t.wearEngine, 0.10); break;                                       // motor ic aksami
-    case 1: case 2: add(t.wearEngine, 0.06); break;                               // emme / egzoz, turbo / yakit
+    case 0: add(t.wearEngine, 0.06); break;                                       // motor ic aksami
+    case 1: case 2: add(t.wearEngine, 0.04); break;                               // emme / egzoz, turbo / yakit
     case 5: add(t.wearBody, 0.08); break;                                         // kaporta: hafifletme / aero
     case 6: add(t.wearElec, 0.08); break;                                         // ecu / sogutma / yag
     default: break;
