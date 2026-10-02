@@ -147,7 +147,7 @@ private:
     double coolCap_ = 0, coolLow_ = 0.4, coolT_ = 88.0, heatLim_ = 1.0, teF_ = 0, stress_ = 0, gbStress_ = 0;
     double octane_ = 100, knockReq_ = 0, knockLim_ = 1.0, tmax_ = 1.0, boostTot_ = 0, boostFac_ = 0, icCredit_ = 0, ecuAgg_ = 0;
     bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
-    double tireWear_ = 0, valveSafeRpm_ = 0;
+    double tireWear_ = 0, valveSafeRpm_ = 0, fineKnock_ = 0, heatMul_ = 1.0;
     bool valveWarned_ = false;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;

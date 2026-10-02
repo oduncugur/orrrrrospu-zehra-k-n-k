@@ -194,6 +194,24 @@ int main() {
         Tune fresh; migrateTune(fresh);
         CHECK(fresh.signature() == Tune{}.signature(), "yeni kayit donusturulmez");
     }
+    std::printf("[3f] Dyno ECU ince ayari: avans / AFR / boost -> guc, vuruntu, isi\n");
+    {
+        Tune base; base.turbo = 5; base.ecuHw = 4; base.fuelPump = 5; base.injector = 5;
+        Tune adv = base; adv.ecuTiming = 4;
+        Tune boost = base; boost.ecuBoost = 4;
+        Tune lean = base; lean.ecuAfr = 135;
+        Tune noEcu = adv; noEcu.ecuHw = 0;
+        auto req = [&](const Tune& t) { VehicleSimConfig c; c.car = &sahin; c.tune = &t; return VehicleSim(c).octaneRequired(); };
+        const double h0 = peakHp(sahin, base), ha = peakHp(sahin, adv), hb = peakHp(sahin, boost), hl = peakHp(sahin, lean);
+        std::printf("    GT2560: %.0f HP | avans +4: %.0f HP (oktan %.1f -> %.1f) | boost +0.4: %.0f HP | AFR 13.5: %.0f HP\n", h0, ha, req(base), req(adv), hb, hl);
+        CHECK(ha > h0 * 1.03 && req(adv) > req(base) + 3.0, "avans guc katar ama oktan ister");
+        CHECK(hb > ha && req(boost) > req(base), "boost hedefi turboda guc katar");
+        CHECK(hl < h0 && req(lean) > req(base), "fakir karisim guc kaybi + vuruntu");
+        CHECK(std::fabs(peakHp(sahin, noEcu) - peakHp(sahin, Tune{noEcu})) < 1e-9 && peakHp(sahin, noEcu) < ha, "plug-in ECU yoksa ince ayar etkisiz");
+        Career c = Career::newGame(); c.car().tune.ecuTiming = -3; c.car().tune.ecuBoost = -2; c.car().tune.ecuAfr = 118;
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.car().tune.ecuTiming == -3 && d.car().tune.ecuBoost == -2 && d.car().tune.ecuAfr == 118, "eksi degerler kayitta");
+    }
     std::printf("[4] Atolye ve kayit\n");
     {
         Career c = Career::newGame();

@@ -128,6 +128,16 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             boostTot_ += S.bar;
             scaleCurves(eng_, superMul, &sc);
         }
+        if (ecuFineTuneAvailable(*tune) && (tune->ecuTiming || tune->ecuAfr || tune->ecuBoost)) {
+            // Dyno ince ayari: avans +%1/derece; AFR 12.8'de en iyi (zengin: guvenli ama guc kaybi, fakir: sicak + vuruntu);
+            // boost hedefi yalniz asiri beslemeli motorda (toplam boostla orantili tork)
+            const double afr = tune->ecuAfr > 0 ? tune->ecuAfr / 10.0 : 12.5;
+            double m = (1.0 + 0.010 * std::clamp(tune->ecuTiming, -4, 6)) * (1.0 - 0.02 * (afr - 12.8) * (afr - 12.8));
+            if (boostTot_ > 0.0) m *= std::max(0.5, (1.0 + boostTot_ + tune->ecuBoost / 10.0) / (1.0 + boostTot_));
+            scaleCurves(eng_, constMul, &m);
+            fineKnock_ = 0.9 * tune->ecuTiming + 3.0 * std::max(0.0, afr - 12.5) + (boostTot_ > 0.0 ? 8.0 * tune->ecuBoost / 10.0 : 0.0);
+            heatMul_ = 1.0 + 0.06 * std::max(0.0, afr - 12.5) + 0.01 * std::max(0, tune->ecuTiming);
+        }
         const CamOpt C = tune->cam == kCustomCam ? customCam(*tune) : row(camTable(), tune->cam);
         if (tune->cam > 0) { ShapeCtx c{red0, C.low, C.high}; scaleCurves(eng_, shapeMul, &c); }
         const HeadOpt& HD = row(headTable(), tune->head);
@@ -196,7 +206,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         static const double kOct[10] = {100, 95, 105, 98, 102, 104, 110, 116, 101, 112};
         octane_ = tune->fuelSel > 0 && tune->fuelSel < 10 ? kOct[tune->fuelSel]
                 : tune->fuel == FuelType::Pump95 ? 95.0 : tune->fuel == FuelType::E85 ? 105.0 : 100.0;
-        knockReq_ = 90.0 + 2.2 * (pt_->compressionRatio() - 10.5) + 8.0 * std::max(0.0, boostTot_ - boostFac_) + ecuAgg_ - icCredit_;
+        knockReq_ = 90.0 + 2.2 * (pt_->compressionRatio() - 10.5) + 8.0 * std::max(0.0, boostTot_ - boostFac_) + ecuAgg_ - icCredit_ + fineKnock_;
     }
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[gbIdx].type : Gearbox::HPattern;
@@ -354,7 +364,7 @@ void VehicleSim::updateHeatAndStress(double dt) {
     PowertrainCore& pt = *pt_;
     const double P = std::max(0.0, pt.engineTorque()) * pt.rpm() / 9.5493;
     const double air = coolLow_ + std::min(1.0, speed() / 40.0) * (1.4 - coolLow_);
-    coolT_ += dt * (P * 0.33 + 1500.0 - coolCap_ * air * (coolT_ - 30.0)) / 250000.0;   // blok + su + radyator isil kutlesi
+    coolT_ += dt * (P * 0.33 * heatMul_ + 1500.0 - coolCap_ * air * (coolT_ - 30.0)) / 250000.0;   // blok + su + radyator isil kutlesi (fakir karisim sicak)
     coolT_ = std::max(coolT_, 85.0);                                          // termostat
     heatLim_ = coolT_ > 108.0 ? std::clamp(1.0 - (coolT_ - 108.0) * 0.025, 0.55, 1.0) : 1.0;
     if (coolT_ > 125.0) stress_ += dt * 0.02 * (coolT_ - 125.0);

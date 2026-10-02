@@ -114,7 +114,8 @@ int  ecuSlotsUsed(const Tune& t);
 void clampEcuSoftware(Tune& t);                      // ECU degisince yazilim yeni donanima sigdirilir
 bool ecuNewSystem(const Tune& t);                    // donanim / yazilim kullaniliyor (eski ecu alani yerine)
 EcuOpt effectiveEcu(const Tune& t, bool* knockSensor = nullptr);
-bool launchControlAvailable(const Tune& t);          // ayarlanabilir 2-step (launch yazilimi ya da eski ECU paketi)
+bool launchControlAvailable(const Tune& t);
+bool ecuFineTuneAvailable(const Tune& t);            // dyno ince ayari: plug-in ECU ve ustu          // ayarlanabilir 2-step (launch yazilimi ya da eski ECU paketi)
 const std::vector<FuelOpt>&    fuelTable();
 const std::vector<OilOpt>&     oilTable();
 const std::vector<ClutchOpt>&  clutchTable();

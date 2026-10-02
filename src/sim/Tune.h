@@ -43,6 +43,8 @@ struct Tune {
     int throttleBody = 0, intakeMani = 0, header = 0, catalyst = 0, meth = 0, headStud = 0, mainSupport = 0;
     int brakeDisc = 0, brakeCaliper = 0, weightBody = 0, weightGlass = 0, weightChassis = 0;
     int aeroFront = 0, aeroSide = 0, aeroUnder = 0, fan = 0, coolMisc = 0, oilCooler = 0, oilPump = 0;
+    // Dyno ECU ince ayari (plug-in ECU ve ustu): avans (derece, -4..+6), AFR x10 (115..135; 0 = 12.5), boost x10 bar (-3..+5)
+    int ecuTiming = 0, ecuAfr = 0, ecuBoost = 0;
     int partsVer = 2;                         // parca tablolari surumu (eski kayit < 2: tek liste secimleri bilesenlere cevrilir)
     int totalWeightKg() const;                // ic + kaporta + cam + sasi hafifletmesi
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi

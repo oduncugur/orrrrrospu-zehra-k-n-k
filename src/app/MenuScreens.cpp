@@ -1,6 +1,7 @@
 // ZEHRA KINIK - Menu ekranlari: parca dukkani, galeri, dyno (dikey 360x640)
 #include "Screens.h"
 #include "Ui.h"
+#include "sim/PartTables.h"
 #include "garage/VehicleCatalog.h"
 #include "sim/VehicleSim.h"
 
@@ -229,14 +230,25 @@ void GalleryScreen::key(Key k, bool down) {
 // ================================================================== DYNO
 namespace {
 const Rect kPull{8, 540, 352, 588};
+const Rect kTuneT{240, 442, 352, 468};          // ECU AYARI / SONUCLAR
 constexpr float kGx0 = 44, kGx1 = 344, kGy0 = 86, kGy1 = 420;
+constexpr float kRowY[3] = {472, 493, 514};
+Rect tMinus(int i) { return {232, kRowY[i] - 1, 270, kRowY[i] + 18}; }
+Rect tPlus(int i) { return {314, kRowY[i] - 1, 352, kRowY[i] + 18}; }
 } // namespace
 
 DynoScreen::DynoScreen(App& app) : app_(app) {
+    recompute();
+    app_.setVoice(1, nullptr);
+}
+
+void DynoScreen::recompute() {
     const OwnedCar& oc = app_.career.car();
     const VehicleDef& v = *findVehicle(oc.carId);
     VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &oc.tune;
     const VehicleSim sim(cfg);
+    octane_ = sim.octane(); octReq_ = sim.octaneRequired(); valveSafe_ = sim.valveSafeRpm();
+    maxNm_ = maxHp_ = 1; peakHp_ = peakNm_ = 0; stockPeakHp_ = 0;
     tuned_ = effectiveCurve(sim.engineSpec());
     stock_ = effectiveCurve(buildEngineSpec(v));
     redline_ = sim.engineSpec().redlineRpm;
@@ -249,7 +261,6 @@ DynoScreen::DynoScreen(App& app) : app_(app) {
         if (p.second > peakNm_) { peakNm_ = p.second; peakNmRpm_ = p.first; }
     }
     for (auto& p : stock_) if (p.first <= redline_) stockPeakHp_ = std::max(stockPeakHp_, p.second * p.first * kHpK);
-    app_.setVoice(1, nullptr);
 }
 
 void DynoScreen::update(double dt) {
@@ -305,12 +316,34 @@ void DynoScreen::render(Renderer& r) {
     r.rect(kGx0 + 86, kGy0 + 6, kGx0 + 96, kGy0 + 10, {0.35f, 0.65f, 1.0f}); r.text(kGx0 + 100, kGy0 + 5, "GUC HP", 1, kUiText);
     r.text(kGx0 + 160, kGy0 + 5, "SOLUK: STOK", 1, kUiDim);
 
-    std::snprintf(b, sizeof b, "TEPE %.0f HP @ %.0f", peakHp_, peakHpRpm_);
-    r.text(8, 446, b, 2, {0.55f, 0.8f, 1.0f});
-    std::snprintf(b, sizeof b, "TEPE %.0f NM @ %.0f", peakNm_, peakNmRpm_);
-    r.text(8, 468, b, 2, {1.0f, 0.7f, 0.3f});
-    std::snprintf(b, sizeof b, "STOK %.0f HP  (%+.0f HP)", stockPeakHp_, peakHp_ - stockPeakHp_);
-    r.text(8, 490, b, 2, kUiText);
+    const Tune& t = app_.career.car().tune;
+    button(r, kTuneT, tuneMode_ ? "SONUCLAR" : "ECU AYARI", tuneMode_ ? kUiBtn : Color{0.15f, 0.35f, 0.6f}, 1);
+    if (!tuneMode_) {
+        std::snprintf(b, sizeof b, "TEPE %.0f HP @ %.0f", peakHp_, peakHpRpm_);
+        r.text(8, 446, b, 2, {0.55f, 0.8f, 1.0f});
+        std::snprintf(b, sizeof b, "TEPE %.0f NM @ %.0f", peakNm_, peakNmRpm_);
+        r.text(8, 468, b, 2, {1.0f, 0.7f, 0.3f});
+        std::snprintf(b, sizeof b, "STOK %.0f HP  (%+.0f HP)", stockPeakHp_, peakHp_ - stockPeakHp_);
+        r.text(8, 490, b, 2, kUiText);
+    } else if (!ecuFineTuneAvailable(t)) {
+        r.text(8, 448, "INCE AYAR ICIN", 1, kUiText);
+        r.text(8, 462, "PLUG-IN ECU YA DA USTU GEREK", 1, {1.0f, 0.5f, 0.35f});
+    } else {
+        std::snprintf(b, sizeof b, "%.0f HP  OKTAN %.0f / %.0f", peakHp_, octane_, octReq_);
+        r.text(8, 448, b, 1, octReq_ > octane_ ? Color{1.0f, 0.4f, 0.3f} : kUiText);
+        const bool boosted = t.turbo > 0 || t.superch > 0 || engineTable()[effectiveEngine(*findVehicle(app_.career.car().carId), &t)].boostBar > 0;
+        const char* names[3] = {"AVANS", "AFR", "BOOST"};
+        for (int i = 0; i < 3; ++i) {
+            if (i == 2 && !boosted) { r.text(8, kRowY[i] + 4, "BOOST: ASIRI BESLEME YOK", 1, kUiDim); continue; }
+            if (i == 0) std::snprintf(b, sizeof b, "%+d DERECE", t.ecuTiming);
+            else if (i == 1) std::snprintf(b, sizeof b, "%.1f : 1", t.ecuAfr > 0 ? t.ecuAfr / 10.0 : 12.5);
+            else std::snprintf(b, sizeof b, "%+.1f BAR", t.ecuBoost / 10.0);
+            r.text(8, kRowY[i] + 2, names[i], 2, kUiText);
+            r.text(96, kRowY[i] + 2, b, 2, kUiGold);
+            button(r, tMinus(i), "-", kUiBtn, 2);
+            button(r, tPlus(i), "+", kUiBtn, 2);
+        }
+    }
     if (pullRpm_ >= 0) {
         const float x = X(pullRpm_);
         r.rect(x, kGy0, x + 2, kGy1, {1, 1, 1});
@@ -323,6 +356,20 @@ void DynoScreen::render(Renderer& r) {
 }
 
 void DynoScreen::pointerDown(int, float x, float y) {
+    if (kTuneT.hit(x, y)) { tuneMode_ = !tuneMode_; return; }
+    if (tuneMode_ && ecuFineTuneAvailable(app_.career.car().tune)) {
+        Tune& t = app_.career.cars[app_.career.current].tune;
+        for (int i = 0; i < 3; ++i) {
+            const int d = tMinus(i).hit(x, y) ? -1 : tPlus(i).hit(x, y) ? 1 : 0;
+            if (!d) continue;
+            if (i == 0) t.ecuTiming = std::clamp(t.ecuTiming + d, -4, 6);
+            else if (i == 1) t.ecuAfr = std::clamp((t.ecuAfr > 0 ? t.ecuAfr : 125) + d, 115, 135);
+            else t.ecuBoost = std::clamp(t.ecuBoost + d, -3, 5);
+            app_.saveCareer();
+            recompute();
+            return;
+        }
+    }
     if (kPull.hit(x, y) && pullRpm_ < 0) pullRpm_ = idle_;
     else if (kBack.hit(x, y)) app_.goGarage();
 }
@@ -331,6 +378,7 @@ void DynoScreen::key(Key k, bool down) {
     if (!down) return;
     if (k == Key::Enter && pullRpm_ < 0) pullRpm_ = idle_;
     else if (k == Key::Back) app_.goGarage();
+    else if (k == Key::Settings) tuneMode_ = !tuneMode_;
 }
 
 } // namespace zk

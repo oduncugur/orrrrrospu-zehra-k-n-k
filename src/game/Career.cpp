@@ -789,7 +789,7 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
 
 // ------------------------------------------------------------------ kayit
 namespace {
-struct IntField { const char* key; int Tune::*f; int max; };
+struct IntField { const char* key; int Tune::*f; int max; int min = 0; };
 struct DblField { const char* key; double Tune::*f; double max; };
 const IntField kIntFields[] = {
     {"tire", &Tune::tireSel, 29}, {"rim", &Tune::rims, 9}, {"fin", &Tune::finalSel, 11}, {"gbx", &Tune::gearSwap, 30},
@@ -808,6 +808,7 @@ const IntField kIntFields[] = {
     {"bdsc", &Tune::brakeDisc, 8}, {"bcal", &Tune::brakeCaliper, 5}, {"wbdy", &Tune::weightBody, 6}, {"wgls", &Tune::weightGlass, 4},
     {"wch", &Tune::weightChassis, 4}, {"aef", &Tune::aeroFront, 4}, {"aes", &Tune::aeroSide, 4}, {"aeu", &Tune::aeroUnder, 4},
     {"fan", &Tune::fan, 5}, {"cmsc", &Tune::coolMisc, 4}, {"oclr", &Tune::oilCooler, 4}, {"opmp", &Tune::oilPump, 4},
+    {"etim", &Tune::ecuTiming, 6, -4}, {"eafr", &Tune::ecuAfr, 135, 0}, {"ebst", &Tune::ecuBoost, 5, -3},
 };
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
@@ -836,7 +837,7 @@ void parseTuneV2(const std::string& v, Tune& t) {
         if (c != std::string::npos) {
             const std::string k = item.substr(0, c);
             const double x = std::atof(item.c_str() + c + 1);
-            for (const IntField& f : kIntFields) if (k == f.key) t.*(f.f) = std::clamp((int)x, 0, f.max);
+            for (const IntField& f : kIntFields) if (k == f.key) t.*(f.f) = std::clamp((int)x, f.min, f.max);
             for (const DblField& f : kDblFields) if (k == f.key) t.*(f.f) = std::clamp(x, 0.0, f.max);
             if (k.size() == 3 && k[0] == 'c' && k[1] == 'g' && k[2] >= '0' && k[2] <= '7') t.custGear[k[2] - '0'] = std::clamp(x, 0.0, 1.5);
         }

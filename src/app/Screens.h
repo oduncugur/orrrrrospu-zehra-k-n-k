@@ -335,6 +335,9 @@ private:
     double redline_ = 7000, idle_ = 850, maxNm_ = 1, maxHp_ = 1, peakHp_ = 0, peakHpRpm_ = 0, peakNm_ = 0, peakNmRpm_ = 0;
     double stockPeakHp_ = 0;
     double pullRpm_ = -1;          // cekis sirasinda devir (-1 = yok)
+    bool tuneMode_ = false;        // ECU ince ayar paneli
+    void recompute();              // egriler / tepe degerler (ayar degisince)
+    double octane_ = 100, octReq_ = 0, valveSafe_ = 0;
 };
 
 // Ayarlar: dikey. Goruntu (FPS siniri, dikey esitleme, gosterge, tam ekran, olcek), ses, kontrol, birim.

@@ -468,6 +468,7 @@ EcuOpt effectiveEcu(const Tune& t, bool* knockSensor) {
     if (knockSensor) *knockSensor = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].knockBuiltin || t.swKnock > 0;
     return e;
 }
+bool ecuFineTuneAvailable(const Tune& t) { return t.ecuHw >= 4; }
 bool launchControlAvailable(const Tune& t) {
     return ecuNewSystem(t) ? t.swLaunch > 0 : (t.ecu == 4 || t.ecu == 8 || t.ecu == 9);
 }
@@ -712,6 +713,7 @@ std::string Tune::signature() const {
                       fan, coolMisc, oilCooler, oilPump);
         out += c;
     }
+    if (ecuTiming || ecuAfr || ecuBoost) { char d[48]; std::snprintf(d, sizeof d, "|D%d,%d,%d", ecuTiming, ecuAfr, ecuBoost); out += d; }
     if (fuelPump || injector || fuelLine || ecuNewSystem(*this)) {
         char e[96];
         std::snprintf(e, sizeof e, "|F%d,%d,%d|E%d,%d,%d,%d,%d,%d,%d,%d", fuelPump, injector, fuelLine, ecuHw, swMap, swRev, swLaunch, swFlat,
