@@ -45,6 +45,12 @@ public:
     void rect(float x0, float y0, float x1, float y1, Color c);
     void gradientV(float x0, float y0, float x1, float y1, Color top, Color bottom);
     void tri(float ax, float ay, float bx, float by, float cx, float cy, Color c);
+    // 3B dunya (yol ekrani): ekrana izdusurulmus ucgenler derinlikleriyle (w = kamera uzakligi) yazilir; araclar
+    // (drawCar) bu derinlige gore test edilir -> bina / tunel / tepe arkasindaki arac gorunmez.
+    void beginWorldDepth(float nearZ, float farZ);
+    void endWorldDepth();
+    void triZ(float ax, float ay, float aw, float bx, float by, float bw, float cx, float cy, float cw, Color c);
+    void setDepthW(float w);              // etiketsiz cizimler (agac, direk, rect) icin derinlik (w); cok buyuk = en uzak
     void circle(float cx, float cy, float r, int seg, Color c);
     void text(float x, float y, const std::string& s, float scale, Color c);
     // Ceviri olmadan cizim (zaten cevrilmis metin; tekrar cevirmek "ON" -> "FRONT" gibi bozar)
@@ -93,7 +99,9 @@ private:
     CarLook look_;
     int uPaint_ = -1, uRim_ = -1, uStripe_ = -1, uPG_ = -1;
     void ensureTarget();                // FBO boyutu = kFbo x olcek (olcek degisince yeniden)
-    std::vector<float> batch_;   // x y r g b a
+    std::vector<float> batch_;   // x y z r g b a (z: NDC; dunya derinligi yoksa 0)
+    bool worldDepth_ = false; float near_ = 0.3f, far_ = 900.0f, curZ_ = 0.0f;
+    float ndcZ(float w) const;
     std::map<int, Mesh> meshes_;
     unsigned p3d_ = 0, p2d_ = 0, pBlit_ = 0, fbo_ = 0, tex_ = 0, depth_ = 0, vao2d_ = 0, vbo2d_ = 0, vaoQ_ = 0, vboQ_ = 0;
     unsigned vaoSh_ = 0, vboSh_ = 0;    // arac golgesi (birim kare, model uzayinda olceklenir)

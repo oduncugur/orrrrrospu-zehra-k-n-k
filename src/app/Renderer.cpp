@@ -233,8 +233,8 @@ void main(){
   vec3 h = normalize(l + v);
   c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), g > 0.5 ? 70.0 : 12.0) * g * 0.9 * uLight.x;
   o = vec4(min(c, vec3(1.0)), uAlpha); })";
-const char* kVs2D = R"(layout(location=0) in vec2 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
-void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, 0.0, 1.0); })";
+const char* kVs2D = R"(layout(location=0) in vec3 aPos; layout(location=1) in vec4 aCol; uniform vec2 uSize; out vec4 vCol;
+void main(){ vCol = aCol; gl_Position = vec4(aPos.x / uSize.x * 2.0 - 1.0, 1.0 - aPos.y / uSize.y * 2.0, aPos.z, 1.0); })";
 const char* kFs2D = R"(precision mediump float; in vec4 vCol; out vec4 o; void main(){ o = vCol; })";
 const char* kVsBlit = R"(layout(location=0) in vec2 aPos; uniform vec2 uUv; out vec2 vUv;
 void main(){ vUv = (aPos * 0.5 + 0.5) * uUv; gl_Position = vec4(aPos, 0.0, 1.0); })";
@@ -294,8 +294,8 @@ bool Renderer::init() {
     GLuint a, b;
     glGenVertexArrays(1, &a); glGenBuffers(1, &b); vao2d_ = a; vbo2d_ = b;
     glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
     const float quad[] = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1};
     glGenVertexArrays(1, &a); glGenBuffers(1, &b); vaoQ_ = a; vboQ_ = b;
     glBindVertexArray(a); glBindBuffer(GL_ARRAY_BUFFER, b);
@@ -398,14 +398,31 @@ void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y)
 }
 
 void Renderer::tri(float ax, float ay, float bx, float by, float cx, float cy, Color c) {
-    batch_.insert(batch_.end(), {ax, ay, c.r, c.g, c.b, c.a, bx, by, c.r, c.g, c.b, c.a, cx, cy, c.r, c.g, c.b, c.a});
+    const float z = curZ_;
+    batch_.insert(batch_.end(), {ax, ay, z, c.r, c.g, c.b, c.a, bx, by, z, c.r, c.g, c.b, c.a, cx, cy, z, c.r, c.g, c.b, c.a});
 }
+// Dunya derinligi: perspektif (near_, far_) ile ayni NDC z (araclar ayni derinlik tamponunda test edilir)
+float Renderer::ndcZ(float w) const { return w <= near_ ? -1.0f : std::min(0.99999f, (far_ + near_) / (far_ - near_) - 2.0f * far_ * near_ / ((far_ - near_) * w)); }
+void Renderer::triZ(float ax, float ay, float aw, float bx, float by, float bw, float cx, float cy, float cw, Color c) {
+    if (!worldDepth_) { tri(ax, ay, bx, by, cx, cy, c); return; }
+    const float za = ndcZ(aw), zb = ndcZ(bw), zc = ndcZ(cw);
+    curZ_ = za;                                                        // ardindan gelen etiketsiz cizim (pencere vb.) bu derinlikte
+    batch_.insert(batch_.end(), {ax, ay, za, c.r, c.g, c.b, c.a, bx, by, zb, c.r, c.g, c.b, c.a, cx, cy, zc, c.r, c.g, c.b, c.a});
+}
+void Renderer::setDepthW(float w) { if (worldDepth_) curZ_ = ndcZ(w); }
+void Renderer::beginWorldDepth(float nearZ, float farZ) {
+    flush2D();
+    worldDepth_ = true; near_ = nearZ; far_ = farZ; curZ_ = 0.99999f;  // etiketsiz arka plan (gok) en uzakta
+    glClear(GL_DEPTH_BUFFER_BIT);
+}
+void Renderer::endWorldDepth() { flush2D(); worldDepth_ = false; curZ_ = 0.0f; }
 void Renderer::rect(float x0, float y0, float x1, float y1, Color c) {
     tri(x0, y0, x1, y0, x1, y1, c); tri(x0, y0, x1, y1, x0, y1, c);
 }
 void Renderer::gradientV(float x0, float y0, float x1, float y1, Color t, Color b) {
-    batch_.insert(batch_.end(), {x0, y0, t.r, t.g, t.b, t.a, x1, y0, t.r, t.g, t.b, t.a, x1, y1, b.r, b.g, b.b, b.a,
-                                 x0, y0, t.r, t.g, t.b, t.a, x1, y1, b.r, b.g, b.b, b.a, x0, y1, b.r, b.g, b.b, b.a});
+    const float z = curZ_;
+    batch_.insert(batch_.end(), {x0, y0, z, t.r, t.g, t.b, t.a, x1, y0, z, t.r, t.g, t.b, t.a, x1, y1, z, b.r, b.g, b.b, b.a,
+                                 x0, y0, z, t.r, t.g, t.b, t.a, x1, y1, z, b.r, b.g, b.b, b.a, x0, y1, z, b.r, b.g, b.b, b.a});
 }
 void Renderer::circle(float cx, float cy, float r, int seg, Color c) {
     for (int i = 0; i < seg; ++i) {
@@ -466,7 +483,8 @@ void Renderer::textRaw(float x, float y, const std::string& s, float sc, Color c
 
 void Renderer::flush2D() {
     if (batch_.empty()) return;
-    glDisable(GL_DEPTH_TEST);
+    if (worldDepth_) { glEnable(GL_DEPTH_TEST); glDepthFunc(GL_ALWAYS); glDepthMask(GL_TRUE); }   // ressam sirasi + derinlik yazar
+    else glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glViewport(0, 0, vw_ * scale_, vh_ * scale_);
@@ -475,8 +493,9 @@ void Renderer::flush2D() {
     glBindVertexArray(vao2d_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo2d_);
     glBufferData(GL_ARRAY_BUFFER, batch_.size() * sizeof(float), batch_.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(batch_.size() / 6));
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(batch_.size() / 7));
     glDisable(GL_BLEND);
+    if (worldDepth_) { glDepthFunc(GL_LESS); glDisable(GL_DEPTH_TEST); }
     batch_.clear();
 }
 
@@ -641,7 +660,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     const Mesh& M = mesh(carId);
     if (!M.count) return;
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
+    if (!worldDepth_) glClear(GL_DEPTH_BUFFER_BIT);                     // dunya derinligi varsa araclar binalarin arkasinda kalir
     const int S = scale_;
     glViewport((int)(x * S), (vh_ - (int)(y + h)) * S, (int)(w * S), (int)(h * S));
     glUseProgram(p3d_);

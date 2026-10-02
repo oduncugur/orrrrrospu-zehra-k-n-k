@@ -28,6 +28,7 @@ Proj project(const Mat4& vp, double X, double Y, double h, int vw, int vh) {
     if (cw < 0.4f) return {0, 0, cw, false};
     return {(cx / cw * 0.5f + 0.5f) * vw, (1.0f - (cy / cw * 0.5f + 0.5f)) * vh, cw, true};
 }
+void triP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, Color col) { r.triZ(a.x, a.y, a.w, b.x, b.y, b.w, c.x, c.y, c.w, col); }
 float hashf(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 std::string secStr(double t) { char b[16]; std::snprintf(b, sizeof b, "%.1f S", t); return t > 0 ? b : "BITIREMEDI"; }
 } // namespace
@@ -379,6 +380,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     const Mat4 proj = matPerspective((float)camFov, (float)W / H, 0.3f, 900.0f);
     const Mat4 view = matLookAt((float)ex, (float)ez, (float)-ey, (float)tx, (float)tz, (float)-ty);
     const Mat4 vp = matMul(proj, view);
+    r.beginWorldDepth(0.3f, 900.0f);                                   // dunya derinlik yazar: araclar binalarin arkasinda kalir
     const float pxPerM = H * 0.5f / std::tan((float)camFov * 0.5f);      // derinlik 1 m'de metre basina piksel
     double dx = tx - ex, dy = ty - ey;
     { const double l = std::max(1e-6, std::hypot(dx, dy)); dx /= l; dy /= l; }
@@ -473,30 +475,30 @@ void RoadScreen::drawWorld(Renderer& r) {
             const Proj gL0 = edgeW(i, 1, -60.0), gL1 = edgeW(j, 1, -60.0), gR0 = edgeW(i, -1, -60.0), gR1 = edgeW(j, -1, -60.0);
             const Color g0 = zone == 1 ? Color{0.42f * amb, 0.42f * amb, 0.44f * amb} : band ? grass : Color{grass.r * 0.94f, grass.g * 0.96f, grass.b * 0.94f};
             const Color gc = fog(night_ && zone == 1 ? L({0.42f, 0.42f, 0.44f}) : g0, aL.w);
-            if (gL0.ok && gL1.ok) { r.tri(gL0.x, gL0.y, aL.x, aL.y, bL.x, bL.y, gc); r.tri(gL0.x, gL0.y, bL.x, bL.y, gL1.x, gL1.y, gc); }
-            if (gR0.ok && gR1.ok) { r.tri(aR.x, aR.y, gR0.x, gR0.y, gR1.x, gR1.y, gc); r.tri(aR.x, aR.y, gR1.x, gR1.y, bR.x, bR.y, gc); }
+            if (gL0.ok && gL1.ok) { triP(r, gL0, aL, bL, gc); triP(r, gL0, bL, gL1, gc); }
+            if (gR0.ok && gR1.ok) { triP(r, aR, gR0, gR1, gc); triP(r, aR, gR1, bR, gc); }
         }
         const Color curb = fog(mtn ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
                                    : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f}), aL.w);
-        { const Color cb = fog(L(curb), aL.w); r.tri(aL.x, aL.y, aR.x, aR.y, bR.x, bR.y, cb); r.tri(aL.x, aL.y, bR.x, bR.y, bL.x, bL.y, cb); }
+        { const Color cb = fog(L(curb), aL.w); triP(r, aL, aR, bR, cb); triP(r, aL, bR, bL, cb); }
         const Proj cL = edgeW(i, 1, 0.0), cR = edgeW(i, -1, 0.0), dL = edgeW(j, 1, 0.0), dR = edgeW(j, -1, 0.0);
         // Asfalt: hafif yama/renk degisimi (hash) + tekerlek izi koyulugu
         const float patch = 0.015f * (hashf(i / 4) - 0.5f);
         const float wet = rain_ ? 0.72f : 1.0f;                              // islak asfalt koyu
         const Color asp = fog(L(band ? Color{(0.30f + patch) * wet, (0.30f + patch) * wet, (0.32f + patch) * wet}
                                      : Color{(0.27f + patch) * wet, (0.27f + patch) * wet, (0.29f + patch) * wet}), cL.w);
-        r.tri(cL.x, cL.y, cR.x, cR.y, dR.x, dR.y, asp); r.tri(cL.x, cL.y, dR.x, dR.y, dL.x, dL.y, asp);
+        triP(r, cL, cR, dR, asp); triP(r, cL, dR, dL, asp);
         if (cL.w < 120.0f)                                         // tekerlek izleri (serit merkezinin iki yani)
             for (double lo : {-ses_->lane() - 0.75, -ses_->lane() + 0.75, ses_->lane() - 0.75, ses_->lane() + 0.75}) {
                 const Proj t0 = edge(i, lo + 0.25), t1 = edge(i, lo - 0.25), t2 = edge(j, lo - 0.25), t3 = edge(j, lo + 0.25);
                 const Color tc{0.0f, 0.0f, 0.0f, 0.07f};
-                r.tri(t0.x, t0.y, t1.x, t1.y, t2.x, t2.y, tc); r.tri(t0.x, t0.y, t2.x, t2.y, t3.x, t3.y, tc);
+                triP(r, t0, t1, t2, tc); triP(r, t0, t2, t3, tc);
             }
         {   // kenar cizgileri (beyaz, surekli)
             const Color ec = fog(L({0.92f, 0.92f, 0.9f}), cL.w);
             for (double sg : {-1.0, 1.0}) {
                 const Proj e0 = edgeW(i, sg, 0.12), e1 = edgeW(i, sg, 0.27), e2 = edgeW(j, sg, 0.27), e3 = edgeW(j, sg, 0.12);
-                r.tri(e0.x, e0.y, e1.x, e1.y, e2.x, e2.y, ec); r.tri(e0.x, e0.y, e2.x, e2.y, e3.x, e3.y, ec);
+                triP(r, e0, e1, e2, ec); triP(r, e0, e2, e3, ec);
             }
         }
         if (P[i].hw > 5.0 && (i % 5) < 2) {                        // genis yol (2x2): ek serit kesik cizgileri
@@ -504,13 +506,13 @@ void RoadScreen::drawWorld(Renderer& r) {
             for (double sg : {-1.0, 1.0}) {
                 const double o = sg * P[i].hw * 0.5, o2 = sg * P[j].hw * 0.5;
                 const Proj m0 = edge(i, o + 0.07), m1 = edge(i, o - 0.07), m2 = edge(j, o2 + 0.07), m3 = edge(j, o2 - 0.07);
-                r.tri(m0.x, m0.y, m1.x, m1.y, m3.x, m3.y, wc); r.tri(m0.x, m0.y, m3.x, m3.y, m2.x, m2.y, wc);
+                triP(r, m0, m1, m3, wc); triP(r, m0, m3, m2, wc);
             }
         }
         if ((i % 5) < 2) {                                         // orta kesik cizgi (4 m cizgi, 6 m bosluk)
             const Proj m0 = edge(i, 0.08), m1 = edge(i, -0.08), m2 = edge(j, 0.08), m3 = edge(j, -0.08);
             const Color mc = fog(L({0.95f, 0.9f, 0.6f}), m0.w);
-            r.tri(m0.x, m0.y, m1.x, m1.y, m3.x, m3.y, mc); r.tri(m0.x, m0.y, m3.x, m3.y, m2.x, m2.y, mc);
+            triP(r, m0, m1, m3, mc); triP(r, m0, m3, m2, mc);
         }
         if (zone == 2) {                                           // tunel: duvar + tavan + tavan lambalari
             const float bt = band ? 1.0f : 0.88f;                           // bant golgesi: derinlik hissi
@@ -519,17 +521,17 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const float sd = (sg > 0 ? 0.9f : 1.0f) * bt;
                 const Color wall = fog(L({0.46f * sd, 0.44f * sd, 0.40f * sd}), cL.w);
                 const Proj w0 = pt(i, sg * (P[i].hw + 1.2), 0), w1 = pt(j, sg * (P[j].hw + 1.2), 0), w2 = pt(j, sg * (P[j].hw + 1.2), 6.0), w3 = pt(i, sg * (P[i].hw + 1.2), 6.0);
-                if (w0.ok && w1.ok && w2.ok && w3.ok) { r.tri(w0.x, w0.y, w1.x, w1.y, w2.x, w2.y, wall); r.tri(w0.x, w0.y, w2.x, w2.y, w3.x, w3.y, wall); }
+                if (w0.ok && w1.ok && w2.ok && w3.ok) { triP(r, w0, w1, w2, wall); triP(r, w0, w2, w3, wall); }
                 const Proj k2 = pt(j, sg * (P[j].hw + 1.2), 0.9), k3 = pt(i, sg * (P[i].hw + 1.2), 0.9);   // alt kusak (sari-siyah)
                 const Color kc = fog(L(((i / 2) & 1) ? Color{0.85f, 0.7f, 0.15f} : Color{0.12f, 0.12f, 0.12f}), cL.w);
-                if (w0.ok && w1.ok && k2.ok && k3.ok) { r.tri(w0.x, w0.y, w1.x, w1.y, k2.x, k2.y, kc); r.tri(w0.x, w0.y, k2.x, k2.y, k3.x, k3.y, kc); }
+                if (w0.ok && w1.ok && k2.ok && k3.ok) { triP(r, w0, w1, k2, kc); triP(r, w0, k2, k3, kc); }
             }
             const Proj c0 = pt(i, P[i].hw + 1.2, 6.0), c1 = pt(i, -P[i].hw - 1.2, 6.0), c2 = pt(j, -P[j].hw - 1.2, 6.0), c3 = pt(j, P[j].hw + 1.2, 6.0);
-            if (c0.ok && c1.ok && c2.ok && c3.ok) { r.tri(c0.x, c0.y, c1.x, c1.y, c2.x, c2.y, ceil); r.tri(c0.x, c0.y, c2.x, c2.y, c3.x, c3.y, ceil); }
+            if (c0.ok && c1.ok && c2.ok && c3.ok) { triP(r, c0, c1, c2, ceil); triP(r, c0, c2, c3, ceil); }
             if (i % 5 == 0) {
                 const Proj l0 = pt(i, 0.6, 5.9), l1 = pt(i, -0.6, 5.9), l2 = pt(j, -0.6, 5.9), l3 = pt(j, 0.6, 5.9);
                 const Color lc = fog({1.0f, 0.85f, 0.55f}, l0.w);
-                if (l0.ok && l1.ok && l2.ok && l3.ok) { r.tri(l0.x, l0.y, l1.x, l1.y, l2.x, l2.y, lc); r.tri(l0.x, l0.y, l2.x, l2.y, l3.x, l3.y, lc); }
+                if (l0.ok && l1.ok && l2.ok && l3.ok) { triP(r, l0, l1, l2, lc); triP(r, l0, l2, l3, lc); }
             }
             continue;
         }
@@ -545,8 +547,9 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const float hcol = hashf(key * 17);
                 const Color base{0.55f + 0.25f * hcol, 0.52f + 0.2f * hashf(key * 19), 0.50f + 0.18f * hashf(key * 23)};
                 const Color face = fog(L({base.r * 0.85f, base.g * 0.85f, base.b * 0.85f}), f0.w), endc = fog(L({base.r * 0.62f, base.g * 0.62f, base.b * 0.62f}), f0.w);
-                r.tri(f0.x, f0.y, e0.x, e0.y, e3.x, e3.y, endc); r.tri(f0.x, f0.y, e3.x, e3.y, f3.x, f3.y, endc);
-                r.tri(f0.x, f0.y, f1.x, f1.y, f2.x, f2.y, face); r.tri(f0.x, f0.y, f2.x, f2.y, f3.x, f3.y, face);
+                triP(r, f0, e0, e3, endc); triP(r, f0, e3, f3, endc);
+                triP(r, f0, f1, f2, face); triP(r, f0, f2, f3, face);
+                r.setDepthW(f0.w - 0.05f);
                 if (f0.w < 260.0f) {                                   // pencereler (gece yanik)
                     const int floors = std::max(2, (int)(hgt / 3.5)), cols = 5;
                     for (int fl = 0; fl < floors; ++fl)
@@ -567,6 +570,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             if (!(camBlend_ < 0.5 && side < 0)) {
                 const Proj p0 = pt(i, side * (P[i].hw + 1.3), 0), p1 = pt(i, side * (P[i].hw + 1.3), 8.0), p2 = pt(i, side * (P[i].hw - 0.6), 8.0);
                 if (p0.ok && p1.ok && p2.ok) {
+                    r.setDepthW(p0.w);
                     const float sc = pxPerM / p0.w;
                     const Color pc = fog(L({0.45f, 0.46f, 0.5f}), p0.w);
                     r.rect(p0.x - 0.09f * sc, p1.y, p0.x + 0.09f * sc, p0.y, pc);
@@ -584,7 +588,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 if (k0.ok && k1.ok && k2.ok && k3.ok) {
                     const float t = 0.85f + 0.15f * hashf(i * 13);
                     const Color rc = fog(L({0.42f * t, 0.38f * t, 0.33f * t}), k0.w);
-                    r.tri(k0.x, k0.y, k1.x, k1.y, k2.x, k2.y, rc); r.tri(k0.x, k0.y, k2.x, k2.y, k3.x, k3.y, rc);
+                    triP(r, k0, k1, k2, rc); triP(r, k0, k2, k3, rc);
                 }
             }
         }
@@ -597,8 +601,9 @@ void RoadScreen::drawWorld(Renderer& r) {
                     static const Color ads[4] = {{0.85f, 0.2f, 0.15f}, {0.15f, 0.45f, 0.85f}, {0.95f, 0.75f, 0.1f}, {0.2f, 0.7f, 0.35f}};
                     const Color ac = fog(night_ ? Color{ads[i % 4].r * 0.6f, ads[i % 4].g * 0.6f, ads[i % 4].b * 0.6f} : ads[i % 4], b0.w);
                     const float sc = pxPerM / g0.w;
+                    r.setDepthW(g0.w);
                     r.rect(g0.x - 0.1f * sc, b0.y, g0.x + 0.1f * sc, g0.y, fog(L({0.35f, 0.35f, 0.38f}), g0.w));
-                    r.tri(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y, ac); r.tri(b0.x, b0.y, b2.x, b2.y, b3.x, b3.y, ac);
+                    triP(r, b0, b1, b2, ac); triP(r, b0, b2, b3, ac);
                 }
             }
         }
@@ -609,6 +614,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 if (h < (mtn ? 0.08f : 0.35f)) continue;
                 const Proj b = edge(i, side * (P[i].hw + 5.0 + 20.0 * hashf(i * 7 + side)));
                 if (!b.ok) continue;
+                r.setDepthW(b.w);
                 const float sc = pxPerM / b.w;
                 const float th = (5.0f + 4.0f * h) * sc, tw = (1.6f + h) * sc;
                 if (h > 0.8f) {                                      // elektrik diregi + travers
@@ -639,7 +645,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const Proj d2 = project(vp, q2.x - o0 * std::sin(q2.heading), q2.y + o0 * std::cos(q2.heading), q2.z + 0.02, W, H);
                 if (!a.ok || !bq.ok || !c2.ok || !d2.ok) continue;
                 const Color cc = (k & 1) ? Color{1, 1, 1} : Color{0.05f, 0.05f, 0.05f};
-                r.tri(a.x, a.y, bq.x, bq.y, c2.x, c2.y, cc); r.tri(a.x, a.y, c2.x, c2.y, d2.x, d2.y, cc);
+                triP(r, a, bq, c2, cc); triP(r, a, c2, d2, cc);
             }
         }
     }
@@ -653,6 +659,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             top = project(vp, bx, by, p.z + h1, W, H);
             bot = project(vp, bx, by, p.z + h0, W, H);
             if (!base.ok || !top.ok || !bot.ok) return 0.0f;
+            r.setDepthW(base.w);
             const float sc = pxPerM / base.w;
             r.rect(base.x - 0.07f * sc, top.y, base.x + 0.07f * sc, base.y, {0.55f, 0.55f, 0.58f});
             return sc;
@@ -685,6 +692,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
         }
     }
+    r.setDepthW(1e9f);                                                 // efektler araclari ortmez
     if (sideCam && sim.speed() > 12.0) {
         // Hiz cizgileri (drag gorunumu): ust ve alt kenarda, hizla uzar ve yogunlasir; arac ortada temiz kalir
         const float k = std::min(1.0f, (float)(sim.speed() - 12.0) / 35.0f) * (1.0f - (float)camBlend_);
@@ -747,6 +755,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const bool on = (side < 0) == ph;
                 const Color c = side < 0 ? Color{1.0f, 0.15f, 0.1f} : Color{0.2f, 0.4f, 1.0f};
                 const float k = (float)pxPerM / q.w;
+                r.setDepthW(1e9f);
                 r.circle(q.x, q.y, 0.16f * k, 8, on ? c : Color{c.r * 0.3f, c.g * 0.3f, c.b * 0.3f});
                 if (on) r.circle(q.x, q.y, (night_ ? 1.6f : 0.7f) * k, 14, {c.r, c.g, c.b, night_ ? 0.22f : 0.15f});
             }
@@ -786,6 +795,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             r.tri(x0, y0, x0 + 0.9f, y0, x0 - slant * len + 0.9f, y0 + len, {0.75f, 0.8f, 0.9f, 0.35f});
         }
     }
+    r.endWorldDepth();
 }
 
 // Polis yakinken ekran kenarlarinda kirmizi / mavi cakar yansimasi (arkadaki polis gorunmese de hissedilir)

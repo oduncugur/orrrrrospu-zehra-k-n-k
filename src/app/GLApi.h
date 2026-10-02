@@ -33,7 +33,7 @@ inline bool zkLoadGL(void* (*)(const char*)) { return true; }
     X(PFNGLDISABLEPROC, glDisable) X(PFNGLDRAWARRAYSPROC, glDrawArrays) X(PFNGLACTIVETEXTUREPROC, glActiveTexture) \
     X(PFNGLREADPIXELSPROC, glReadPixels) X(PFNGLPIXELSTOREIPROC, glPixelStorei)                             \
     X(PFNGLUNIFORM2FPROC, glUniform2f) X(PFNGLBLENDFUNCPROC, glBlendFunc)                                      \
-    X(PFNGLUNIFORM1FPROC, glUniform1f) X(PFNGLUNIFORM3FPROC, glUniform3f) X(PFNGLDEPTHMASKPROC, glDepthMask)  \
+    X(PFNGLUNIFORM1FPROC, glUniform1f) X(PFNGLUNIFORM3FPROC, glUniform3f) X(PFNGLDEPTHMASKPROC, glDepthMask) X(PFNGLDEPTHFUNCPROC, glDepthFunc)  \
     X(PFNGLDELETEFRAMEBUFFERSPROC, glDeleteFramebuffers) X(PFNGLDELETETEXTURESPROC, glDeleteTextures)          \
     X(PFNGLDELETERENDERBUFFERSPROC, glDeleteRenderbuffers) X(PFNGLUNIFORM4FPROC, glUniform4f)
 
@@ -84,6 +84,7 @@ ZK_GL_FUNCS(ZK_GL_DECLARE)
 #define glUniform1f zk_glUniform1f
 #define glUniform3f zk_glUniform3f
 #define glDepthMask zk_glDepthMask
+#define glDepthFunc zk_glDepthFunc
 #define glDeleteFramebuffers zk_glDeleteFramebuffers
 #define glDeleteTextures zk_glDeleteTextures
 #define glDeleteRenderbuffers zk_glDeleteRenderbuffers
