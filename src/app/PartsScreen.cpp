@@ -1,6 +1,7 @@
 // ZEHRA KINIK - Parca dukkani (5 sekme, 37 kategori, kaydirmali secenek listesi, onizleme + onay) ve
 // ozel uretim atolyesi (turbo / kam / stroker / son disli / vites oranlari / kanat).
 #include "Screens.h"
+#include "app/Hints.h"
 #include "Ui.h"
 #include "garage/VehicleCatalog.h"
 #include "sim/PartTables.h"
@@ -80,7 +81,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
 
 // ================================================================== PARCA DUKKANI
 PartsScreen::PartsScreen(App& app, int cat) : app_(app), cat_(cat) {
-    app_.hint(3, "MODIFIYE\nILK DOKUNUS: ONIZLEME (GUC, YUK, 1/4 MIL)\nIKINCI DOKUNUS: SATIN AL VE TAK\nMOTOR / SANZIMAN YUKU %100'U GECMESIN\nBUYUK TURBO: YAKIT SISTEMI, ARA SOGUTUCU\nVE YUKSEK OKTAN ISTER (YOKSA VURUNTU)");
+    app_.hint(HintParts, hintTexts()[HintParts]);
     if (cat_ >= 0) tab_ = partTab((PartCat)cat_);
     recompute();
 }
@@ -566,7 +567,10 @@ Rect swMinus(int i) { return {214, kSwY0 + i * kSwH + 16, 254, kSwY0 + i * kSwH 
 Rect swPlus(int i) { return {258, kSwY0 + i * kSwH + 16, 352, kSwY0 + i * kSwH + 46}; }
 }
 
-EcuScreen::EcuScreen(App& app) : app_(app) { now_ = tuneStats(*findVehicle(app_.career.car().carId), app_.career.car().tune); }
+EcuScreen::EcuScreen(App& app) : app_(app) {
+    app_.hint(HintEcu, hintTexts()[HintEcu]);
+    now_ = tuneStats(*findVehicle(app_.career.car().carId), app_.career.car().tune);
+}
 
 void EcuScreen::render(Renderer& r) {
     const OwnedCar& oc = app_.career.car();

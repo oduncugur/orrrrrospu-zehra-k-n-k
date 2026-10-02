@@ -2,6 +2,7 @@
 // Kontroller (Cockpit): analog gaz / fren (/ debriyaj), sanzimana gore vites kolu. Direksiyon: telefonda egim,
 // masaustunde klavye (ekranda sag/sol tusu yok).
 #include "Screens.h"
+#include "app/Hints.h"
 #include "Ui.h"
 #include "app/Looks.h"
 #include "garage/VehicleCatalog.h"
@@ -48,7 +49,7 @@ void RoadScreen::setupLayout() {
 }
 
 RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId_(carId) {
-    app_.hint(2, "YOL SURUSU\nDIREKSIYON: SOL / SAG (TELEFONU EGEREK DE)\nKAYAN ARAC KENDI TOPARLANMAZ: KARSI DIREKSIYON + GAZ\nGECE VE YAGMURDA TUTUS DUSER, ERKEN FRENLE\nSU 108 C USTU: GUC KAYBI (SOGUTMAYI YUKSELT)");
+    app_.hint(HintRoad, hintTexts()[HintRoad]);
     setupLayout();
     if (tune) tune_ = *tune;
     app_.setVoiceTuned(0, carId, &tune_);
@@ -115,6 +116,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     cockpit_.setPortrait(!land_);
     cockpit_.setKnobGear(1);
     menu_ = false; rewarded_ = false; record_ = false; prize_ = 0; finT_ = 0;
+    if (m == RoadSession::Mode::Chase) app_.hint(HintChase, hintTexts()[HintChase]);
     if (night_ || rain_) msgNote_ = std::string(night_ ? "GECE" : "") + (night_ && rain_ ? " + " : "") + (rain_ ? "YAGMUR: TUTUS DUSUK" : "");
     else msgNote_.clear();
     flash(m == RoadSession::Mode::Free ? "SERBEST SURUS"
