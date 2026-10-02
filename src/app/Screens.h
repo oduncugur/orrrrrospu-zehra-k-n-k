@@ -34,7 +34,7 @@ private:
     void refreshEngine();
     App& app_;
     std::unique_ptr<PowertrainCore> pt_;
-    double tunedHp_ = 0, stockHp_ = 0;
+    double tunedHp_ = 0, stockHp_ = 0, torqueNm_ = 0, index_ = 0, estEt_ = 0;
     bool cancelArm_ = false;                     // musteri isi iptali: ikinci basis onaylar
     std::string msg_; double msgT_ = 0;
     bool selling_ = false;                       // satis onay penceresi acik

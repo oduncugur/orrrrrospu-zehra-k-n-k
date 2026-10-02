@@ -45,6 +45,95 @@ inline void button(Renderer& r, const Rect& b, const std::string& label, Color b
     r.textFit(b.cx(), ty, label, scale, maxW, fg, true);
 }
 
+// Vektor ikonlar (s: yaricap olcegi). Ortak gorsel dil: ana ekranlarda ikon + etiket kutucuklari.
+enum Icon { IconParts, IconSetup, IconGauge, IconPaint, IconDyno, IconRoad, IconGallery, IconStreet, IconSettings, IconMap, IconCash, IconSell, IconRepair };
+inline void thickLine(Renderer& r, float x0, float y0, float x1, float y1, float w, Color c) {
+    const float dx = x1 - x0, dy = y1 - y0, l = std::max(1e-3f, std::sqrt(dx * dx + dy * dy)), nx = -dy / l * w * 0.5f, ny = dx / l * w * 0.5f;
+    r.tri(x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, c); r.tri(x0 + nx, y0 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny, c);
+}
+inline void ring(Renderer& r, float cx, float cy, float rad, float w, Color c, float a0 = 0, float a1 = 6.2831853f, int seg = 24) {
+    for (int i = 0; i < seg; ++i) {
+        const float t0 = a0 + (a1 - a0) * i / seg, t1 = a0 + (a1 - a0) * (i + 1) / seg;
+        thickLine(r, cx + std::cos(t0) * rad, cy + std::sin(t0) * rad, cx + std::cos(t1) * rad, cy + std::sin(t1) * rad, w, c);
+    }
+}
+inline void icon(Renderer& r, int id, float cx, float cy, float s, Color c) {
+    const float w = std::max(2.0f, s * 0.16f);
+    switch (id) {
+    case IconParts:                                                      // anahtar: sap + agiz (cember, ucu acik)
+        thickLine(r, cx - s * 0.75f, cy + s * 0.75f, cx + s * 0.15f, cy - s * 0.15f, w * 1.6f, c);
+        r.circle(cx + s * 0.42f, cy - s * 0.42f, s * 0.42f, 16, c);
+        r.tri(cx + s * 0.42f, cy - s * 0.42f, cx + s * 0.95f, cy - s * 0.6f, cx + s * 0.6f, cy - s * 0.95f, {0.1f, 0.1f, 0.13f});
+        r.circle(cx + s * 0.48f, cy - s * 0.48f, s * 0.17f, 10, {0.1f, 0.1f, 0.13f});
+        break;
+    case IconSetup:                                                      // ayar surguleri
+        for (int k = 0; k < 3; ++k) {
+            const float x = cx + (k - 1) * s * 0.6f, ky = cy + s * (k == 0 ? 0.3f : k == 1 ? -0.35f : 0.1f);
+            thickLine(r, x, cy - s * 0.8f, x, cy + s * 0.8f, w * 0.7f, c);
+            r.rect(x - s * 0.22f, ky - s * 0.13f, x + s * 0.22f, ky + s * 0.13f, c);
+        }
+        break;
+    case IconGauge:                                                      // kadran
+        ring(r, cx, cy + s * 0.1f, s * 0.8f, w, c, 2.6f, 2.6f + 4.2f, 20);
+        thickLine(r, cx, cy + s * 0.1f, cx + s * 0.5f, cy - s * 0.4f, w, c);
+        r.circle(cx, cy + s * 0.1f, s * 0.14f, 10, c);
+        break;
+    case IconPaint:                                                      // boya damlasi
+        r.circle(cx, cy + s * 0.25f, s * 0.5f, 18, c);
+        r.tri(cx - s * 0.47f, cy + s * 0.1f, cx + s * 0.47f, cy + s * 0.1f, cx, cy - s * 0.8f, c);
+        break;
+    case IconDyno:                                                       // guc egrisi
+        thickLine(r, cx - s * 0.8f, cy + s * 0.75f, cx + s * 0.8f, cy + s * 0.75f, w * 0.7f, c);
+        thickLine(r, cx - s * 0.8f, cy + s * 0.75f, cx - s * 0.8f, cy - s * 0.8f, w * 0.7f, c);
+        thickLine(r, cx - s * 0.7f, cy + s * 0.5f, cx - s * 0.15f, cy - s * 0.1f, w, c);
+        thickLine(r, cx - s * 0.15f, cy - s * 0.1f, cx + s * 0.35f, cy - s * 0.55f, w, c);
+        thickLine(r, cx + s * 0.35f, cy - s * 0.55f, cx + s * 0.75f, cy - s * 0.35f, w, c);
+        break;
+    case IconRoad:                                                       // perspektif yol
+        r.tri(cx - s * 0.25f, cy - s * 0.8f, cx + s * 0.25f, cy - s * 0.8f, cx + s * 0.9f, cy + s * 0.8f, c);
+        r.tri(cx - s * 0.25f, cy - s * 0.8f, cx + s * 0.9f, cy + s * 0.8f, cx - s * 0.9f, cy + s * 0.8f, c);
+        for (int k = 0; k < 3; ++k) r.rect(cx - s * 0.05f * (1 + k), cy - s * 0.6f + k * s * 0.5f, cx + s * 0.05f * (1 + k), cy - s * 0.35f + k * s * 0.5f, {0.1f, 0.1f, 0.12f});
+        break;
+    case IconGallery:                                                    // araba
+        r.rect(cx - s * 0.9f, cy - s * 0.05f, cx + s * 0.9f, cy + s * 0.4f, c);
+        r.tri(cx - s * 0.5f, cy - s * 0.05f, cx - s * 0.25f, cy - s * 0.45f, cx + s * 0.3f, cy - s * 0.45f, c);
+        r.tri(cx - s * 0.5f, cy - s * 0.05f, cx + s * 0.3f, cy - s * 0.45f, cx + s * 0.55f, cy - s * 0.05f, c);
+        r.circle(cx - s * 0.5f, cy + s * 0.45f, s * 0.22f, 12, {0.08f, 0.08f, 0.1f}); r.circle(cx + s * 0.5f, cy + s * 0.45f, s * 0.22f, 12, {0.08f, 0.08f, 0.1f});
+        break;
+    case IconStreet:                                                     // hilal (gece)
+        r.circle(cx, cy, s * 0.75f, 20, c);
+        r.circle(cx + s * 0.35f, cy - s * 0.2f, s * 0.62f, 20, {0.1f, 0.1f, 0.13f});
+        break;
+    case IconSettings:                                                   // disli
+        for (int k = 0; k < 8; ++k) { const float a = 0.785398f * k; thickLine(r, cx + std::cos(a) * s * 0.45f, cy + std::sin(a) * s * 0.45f, cx + std::cos(a) * s * 0.85f, cy + std::sin(a) * s * 0.85f, w * 1.4f, c); }
+        r.circle(cx, cy, s * 0.6f, 18, c); r.circle(cx, cy, s * 0.25f, 12, {0.1f, 0.1f, 0.13f});
+        break;
+    case IconMap:                                                        // konum isareti
+        r.circle(cx, cy - s * 0.25f, s * 0.5f, 18, c);
+        r.tri(cx - s * 0.45f, cy - s * 0.05f, cx + s * 0.45f, cy - s * 0.05f, cx, cy + s * 0.85f, c);
+        r.circle(cx, cy - s * 0.25f, s * 0.2f, 12, {0.1f, 0.1f, 0.13f});
+        break;
+    case IconCash: r.textCentered(cx, cy - 7, "$", 2, c); break;
+    case IconSell: r.textCentered(cx, cy - 7, "%", 2, c); break;
+    case IconRepair:                                                     // tornavida + anahtar (capraz)
+        thickLine(r, cx - s * 0.7f, cy - s * 0.7f, cx + s * 0.7f, cy + s * 0.7f, w * 1.3f, c);
+        thickLine(r, cx + s * 0.7f, cy - s * 0.7f, cx - s * 0.7f, cy + s * 0.7f, w * 1.3f, c);
+        break;
+    default: break;
+    }
+}
+// Kutucuk: ikon ustte, etiket altta (ana menu izgarasi). badge: sag ustte kucuk uyari / bilgi (bos: yok)
+inline void tile(Renderer& r, const Rect& b, int ic, const std::string& label, Color bg, const std::string& badge = "") {
+    button(r, b, "", bg, 1);
+    icon(r, ic, b.cx(), b.y0 + (b.y1 - b.y0) * 0.40f, std::min(b.x1 - b.x0, b.y1 - b.y0) * 0.22f, {0.95f, 0.95f, 0.97f});
+    r.textFit(b.cx(), b.y1 - 17, label, 1, b.x1 - b.x0 - 6, {1, 1, 1}, true);
+    if (!badge.empty()) {
+        const float bw = r.textWidth(badge, 1) + 8;
+        r.rect(b.x1 - bw - 2, b.y0 + 3, b.x1 - 3, b.y0 + 15, {0.9f, 0.2f, 0.15f});
+        r.text(b.x1 - bw + 2, b.y0 + 6, badge, 1, {1, 1, 1});
+    }
+}
+
 inline std::string money(long v) {
     std::string d = std::to_string(v < 0 ? -v : v), o;
     for (size_t i = 0; i < d.size(); ++i) { if (i && (d.size() - i) % 3 == 0) o += ','; o += d[i]; }

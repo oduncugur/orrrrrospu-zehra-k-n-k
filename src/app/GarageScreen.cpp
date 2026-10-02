@@ -13,16 +13,16 @@
 namespace zk {
 
 namespace {
-const Rect kPrev{8, 470, 60, 508}, kNext{214, 470, 266, 508};
-const Rect kRace{8, 516, 128, 562}, kRoad{132, 516, 188, 562}, kSettings{192, 516, 266, 562};
-const Rect kParts{8, 570, 90, 632}, kGallery{96, 570, 178, 632}, kDyno{184, 570, 266, 632};
-const float kSl[4] = {292, 380, 352, 632};
-const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac varken)
-const Rect kRestoreG{8, 66, 112, 94};         // sol ust: hasar / yipranma varsa
-const Rect kPaintG{284, 100, 352, 128};       // sag ust: boyahane
-const Rect kCashG{284, 134, 352, 160};
-const Rect kSetupG{284, 168, 352, 196};      // kurulum (suspansiyon / lastik / profiller)
-const Rect kGaugeG{284, 202, 352, 230};      // kadran dukkani        // TEST: her basista +10.000 $ (yayin oncesi kaldirilacak)
+// Yerlesim (v2, kullanici dostu): ust serit (para / un), 3B arac (iki yanda ok, sag ustte ayar), bilgi kartlari,
+// buyuk YARIS dugmesi, iki sira ikonlu kutucuk. Devir testi: 3B gorunumde GAZ dugmesi (basili tut).
+const Rect kPrev{4, 140, 42, 214}, kNext{318, 140, 356, 214};
+const Rect kSettingsG{316, 64, 354, 100}, kSellG{316, 106, 354, 132}, kRestoreG{6, 64, 118, 88}, kCashG{6, 260, 58, 286};
+const Rect kGas{282, 246, 354, 288};
+const Rect kRace{8, 386, 352, 436};
+Rect tileR(int i) { return {8 + (i % 4) * 87.0f, 444 + (i / 4) * 92.0f, 8 + (i % 4) * 87.0f + 82, 444 + (i / 4) * 92.0f + 86}; }
+enum GTile { TParts, TSetup, TGauge, TPaint, TDyno, TRoad, TGallery, TStreet, TCount };
+const char* const kTileName[TCount] = {"PARCA", "KURULUM", "KADRAN", "BOYA", "DYNO", "SERBEST YOL", "GALERI", "SOKAK"};
+const int kTileIcon[TCount] = {IconParts, IconSetup, IconGauge, IconPaint, IconDyno, IconRoad, IconGallery, IconStreet};
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -49,6 +49,10 @@ void GarageScreen::refreshEngine() {
     pt_->setClutchPedal(1.0);
     tunedHp_ = peakHp(sim.engineSpec());
     stockHp_ = peakPowerHp(v);
+    torqueNm_ = 0;
+    for (auto* c : {&sim.engineSpec().lowCam, &sim.engineSpec().highCam}) for (auto& p : *c) torqueNm_ = std::max(torqueNm_, p.second);
+    index_ = performanceIndex(v, oc.tune);
+    estEt_ = v.streetLegal ? estimatedEt(v, oc.tune) : 0.0;
 }
 
 void GarageScreen::select(int idx) {
@@ -80,100 +84,102 @@ void GarageScreen::render(Renderer& r) {
     const OwnedCar& oc = c.car();
     const VehicleDef& v = *findVehicle(oc.carId);
     const EngineDef& e = engineTable()[effectiveEngine(v, &oc.tune)];   // motor swap
-    r.begin(360, 640, kUiBg);
-    studio(r, 60, 296, 196);
-    r.rect(0, 0, 360, 58, kUiPanel);
-    r.text(8, 8, upper(v.brand), 2, kUiGold);
-    r.text(8, 30, upper(v.model).substr(0, 20), 2, {1, 1, 1});
-    const std::string m = money(c.money);
-    r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
     char b[128];
-    std::snprintf(b, sizeof b, "YARIS %d  GAL %d", c.races, c.wins);
-    r.text(352 - r.textWidth(b, 1), 32, b, 1, kUiDim);
-    if (app_.settings.showFps) {
-        std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps());
-        r.text(352 - r.textWidth(b, 1), 44, b, 1, {0.45f, 0.5f, 0.45f});
-    }
-
+    r.begin(360, 640, kUiBg);
+    // ---- 3B arac (studyo) ----
+    studio(r, 58, 294, 230);
     const float L = (float)v.lengthM;
-    const Mat4 proj = matPerspective(0.75f, 360.0f / 230.0f, 0.1f, 50.0f);
+    const Mat4 proj = matPerspective(0.75f, 360.0f / 236.0f, 0.1f, 50.0f);
     const Mat4 view = matLookAt(0.0f, 1.1f + 0.2f * L, 1.35f * L + 1.2f, 0.0f, 0.55f, 0.0f);
     r.setCarLook(lookOf(oc));
-    r.drawCar(v.id, 0, 64, 360, 230, proj, view, matRotY(spin_));
-
-    std::snprintf(b, sizeof b, "%d %s %s %.0fKG", v.year, bodyName(v.body), driveName(v.drive), v.massKg - oc.tune.totalWeightKg());
-    r.text(8, 298, upper(b), 2, kUiText);
-    std::snprintf(b, sizeof b, "%s %s %.1fL %s", e.code, layoutName(e.layout), e.displacementL, inductionName(e.induction));
-    r.text(8, 318, upper(b).substr(0, 23), 2, kUiText);
-    if (tunedHp_ > stockHp_ + 0.5) std::snprintf(b, sizeof b, "%.0f HP  (STOK %.0f)", tunedHp_, stockHp_);
-    else std::snprintf(b, sizeof b, "%.0f HP  %s %zuV", tunedHp_, upper(gearboxName(gearboxTable()[v.gearbox].type)).c_str(), gearboxTable()[v.gearbox].ratios.size());
-    r.text(8, 338, b, 2, tunedHp_ > stockHp_ + 0.5 ? Color{0.4f, 1.0f, 0.5f} : kUiText);
-    r.text(8, 358, tuneSummary(oc.tune).substr(0, 46), 1, kUiGold);
-    if (oc.bestEt > 0) { std::snprintf(b, sizeof b, "EN IYI 1/4: %.3f S", oc.bestEt); r.text(8, 368, b, 1, kUiDim); }
-    std::snprintf(b, sizeof b, "KESICI %.0f RPM", pt_->engine().redlineRpm);                // parcalarla devir siniri
-    r.text(280 - r.textWidth(b, 1), 370, b, 1, {1.0f, 0.45f, 0.4f});
-    if (!v.streetLegal) r.text(8, 280, "YARIS ARACI - ROMORK", 2, {1.0f, 0.3f, 0.3f});
-
-    // Devir testi (bosta)
-    const float rpm = (float)pt_->rpm(), red = (float)pt_->engine().redlineRpm;
-    r.rect(8, 384, 280, 414, {0.15f, 0.15f, 0.18f});
-    const float fill = std::clamp(rpm / (red * 1.08f), 0.0f, 1.0f);
-    const bool hot = rpm > red * 0.9f;
-    r.rect(8, 384, 8 + 272 * fill, 414, hot ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
-    r.rect(8 + 272 / 1.08f, 380, 10 + 272 / 1.08f, 418, {1, 0.2f, 0.2f});
-    std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
-    r.text(8, 424, b, 3, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
-    if (pt_->vtecActive()) r.text(196, 424, "VTEC", 3, {1.0f, 0.2f, 0.2f});
-    std::snprintf(b, sizeof b, "YAG %.1f BAR", pt_->oilPressureBar());
-    r.text(8, 452, b, 1, {0.7f, 0.8f, 0.7f});
-#ifndef __ANDROID__
-    r.textFit(112, 452, "<> ARAC ENTER YARIS PGUP YOL", 1, 172, {0.55f, 0.75f, 1.0f});
-#endif
-
-    // Garajdaki araclar
-    button(r, kPrev, "<", kUiBtn, 3);
-    button(r, kNext, ">", kUiBtn, 3);
-    std::snprintf(b, sizeof b, "ARAC %d/%zu", c.current + 1, c.cars.size());
-    r.textCentered((kPrev.x1 + kNext.x0) / 2, 482, b, 2, {1, 1, 1});
-
-    if (c.car().jobHp > 0) {                                           // musteri araci: hedef + teslim
-        const double hp = peakHpOf(*findVehicle(c.car().carId), c.car().tune);
-        const bool ok = hp + 0.5 >= c.car().jobHp;
-        button(r, kRace, ok ? "TESLIM ET" : "IPTAL", ok ? kUiGreen : Color{0.45f, 0.20f, 0.15f}, 2);
-        std::snprintf(b, sizeof b, "MUSTERI: %.0f / %d HP  ODEME %s", hp, c.car().jobHp, money(c.car().jobReward).c_str());
-        r.text(8, 462, b, 1, ok ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
-    } else if (!c.car().raceable()) {
-        button(r, kRace, "TAMIR ET", Color{0.75f, 0.15f, 0.12f}, 2);
-        std::string d = "HASAR:";
-        if (c.car().axleBroken) d += " AKS KIRIK";
-        if (c.car().engineWear > 0.02) { char e[32]; std::snprintf(e, sizeof e, " MOTOR YATAK %%%d", (int)(c.car().engineWear * 100 + 0.5)); d += e; }
-        r.text(8, 462, d, 1, {1.0f, 0.35f, 0.3f});
-    } else button(r, kRace, "YARIS >", kUiOrange, 2);
-    button(r, kRoad, "YOL", Color{0.15f, 0.45f, 0.7f}, 2);
-    button(r, kSettings, "AYAR", kUiBtn, 2);
-#ifndef __ANDROID__
-    r.textCentered(kSettings.cx(), kSettings.y1 - 13, "(O)", 1, {0.55f, 0.75f, 1.0f});
-#endif
-    button(r, kParts, "PARCA", kUiBtn, 2);
-    button(r, kGallery, "GALERI", kUiBtn, 2);
-    button(r, kDyno, "DYNO", kUiBtn, 2);
-
-    r.rect(kSl[0], kSl[1], kSl[2], kSl[3], {0.18f, 0.18f, 0.22f});
-    r.rect(kSl[0], kSl[3] - (kSl[3] - kSl[1]) * throttle_, kSl[2], kSl[3], {0.9f, 0.55f, 0.1f});
-    r.textCentered((kSl[0] + kSl[2]) / 2, kSl[1] - 16, "GAZ", 2, {1, 1, 1});
-#ifndef __ANDROID__
-    r.textCentered((kSl[0] + kSl[2]) / 2, kSl[1] - 28, "(W)", 1, {0.55f, 0.75f, 1.0f});
-#endif
-
-    if (c.cars.size() > 1) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 2);
+    r.drawCar(v.id, 0, 58, 360, 236, proj, view, matRotY(spin_));
+    if (c.cars.size() > 1) {                                            // arac degistir: iki yanda buyuk ok
+        button(r, kPrev, "<", {0.15f, 0.16f, 0.2f, 0.75f}, 3);
+        button(r, kNext, ">", {0.15f, 0.16f, 0.2f, 0.75f}, 3);
+        std::snprintf(b, sizeof b, "%d / %zu", c.current + 1, c.cars.size());
+        r.textCentered(180, 66, b, 1, kUiDim);
+    }
+    button(r, kSettingsG, "", {0.15f, 0.16f, 0.2f, 0.8f}, 1);
+    icon(r, IconSettings, kSettingsG.cx(), kSettingsG.cy(), 11, {0.9f, 0.9f, 0.95f});
+    if (c.cars.size() > 1 && oc.jobHp == 0) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 1);
     if (worn()) button(r, kRestoreG, "RESTORASYON", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
-    button(r, kPaintG, "BOYA", Color{0.35f, 0.18f, 0.45f, 0.95f}, 2);
-    button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.95f}, 2);
-    button(r, kSetupG, "KURULUM", Color{0.15f, 0.30f, 0.40f, 0.95f}, 1);
-    button(r, kGaugeG, "KADRAN", Color{0.40f, 0.30f, 0.10f, 0.95f}, 1);
+    button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.9f}, 1);         // TEST: yayin oncesi kaldirilacak
+    if (!v.streetLegal) r.textCentered(180, 80, "YARIS ARACI - ROMORK", 1, {1.0f, 0.3f, 0.3f});
+    // Devir testi: GAZ dugmesi + devir + ince serit (kesici cizgisi)
+    const float rpm = (float)pt_->rpm(), red = (float)pt_->engine().redlineRpm;
+    button(r, kGas, "GAZ", throttle_ > 0.05f ? Color{0.9f, 0.5f, 0.1f} : Color{0.3f, 0.22f, 0.12f, 0.9f}, 2);
+    std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
+    r.text(66, 266, b, 2, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
+    if (pt_->vtecActive()) r.text(196, 266, "VTEC", 2, {1.0f, 0.2f, 0.2f});
+    const float fill = std::clamp(rpm / (red * 1.08f), 0.0f, 1.0f);
+    r.rect(0, 290, 360, 294, {0.15f, 0.15f, 0.18f});
+    r.rect(0, 290, 360 * fill, 294, rpm > red * 0.9f ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
+    r.rect(360 / 1.08f, 288, 360 / 1.08f + 2, 296, {1, 0.2f, 0.2f});
+    // ---- ust serit ----
+    r.rect(0, 0, 360, 58, kUiPanel);
+    r.text(8, 7, upper(v.brand), 1, kUiGold);
+    r.textFit(8, 22, upper(v.model), 2, 200, {1, 1, 1});
+    std::snprintf(b, sizeof b, "%d %s %s", v.year, bodyName(v.body), driveName(v.drive));
+    r.text(8, 42, upper(b), 1, kUiDim);
+    const std::string m = money(c.money);
+    r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
+    std::snprintf(b, sizeof b, "UN %d   GALIBIYET %d", c.rep, c.wins);
+    r.text(352 - r.textWidth(b, 1), 30, b, 1, kUiDim);
+    if (app_.settings.showFps) { std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps()); r.text(352 - r.textWidth(b, 1), 42, b, 1, {0.45f, 0.5f, 0.45f}); }
+    // ---- bilgi kartlari ----
+    std::snprintf(b, sizeof b, "%s %s %.1fL %s  %.0f KG  KESICI %.0f", e.code, layoutName(e.layout), e.displacementL, inductionName(e.induction),
+                  v.massKg - oc.tune.totalWeightKg(), pt_->engine().redlineRpm);
+    r.textFit(8, 302, upper(b), 1, 344, kUiText);
+    struct Chip { const char* label; std::string val; Color col; };
+    char hp[24], tq[24], ix[24], et[24];
+    std::snprintf(hp, sizeof hp, "%.0f", tunedHp_); std::snprintf(tq, sizeof tq, "%.0f", torqueNm_); std::snprintf(ix, sizeof ix, "%.0f", index_);
+    if (oc.bestEt > 0) std::snprintf(et, sizeof et, "%.2f", oc.bestEt); else if (estEt_ > 0) std::snprintf(et, sizeof et, "~%.1f", estEt_); else std::snprintf(et, sizeof et, "-");
+    const Chip chips[4] = {{"GUC HP", hp, tunedHp_ > stockHp_ + 0.5 ? Color{0.4f, 1.0f, 0.5f} : Color{1, 1, 1}}, {"TORK NM", tq, {1, 1, 1}},
+                           {"ENDEKS", ix, kUiGold}, {oc.bestEt > 0 ? "EN IYI 1/4" : "TAHMINI 1/4", et, {0.55f, 0.8f, 1.0f}}};
+    for (int i = 0; i < 4; ++i) {
+        const float x0 = 8 + i * 87.0f;
+        r.rect(x0, 316, x0 + 82, 356, kUiPanel);
+        r.rect(x0, 316, x0 + 82, 318, chips[i].col);
+        r.textCentered(x0 + 41, 322, chips[i].label, 1, kUiDim);
+        r.textFit(x0 + 41, 335, chips[i].val, 2, 76, chips[i].col, true);
+    }
+    // Durum satiri: hasar / musteri / parca ozeti
+    if (oc.jobHp > 0) {
+        std::snprintf(b, sizeof b, "MUSTERI: %.0f / %d HP  ODEME %s", tunedHp_, oc.jobHp, money(oc.jobReward).c_str());
+        r.textFit(8, 366, b, 1, 344, tunedHp_ + 0.5 >= oc.jobHp ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
+    } else if (!oc.raceable()) {
+        std::string d = "HASAR:";
+        if (oc.axleBroken) d += " AKS KIRIK";
+        if (oc.gearboxBroken) d += " SANZIMAN KIRIK";
+        if (oc.engineWear > 0.02) { char e2[32]; std::snprintf(e2, sizeof e2, " MOTOR %%%d", (int)(oc.engineWear * 100 + 0.5)); d += e2; }
+        r.textFit(8, 366, d, 1, 344, {1.0f, 0.35f, 0.3f});
+    } else r.textFit(8, 366, tuneSummary(oc.tune), 1, 344, kUiGold);
+    // ---- buyuk YARIS dugmesi ----
+    if (oc.jobHp > 0) {
+        const bool ok = tunedHp_ + 0.5 >= oc.jobHp;
+        button(r, kRace, ok ? "TESLIM ET" : "MUSTERI ARACI: IPTAL", ok ? kUiGreen : Color{0.45f, 0.20f, 0.15f}, 2);
+    } else if (!oc.raceable()) button(r, kRace, "TAMIR ET >", Color{0.75f, 0.15f, 0.12f}, 3);
+    else {
+        button(r, kRace, "", kUiOrange, 3);
+        r.textCentered(kRace.cx() + 1, kRace.y0 + 9, "YARIS", 3, {0, 0, 0, 0.4f});
+        r.textCentered(kRace.cx(), kRace.y0 + 8, "YARIS", 3, {1, 1, 1});
+        r.textCentered(kRace.cx(), kRace.y1 - 14, "LIG  TURNUVA  HARITA", 1, {1.0f, 0.85f, 0.7f});
+    }
+    // ---- kutucuklar ----
+    static const Color kTileCol[TCount] = {{0.22f, 0.26f, 0.34f}, {0.15f, 0.30f, 0.40f}, {0.40f, 0.30f, 0.10f}, {0.35f, 0.18f, 0.45f},
+                                           {0.20f, 0.32f, 0.22f}, {0.15f, 0.35f, 0.55f}, {0.30f, 0.30f, 0.34f}, {0.30f, 0.15f, 0.40f}};
+    for (int i = 0; i < TCount; ++i) {
+        std::string badge;
+        if (i == TStreet && c.meetAvailable()) badge = "!";                 // bu gece bulusma var
+        if (i == TSetup && oc.tune.nitrous > 0 && oc.nosFill < 0.999) badge = "NOS";
+        tile(r, tileR(i), kTileIcon[i], kTileName[i], kTileCol[i], badge);
+    }
+#ifndef __ANDROID__
+    r.textCentered(180, 630, "<> ARAC  ENTER YARIS  PGUP YOL  W GAZ  O AYAR", 1, {0.45f, 0.6f, 0.85f});
+#endif
     if (msgT_ > 0) {
-        r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
-        r.textCentered(180, 258, msg_, 2, kUiGold);
+        r.rect(0, 240, 360, 270, {0.02f, 0.02f, 0.04f, 0.88f});
+        r.textFit(180, 248, msg_, 2, 344, kUiGold, true);
     }
     if (selling_) drawSaleDialog(r, c.car());
 }
@@ -194,30 +200,35 @@ void GarageScreen::pointerDown(int id, float x, float y) {
         else if (kDlgNo.hit(x, y)) selling_ = false;
         return;
     }
-    if (app_.career.cars.size() > 1 && kSellG.hit(x, y)) { selling_ = true; return; }
+    Career& c = app_.career;
+    if (c.cars.size() > 1 && c.car().jobHp == 0 && kSellG.hit(x, y)) { selling_ = true; return; }
+    if (kSettingsG.hit(x, y)) { app_.goSettings(); return; }
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
-    if (kPaintG.hit(x, y)) { app_.goBodyShop(); return; }
-    if (kSetupG.hit(x, y)) { app_.goSetup(); return; }
-    if (kGaugeG.hit(x, y)) { app_.goGauges(); return; }
     if (kCashG.hit(x, y)) {                                      // TEST: para
-        app_.career.money += 10000;
+        c.money += 10000;
         app_.saveCareer();
         msg_ = "TEST: +$10,000"; msgT_ = 1.2;
         return;
     }
-    if (x >= kSl[0] - 10 && y >= kSl[1] - 20) {
-        throttlePtr_ = id;
-        throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);
+    if (kGas.hit(x, y)) { throttlePtr_ = id; throttle_ = 1.0f; return; }   // basili tut: devir
+    if (c.cars.size() > 1 && kPrev.hit(x, y)) { select(c.current - 1); cancelArm_ = false; return; }
+    if (c.cars.size() > 1 && kNext.hit(x, y)) { select(c.current + 1); cancelArm_ = false; return; }
+    if (kRace.hit(x, y)) { raceOrRepair(); return; }
+    for (int i = 0; i < TCount; ++i) {
+        if (!tileR(i).hit(x, y)) continue;
+        switch (i) {
+        case TParts: app_.goParts(); break;
+        case TSetup: app_.goSetup(); break;
+        case TGauge: app_.goGauges(); break;
+        case TPaint: app_.goBodyShop(); break;
+        case TDyno: app_.goDyno(); break;
+        case TRoad: if (c.car().raceable()) app_.goRoad(); else { msg_ = c.car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI - TAMIR"; msgT_ = 2.0; } break;
+        case TGallery: app_.goGallery(); break;
+        case TStreet: app_.goStreet(); break;
+        default: break;
+        }
         return;
     }
-    if (kPrev.hit(x, y)) select(app_.career.current - 1);
-    else if (kNext.hit(x, y)) select(app_.career.current + 1);
-    else if (kSettings.hit(x, y)) app_.goSettings();
-    else if (kRace.hit(x, y)) raceOrRepair();
-    else if (kRoad.hit(x, y)) { if (app_.career.car().raceable()) app_.goRoad(); else { msg_ = "ARAC HASARLI - TAMIR"; msgT_ = 2.0; } }
-    else if (kParts.hit(x, y)) app_.goParts();
-    else if (kGallery.hit(x, y)) app_.goGallery();
-    else if (kDyno.hit(x, y)) app_.goDyno();
 }
 // Hasarli arac yarisamaz: once tamir. Hafif motor asinmasi yarisa engel degil ama buton tamir teklif eder;
 // ikinci basista (tamir parasi yoksa) yine de yarisa girilir.
@@ -240,9 +251,7 @@ bool GarageScreen::worn() const {
     return false;
 }
 
-void GarageScreen::pointerMove(int id, float, float y) {
-    if (id == throttlePtr_) throttle_ = std::clamp((kSl[3] - y) / (kSl[3] - kSl[1]), 0.0f, 1.0f);
-}
+void GarageScreen::pointerMove(int, float, float) {}
 void GarageScreen::pointerUp(int id) { if (id == throttlePtr_) throttlePtr_ = -1; }
 
 void GarageScreen::key(Key k, bool down) {
