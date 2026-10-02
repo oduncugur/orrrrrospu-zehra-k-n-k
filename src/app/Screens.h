@@ -459,6 +459,8 @@ private:
     bool night_ = false, rain_ = false;          // ortam: gece / yagmur (yaris basinda tohumdan)
     double envT_ = 0;                            // yagmur damlasi animasyonu
     float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
+    int runLane_ = 1; double laneCool_ = 0;      // The Run: duzlukte secilen serit
+    double l100_ = 0, lastRunS_ = 0, lastFuel_ = 0, usedRun_ = 0;   // The Run: anlik L/100, harcanan yakit
     int lastGear_ = -2;                          // vites sesi icin
     std::string msgNote_;                        // ortam notu (HUD, ilk saniyeler)
     struct Puff { double x, y, z, vx, vy, vz, life, size; };

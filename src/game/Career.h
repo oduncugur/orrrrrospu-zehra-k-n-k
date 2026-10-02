@@ -205,6 +205,8 @@ struct Career {
     bool tourAvailable(std::string* why = nullptr) const;
     bool tourStart(std::string* why = nullptr);   // ilk turda giris ucreti alinir
     long recordTour(bool won);             // donus: verilen odul (yalniz son tur galibiyetinde)
+    // The Run etabi: siraya ve etap gercek mesafesine gore odul (ilk uc buyuk, digerleri katilim), un
+    long recordRun(int position, int count, double realKm);
     // ---- Sokak: gece bulusmasi (3 saatte bir yeni rakip, bahisli drag, polis baskini riski),
     //      haftalik dyno yarismasi (en yuksek beygir), musteri isleri (araci hedef beygire cikar, teslim et)
     int  clockSlot = -1;                   // testler: sabit 3 saatlik dilim (-1: gercek saat)

@@ -18,6 +18,9 @@ class RoadPath {
 public:
     // Karma yaris yolu: duz (drag) -> viraj blogu -> duz -> viraj blogu -> bitis duzlugu (bolumler sections())
     static RoadPath karma(uint32_t seed, double maxGrade);
+    // Uzun etap (The Run): tekrar eden uzun duzluk (drag gorunumu) + viraj bloklari, uzun tirmanis / inisler
+    // (dalga boyu 1.8-5 km; duzluklerde de egim). lengthM: surulen uzunluk (bitis + 400 m yavaslama dahil degil)
+    static RoadPath run(uint32_t seed, double lengthM, double maxGrade);
     static constexpr double kKarmaLead = 450.0;  // virajli bolum ilk virajdan bu kadar once baslar (fren + kamera)
     const std::vector<RoadSection>& sections() const { return sections_; }
     bool curvyAt(double s) const;               // karma: s virajli bolumde mi (normal yolda hep false)

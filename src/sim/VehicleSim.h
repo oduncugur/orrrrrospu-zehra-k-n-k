@@ -123,6 +123,7 @@ public:
     bool tcActive() const { return tcLim_ < 0.98; }   // su an tork kesiyor (gosterge)
     double shiftRpm() const { return eng_.redlineRpm - 250.0; }
     double baseMassKg() const { return baseMass_; }
+    double cdA() const { return CdA_; }
     double axleDiameterMm() const { return fail_->axle().diameterMm; }
     double rideFreqHz() const { return fRide_; }
     const RoadProfile& road() const { return *road_; }

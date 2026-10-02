@@ -39,6 +39,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/Career.cpp
     ${ZK_ROOT}/src/game/RoadPath.cpp
     ${ZK_ROOT}/src/game/RoadCar.cpp
+    ${ZK_ROOT}/src/game/RunField.cpp
     ${ZK_ROOT}/src/game/RoadSession.cpp
     ${ZK_ROOT}/src/game/Settings.cpp
     ${ZK_ROOT}/src/game/FlowScore.cpp

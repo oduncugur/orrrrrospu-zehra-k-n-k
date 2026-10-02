@@ -20,7 +20,7 @@ add_library(zk_sim STATIC
   src/game/Career.cpp
   src/game/RoadPath.cpp
   src/game/RoadCar.cpp
-  src/game/RoadSession.cpp
+  src/game/RunField.cpp src/game/RoadSession.cpp
   src/game/Settings.cpp
   src/game/FlowScore.cpp
   src/game/Contact.cpp

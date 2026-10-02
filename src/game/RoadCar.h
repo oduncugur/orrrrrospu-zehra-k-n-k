@@ -50,6 +50,7 @@ public:
     bool takeRecovered() { const bool r = recovered_; recovered_ = false; return r; }
     bool takeStalled() { const bool r = stalledEv_; stalledEv_ = false; return r; }
     void recover(double backM = 20.0);
+    void recoverAt(double s, double lateral);   // dururken s / yanal konuma yerlestir (grid)
     void bump(double speedFactor);         // carpisma: hiz kaybi
     void nudge(double dx, double dy) { sim_->nudge(dx, dy); }   // temas: konumu it
 

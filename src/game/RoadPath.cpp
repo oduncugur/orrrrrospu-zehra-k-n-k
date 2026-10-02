@@ -109,6 +109,36 @@ RoadPath RoadPath::karma(uint32_t seed, double maxGrade) {
     return p;
 }
 
+RoadPath RoadPath::run(uint32_t seed, double lengthM, double maxGrade) {
+    RoadPath p;
+    p.halfWidth_ = 3.6;
+    Rng r{seed ? seed * 3266489917u + 7u : 1u};
+    std::vector<Seg> prog;
+    double s = 0.0;
+    auto straight = [&](double len) { prog.push_back({len, 0.0, 0.0}); s += len; };
+    auto curveBlock = [&]() {
+        const double s0 = s;
+        const int n = 1 + (int)(r.uni() * 4.0);                      // 1-4 viraj
+        double sign = r.uni() < 0.5 ? 1.0 : -1.0, minR = 1e9;
+        for (int i = 0; i < n; ++i) {
+            if (i > 0) { straight(r.range(40.0, 160.0)); if (r.uni() < 0.6) sign = -sign; }
+            const double R = r.range(80.0, 320.0), k = sign / R;
+            minR = std::min(minR, R);
+            const double trans = std::clamp(0.25 * R, 20.0, 70.0);
+            const double arc = r.range(25.0, 95.0) * 3.14159265358979 / 180.0 * R;
+            prog.push_back({trans, 0.0, k}); prog.push_back({arc, k, k}); prog.push_back({trans, k, 0.0});
+            s += 2 * trans + arc;
+        }
+        p.sections_.push_back({std::max(0.0, s0 - kKarmaLead), s + 60.0, true, s0, minR});
+    };
+    straight(r.range(1200.0, 2000.0));
+    while (s < lengthM - 1800.0) { curveBlock(); straight(r.range(900.0, 2600.0)); }
+    straight(std::max(400.0, lengthM - s) + 400.0);                    // bitis duzlugu + yavaslama
+    p.integrate(prog, s);
+    p.addElevation(seed + 91u, maxGrade, 1800.0, 5000.0);              // uzun tirmanis / inisler
+    return p;
+}
+
 bool RoadPath::curvyAt(double s) const {
     for (const RoadSection& q : sections_) if (q.curvy && s >= q.s0 && s <= q.s1) return true;
     return false;

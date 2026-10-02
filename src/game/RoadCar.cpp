@@ -66,6 +66,13 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     if (sinceShift_ > 1.0 && rLow < up * 0.80 && rpm < (sport ? 0.55 * red : std::max(idle + 700.0, eff * 0.72))) shift(gear - 1);
 }
 
+void RoadCar::recoverAt(double s, double lateral) {
+    const RoadPoint p = road_.at(s);
+    sim_->resetPose(p.x - lateral * std::sin(p.heading), p.y + lateral * std::cos(p.heading), p.heading);
+    hint_ = (int)(s / RoadPath::kStep);
+    road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+}
+
 void RoadCar::requestShift(int dir) {
     if (shiftT_ >= 0) return;
     PowertrainCore& pt = sim_->powertrain();

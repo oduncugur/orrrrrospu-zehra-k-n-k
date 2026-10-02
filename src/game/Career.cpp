@@ -526,6 +526,17 @@ bool Career::toggleBoostGauge(std::string* why) {
     return true;
 }
 
+long Career::recordRun(int position, int count, double realKm) {
+    ++races;
+    const double base = 30.0 * realKm * (1 + leagueUnlocked() * 0.5);
+    const double k = position == 1 ? 1.0 : position == 2 ? 0.6 : position == 3 ? 0.38 : std::max(0.04, 0.2 * (1.0 - (double)position / std::max(2, count)));
+    const long p = (long)std::lround(base * k / 50.0) * 50;
+    money += p; earnings += p;
+    if (position == 1) { ++wins; rep += 4; dailyAdd(TaskType::WinRoad, 1); dailyAdd(TaskType::WinAny, 1); }
+    else if (position <= 3) rep += 2;
+    return p;
+}
+
 long Career::tourEntry() const { return 400L * (1 + leagueUnlocked()); }
 long Career::tourPrize() const { return 3000L * (1 + leagueUnlocked()) * (1 + leagueUnlocked()) / 2 + 2000L; }
 bool Career::tourAvailable(std::string* why) const {

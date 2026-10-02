@@ -12,7 +12,7 @@ double RoadSession::rnd() { rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_
 
 RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed, Kind kind)
     : mode_(mode), kind_(kind),
-      road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04)
+      road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04) : mode == Mode::Marathon ? RoadPath::run(seed, 18000.0 + kRunStartS, 0.07)
             : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
                        kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
@@ -21,7 +21,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     if (mode == Mode::Karma || mode == Mode::Marathon) road_.setLaneProgram(seed, RoadPath::LanesClosed);
     else if (kind == Kind::Touge) road_.setLaneProgram(seed + 17u, RoadPath::LanesMountain);
     else road_.setLaneProgram(seed + 31u, RoadPath::LanesHighway);
-    startS_ = mode == Mode::Chase ? 90.0 : kStartS;
+    startS_ = mode == Mode::Chase ? 90.0 : mode == Mode::Marathon ? kRunStartS : kStartS;   // The Run: 200 araclik grid sigar
     rivalLane_ = rightLane(startS_);
     player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, rightLane(startS_));
     if (mode == Mode::Chase) {
@@ -35,7 +35,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         phase_ = Phase::Countdown; countdown_ = 3.0;
         msgs_.push_back("POLIS! KAC!");
     }
-    if (mode == Mode::Race || mode == Mode::Karma || mode == Mode::Marathon) {
+    if (mode == Mode::Race || mode == Mode::Karma) {
         // Rakip yan seritte, ayni cizgide
         // Yan seritte: gidis yonunde ikinci serit varsa orada, yoksa karsi seritte
         rivalLane_ = road_.lanesFwd(startS_) >= 2 ? road_.laneOffset(startS_, false, 1) : road_.laneOffset(startS_, true, 0);
@@ -50,14 +50,16 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
             rivalReact_ = 0.15 + 0.20 * rnd();
         }
     }
-    if (mode == Mode::Marathon) {                                        // kucuk depo: en az bir benzinlik molasi
-        // Tuketim carpani guce gore normallesir (yakit ~ guc): her arac bir depoyla ~7 km gider, en az bir mola sart
-        for (RoadCar* c : {player_.get(), rival_.get()}) {
-            double hp = 0;
-            for (auto* cv : {&c->sim().engineSpec().lowCam, &c->sim().engineSpec().highCam})
-                for (auto& p : *cv) if (p.first <= c->sim().engineSpec().redlineRpm) hp = std::max(hp, p.second * p.first / 7120.9);
-            c->sim().setFuelSystem(kMarathonTank, kMarathonBurn * 141.0 / std::max(60.0, hp));
+    if (mode == Mode::Marathon) {                                        // varsayilan alan: 19 rastgele rakip, karisik tarz
+        std::vector<RunEntrant> f;
+        const auto& cat = vehicleCatalog();
+        for (int i = 0; i < 19; ++i) {
+            int id;
+            do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
+            f.push_back({id, Tune{}, (int)(rnd() * StyleCount) % StyleCount});
         }
+        setRunField(f, 300.0);
+        phase_ = Phase::Countdown; countdown_ = 3.0;
     }
     if (mode == Mode::Flow) {
         // Viraj tepeleri (R < 600 m) + oyuncu govde yari genisligi
@@ -135,7 +137,19 @@ void RoadSession::collide(RoadCar& car, bool isPlayer) {
 // YZ rakip: sag seritte yavas trafik varsa karsi serit bossa sollar, degilse arkasinda bekler
 std::vector<double> RoadSession::stations() const {
     if (mode_ != Mode::Marathon) return {};
-    return {startS_ + 4500.0, startS_ + 9000.0, startS_ + 13500.0};
+    std::vector<double> v;
+    for (double st = startS_ + kStationGap; st < startS_ + raceLength() - 1000.0; st += kStationGap) v.push_back(st);
+    return v;
+}
+void RoadSession::setRunField(const std::vector<RunEntrant>& field, double realKm) {
+    realKm_ = std::max(20.0, realKm);
+    // Oyuncu gridin arka ucte birinde (gecerek ilerler); o sira bos birakilir; depo gercekci, ayni sikistirma
+    const int lanes = std::max(1, road_.lanesFwd(startS_)), n = (int)field.size();
+    const int slot = std::max(0, n * 2 / 3);
+    run_.init(field, road_, startS_, compression(), rng_, slot);
+    const double ps = startS_ - 12.0 - (slot / lanes) * 9.0;
+    player_->recoverAt(std::max(2.0, ps), road_.laneOffset(std::max(2.0, ps), false, slot % lanes));
+    player_->sim().setFuelSystem(RunField::tankFor(playerCar_), compression());
 }
 double RoadSession::nextStation(double s) const {
     for (double st : stations()) if (st + kStationLen > s) return std::max(0.0, st - s);
@@ -179,10 +193,6 @@ bool RoadSession::pitControls(int car, double pace, RoadControls& out) {
 RoadControls RoadSession::rivalControls() {
     RoadCar& r = *rival_;
     const double pace = rivalPace_ * (rain_ ? 0.85 : 1.0);
-    if (mode_ == Mode::Marathon) {
-        RoadControls c;
-        if (pitControls(1, pace, c)) { rivalLane_ = rightLane(rival_->s()); return c; }
-    }
     const double s = r.s(), v = r.sim().speed();
     if (mode_ == Mode::Karma) return r.aiControls(road_.laneOffset(s, false, std::min(1, road_.lanesFwd(s) - 1)), pace + 0.05);   // kapali yol: sol serit
     // Seritler: gidis 0..nf-1 (0 en sag), varsa karsi seridin ilki (sollama). Bulundugu seritte onde yavas arac
@@ -319,6 +329,35 @@ void RoadSession::update(double dt, const RoadControls& in) {
         static const double kWarn = 1.0;
         if (player_->sim().fuelLiters() < kWarn && !lowFuelMsg_) { lowFuelMsg_ = true; msgs_.push_back("YAKIT AZ! BENZINLIGE GIR"); }
         if (player_->sim().fuelLiters() > 2.0) lowFuelMsg_ = false;
+    }
+    if (mode_ == Mode::Marathon) {
+        if (player_->takeRecovered()) msgs_.push_back("ARAC YOLA ALINDI");
+        player_->takeStalled();
+        const double goal = startS_ + raceLength();
+        if (phase_ == Phase::Run) raceT_ += dt;
+        run_.update(dt, road_, stations(), kStationLen, kRefuelLps, goal, raceT_, player_->s(), player_->lateral(), player_->sim().speed());
+        // Oyuncu - rakip temasi (kutu): oyuncu savrulur / yavaslar, rakip yavaslar
+        const double cx = player_->sim().posX(), cy = player_->sim().posY();
+        for (Runner& R : run_.runners()) {
+            if (std::fabs(R.s - player_->s()) > 9.0) continue;
+            const RoadPoint p = road_.at(R.s);
+            const double x = p.x - R.lane * std::sin(p.heading), y = p.y + R.lane * std::cos(p.heading);
+            const double dx = cx - x, dy = cy - y, c = std::cos(p.heading), sn = std::sin(p.heading);
+            const double lon = dx * c + dy * sn, lat = -dx * sn + dy * c;
+            if (std::fabs(lon) < 4.3 && std::fabs(lat) < 1.75) {
+                const double rel = std::fabs(player_->sim().speed() - R.v);
+                player_->bump(std::clamp(1.0 - rel / 45.0, 0.35, 0.92));
+                R.v *= 0.75; R.lane += lat > 0 ? -0.6 : 0.6;
+                if (!touching_) { msgs_.push_back(rel > 6.0 ? "SERT TEMAS!" : "TEMAS!"); crashEv_ = true; ++collisions_; }
+                touching_ = true;
+            }
+        }
+        if (finishT_[0] <= 0 && player_->s() >= goal) {
+            finishT_[0] = raceT_; phase_ = Phase::Finished;
+            winner_ = runPosition() == 1 ? 0 : 1;
+            char m[48]; std::snprintf(m, sizeof m, "BITIS: %d. / %d", runPosition(), runCount()); msgs_.push_back(m);
+        }
+        return;
     }
     if (player_->takeRecovered()) msgs_.push_back("ARAC YOLA ALINDI");
     if (player_->takeStalled()) msgs_.push_back("MOTOR STOP ETTI");

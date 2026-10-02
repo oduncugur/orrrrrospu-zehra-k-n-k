@@ -4,6 +4,7 @@
 #include "game/FlowScore.h"
 #include "game/RoadCar.h"
 #include "game/RoadPath.h"
+#include "game/RunField.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -22,7 +23,8 @@ public:
     // Karma: duz bolumler drag gorunumunde, virajli bolumler 3B; rakipli, trafiksiz (RoadPath::karma)
     // Chase: polis kovalamacasi (polis arkadan baslar; 400 m acilip 4 s tut ya da 5 km'yi bitir = kactin;
     // polis dibindeyken yavaslamak / temas yakalanma gostergesini doldurur)
-    // Marathon: 18 km otoban yarisi, kucuk depo + tuketim carpani; yol kenarindaki BENZINLIKLERDE (sag serit, dur) yakit alinir
+    // Marathon (THE RUN): uzun hibrit etap (duzluk drag gorunumu + viraj bloklari, uzun yokus / inisler), 10-200 rakip
+    // (RunField: tarz + yakit modeli), gercekci depo; etap gercek mesafeyi temsil eder (yakit sikistirmasi). Benzinlikte dur, doldur.
     enum class Mode { Free, Race, Flow, Karma, Chase, Marathon };
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
@@ -33,7 +35,15 @@ public:
         if (mode_ == Mode::Marathon) return 18000.0;
         return kind_ == Kind::Touge ? 3000.0 : 4000.0;
     }
-    bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma || mode_ == Mode::Marathon; }
+    bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma; }
+    // The Run alani: setRunField cagrilmazsa kurucuda 19 rastgele rakip; realKm: etabin temsil ettigi gercek mesafe
+    void setRunField(const std::vector<RunEntrant>& field, double realKm);
+    const RunField& runField() const { return run_; }
+    int runPosition() const { return run_.playerPosition(player_->s(), finishT_[0] > 0, finishT_[0]); }
+    int runCount() const { return (int)run_.runners().size() + 1; }
+    double realKm() const { return realKm_; }
+    double compression() const { return realKm_ * 1000.0 / raceLength(); }
+    static constexpr double kStationGap = 3000.0;    // benzinlik araligi (surulen m)
     // Benzinlik (maraton): istasyon baslangiclari (yol s'si), alan boyu, dolum hizi, depo / tuketim
     static constexpr double kStationLen = 70.0, kRefuelLps = 2.0, kMarathonTank = 8.0, kMarathonBurn = 4.0;
     std::vector<double> stations() const;
@@ -42,7 +52,8 @@ public:
     bool refueling(int car) const { return refuel_[car]; }   // 0 oyuncu, 1 rakip
     // Yakit stratejisi (rakip; oyuncu otopilotu / testler): mola gerekiyorsa kontrolleri doldurur ve true doner
     bool pitControls(int car, double pace, RoadControls& out);
-    static constexpr double kStartS = 20.0;
+    static constexpr double kStartS = 20.0, kRunStartS = 950.0;
+    double startS() const { return startS_; }
     static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8); dag yolunda lane()
     double lane() const { return kind_ == Kind::Touge ? 1.5 : kLane; }
     double rightLane(double s) const { return road_.laneOffset(s, false, 0); }   // en sag gidis seridi (yanal)
@@ -125,6 +136,8 @@ private:
     double pitAt_[2] = {-1, -1};                     // benzinlik durma noktasi (s; -1: mola yok)
     double refilled_[2] = {0, 0};                    // alinan toplam yakit (tuketim tahmini)
     bool lowFuelMsg_ = false;
+    RunField run_;
+    double realKm_ = 300.0;
     void fuelStep(double dt);
     double rnd();
 };
