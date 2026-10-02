@@ -53,7 +53,7 @@ const char* partCatName(PartCat c) {
         "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "SU / METANOL", "NITRO (NOS)",
         "YAKIT POMPASI", "ENJEKTOR", "YAKIT HATTI / REGULATOR", "YAKIT",
         "DEBRIYAJ", "SANZIMAN SWAP", "SANZIMAN GUCLENDIRME", "SON DISLI", "DIFERANSIYEL", "AKS",
-        "LASTIK", "JANT", "SUSPANSIYON", "FREN BALATASI", "FREN DISKI", "KALIPER",
+        "LASTIK", "YOL LASTIGI (2. TAKIM)", "JANT", "SUSPANSIYON", "FREN BALATASI", "FREN DISKI", "KALIPER",
         "IC HAFIFLETME", "KAPORTA HAFIFLETME", "CAM", "SASI HAFIFLETME", "ON AERO", "YAN AERO", "ARKA KANAT / SPOILER", "ALT AERO",
         "ECU", "ELEKTRONIK", "RADYATOR", "FAN", "TERMOSTAT / KATKI", "KARTER", "YAG SOGUTUCU", "YAG POMPASI"};
     return n[(int)c];
@@ -103,6 +103,7 @@ const std::vector<PartOption>& partOptions(PartCat c) {
                 t[(int)PartCat::EngineSwap].push_back({names[i].c_str(), i == 0 ? 0 : swapPrice(swapEngines()[i - 1])});
         }
         t[(int)PartCat::Intake] = opts(intakeTable());      t[(int)PartCat::Exhaust] = opts(exhaustTable());
+        t[(int)PartCat::RoadTires] = opts(tireTable()); t[(int)PartCat::RoadTires][0] = {"YOK (YOLDA ANA LASTIK)", 0};
         t[(int)PartCat::Turbo] = opts(turboTable());        t[(int)PartCat::Turbine] = opts(turbineTable());
         t[(int)PartCat::Wastegate] = opts(wastegateTable()); t[(int)PartCat::BoostCtl] = opts(boostCtlTable());
         t[(int)PartCat::Supercharger] = opts(superTable()); t[(int)PartCat::Intercooler] = opts(intercoolerTable());
@@ -154,6 +155,7 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     }
     case PartCat::Diff: return (int)t.diff;      case PartCat::Axles: return t.axles;
     case PartCat::Tires: return t.tireSel > 0 ? t.tireSel : (int)t.tires;
+    case PartCat::RoadTires: return t.roadTire;
     case PartCat::Rims: return t.rims;           case PartCat::Suspension: return t.susp;
     case PartCat::Brakes: return t.brakes;       case PartCat::Weight: return t.weight;
     case PartCat::Aero: return t.aero;           case PartCat::Ecu: return t.ecuHw;
@@ -197,6 +199,7 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::FinalDrive: t.finalSel = l; t.finalDrive = 0.0; break;
     case PartCat::Diff: t.diff = (DiffType)l; break; case PartCat::Axles: t.axles = l; break;
     case PartCat::Tires: t.tireSel = l; t.tires = (TireType)tireTable()[l].type; t.psi = 0; break;
+    case PartCat::RoadTires: t.roadTire = l; break;
     case PartCat::Rims: t.rims = l; break;           case PartCat::Suspension: t.susp = l; break;
     case PartCat::Brakes: t.brakes = l; break;       case PartCat::Weight: t.weight = l; break;
     case PartCat::Aero: t.aero = l; break;
@@ -245,6 +248,7 @@ bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, 
     if (c == PartCat::Intercooler && level > 0 && t && t->turbo == 0 && t->superch == 0 && !turboEngine && e.induction != Induction::Supercharger)
         return no("ASIRI BESLEME YOK");
     if (c == PartCat::EngineSwap && level > 0 && swapEngines()[level - 1] == v.engine) return no("FABRIKA MOTORU");
+    if (c == PartCat::RoadTires && level > 0 && tireTable()[level].type == (int)TireType::DragSlick) return no("DRAG LASTIGI YOLA OLMAZ");
     // Atolye satirlari: once ozel parca uretilmeli (PARCA URET)
     if (level > 0 && level == customOption(c) && t) {
         const bool made = c == PartCat::Turbo ? t->custTurboMm > 0 : c == PartCat::Cam ? t->custCamDeg > 0 : c == PartCat::Crank ? t->custDisp > 0
@@ -1004,7 +1008,7 @@ const IntField kIntFields[] = {
     {"brg", &Tune::bearing, 9}, {"gsk", &Tune::gasket, 9}, {"trb", &Tune::turbine, 9}, {"wg", &Tune::wastegate, 9},
     {"bc", &Tune::boostCtl, 9}, {"gbs", &Tune::gbStrength, 9}, {"cool", &Tune::cooling, 9}, {"oil", &Tune::oil, 9},
     {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
-    {"lrpm", &Tune::launchRpm, 12000},
+    {"lrpm", &Tune::launchRpm, 12000}, {"rtir", &Tune::roadTire, 29},
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
     {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 10}, {"slc", &Tune::swLaunch, 1},
     {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1}, {"stcu", &Tune::swTcu, 1},

@@ -1,4 +1,5 @@
 #include "RoadCar.h"
+#include "sim/PartTables.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,6 +9,9 @@ namespace zk {
 RoadCar::RoadCar(const VehicleDef* car, const Tune* tune, const RoadPath& road, double s0, double laneOffset)
     : road_(road), lane_(laneOffset) {
     if (tune) tune_ = *tune;          // yoksa varsayilan Tune: sokak lastigi (drag ayari degil)
+    if (tune_.roadTire > 0 && tune_.roadTire < (int)tireTable().size()) {   // yol lastigi takimi: drag lastigi yerine
+        tune_.tireSel = tune_.roadTire; tune_.tires = (TireType)tireTable()[tune_.roadTire].type; tune_.psi = 0;
+    }
     hasTune_ = true;
     VehicleSimConfig c;
     c.car = car; c.tune = &tune_; c.planar = true; c.road = "acikyol"; c.laneAsymmetry = false;
@@ -165,6 +169,15 @@ void RoadCar::update(double dt, const RoadControls& c) {
     }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
     sim_->setTractionControl(assist);                                   // TC yalniz aracta varsa (fabrika / ECU kiti)
+    if (stability && v > 5.0 && std::fabs(c.steer) < 0.05 && !(assist && sim_->hasTc())) {
+        // Duz yol dengesi (her aracta, surucu refleksi): direksiyon duzken arka kayarsa hafif karsi direksiyon, cok
+        // kayarsa gaz biraz kesilir. Virajda (direksiyon cevrili) devreye girmez: tam gaz virajda kayma serbest.
+        const double beta = sim_->bodySlipAngle();
+        const double excess = beta - std::clamp(beta, -0.02, 0.02);
+        in.steer = std::clamp(c.steer + 0.8 * excess, -0.3, 0.3);
+        const double over = std::fabs(beta) - 0.07;
+        if (over > 0) sim_->powertrain().setThrottle(sim_->powertrain().throttle() * std::max(0.35, 1.0 - over * 4.0));
+    }
     if (assist && sim_->hasTc() && v > 3.0) {
         // ESP benzeri: arka kayarsa otomatik karsi direksiyon + gaz kesme
         const double beta = sim_->bodySlipAngle();

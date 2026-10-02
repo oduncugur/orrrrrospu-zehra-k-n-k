@@ -51,7 +51,7 @@ enum class PartCat {
     // AKTARMA
     Clutch, Gearbox, GbStrength, FinalDrive, Diff, Axles,
     // SASI
-    Tires, Rims, Suspension, Brakes, BrakeDisc, BrakeCaliper,
+    Tires, RoadTires, Rims, Suspension, Brakes, BrakeDisc, BrakeCaliper,
     // KAPORTA (hafifletme + aero)
     Weight, WeightBody, WeightGlass, WeightChassis, AeroFront, AeroSide, Aero, AeroUnder,
     // ECU / SOGUTMA / YAG

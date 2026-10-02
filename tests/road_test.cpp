@@ -332,6 +332,25 @@ int main() {
             CHECK(vf > 10.0, "D'ye donunce ileri gider");
         }
     }
+    std::printf("[D] Duz yolda tam gaz: guclu arkadan itisli arac kopmaz\n");
+    {
+        const RoadPath straight(7u, 20000.0, 4000.0);                       // neredeyse duz yol
+        const VehicleDef* sup = nullptr;
+        for (int i = 0; i < 1000 && !sup; ++i) if (const VehicleDef* d = findVehicle(i); d && d->ref == std::string("Ford Mustang GT S550")) sup = d;
+        if (!sup) sup = findVehicle(227);
+        Tune t; t.tires = TireType::Street;
+        RoadCar a(sup, &t, straight, 0.0, -1.8);
+        a.manual = false; a.assist = false; a.stability = true;
+        RoadControls k; k.throttle = 1.0; k.steer = 0.0;
+        double maxBeta = 0, maxLat = 0;
+        for (double tt = 0; tt < 14.0; tt += 1.0 / 60.0) {
+            a.update(1.0 / 60.0, k);
+            if (a.sim().speed() > 5) maxBeta = std::max(maxBeta, std::fabs(a.sim().bodySlipAngle()));
+            maxLat = std::max(maxLat, std::fabs(a.lateral() + 1.8));
+        }
+        std::printf("    %s: %.0f km/h, en buyuk govde kaymasi %.1f derece, serit sapmasi %.2f m\n", sup->model, a.sim().speed() * 3.6, maxBeta * 57.3, maxLat);
+        CHECK(maxBeta < 0.10, "duz yolda govde kaymasi < 6 derece");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

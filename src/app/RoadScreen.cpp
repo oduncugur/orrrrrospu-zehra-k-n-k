@@ -106,6 +106,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     camPsi_ = ses_->player().sim().heading();
     RoadCar& P = ses_->player();
     P.assist = app_.settings.assist;
+    P.stability = true;                                                 // duz yol dengesi (oyuncu)
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();
     const int gears = P.sim().powertrain().gearCount();

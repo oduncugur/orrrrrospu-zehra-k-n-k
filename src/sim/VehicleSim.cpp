@@ -358,12 +358,20 @@ void VehicleSim::updateElectronics(double dt, double brake) {
     if (tcAvail_) {
         // Anlik kayma: tekerlek cevre hizi vs arac hizi (gevsemeli kappa dusuk hizda gecikir, kontrol salinirdi).
         // Oransal: hedefin (0.10) asimiyla orantili hizli kesme, altinda yavas geri verme.
+        // Kalkis dostu: dusuk hizda kayma orani patlar (0.5 m/s'de 1 m/s patinaj = %100); izin verilen patinaj en az
+        // 2.5 m/s (kontrollu patinaj = en iyi kalkis). Motor kalkis devrinin (2-step / varsayilan) altina dusmez: devir
+        // oraya inince kesme durur ve tork hizla geri verilir (bogulma / stop yok). Kesme tabani kalkista %35.
         const double V = std::max(speed(), 2.0);
         double s = 0.0;
         for (int i = 0; i < 4; ++i)
-            if ((i < 2 && frontShare_ > 0.0) || (i >= 2 && frontShare_ < 1.0)) s = std::max(s, (w_[i].omega() * w_[i].rEff() - speed()) / V);
+            if ((i < 2 && frontShare_ > 0.0) || (i >= 2 && frontShare_ < 1.0))
+                s = std::max(s, (w_[i].omega() * w_[i].rEff() - speed() - std::max(0.0, 2.5 - tcSlip_ * V)) / V);
+        const double holdRpm = defaultLaunchRpm();                           // 2-step ayari ya da arac varsayilani
+        const bool bogging = pt_->rpm() < holdRpm && speed() < 8.0;          // yalniz kalkis (~30 km/h alti)
+        const double floor = speed() < 15.0 ? 0.35 : 0.10;
         if (!tcOn_) tcLim_ = std::min(1.0, tcLim_ + dt * 4.0);
-        else tcLim_ = s > tcSlip_ ? std::max(0.05, tcLim_ - dt * 40.0 * std::min(s - tcSlip_, 1.0)) : std::min(1.0, tcLim_ + dt * 2.5);
+        else if (bogging) tcLim_ = std::min(1.0, tcLim_ + dt * 8.0);
+        else tcLim_ = s > tcSlip_ ? std::max(floor, tcLim_ - dt * 25.0 * std::min(s - tcSlip_, 1.0)) : std::min(1.0, tcLim_ + dt * 3.0);
     }
     pt_->setTorqueLimit((tcAvail_ ? tcLim_ : 1.0) * heatLim_);
 }

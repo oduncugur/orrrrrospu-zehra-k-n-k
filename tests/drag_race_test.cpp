@@ -230,6 +230,24 @@ int main() {
         CHECK(et[0] > 0 && et[1] > et[0] + 3.0 && et[2] > et[1] + 5.0, "uzun mesafe bitiyor ve daha uzun suruyor");
         CHECK(trap[1] > trap[0] && trap[2] >= trap[1] - 1.0, "uzun mesafede cikis hizi yuksek (azami hiza yaklasir)");
     }
+    std::printf("[TC] Cekis kontrolu: kalkista kontrollu patinaj, bogulma / stop yok\n");
+    {
+        const VehicleDef* sup = nullptr;
+        for (int i = 0; i < 1000 && !sup; ++i) if (const VehicleDef* d = findVehicle(i); d && d->ref == std::string("Toyota GR Supra A90")) sup = d;
+        double et[2] = {0, 0}; bool stalled[2] = {false, false};
+        for (int k = 0; k < 2; ++k) {
+            Tune t; t.tires = TireType::Street; t.elec = 2;                 // ABS + TC kiti
+            DragRace r(sup->id, sup->id, TreeType::Pro, 11, false, &t, &t);
+            r.setPlayerAutopilot(true);
+            r.setPlayerTractionControl(k == 1);
+            PlayerControls pc; double tt = 0;
+            while (!r.lane(0).slip.finished && tt < 60) { r.advance(1.0 / 60.0, pc); tt += 1.0 / 60.0; stalled[k] = stalled[k] || r.lane(0).sim->powertrain().stalled(); }
+            et[k] = r.lane(0).slip.quarter;
+        }
+        std::printf("    Supra sokak lastigi: TC kapali %.2f s, TC acik %.2f s\n", et[0], et[1]);
+        CHECK(et[1] > 0 && !stalled[1], "TC acik: bitirir, stop etmez");
+        CHECK(et[1] < et[0] + 0.35, "TC kalkisi belirgin yavaslatmaz (< 0.35 s fark)");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

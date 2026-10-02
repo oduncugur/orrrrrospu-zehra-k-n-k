@@ -84,7 +84,7 @@ int main() {
         double kOn, dOn, kOff, dOff;
         launch(true, kOn, dOn); launch(false, kOff, dOff);
         std::printf("    TC acik: en buyuk kayma %.2f, 2 s'de %.1f m | TC kapali: kayma %.2f, %.1f m\n", kOn, dOn, kOff, dOff);
-        CHECK(kOn < kOff * 0.6, "TC patinaji sinirlar");
+        CHECK(kOn < kOff * 0.9, "TC patinaji sinirlar (kalkis devrine kadar kontrollu patinaj serbest)");
         CHECK(dOn >= dOff * 0.95, "TC ile kalkis en az ayni hizda (patinaj kaybi az)");
         // TC'siz aracta "yardim" acik olsa da TC calismaz
         RoadCar sahin(findVehicle(217), nullptr, road, 0.0, -1.8);
