@@ -347,6 +347,27 @@ int main() {
         Career poor = Career::newGame(); poor.money = 100; std::string why;
         CHECK(!poor.selectGauge(3, &why) && why == "PARA YETMIYOR" && poor.car().gauge == 0, "para yoksa takilmaz");
     }
+    std::printf("[C] Sehirler: seyahat kilidi, hizli gecis, kayit, etap alani\n");
+    {
+        Career c = Career::newGame(); c.money = 100000;
+        std::string why;
+        CHECK(c.city == 0 && !c.canTravel(1, &why) && why == "KILITLI: ONCEKI PATRONU YEN", "kilitli sehre gidilmez");
+        CHECK(!c.canTravel(0, &why) && why == "ZATEN BURADASIN", "bulunulan sehir");
+        for (int i = 0; i < (int)leagueEvents().size(); ++i)            // tum ligleri ac (patronlari kazanmis say)
+            if (leagueEvents()[i].rival >= 0 && rivals()[leagueEvents()[i].rival].boss) c.recordEvent(i, true, 12.0, 0, nullptr);
+        CHECK(c.leagueUnlocked() >= 2 && c.canTravel(2), "acik lig sehrine gidilir");
+        const long p2 = c.fastTravelPrice(2), m0 = c.money;
+        CHECK(std::fabs(c.travelKm(2) - (Career::legKm(0) + Career::legKm(1))) < 1e-9 && p2 > 0, "iki sehir: iki ayak toplam km");
+        CHECK(c.fastTravel(2) && c.city == 2 && c.money == m0 - p2, "hizli gecis: para dusulur, sehir degisir");
+        Career r;
+        CHECK(Career::parse(c.serialize(), r) && r.city == 2, "sehir kayitta");
+        const auto f = c.runField(50, 7u);
+        int st[StyleCount] = {0};
+        for (const RunEntrant& e : f) ++st[e.style];
+        int kinds = 0; for (int k = 0; k < StyleCount; ++k) kinds += st[k] > 0;
+        std::printf("    50 arac: dengeli %d, dip gaz %d, eko %d, stok %d, canavar %d\n", st[0], st[1], st[2], st[3], st[4]);
+        CHECK(f.size() == 50 && kinds == StyleCount, "etap alani: 50 arac, 5 tarzin hepsi var");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

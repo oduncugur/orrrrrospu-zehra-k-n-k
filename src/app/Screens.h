@@ -226,6 +226,7 @@ public:
     void key(Key k, bool down) override;
 private:
     App& app_;
+    int travelTo_ = -1;                          // seyahat penceresi (hedef sehir)
     std::string msg_; double msgT_ = 0, t_ = 0;
 };
 
@@ -426,6 +427,7 @@ public:
     void key(Key k, bool down) override;
 
 private:
+    void leaveResults();
     void setupLayout();                          // ayardan yon: yatay 640x360 / dikey 360x640
     float fov() const { return land_ ? 0.85f : 1.05f; }
     void start(RoadSession::Mode m, RoadSession::Kind kind = RoadSession::Kind::Highway);

@@ -57,6 +57,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     app_.setVoiceTuned(0, carId, &tune_);
     app_.setVoice(1, nullptr);
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
+    if (app_.runPlan.active) { start(RoadSession::Mode::Marathon); return; }   // sehirler arasi etap
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
         const std::string n = m;
         start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : n == "karma" ? RoadSession::Mode::Karma
@@ -90,6 +91,13 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
     ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind);
+    if (m == RoadSession::Mode::Marathon) {                              // alan: seyahat plani ya da kariyer seviyesinde 20 arac
+        if (app_.runPlan.active) {
+            ses_->setRunField(app_.runPlan.field, app_.runPlan.realKm);
+            if (app_.runPlan.fuelL >= 0) ses_->player().sim().setFuelLevel(app_.runPlan.fuelL);   // onceki etaptan kalan
+        } else ses_->setRunField(app_.career.runField(20, seed), 300.0);
+        l100_ = 0; usedRun_ = 0; lastRunS_ = ses_->player().s(); lastFuel_ = ses_->player().sim().fuelLiters();
+    }
     if (app_.career.car().carId == carId_) ses_->player().sim().setNosFill(app_.career.car().nosFill);   // tupte kalan
     {   // Ortam: gece %30, yagmur %25 (tohumdan); test icin ZK_NIGHT / ZK_RAIN
         const uint32_t w = seed * 2246822519u + 0x9E3779B9u;
@@ -135,6 +143,16 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
           : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM" : "YOL YARISI 4 KM", 2.5);
 }
 
+// Sonuctan cikis: seyahatte sonraki etap (yeni ekran), varista harita, aksi halde garaj
+void RoadScreen::leaveResults() {
+    if (ses_->mode() == RoadSession::Mode::Marathon && app_.runPlan.active && rewarded_) {
+        app_.continueTravel();
+        return;
+    }
+    if (ses_->mode() == RoadSession::Mode::Marathon && !app_.eventNote.empty()) { app_.goMap(); return; }
+    app_.goGarage();
+}
+
 bool RoadScreen::autoClutchPenalty() const {
     return cockpit_.lever() == Cockpit::Lever::HPattern && !cockpit_.clutchPedal();
 }
@@ -152,7 +170,10 @@ void RoadScreen::finishRace() {
     }
     else if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
     else if (ses_->mode() == RoadSession::Mode::Chase) prize_ = app_.career.recordChase(ses_->playerWon(), ses_->collisions());
-    else if (ses_->mode() == RoadSession::Mode::Marathon) prize_ = app_.career.recordRun(ses_->runPosition(), ses_->runCount(), ses_->realKm());
+    else if (ses_->mode() == RoadSession::Mode::Marathon) {
+        prize_ = app_.career.recordRun(ses_->runPosition(), ses_->runCount(), ses_->realKm());
+        if (app_.runPlan.active) app_.nextTravelLeg(ses_->player().sim().fuelLiters());   // sehir ilerler; sonraki etap / varis
+    }
     else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
                                                          ses_->prizeScale() * (app_.lastOpp.estEt > 0 && app_.lastOpp.playerEt > 0 ? prizeDifficulty(app_.lastOpp.playerEt - app_.lastOpp.estEt) : 1.0));
     else return;
@@ -1244,7 +1265,12 @@ void RoadScreen::drawResults(Renderer& r) {
     else std::snprintf(b, sizeof b, "ODUL $%ld", prize_);
     r.textCentered(W / 2.0f, 200 + oy, b, 3, prize_ < 0 ? Color{1.0f, 0.35f, 0.3f} : kUiGold);
     if (autoClutchPenalty()) r.textCentered(W / 2.0f, 232 + oy, "OTOMATIK DEBRIYAJ: ODUL %75", 1, {0.9f, 0.6f, 0.3f});
-    r.textCentered(W / 2.0f, 280 + oy, "DOKUN / ENTER: GARAJ", 1, {0.7f, 0.75f, 0.9f});
+    if (ses_->mode() == RoadSession::Mode::Marathon && app_.runPlan.active) {
+        std::snprintf(b, sizeof b, "SIMDI %s  -  SONRAKI ETAP: %s (%.0f KM)", Career::cityName(app_.career.city),
+                      Career::cityName(app_.career.city + (app_.runPlan.target > app_.career.city ? 1 : -1)), app_.runPlan.realKm);
+        r.textCentered(W / 2.0f, 256 + oy, b, 1, {0.55f, 0.85f, 1.0f});
+        r.textCentered(W / 2.0f, 280 + oy, "DOKUN / ENTER: SONRAKI ETAP", 1, {0.7f, 0.75f, 0.9f});
+    } else r.textCentered(W / 2.0f, 280 + oy, "DOKUN / ENTER: GARAJ", 1, {0.7f, 0.75f, 0.9f});
 }
 
 void RoadScreen::render(Renderer& r) {
@@ -1268,7 +1294,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
         else if (marathon_.hit(x, y)) start(RoadSession::Mode::Marathon);
         return;
     }
-    if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { app_.goGarage(); return; }
+    if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { leaveResults(); return; }
     if (cockpit_.pointerDown(id, x, y)) return;
     if (assistBtn_.hit(x, y)) toggleAssist();
     else if (tiltBtn_.hit(x, y) && app_.tiltAvailable) toggleTilt();
@@ -1305,7 +1331,7 @@ void RoadScreen::key(Key k, bool down) {
     case Key::Left: kL_ = down; break;
     case Key::Right: kR_ = down; break;
     case Key::Enter:
-        if (down && ses_->phase() == RoadSession::Phase::Finished) app_.goGarage();
+        if (down && ses_->phase() == RoadSession::Phase::Finished) leaveResults();
         break;
     case Key::PageDown: if (down) toggleAssist(); break;
     case Key::Back: if (down) app_.goGarage(); break;

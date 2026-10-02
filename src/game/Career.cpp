@@ -537,6 +537,47 @@ long Career::recordRun(int position, int count, double realKm) {
     return p;
 }
 
+const char* Career::cityName(int c) {
+    static const char* const n[kCities] = {"ISTANBUL", "BURSA", "ANKARA", "KAPADOKYA", "ANTALYA"};
+    return n[std::clamp(c, 0, kCities - 1)];
+}
+double Career::legKm(int from) { static const double km[kCities - 1] = {155, 385, 280, 450}; return km[std::clamp(from, 0, kCities - 2)]; }
+int Career::legField(int from) { static const int n[kCities - 1] = {20, 50, 100, 200}; return n[std::clamp(from, 0, kCities - 2)]; }
+double Career::travelKm(int to) const {
+    double km = 0;
+    for (int c = std::min(city, to); c < std::max(city, to); ++c) km += legKm(c);
+    return km;
+}
+long Career::fastTravelPrice(int to) const { return (long)std::lround(travelKm(to) * 9.0 / 10.0) * 10; }   // ~9 $/km
+bool Career::canTravel(int to, std::string* why) const {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (to < 0 || to >= kCities) return no("GECERSIZ");
+    if (to == city) return no("ZATEN BURADASIN");
+    if (to > leagueUnlocked()) return no("KILITLI: ONCEKI PATRONU YEN");
+    return true;
+}
+bool Career::fastTravel(int to, std::string* why) {
+    if (!canTravel(to, why)) return false;
+    const long p = fastTravelPrice(to);
+    if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= p; city = to;
+    return true;
+}
+std::vector<RunEntrant> Career::runField(int n, uint32_t seed) const {
+    std::vector<RunEntrant> f;
+    f.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        const uint32_t h = (seed + (uint32_t)i * 2654435761u) * 2246822519u;
+        const int roll = (int)(h >> 8) % 100;
+        const int style = roll < 30 ? StyleBalanced : roll < 50 ? StyleFlatOut : roll < 70 ? StyleEco : roll < 85 ? StyleStock : StyleMonster;
+        const double off = style == StyleMonster ? -1.2 : style == StyleStock ? 0.6 : -0.3 + 0.6 * ((h >> 3) % 100) / 100.0;
+        Opponent o = pickOpponentFor(seed * 31u + (uint32_t)i * 977u + 5u, off);
+        if (style == StyleStock) o.tune = Tune{};
+        f.push_back({o.carId, o.tune, style});
+    }
+    return f;
+}
+
 long Career::tourEntry() const { return 400L * (1 + leagueUnlocked()); }
 long Career::tourPrize() const { return 3000L * (1 + leagueUnlocked()) * (1 + leagueUnlocked()) / 2 + 2000L; }
 bool Career::tourAvailable(std::string* why) const {
@@ -1252,7 +1293,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity=" << city << "\n";
     {
         char lb[160];
         std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
@@ -1313,6 +1354,7 @@ bool Career::parse(const std::string& text, Career& out) {
             int w = -1, r = 0, o = 0;
             if (std::sscanf(v.c_str(), "%d;%d;%d", &w, &r, &o) == 3) { c.tourWeek = w; c.tourRound = std::clamp(r, 0, (int)kTourRounds); c.tourOut = o != 0; }
         }
+        else if (k == "city") c.city = std::clamp(std::atoi(v.c_str()), 0, kCities - 1);
         else if (k == "slots") c.garageSlots = std::clamp(std::atoi(v.c_str()), (int)kStartSlots, (int)kMaxSlots);
         else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
         else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));

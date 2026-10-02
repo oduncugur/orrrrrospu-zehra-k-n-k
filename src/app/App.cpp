@@ -100,6 +100,7 @@ void App::setScreen(std::unique_ptr<Screen> s) {
 }
 void App::goGarage() {
     setVoice(1, nullptr);
+    runPlan.active = false;                                             // yarim kalan seyahat iptal (bulunulan sehirde kalinir)
     if (activeEvent >= 0) {                                                       // etkinlikten donus: o lig
         const int tab = leagueEvents()[activeEvent].league;
         activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); return;
@@ -163,6 +164,30 @@ void App::goEcu() { setScreen(std::make_unique<EcuScreen>(*this)); }
 void App::goSetup() { setScreen(std::make_unique<SetupScreen>(*this)); }
 void App::goGauges() { setScreen(std::make_unique<GaugeShopScreen>(*this)); }
 void App::goStreet() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); }
+void App::startTravel(int target) {
+    std::string why;
+    if (!career.canTravel(target, &why)) return;
+    runPlan = {};
+    runPlan.active = true; runPlan.from = career.city; runPlan.target = target;
+    const int dir = target > career.city ? 1 : -1, leg = dir > 0 ? career.city : career.city - 1;
+    runPlan.realKm = Career::legKm(leg);
+    runPlan.field = career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
+    activeEvent = -1; activeTour = false; activeMeet = false;
+    setScreen(std::make_unique<RoadScreen>(*this, career.car().carId, &career.car().tune));   // runPlan: The Run etabi
+}
+void App::continueTravel() { setScreen(std::make_unique<RoadScreen>(*this, career.car().carId, &career.car().tune)); }
+void App::nextTravelLeg(double fuelLeft) {
+    if (!runPlan.active) return;
+    const int dir = runPlan.target > career.city ? 1 : -1;
+    career.arriveCity(career.city + dir);
+    saveCareer();
+    if (career.city == runPlan.target) { runPlan.active = false; eventNote = std::string(Career::cityName(career.city)) + "'A VARDIN!"; return; }
+    const int leg = dir > 0 ? career.city : career.city - 1;
+    runPlan.realKm = Career::legKm(leg);
+    runPlan.field = career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
+    runPlan.fuelL = fuelLeft;                                           // depo bir sonraki etaba tasinir
+}
+
 void App::startMeet() {
     std::string why;
     if (!career.meetStart(&why)) return;

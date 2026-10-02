@@ -146,6 +146,9 @@ void LeagueScreen::pointerDown(int, float x, float y) {
     if (sel_ >= 0 && kStartL.hit(x, y)) {
         std::string why;
         if (!app_.career.eventAvailable(sel_, &why)) { msg_ = why; msgT_ = 2.0; return; }
+        if (leagueEvents()[sel_].league != app_.career.city) {          // etkinlik baska sehirde: haritadan seyahat
+            msg_ = std::string("ONCE ") + Career::cityName(leagueEvents()[sel_].league) + " (HARITA)"; msgT_ = 2.2; return;
+        }
         confirm_ = true;                                                  // onay (pink slip uyarisi panelde)
         return;
     }

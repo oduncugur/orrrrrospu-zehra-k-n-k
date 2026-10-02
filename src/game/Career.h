@@ -4,8 +4,10 @@
 #include "game/League.h"
 #include "sim/Tune.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
+#include "game/RunField.h"
 #include <vector>
 
 namespace zk {
@@ -207,6 +209,20 @@ struct Career {
     long recordTour(bool won);             // donus: verilen odul (yalniz son tur galibiyetinde)
     // The Run etabi: siraya ve etap gercek mesafesine gore odul (ilk uc buyuk, digerleri katilim), un
     long recordRun(int position, int count, double realKm);
+    // ---- Sehirler (hikaye): her lig bir sehirde; sehirler arasi seyahat THE RUN etabiyla (her ara bir etap) ya da
+    //      parali hizli gecisle. Lig etkinlikleri bulunulan sehirde oynanir.
+    static constexpr int kCities = 5;
+    static const char* cityName(int c);
+    static double legKm(int from);              // c -> c+1 gercek mesafe (km)
+    static int legField(int from);              // o etabin rakip sayisi (20 / 50 / 100 / 200)
+    int  city = 0;
+    double travelKm(int to) const;              // bulunulan sehirden toplam
+    long fastTravelPrice(int to) const;
+    bool canTravel(int to, std::string* why = nullptr) const;
+    bool fastTravel(int to, std::string* why = nullptr);
+    void arriveCity(int c) { city = std::clamp(c, 0, kCities - 1); }
+    // Etap alani: oyuncu seviyesine yakin araclar + tarz dagilimi (dengeli, dip gaz, eko, stok, canavar)
+    std::vector<RunEntrant> runField(int n, uint32_t seed) const;
     // ---- Sokak: gece bulusmasi (3 saatte bir yeni rakip, bahisli drag, polis baskini riski),
     //      haftalik dyno yarismasi (en yuksek beygir), musteri isleri (araci hedef beygire cikar, teslim et)
     int  clockSlot = -1;                   // testler: sabit 3 saatlik dilim (-1: gercek saat)

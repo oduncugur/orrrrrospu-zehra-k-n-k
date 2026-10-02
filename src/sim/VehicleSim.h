@@ -71,6 +71,7 @@ public:
     // Maraton yakiti: depo (L) ve tuketim carpani (uzun yarisi kisa surede anlamli kilar); dolum depoyu asmaz
     void setFuelSystem(double tankL, double burnMul) { cfg_.fuelLiters = tankL; tankL_ = tankL; burnMul_ = burnMul; fuelAdded_ = 0.0; fuelKg_ = tankL * fuelDensity_; }
     double fuelLiters() const { return fuelKg_ / fuelDensity_; }
+    void setFuelLevel(double L) { const double d = std::clamp(L, 0.0, tankLiters()) - fuelLiters(); fuelAdded_ += d; fuelKg_ += d * fuelDensity_; }
     double tankLiters() const { return tankL_ > 0 ? tankL_ : cfg_.fuelLiters; }
     void addFuel(double liters) { const double room = tankLiters() - fuelLiters(); if (room > 0) { fuelAdded_ += std::min(liters, room); fuelKg_ += std::min(liters, room) * fuelDensity_; } }
     double hapticIntensity() const { return haptic_; }

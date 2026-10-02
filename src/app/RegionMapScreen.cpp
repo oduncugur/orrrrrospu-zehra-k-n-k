@@ -19,6 +19,7 @@ const Node kNodes[kLeagues] = {
 };
 constexpr float kR = 30;
 const Rect kTour{8, 528, 352, 566}, kBackM{8, 596, 176, 634}, kStreetM{184, 596, 352, 634};
+const Rect kRunT{32, 260, 328, 304}, kFastT{32, 326, 328, 370}, kCancelT{32, 384, 328, 424};   // seyahat penceresi
 
 bool bossBeaten(const Career& c, int league) {
     const auto& ev = leagueEvents();
@@ -78,8 +79,12 @@ void RegionMapScreen::render(Renderer& r) {
         r.circle(n.x, n.y, kR, 24, locked ? Color{0.30f, 0.30f, 0.32f} : n.c);
         std::snprintf(b, sizeof b, "%d", l + 1);
         r.textCentered(n.x, n.y - 10, b, 3, locked ? kUiDim : Color{1, 1, 1});
-        std::string name = leagueName(l);
-        r.textFit(n.x, n.y + kR + 6, name, 1, 150, locked ? kUiDim : Color{1, 1, 1}, true);
+        std::string name = std::string(Career::cityName(l)) + ": " + leagueName(l);   // sehir + lig
+        r.textFit(n.x, n.y + kR + 6, name, 1, 170, locked ? kUiDim : Color{1, 1, 1}, true);
+        if (l == c.city) {                                                // buradasin: araba isareti
+            r.circle(n.x + kR * 0.8f, n.y - kR * 0.8f, 11, 16, {0.1f, 0.6f, 0.95f});
+            icon(r, IconGallery, n.x + kR * 0.8f, n.y - kR * 0.8f, 7, {1, 1, 1});
+        }
         std::snprintf(b, sizeof b, locked ? "KILITLI" : "%d / %d", c.leagueWins(l), total);
         r.textCentered(n.x, n.y + kR + 17, b, 1, locked ? kUiDim : kUiGold);
     }
@@ -109,10 +114,41 @@ void RegionMapScreen::render(Renderer& r) {
     button(r, kTour, can ? std::string(tb) : why, can ? kUiOrange : Color{0.25f, 0.25f, 0.28f}, 2);
     button(r, kBackM, "< GARAJ", kUiBtn, 2);
     button(r, kStreetM, "SOKAK >", {0.35f, 0.15f, 0.45f}, 2);
-    if (msgT_ > 0) { r.rect(0, 440, 360, 470, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 448, msg_, 2, kUiGold); }
+    if (travelTo_ >= 0) {                                                // seyahat secimi
+        r.rect(0, 0, 360, 640, {0, 0, 0, 0.6f});
+        r.rect(16, 180, 344, 440, kUiPanel);
+        r.rect(16, 180, 344, 183, kUiGold);
+        const int legs = std::abs(travelTo_ - c.city);
+        std::snprintf(b, sizeof b, "%s -> %s", Career::cityName(c.city), Career::cityName(travelTo_));
+        r.textFit(180, 194, b, 2, 320, kUiGold, true);
+        std::snprintf(b, sizeof b, "%.0f KM, %d ETAP", c.travelKm(travelTo_), legs);
+        r.textCentered(180, 220, b, 1, kUiText);
+        std::string rs = "THE RUN: ";
+        for (int k = 0; k < legs; ++k) {
+            const int from = travelTo_ > c.city ? c.city + k : c.city - k - 1;
+            char e[32]; std::snprintf(e, sizeof e, "%s%d ARAC", k ? " + " : "", Career::legField(from)); rs += e;
+        }
+        r.textFit(180, 236, rs, 1, 320, kUiDim, true);
+        button(r, kRunT, "THE RUN ILE GIT >", kUiOrange, 2);
+        r.textCentered(180, kRunT.y1 + 4, "ODUL + UN; YAKIT VE SIRA ONEMLI", 1, kUiDim);
+        std::snprintf(b, sizeof b, "HIZLI GECIS %s", money(c.fastTravelPrice(travelTo_)).c_str());
+        button(r, kFastT, b, c.money >= c.fastTravelPrice(travelTo_) ? Color{0.15f, 0.45f, 0.7f} : Color{0.25f, 0.25f, 0.28f}, 2);
+        button(r, kCancelT, "VAZGEC", kUiBtn, 2);
+    }
+    if (msgT_ > 0) { r.rect(0, 440, 360, 470, {0.02f, 0.02f, 0.04f, 0.92f}); r.textFit(180, 448, msg_, 2, 344, kUiGold, true); }
 }
 
 void RegionMapScreen::pointerDown(int, float x, float y) {
+    if (travelTo_ >= 0) {                                                // seyahat penceresi (modal)
+        std::string why;
+        if (kRunT.hit(x, y)) { const int t = travelTo_; travelTo_ = -1; app_.startTravel(t); }
+        else if (kFastT.hit(x, y)) {
+            if (app_.career.fastTravel(travelTo_, &why)) { app_.saveCareer(); msg_ = std::string(Career::cityName(app_.career.city)) + "'A GELDIN"; }
+            else msg_ = why;
+            msgT_ = 2.0; travelTo_ = -1;
+        } else if (kCancelT.hit(x, y)) travelTo_ = -1;
+        return;
+    }
     if (kBackM.hit(x, y)) { app_.goGarage(); return; }
     if (kStreetM.hit(x, y)) { app_.goStreet(); return; }
     if (kTour.hit(x, y)) {
@@ -125,6 +161,7 @@ void RegionMapScreen::pointerDown(int, float x, float y) {
         const float dx = x - kNodes[l].x, dy = y - kNodes[l].y;
         if (dx * dx + dy * dy > (kR + 12) * (kR + 12)) continue;
         if (l > app_.career.leagueUnlocked()) { msg_ = "KILITLI: ONCEKI PATRONU YEN"; msgT_ = 2.0; return; }
+        if (l != app_.career.city) { travelTo_ = l; return; }           // baska sehir: seyahat (The Run / hizli gecis)
         app_.goLeague(l);
         return;
     }
@@ -133,7 +170,7 @@ void RegionMapScreen::pointerDown(int, float x, float y) {
 void RegionMapScreen::key(Key k, bool down) {
     if (!down) return;
     if (k == Key::Back) app_.goGarage();
-    else if (k == Key::Enter) app_.goLeague(app_.career.leagueUnlocked());
+    else if (k == Key::Enter) app_.goLeague(app_.career.city);
 }
 
 } // namespace zk

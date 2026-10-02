@@ -105,6 +105,12 @@ public:
     void goStreet();
     void goGauges();                             // kadran dukkani                             // sokak: bulusma / dyno yarismasi / musteri isleri
     void startMeet();                            // gece bulusmasi: bahisli drag
+    // Sehirler arasi THE RUN seyahati: hedefe kadar her ara bir etap (yakit tasinir). Etap bitince sonraki etap ya da varis.
+    struct RunPlan { bool active = false; int from = 0, target = 0; double fuelL = -1; std::vector<RunEntrant> field; double realKm = 300; };
+    RunPlan runPlan;
+    void startTravel(int target);                // ilk etap
+    void continueTravel();                       // sonraki etap ekrani
+    void nextTravelLeg(double fuelLeft);         // etap bitti (bitirdiyse): sehir ilerler, sonraki etap / varis
     bool activeMeet = false;
     void goSaveCode();
     // Pano (platform baglar: masaustu SDL, Android ClipboardManager). Yoksa bos / etkisiz.
