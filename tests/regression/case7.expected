@@ -26,7 +26,7 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ko
   [  1.881 s] Takoza vurdu (bottoming): arka sol
   [  1.961 s] Tekerlek havalandi: arka sol @ 6 m
   [  1.969 s] Takoza vurdu (bottoming): arka sag
-  2.00     7.2   27.1  2  5869   59.1   59.0  0.948   off    29.4   56.8   56.1   105  4.57
+  2.00     7.2   27.1  2  5868   59.1   59.0  0.948   off    29.4   56.8   56.1   105  4.57
   [  2.050 s] Tekerlek havalandi: arka sol @ 7 m
   [  2.082 s] Tekerlek havalandi: arka sag @ 7 m
   [  2.264 s] Takoza vurdu (bottoming): arka sag
@@ -36,7 +36,7 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ko
   4.00    31.9   58.8  2  5760   57.5   58.4  0.031   off    40.6   55.7   55.1   197  4.50
   [  4.801 s] Vites 3 (7483 rpm)
   5.00    49.7   67.9  3  6406   67.3   62.4  0.004   off    45.8   54.7   54.1    58  4.90
-  6.00    70.3   78.5  3  5496   80.0   80.0  0.088   off    51.6   53.6   53.0   127  4.34
+  6.00    70.3   78.5  3  5496   80.0   80.0  0.088   off    51.6   53.6   53.0   126  4.34
   7.00    93.4   87.8  3  5803   84.7   84.6  0.012   off    57.8   52.4   51.8    48  4.53
   8.00   118.9   96.3  3  6399   93.6   93.1  0.042   off    64.5   51.2   50.5    21  4.90
   [  8.453 s] 0-100 km/h: 8.452 s
@@ -45,9 +45,9 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ko
  10.00   175.7  106.8  4  7500  102.2  138.1  0.105   off    76.1   48.7   48.0     6  5.50
   [ 10.044 s] Vites 5 (7483 rpm)
  11.00   206.0  111.8  5  4347  109.4  110.8  0.016   off    80.5   47.5   46.8    76  3.62
- 12.00   237.6  116.2  5  4557  115.4  115.9 -0.002   off    85.8   46.3   45.6     3  3.75
- 13.00   270.5  119.9  5  5379  121.0  151.7  0.076   off    91.2   45.1   44.4    51  4.26
- 14.00   304.5  124.4  5  4881  126.8  121.0 -0.005   off    96.9   44.0   43.4    50  3.95
+ 12.00   237.6  116.2  5  4558  115.4  115.9 -0.002   off    85.8   46.3   45.7     3  3.75
+ 13.00   270.5  119.9  5  5379  121.0  151.7  0.076   off    91.2   45.1   44.4    52  4.26
+ 14.00   304.5  124.4  5  4882  126.8  121.0 -0.005   off    96.9   44.0   43.4    50  3.95
  15.00   339.3  127.9  5  5378  124.4  148.2  0.023   off   103.1   43.0   42.4    54  4.26
  16.00   375.4  131.9  5  5114  129.5  129.5  0.015   off   109.0   42.0   41.4    56  4.10
 
@@ -57,22 +57,28 @@ Suspansiyon: 1.70 Hz on / 1.87 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: ko
   Kosuda yakilan yakit: 94.9 g (toplam 113.0 g) | Balata 88 C | En yuksek aks gerilmesi 326 MPa
 
   [ 16.665 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
- 17.00   412.3  129.7  5  5146    0.0    0.0 -0.986   off   113.2   42.4   41.0     0  4.12
- 18.00   444.5  104.1  5  2559    0.0    0.0 -0.983   off   113.2   47.9   46.8     0  2.35
- 19.00   468.9   73.3  5   816    0.0    0.0 -0.976   off   113.3   53.9   51.3     0  1.40
-  [ 19.946 s] Kilitlenmeyi fark etti: fren gevsetildi
- 20.00   485.8   48.8  5   780   41.9   30.5  0.088   off   113.6   56.5   53.8     6  1.20
- 21.00   497.2   33.2  5   780   28.4   30.9 -0.039   off   113.8   55.9   53.1     6  1.38
- 22.00   504.3   18.1  5   780   15.7   16.8 -0.047   off   114.1   55.4   52.8     6  1.39
- 23.00   507.3    3.2  5   780    3.0    3.0 -0.013   off   114.3   55.1   52.6     0  1.39
+ 17.00   412.3  129.8  5  5146    0.0    0.0 -0.986   off   113.2   42.3   41.0     0  4.12
+ 18.00   444.5  104.1  5  2559    0.0    0.0 -0.978   off   113.2   46.7   46.6     0  2.31
+ 19.00   468.9   73.0  5   816    0.0    0.0 -0.958   off   113.3   52.1   50.6     0  1.39
+  [ 19.921 s] Kilitlenmeyi fark etti: fren gevsetildi
+ 20.00   485.7   48.9  5   780   44.2   50.7 -0.091   off   113.6   53.7   52.3     6  1.23
+ 21.00   498.4   43.3  5   780   40.1   40.4 -0.007   off   113.8   52.9   51.6     4  1.38
+ 22.00   509.8   38.3  5   780   37.0   25.3 -0.009   off   114.1   52.3   51.0     6  1.39
+ 23.00   519.7   33.3  5   780   31.9   31.0 -0.005   off   114.3   51.7   50.5     6  1.39
+ 24.00   528.3   28.3  5   780   26.7   26.4 -0.007   off   114.6   51.2   50.0     5  1.39
+ 25.00   535.5   23.4  5   780   22.7   21.6 -0.007   off   114.8   50.7   49.6     6  1.39
+ 26.00   541.4   18.6  5   780   17.3   17.5 -0.008   off   115.1   50.4   49.3     3  1.39
+ 27.00   545.9   13.8  5   780   13.0   12.9 -0.006   off   115.3   50.1   49.0     2  1.39
+ 28.00   549.0    8.9  5   780    8.3    8.4 -0.007   off   115.6   49.8   48.8     1  1.39
+ 29.00   550.8    4.1  5   780    3.8    3.8 -0.006   off   115.8   49.6   48.6     0  1.39
 
 === DURUS / HASAR RAPORU ===
-  Toplam mesafe 507.4 m | Toplam yakit 114.4 g | Kalan depo 5.85 kg
-  On Sol  :  55.1 C, 16.0 PSI, flat-spot 0.04 mm, haptik vuruntu 0 kez
-  On Sag  :  52.6 C, 16.0 PSI, flat-spot 0.04 mm, haptik vuruntu 0 kez
-  Arka Sol:  29.4 C, 32.0 PSI, flat-spot 0.01 mm, haptik vuruntu 0 kez
-  Arka Sag:  30.5 C, 32.0 PSI, flat-spot 0.01 mm, haptik vuruntu 0 kez
-  Suspansiyon: havalanma sayisi FL/FR/RL/RR = 62/81/168/150 | takoz = 40/35/42/73
-  Tepe lastik yuku FL/FR/RL/RR = 17989/13325/17174/16600 N
+  Toplam mesafe 551.3 m | Toplam yakit 116.0 g | Kalan depo 5.84 kg
+  On Sol  :  49.5 C, 16.0 PSI, flat-spot 0.02 mm, haptik vuruntu 0 kez
+  On Sag  :  48.5 C, 16.0 PSI, flat-spot 0.02 mm, haptik vuruntu 0 kez
+  Arka Sol:  28.6 C, 32.0 PSI, flat-spot 0.00 mm, haptik vuruntu 0 kez
+  Arka Sag:  29.6 C, 32.0 PSI, flat-spot 0.01 mm, haptik vuruntu 0 kez
+  Suspansiyon: havalanma sayisi FL/FR/RL/RR = 63/87/200/180 | takoz = 41/35/43/81
+  Tepe lastik yuku FL/FR/RL/RR = 17989/13325/17176/16601 N
   Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 326 MPa
   Motor yataklari: hasar %0  | Motor: calisiyor

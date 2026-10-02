@@ -8,72 +8,79 @@ Suspansiyon: 1.60 Hz on / 1.76 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: dr
   [  0.398 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
   [  5.000 s] Burnout bitti, on lastikler 63/63 C
   [  5.000 s] VTEC kapandi (dusuk kam @6000 rpm)
-  [  5.500 s] Stage isiklari yandi. 2-Step 6500 RPM aktif.
-  [  5.576 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
-  [  7.500 s] AGAC: amber 1
-  [  8.000 s] AGAC: amber 2
-  [  8.500 s] AGAC: amber 3
-  [  9.000 s] AGAC: *** YESIL ***
+  [  5.593 s] Stage isiklari yandi. 2-Step 6500 RPM aktif.
+  [  5.684 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
+  [  7.593 s] AGAC: amber 1
+  [  8.093 s] AGAC: amber 2
+  [  8.593 s] AGAC: amber 3
+  [  9.093 s] AGAC: *** YESIL ***
 
 >>> KALKIS! Tepki suresi 0.050 s, debriyaj 6500 RPM'de tokatlandi
 
   t[s]    x[m]   km/h  G   RPM     wL     wR   kapL  VTEC yakit_g  LastL  LastR  tauL   yag
-  0.00     0.0    0.0  1  6500    0.0    0.0 -0.000    ON    45.7   63.3   63.7     0  4.96
-  [  0.140 s] VTEC kapandi (dusuk kam @7608 rpm)
-  1.00     2.0   15.3  1  5532   37.2   37.2  1.542   off    52.7   64.9   65.4   219  4.36
-  2.00     9.0   36.5  1  5557   37.4   37.4  0.094   off    62.1   65.3   65.9   293  4.37
+  0.00     0.0    0.0  1  6500    0.0    0.0  0.000    ON    45.8   63.5   63.9     0  4.96
+  [  0.140 s] VTEC kapandi (dusuk kam @7607 rpm)
+  1.00     2.0   15.3  1  5537   37.3   37.3  1.539   off    52.8   65.1   65.6   219  4.36
+  2.00     9.0   36.5  1  5551   37.4   37.3  0.091   off    62.3   65.5   66.0   292  4.37
   [  2.119 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
-  [  2.729 s] VTEC kapandi (dusuk kam @8350 rpm)
-  [  2.829 s] Vites 2 (8055 rpm)
-  [  2.899 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
-  3.00    22.1   54.9  2  7989   82.4   82.4  0.452    ON    78.2   64.6   65.1   330  5.50
-  [  3.209 s] VTEC kapandi (dusuk kam @6480 rpm)
-  [  3.402 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
-  4.00    39.7   70.5  2  6812   70.3   70.3  0.052    ON    89.6   63.7   64.2   233  5.16
-  [  4.911 s] VTEC kapandi (dusuk kam @8350 rpm)
-  5.00    61.8   87.2  2  8092   82.6   82.8  0.000   off   109.8   62.2   62.7     5  5.50
-  [  5.011 s] Vites 3 (8055 rpm)
-  [  5.081 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
-  [  5.919 s] 0-100 km/h: 5.919 s
-  6.00    87.9  101.1  3  6827   98.9   98.9  0.034    ON   127.3   60.6   61.1   187  5.17
-  7.00   117.8  114.4  3  7714  111.8  111.8  0.030    ON   148.6   58.7   59.2   175  5.50
-  [  7.795 s] VTEC kapandi (dusuk kam @8350 rpm)
-  [  7.895 s] Vites 4 (8055 rpm)
-  [  7.965 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
-  8.00   151.3  123.9  4  8543  117.5  117.5 -0.000    ON   167.7   56.7   57.2     0  5.50
-  9.00   187.4  134.7  4  6818  130.7  130.7  0.026    ON   187.0   54.8   55.2   137  5.16
- 10.00   226.1  144.1  4  7287  139.7  139.6  0.024    ON   207.6   52.8   53.2   141  5.45
- 11.00   267.4  153.0  4  7733  148.2  148.2  0.028    ON   229.5   50.8   51.2   138  5.50
- 12.00   311.0  161.3  4  8143  156.1  156.1  0.020    ON   252.5   49.0   49.3   133  5.50
-  [ 12.555 s] VTEC kapandi (dusuk kam @8350 rpm)
-  [ 12.655 s] Vites 5 (8055 rpm)
-  [ 12.725 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
- 13.00   356.7  167.4  5  6762  161.4  161.4  0.021    ON   271.2   47.2   47.5   113  5.13
+  [  2.728 s] VTEC kapandi (dusuk kam @8350 rpm)
+  [  2.828 s] Vites 2 (8055 rpm)
+  [  2.898 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
+  3.00    22.1   55.0  2  7986   82.4   82.4  0.452    ON    78.3   64.7   65.3   328  5.50
+  [  3.213 s] VTEC kapandi (dusuk kam @6439 rpm)
+  [  3.396 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
+  4.00    39.7   70.6  2  6821   70.4   70.4  0.052    ON    89.9   63.8   64.4   233  5.16
+  [  4.906 s] VTEC kapandi (dusuk kam @8350 rpm)
+  5.00    61.9   87.2  2  8075   82.6   82.8  0.000   off   109.9   62.3   62.9     5  5.50
+  [  5.006 s] Vites 3 (8055 rpm)
+  [  5.076 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
+  [  5.914 s] 0-100 km/h: 5.914 s
+  6.00    88.0  101.1  3  6829   99.0   98.9  0.034    ON   127.5   60.7   61.2   185  5.17
+  7.00   117.9  114.5  3  7719  111.9  111.9  0.031    ON   148.8   58.8   59.3   176  5.50
+  [  7.791 s] VTEC kapandi (dusuk kam @8350 rpm)
+  [  7.891 s] Vites 4 (8055 rpm)
+  [  7.961 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
+  8.00   151.4  123.9  4  8600  117.4  117.5 -0.000    ON   167.9   56.8   57.3     3  5.50
+  9.00   187.5  134.8  4  6821  130.7  130.7  0.027    ON   187.2   54.9   55.3   138  5.16
+ 10.00   226.2  144.1  4  7289  139.7  139.7  0.023    ON   207.8   52.9   53.3   143  5.46
+ 11.00   267.5  153.0  4  7735  148.3  148.3  0.028    ON   229.8   50.9   51.3   140  5.50
+ 12.00   311.2  161.3  4  8145  156.1  156.1  0.020    ON   252.8   49.0   49.4   132  5.50
+  [ 12.551 s] VTEC kapandi (dusuk kam @8350 rpm)
+  [ 12.651 s] Vites 5 (8055 rpm)
+  [ 12.721 s] VTEC KICKED IN YO! (yuksek kam @8061 rpm)
+ 13.00   356.9  167.4  5  6763  161.4  161.4  0.022    ON   271.5   47.2   47.6   113  5.13
 
 === 400 m (1/4 mil) BITIS ===
-  60 ft :  2.745 s | 100 m :  6.439 s | 201 m (1/8):  9.364 s | 1000 ft: 11.861 s
-  0-100 km/h:  5.919 s | 400 m ET: 13.915 s | Trap: 173.1 km/h | Tepe ivme: 0.70 g
-  Kosuda yakilan yakit: 243.8 g (toplam 289.5 g) | Balata 65 C | En yuksek aks gerilmesi 793 MPa
+  60 ft :  2.743 s | 100 m :  6.436 s | 201 m (1/8):  9.361 s | 1000 ft: 11.857 s
+  0-100 km/h:  5.914 s | 400 m ET: 13.911 s | Trap: 173.1 km/h | Tepe ivme: 0.70 g
+  Kosuda yakilan yakit: 243.8 g (toplam 289.7 g) | Balata 65 C | En yuksek aks gerilmesi 793 MPa
 
-  [ 13.915 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
-  [ 13.915 s] VTEC kapandi (dusuk kam @6992 rpm)
- 14.00   404.1  170.8  5  6800    0.0    0.0 -0.987   off   289.6   46.0   46.4     0  5.15
- 15.00   447.4  140.9  5  4352    0.0    0.0 -0.987   off   289.6   57.5   58.5     0  3.62
- 16.00   482.2  109.4  5  2563    0.0    0.0 -0.984   off   289.6   67.1   68.6     0  2.50
- 17.00   508.0   76.6  5  1213    0.0    0.0 -0.977   off   289.6   74.3   76.3     0  1.66
-  [ 17.810 s] Kilitlenmeyi fark etti: fren gevsetildi
- 18.00   524.8   46.6  5   871   43.7   43.8 -0.019   off   289.9   78.1   80.3     4  1.44
- 19.00   535.5   30.9  5   871   28.9   29.0 -0.017   off   290.1   76.9   79.0     2  1.44
- 20.00   542.0   15.3  5   871   14.3   14.3 -0.017   off   290.4   76.1   78.1     1  1.44
+  [ 13.911 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
+  [ 13.911 s] VTEC kapandi (dusuk kam @6992 rpm)
+ 14.00   404.2  170.5  5  6789   54.1   58.6 -0.624   off   289.7   45.9   46.2     8  5.14
+ 15.00   447.5  140.6  5  4344    0.0    0.0 -0.987   off   289.7   57.4   58.3     0  3.61
+ 16.00   482.2  109.1  5  2557    0.0    0.0 -0.984   off   289.7   66.9   68.4     0  2.50
+ 17.00   508.0   76.4  5  1208    0.0    0.0 -0.977   off   289.8   74.1   76.0     0  1.66
+  [ 17.805 s] Kilitlenmeyi fark etti: fren gevsetildi
+ 18.00   524.7   48.0  5   871   45.3   45.4 -0.004   off   290.0   77.8   79.9     2  1.44
+ 19.00   537.4   43.0  5   871   40.7   40.7 -0.006   off   290.3   76.4   78.4     0  1.44
+ 20.00   548.6   37.9  5   871   35.9   35.9 -0.006   off   290.5   75.1   77.1     0  1.44
+ 21.00   558.5   32.9  5   871   31.2   31.2 -0.006   off   290.8   74.0   75.9     1  1.44
+ 22.00   566.9   27.9  5   871   26.5   26.5 -0.006   off   291.0   73.0   74.9     0  1.44
+ 23.00   574.0   23.0  5   871   21.8   21.8 -0.006   off   291.3   72.2   74.1     1  1.44
+ 24.00   579.7   18.1  5   871   17.1   17.1 -0.006   off   291.5   71.5   73.4     0  1.44
+ 25.00   584.0   13.2  5   871   12.5   12.5 -0.006   off   291.8   71.0   72.8     0  1.44
+ 26.00   587.0    8.3  5   871    7.8    7.8 -0.006   off   292.0   70.5   72.3     0  1.44
+ 27.00   588.6    3.4  5   871    3.2    3.2 -0.006   off   292.3   70.2   72.0     0  1.44
 
 === DURUS / HASAR RAPORU ===
-  Toplam mesafe 544.0 m | Toplam yakit 290.6 g | Kalan depo 5.99 kg
-  On Sol  :  75.7 C, 16.0 PSI, flat-spot 0.11 mm, haptik vuruntu 11 kez
-  On Sag  :  77.7 C, 16.0 PSI, flat-spot 0.12 mm, haptik vuruntu 11 kez
-  Arka Sol:  33.2 C, 32.0 PSI, flat-spot 0.02 mm, haptik vuruntu 0 kez
-  Arka Sag:  33.2 C, 32.0 PSI, flat-spot 0.02 mm, haptik vuruntu 0 kez
+  Toplam mesafe 589.0 m | Toplam yakit 292.4 g | Kalan depo 5.99 kg
+  On Sol  :  70.1 C, 16.0 PSI, flat-spot 0.11 mm, haptik vuruntu 36 kez
+  On Sag  :  71.8 C, 16.0 PSI, flat-spot 0.11 mm, haptik vuruntu 36 kez
+  Arka Sol:  31.2 C, 32.0 PSI, flat-spot 0.01 mm, haptik vuruntu 0 kez
+  Arka Sag:  31.2 C, 32.0 PSI, flat-spot 0.01 mm, haptik vuruntu 0 kez
   Suspansiyon: havalanma sayisi FL/FR/RL/RR = 0/0/0/0 | takoz = 0/0/0/0
-  Tepe lastik yuku FL/FR/RL/RR = 5314/5180/3587/3560 N
+  Tepe lastik yuku FL/FR/RL/RR = 5351/5182/3587/3573 N
   >> Telefon titresimi: flat-spot her turda 6% siddetle vuruyor
   Akslar: sol saglam (burulma 0.1 deg), sag saglam (burulma 0.1 deg), tepe tau 793 MPa
   Motor yataklari: hasar %0  | Motor: calisiyor
