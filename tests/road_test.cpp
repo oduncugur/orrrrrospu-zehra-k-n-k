@@ -66,7 +66,9 @@ int main() {
         RoadSession rs(RoadSession::Mode::Free, 5, &t, 0, nullptr, 5u);
         int braked = 0, hitWhileStopped = 0;
         for (int i = 0; i < 60 * 150; ++i) {
-            RoadControls c = rs.player().aiControls(+RoadSession::kLane, 0.5, 8.0);
+            const double ps = rs.player().s();                         // once kendi seridinde hizlan, sonra ic karsi seride gec
+            const double tgt = i < 60 * 4 ? rs.rightLane(ps) : rs.road().laneOffset(ps, true, std::max(0, rs.road().lanesBack(ps) - 1));
+            RoadControls c = rs.player().aiControls(tgt, 0.5, 8.0);
             if (i > 60 * 12) { c.throttle = 0; c.brake = 1.0; }
             rs.update(1.0 / 60.0, c);
             for (const TrafficCar& tc : rs.traffic()) if (tc.oncoming && tc.braking) { ++braked; break; }

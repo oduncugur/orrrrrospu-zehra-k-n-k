@@ -14,7 +14,7 @@
 namespace zk {
 
 // v0: istenen hiz; uid: her yeniden doguste yeni (skor takibi icin kimlik)
-struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; };
+struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; int li = 0; };   // li: serit no (lane: yanal konum)
 
 class RoadSession {
 public:
@@ -45,6 +45,7 @@ public:
     static constexpr double kStartS = 20.0;
     static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8); dag yolunda lane()
     double lane() const { return kind_ == Kind::Touge ? 1.5 : kLane; }
+    double rightLane(double s) const { return road_.laneOffset(s, false, 0); }   // en sag gidis seridi (yanal)
 
     RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed,
                 Kind kind = Kind::Highway);

@@ -189,7 +189,7 @@ void RoadScreen::update(double dt) {
     const bool karma = ses_->mode() == RoadSession::Mode::Karma;
     const bool curvy = !karma || ses_->road().curvyAt(P.s());
     camBlend_ += std::clamp((curvy ? 1.0 : 0.0) - camBlend_, -dt / 0.9, dt / 0.9);
-    if (karma && !curvy) steer_ = P.aiControls(-ses_->lane(), 0.6).steer;
+    if (karma && !curvy) steer_ = P.aiControls(ses_->rightLane(P.s()), 0.6).steer;
 
     RoadControls c;
     c.steer = steer_; c.throttle = cockpit_.throttle(); c.brake = cockpit_.brake();
@@ -221,7 +221,7 @@ void RoadScreen::update(double dt) {
         double cap = 1e9;
         for (const TrafficCar& t : ses_->traffic())
             if (!t.oncoming && t.s > P.s() && t.s - P.s() < 40.0) cap = std::min(cap, t.v);
-        c = P.aiControls(-ses_->lane(), 0.55, cap);
+        c = P.aiControls(ses_->rightLane(P.s()), 0.55, cap);
         if (ses_->mode() == RoadSession::Mode::Marathon) ses_->pitControls(0, 0.55, c);   // otopilot da benzinlige girer
         P.manual = false; P.slowClutch = false;
     }
@@ -535,7 +535,9 @@ void RoadScreen::drawWorld(Renderer& r) {
                                      : Color{(0.27f + patch) * wet, (0.27f + patch) * wet, (0.29f + patch) * wet}), cL.w);
         triP(r, cL, cR, dR, asp); triP(r, cL, dR, dL, asp);
         if (cL.w < 120.0f)                                         // tekerlek izleri (serit merkezinin iki yani)
-            for (double lo : {-ses_->lane() - 0.75, -ses_->lane() + 0.75, ses_->lane() - 0.75, ses_->lane() + 0.75}) {
+            for (int tk = 0; tk < 2 * (int)std::lround(P[i].lf + P[i].lb); ++tk) {
+                const double w2 = 2.0 * P[i].hw / std::max(1.0, P[i].lf + P[i].lb);
+                const double lo = -P[i].hw + (tk / 2 + 0.5) * w2 + ((tk & 1) ? 0.75 : -0.75);
                 const Proj t0 = edge(i, lo + 0.25), t1 = edge(i, lo - 0.25), t2 = edge(j, lo - 0.25), t3 = edge(j, lo + 0.25);
                 const Color tc{0.0f, 0.0f, 0.0f, 0.07f};
                 triP(r, t0, t1, t2, tc); triP(r, t0, t2, t3, tc);
@@ -545,14 +547,6 @@ void RoadScreen::drawWorld(Renderer& r) {
             for (double sg : {-1.0, 1.0}) {
                 const Proj e0 = edgeW(i, sg, 0.12), e1 = edgeW(i, sg, 0.27), e2 = edgeW(j, sg, 0.27), e3 = edgeW(j, sg, 0.12);
                 triP(r, e0, e1, e2, ec); triP(r, e0, e2, e3, ec);
-            }
-        }
-        if (P[i].hw > 5.0 && (i % 5) < 2) {                        // genis yol (2x2): ek serit kesik cizgileri
-            const Color wc = fog(L({0.92f, 0.92f, 0.9f}), cL.w);
-            for (double sg : {-1.0, 1.0}) {
-                const double o = sg * P[i].hw * 0.5, o2 = sg * P[j].hw * 0.5;
-                const Proj m0 = edge(i, o + 0.07), m1 = edge(i, o - 0.07), m2 = edge(j, o2 + 0.07), m3 = edge(j, o2 - 0.07);
-                triP(r, m0, m1, m3, wc); triP(r, m0, m3, m2, wc);
             }
         }
         if (night_ && i % 5 == 3 && cL.w < 160.0f) {                // gece: kedi gozu reflektorler (farda parlar)
@@ -574,10 +568,33 @@ void RoadScreen::drawWorld(Renderer& r) {
                 }
             }
         }
-        if ((i % 5) < 2) {                                         // orta kesik cizgi (4 m cizgi, 6 m bosluk)
-            const Proj m0 = edge(i, 0.08), m1 = edge(i, -0.08), m2 = edge(j, 0.08), m3 = edge(j, -0.08);
-            const Color mc = fog(L({0.95f, 0.9f, 0.6f}), m0.w);
-            triP(r, m0, m1, m3, mc); triP(r, m0, m3, m2, mc);
+        {   // Serit cizgileri: ayni yon seritleri arasi kesik beyaz (4 m cizgi / 6 m bosluk); gidis / gelis ayrimi cift
+            // sari surekli, 3+3 ve ustunde beton orta refuj; tek yon yolda ayrim yok
+            const RoadPoint &pa = P[i], &pb = P[j];
+            auto bnd = [](const RoadPoint& p, bool back, double k) { const double w = 2.0 * p.hw / std::max(1.0, p.lf + p.lb); return back ? p.hw - k * w : -p.hw + k * w; };
+            const int nf = (int)std::lround(pa.lf), nb = (int)std::lround(pa.lb);
+            auto strip = [&](double oa, double ob, double hwid, Color c) {
+                const Proj m0 = edge(i, oa + hwid), m1 = edge(i, oa - hwid), m2 = edge(j, ob + hwid), m3 = edge(j, ob - hwid);
+                if (m0.ok && m1.ok && m2.ok && m3.ok) { triP(r, m0, m1, m3, c); triP(r, m0, m3, m2, c); }
+            };
+            if ((i % 5) < 2) {
+                const Color wc = fog(L({0.92f, 0.92f, 0.9f}), cL.w);
+                for (int k = 1; k < nf; ++k) strip(bnd(pa, false, k), bnd(pb, false, k), 0.07, wc);
+                for (int k = 1; k < nb; ++k) strip(bnd(pa, true, k), bnd(pb, true, k), 0.07, wc);
+            }
+            if (nb > 0) {
+                const double da = bnd(pa, false, pa.lf), db = bnd(pb, false, pb.lf);
+                if (nf >= 3 && nb >= 3) {                                  // beton refuj (0.8 m)
+                    const Proj b0 = pt(i, da + 0.35, 0.8), b1 = pt(j, db + 0.35, 0.8), b2 = pt(j, db - 0.35, 0.8), b3 = pt(i, da - 0.35, 0.8);
+                    const Proj g0 = edge(i, da - 0.35), g1 = edge(j, db - 0.35);
+                    const Color top = fog(L({0.78f, 0.78f, 0.76f}), cL.w), side = fog(L({0.62f, 0.62f, 0.60f}), cL.w);
+                    if (b0.ok && b1.ok && b2.ok && b3.ok) { triP(r, b0, b1, b2, top); triP(r, b0, b2, b3, top); }
+                    if (g0.ok && g1.ok && b2.ok && b3.ok) { triP(r, g0, g1, b2, side); triP(r, g0, b2, b3, side); }
+                } else {
+                    const Color yc = fog(L({0.95f, 0.8f, 0.2f}), cL.w);
+                    strip(da + 0.13, db + 0.13, 0.05, yc); strip(da - 0.13, db - 0.13, 0.05, yc);
+                }
+            }
         }
         if (zone == 2) {                                           // tunel: duvar + tavan + tavan lambalari
             const float bt = band ? 1.0f : 0.88f;                           // bant golgesi: derinlik hissi

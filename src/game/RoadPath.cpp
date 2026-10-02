@@ -121,7 +121,7 @@ RoadPoint RoadPath::at(double s) const {
     const RoadPoint &a = pts_[i], &b = pts_[i + 1];
     return {a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.heading + (b.heading - a.heading) * f,
             a.curvature + (b.curvature - a.curvature) * f, s, a.z + (b.z - a.z) * f, a.grade + (b.grade - a.grade) * f,
-            a.hw + (b.hw - a.hw) * f};
+            a.hw + (b.hw - a.hw) * f, a.lf + (b.lf - a.lf) * f, a.lb + (b.lb - a.lb) * f};
 }
 
 void RoadPath::setWidthRange(uint32_t seed, double hwMin, double hwMax) {
@@ -134,6 +134,43 @@ void RoadPath::setWidthRange(uint32_t seed, double hwMin, double hwMax) {
         const double t = std::clamp((p.s - (s1 - 120.0)) / 120.0, 0.0, 1.0);   // bolum sonunda 120 m gecis
         p.hw = w0 + (w1 - w0) * t * t * (3.0 - 2.0 * t);
     }
+}
+
+void RoadPath::setLaneProgram(uint32_t seed, int profile) {
+    struct Lay { int f, b; };
+    static const Lay kHighway[] = {{1, 1}, {2, 2}, {4, 4}, {4, 0}, {3, 0}, {2, 1}, {3, 3}, {2, 2}, {1, 1}, {3, 0}, {2, 0}};
+    static const Lay kClosed[] = {{2, 0}, {3, 0}, {4, 0}, {3, 0}};
+    const double W = profile == LanesMountain ? 3.0 : 3.5;
+    Rng r{seed ? seed * 2891336453u + 29u : 5u};
+    auto pick = [&]() -> Lay {
+        if (profile == LanesMountain) return {1, 1};
+        if (profile == LanesClosed) return kClosed[(int)(r.uni() * 4) % 4];
+        return kHighway[(int)(r.uni() * 11) % 11];
+    };
+    Lay cur = profile == LanesMountain ? Lay{1, 1} : profile == LanesClosed ? Lay{2, 0} : Lay{2, 2};   // kalkis bolumu
+    double s1 = 900.0;
+    Lay next = pick();
+    double sPrev = 0.0;
+    for (RoadPoint& p : pts_) {
+        while (p.s > s1) { sPrev = s1; cur = next; next = pick(); s1 += r.range(700.0, 1600.0); }
+        const double t = std::clamp((p.s - (s1 - 150.0)) / 150.0, 0.0, 1.0), e = t * t * (3.0 - 2.0 * t);
+        p.lf = cur.f + (next.f - cur.f) * e;
+        p.lb = cur.b + (next.b - cur.b) * e;
+        p.hw = 0.5 * W * (p.lf + p.lb);
+    }
+    (void)sPrev;
+    halfWidth_ = W;
+}
+int RoadPath::lanesFwd(double s) const { return std::max(1, (int)std::lround(at(s).lf)); }
+int RoadPath::lanesBack(double s) const { return std::max(0, (int)std::lround(at(s).lb)); }
+double RoadPath::laneOffset(double s, bool back, int k) const {
+    const RoadPoint p = at(s);
+    const double w = 2.0 * p.hw / std::max(1.0, p.lf + p.lb);         // gecis sirasinda serit genisligi korunur
+    return back ? p.hw - (k + 0.5) * w : -p.hw + (k + 0.5) * w;
+}
+double RoadPath::dividerOffset(double s) const {
+    const RoadPoint p = at(s);
+    return -p.hw + 2.0 * p.hw * p.lf / std::max(1.0, p.lf + p.lb);
 }
 
 void RoadPath::project(double x, double y, int& hint, double& s, double& lateral) const {

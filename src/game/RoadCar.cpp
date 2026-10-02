@@ -149,6 +149,10 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
         if (!manual) autoShift(gear, shiftRpm, thrIn);
         if (!manual && gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
         if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && (manual ? gear >= 1 : gear == 1)) { launching_ = true; launchPedal_ = 0.6; }
+        // Otomatik debriyaj: sert frende (kilitlenen teker) devir rolantiye inerse debriyaj kademeli ayrilir; motor stop etmez
+        const double idle = sim_->engineSpec().idleRpm;
+        if (!pt.converter() && v > 3.0 && pt.rpm() < idle * 1.25 && gear >= 1)
+            clutch = std::max(clutch, std::clamp(1.0 - (pt.rpm() - idle * 0.95) / (idle * 0.3), 0.0, 1.0));
     }
     if (neutral || pt.gear() == 0) clutch = 1.0;                         // N / P: konvertor / debriyaj ayrik
     pt.setClutchPedal(clutch);
@@ -164,6 +168,10 @@ void RoadCar::update(double dt, const RoadControls& c) {
         else if (c.shift != 0) { manual = true; requestShift(c.shift); }
         sim_->setReverse(c.reverse, c.throttle);
         driverAssist(dt, c.reverse ? 0.0 : c.throttle, c.neutral || c.reverse);
+        {   // sert frende devir dusukse debriyaj onceden ayrilir (teker bir karede kilitlenir, motor stop ederdi)
+            PowertrainCore& pt = sim_->powertrain();
+            if (!pt.converter() && c.brake > 0.5 && pt.gear() >= 1 && pt.rpm() < 2.0 * sim_->engineSpec().idleRpm) pt.setClutchPedal(1.0);
+        }
     }
     sim_->setSurfaceMu((offRoad() ? 0.55 : 1.0) * gripMul);           // cim/toprak; yagmur
     {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)

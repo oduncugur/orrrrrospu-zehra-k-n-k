@@ -17,16 +17,18 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
                        kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
     // Yol genisligi cesitliligi: otoban / sehirlerarasi 2x1 ile 2x2 genislik arasi, dag yolu dar, karma orta
-    if (mode == Mode::Karma) road_.setWidthRange(seed, 3.4, 5.4);
-    else if (kind == Kind::Touge) road_.setWidthRange(seed + 17u, 2.7, 3.5);
-    else road_.setWidthRange(seed + 31u, 3.3, 6.2);
+    // Serit duzeni: bolum bolum degisir (1+1, 2+2, 4+4, tek yon 3 / 4 ...); dag yolu dar 1+1; karma / maraton kapali yol (tek yon)
+    if (mode == Mode::Karma || mode == Mode::Marathon) road_.setLaneProgram(seed, RoadPath::LanesClosed);
+    else if (kind == Kind::Touge) road_.setLaneProgram(seed + 17u, RoadPath::LanesMountain);
+    else road_.setLaneProgram(seed + 31u, RoadPath::LanesHighway);
     startS_ = mode == Mode::Chase ? 90.0 : kStartS;
-    rivalLane_ = -lane();
-    player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, -lane());
+    rivalLane_ = rightLane(startS_);
+    player_ = std::make_unique<RoadCar>(findVehicle(playerCar), playerTune, road_, startS_, rightLane(startS_));
     if (mode == Mode::Chase) {
         // Polis 55 m arkada, karsi seritte baslar (kalkista carpismasin); tam debriyaj, keskin viraj temposu
-        rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_ - 55.0, +lane());
-        rivalLane_ = +lane();
+        const double pl = road_.lanesFwd(startS_) >= 2 ? road_.laneOffset(startS_, false, 1) : road_.laneOffset(startS_, true, road_.lanesBack(startS_) - 1);   // oyuncunun yan seridi
+        rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_ - 55.0, pl);
+        rivalLane_ = pl;
         rivalPace_ = 0.64;
         const EngineSpec& e = rival_->sim().engineSpec();
         rival_->launchRpm = std::max(e.idleRpm + 800.0, 0.30 * e.redlineRpm);   // kalkis: drag devri
@@ -35,7 +37,9 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     }
     if (mode == Mode::Race || mode == Mode::Karma || mode == Mode::Marathon) {
         // Rakip yan seritte, ayni cizgide
-        rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
+        // Yan seritte: gidis yonunde ikinci serit varsa orada, yoksa karsi seritte
+        rivalLane_ = road_.lanesFwd(startS_) >= 2 ? road_.laneOffset(startS_, false, 1) : road_.laneOffset(startS_, true, 0);
+        rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, rivalLane_);
         rival_->slowClutch = true;                   // otomatik debriyajli oyuncu gibi gec kavrar (hata payi)
         phase_ = Phase::Countdown; countdown_ = 3.0;
         if (mode == Mode::Karma) {
@@ -78,12 +82,16 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
 
 void RoadSession::spawnTraffic(TrafficCar& t, double fromS) {
     t.uid = nextUid_++;
-    t.oncoming = rnd() < 0.45;
-    t.lane = t.oncoming ? +lane() : -lane();
+    t.s = std::clamp(fromS + 60.0 * rnd(), 0.0, road_.length() - 10.0);
+    t.oncoming = road_.lanesBack(t.s) > 0 && rnd() < 0.45;             // tek yonde gelen trafik yok
+    const int n = t.oncoming ? road_.lanesBack(t.s) : road_.lanesFwd(t.s);
+    t.li = std::min(n - 1, (int)(rnd() * n * 0.999));
+    if (!t.oncoming && n >= 3 && t.li == n - 1 && rnd() < 0.5) t.li = 0;   // sol serit (sollama) seyrek
+    t.lane = road_.laneOffset(t.s, t.oncoming, t.li);
     t.v0 = t.oncoming ? 18.0 + 8.0 * rnd() : 14.0 + 8.0 * rnd();  // 50-95 km/h
     if (kind_ == Kind::Touge) t.v0 *= 0.6;                          // dag yolunda yavas
+    t.v0 *= 1.0 + 0.08 * t.li;                                         // sol seritler hizli
     t.v = t.v0;
-    t.s = std::clamp(fromS + 60.0 * rnd(), 0.0, road_.length() - 10.0);
 }
 
 int RoadSession::treeLights() const {
@@ -163,7 +171,7 @@ bool RoadSession::pitControls(int car, double pace, RoadControls& out) {
     if (pitAt_[car] < 0) return false;
     if (r.sim().fuelLiters() >= r.sim().tankLiters() - 0.05 || s > pitAt_[car] + kStationLen) { pitAt_[car] = -1; return false; }   // dolu / gecti
     const double dist = pitAt_[car] - s;
-    out = r.aiControls(-lane(), pace, dist > 0 ? std::sqrt(2.0 * 3.5 * dist) : 0.0);
+    out = r.aiControls(rightLane(s), pace, dist > 0 ? std::sqrt(2.0 * 3.5 * dist) : 0.0);
     if (dist < 3.0 || (inStation(s) && r.sim().speed() < 1.0)) { out.throttle = 0.0; out.brake = 1.0; }
     return true;
 }
@@ -173,29 +181,47 @@ RoadControls RoadSession::rivalControls() {
     const double pace = rivalPace_ * (rain_ ? 0.85 : 1.0);
     if (mode_ == Mode::Marathon) {
         RoadControls c;
-        if (pitControls(1, pace, c)) { rivalLane_ = -lane(); return c; }
+        if (pitControls(1, pace, c)) { rivalLane_ = rightLane(rival_->s()); return c; }
     }
-    if (mode_ == Mode::Karma) return r.aiControls(+lane(), pace + 0.05);   // kapali yol: kendi (sol) seridinde kalir
     const double s = r.s(), v = r.sim().speed();
-    double cap = 1e9, blockV = -1;
-    for (const TrafficCar& t : traffic_)
-        if (!t.oncoming && t.s > s && t.s - s < 25.0 + 1.2 * v && t.v < v) blockV = std::max(blockV, t.v);
-    // Oyuncu da engeldir: ayni seritte ve ondeyse (sollamak icin serit degistirir)
-    {
+    if (mode_ == Mode::Karma) return r.aiControls(road_.laneOffset(s, false, std::min(1, road_.lanesFwd(s) - 1)), pace + 0.05);   // kapali yol: sol serit
+    // Seritler: gidis 0..nf-1 (0 en sag), varsa karsi seridin ilki (sollama). Bulundugu seritte onde yavas arac
+    // (trafik / oyuncu) varsa: once soldaki gidis seridi, o da doluysa ve karsi bos ise karsi serit; olmazsa takip.
+    // Engel yoksa ve sagdaki serit bossa saga doner (sag serit kurali).
+    const int nf = road_.lanesFwd(s), nb = road_.lanesBack(s);
+    auto laneAhead = [&](double off, bool sameDir) {                     // en yavas ondeki hiz (-1: bos)
+        double bv = -1;
+        for (const TrafficCar& t : traffic_) {
+            if (t.oncoming == sameDir || std::fabs(t.lane - off) > 2.0) continue;
+            if (sameDir ? (t.s > s && t.s - s < 25.0 + 1.2 * v && t.v < v) : (t.s > s - 15.0 && t.s - s < 60.0 + 3.0 * v)) bv = bv < 0 ? t.v : std::min(bv, t.v);
+        }
         const double ds = player_->s() - s, pv = player_->sim().speed();
-        if (ds > 0 && ds < 20.0 + 1.0 * v && std::fabs(player_->lateral() - rivalLane_) < 2.0 && pv < v) blockV = std::max(blockV, pv);
+        if (sameDir && ds > 0 && ds < 20.0 + 1.0 * v && std::fabs(player_->lateral() - off) < 2.0 && pv < v) bv = bv < 0 ? pv : std::min(bv, pv);
+        return bv;
+    };
+    auto sideClear = [&](double off) {
+        for (const TrafficCar& t : traffic_) if (std::fabs(t.lane - off) < 2.0 && std::fabs(t.s - s) < 16.0) return false;
+        if (std::fabs(player_->s() - s) < 12.0 && std::fabs(player_->lateral() - off) < 2.0) return false;
+        return true;
+    };
+    int cur = -1;                                                       // bulundugu gidis seridi (-1: karsi seritte)
+    {
+        double best = 1e9;
+        for (int k = 0; k < nf; ++k) { const double d = std::fabs(rivalLane_ - road_.laneOffset(s, false, k)); if (d < best) { best = d; cur = k; } }
+        if (nb > 0 && std::fabs(rivalLane_ - road_.laneOffset(s, true, 0)) < best) cur = -1;
     }
-    bool oncomingClose = false;
-    for (const TrafficCar& t : traffic_)
-        if (t.oncoming && t.s > s - 15.0 && t.s - s < 60.0 + 3.0 * v) oncomingClose = true;
-    if (rivalLane_ < 0 && blockV >= 0) {
-        if (!oncomingClose) rivalLane_ = +lane(); else cap = blockV;
-    } else if (rivalLane_ > 0) {
-        bool rightClear = true;
-        for (const TrafficCar& t : traffic_) if (!t.oncoming && std::fabs(t.s - s) < 18.0) rightClear = false;
-        if (std::fabs(player_->s() - s) < 12.0 && player_->lateral() < 0.0) rightClear = false;
-        if (rightClear || oncomingClose) rivalLane_ = -lane();
-    }
+    double cap = 1e9;
+    const double oncomingOff = nb > 0 ? road_.laneOffset(s, true, 0) : 0.0;
+    const bool oncomingClose = nb > 0 && laneAhead(oncomingOff, false) >= 0;
+    if (cur >= 0) {
+        const double here = road_.laneOffset(s, false, cur), block = laneAhead(here, true);
+        if (block >= 0) {
+            if (cur + 1 < nf && laneAhead(road_.laneOffset(s, false, cur + 1), true) < 0 && sideClear(road_.laneOffset(s, false, cur + 1))) cur += 1;
+            else if (cur == nf - 1 && nb > 0 && !oncomingClose) cur = -1;
+            else cap = block;
+        } else if (cur > 0 && laneAhead(road_.laneOffset(s, false, cur - 1), true) < 0 && sideClear(road_.laneOffset(s, false, cur - 1))) cur -= 1;
+    } else if (nb == 0 || oncomingClose || sideClear(road_.laneOffset(s, false, nf - 1))) cur = nf - 1;   // karsidan don
+    rivalLane_ = cur >= 0 ? road_.laneOffset(s, false, cur) : oncomingOff;
     return r.aiControls(rivalLane_, pace, cap);
 }
 
@@ -212,7 +238,12 @@ RoadControls RoadSession::chaseControls() {
             if (std::fabs(t.lane - lat) < 2.2 && t.s > s - 3.0 && t.s - s < 18.0 + 1.1 * v) return true;
         return false;
     };
-    if (blocked(target)) target = blocked(-lane()) ? +lane() : -lane();
+    if (blocked(target)) {                                             // dolu: bos bir gidis seridi, o da yoksa karsi serit
+        double alt = target;
+        for (int k = 0; k < road_.lanesFwd(s); ++k) if (!blocked(road_.laneOffset(s, false, k))) { alt = road_.laneOffset(s, false, k); break; }
+        if (alt == target && road_.lanesBack(s) > 0) alt = road_.laneOffset(s, true, 0);
+        target = alt;
+    }
     rivalLane_ += std::clamp(target - rivalLane_, -2.5 * 0.05, 2.5 * 0.05) * 4.0;   // yumusak serit degisimi
     const double gap = player_->s() - s;
     const double pace = (gap > 120.0 ? 0.74 : rivalPace_) * (rain_ ? 0.88 : 1.0);
@@ -262,6 +293,11 @@ void RoadSession::update(double dt, const RoadControls& in) {
     const double far = mode_ == Mode::Flow ? 1400.0 : 2600.0;
     for (TrafficCar& t : traffic_) {
         t.s += (t.oncoming ? -t.v : t.v) * dt;
+        const int n = t.oncoming ? road_.lanesBack(t.s) : road_.lanesFwd(t.s);
+        if (n == 0) { spawnTraffic(t, player_->s() + near + spread * rnd()); continue; }   // tek yona girdi
+        t.li = std::min(t.li, n - 1);                                   // serit bitti: birles
+        const double target = road_.laneOffset(t.s, t.oncoming, t.li);
+        t.lane += std::clamp(target - t.lane, -1.6 * dt, 1.6 * dt);
         const double ref = player_->s();
         if (t.s < ref - 250.0 || t.s > ref + far || t.s < 5.0 || t.s > road_.length() - 20.0) spawnTraffic(t, ref + near + spread * rnd());
     }

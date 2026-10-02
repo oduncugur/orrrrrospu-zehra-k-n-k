@@ -8,7 +8,8 @@ namespace zk {
 
 // z: yukseklik (m), grade: boyuna egim (dz/ds, yokus yukari +)
 // hw: o noktadaki yol yari genisligi (m; yol boyunca daralir / genisler)
-struct RoadPoint { double x, y, heading, curvature, s, z = 0.0, grade = 0.0, hw = 3.6; };
+// lf / lb: gidis / gelis serit sayisi (gecislerde ara deger; 0 gelis = tek yon). Gidis seritleri sagda (yanal -).
+struct RoadPoint { double x, y, heading, curvature, s, z = 0.0, grade = 0.0, hw = 3.6, lf = 1.0, lb = 1.0; };
 // Karma yarista yol bolumu: virajli (3B surus) ya da duz (drag gorunumu)
 // entry: ilk virajin gercek basladigi yer; minR: bloktaki en dar yaricap (onerilen giris hizi icin)
 struct RoadSection { double s0, s1; bool curvy; double entry = 0.0, minR = 0.0; };
@@ -31,6 +32,17 @@ public:
     double halfWidthAt(double s) const { return at(s).hw; }
     // Genislik degisimi: yol boyunca 400-1100 m'lik bolumler [hwMin, hwMax] arasinda, 120 m'lik gecislerle
     void setWidthRange(uint32_t seed, double hwMin, double hwMax);
+    // Serit programi: yol 700-1600 m'lik bolumlerde farkli duzenler (1+1, 2+2, 4+4, tek yon 3 / 4, 2+1, 3+3 ...),
+    // 150 m genisleme / daralma gecisi; genislik = serit sayisi x serit genisligi. profile: 0 sehirlerarasi / otoban,
+    // 1 dag yolu (hep 1+1, dar), 2 kapali yol (tek yon 2-4 serit; karma / maraton). Ilk 900 m: sabit (kalkis).
+    enum LaneProfile { LanesHighway = 0, LanesMountain = 1, LanesClosed = 2 };
+    void setLaneProgram(uint32_t seed, int profile);
+    int lanesFwd(double s) const;               // s'deki gidis serit sayisi (yuvarlanmis, en az 1)
+    int lanesBack(double s) const;              // gelis serit sayisi (0 = tek yon)
+    // Serit merkezinin yanal konumu (sola +). back=false: gidis seridi k (0 = en sag, yavas); back=true: gelis seridi k
+    // (0 = gelis yonunun sagi = yolun en solu). Gecislerde seritler genislikle birlikte kayar.
+    double laneOffset(double s, bool back, int k) const;
+    double dividerOffset(double s) const;       // gidis / gelis ayrimi (yanal); tek yonde sol kenar
     // s'deki nokta (dogrusal ara degerleme); s sinirlara kirpilir
     RoadPoint at(double s) const;
     // (x,y) icin en yakin yol koordinati. hint: onceki indeks (yerel arama, O(1)); guncellenir
