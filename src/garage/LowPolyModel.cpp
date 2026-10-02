@@ -40,6 +40,11 @@ const CarShape& shapeFor(const VehicleDef& v, CarShape& tmp) {
     return tmp;
 }
 
+const CarProfile* profileFor(int id) {
+    for (const CarProfile& p : kProfiles) if (p.id == id) return &p;
+    return nullptr;
+}
+
 // Yan profil: x orani (on 0 .. arka 1) -> bel (kaput/bagaj/kapi ust kenari) ve tavan yuksekligi (H orani)
 struct Profile {
     ArchSpec a;
@@ -165,7 +170,9 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     Builder B{m};
     CarShape tmp;
     const CarShape& sh = shapeFor(v, tmp);
-    Profile P{kArch[sh.arch]};
+    const CarProfile* cp = profileFor(v.id);
+    Profile P{cp && cp->a.noseZ >= 0 ? cp->a : kArch[sh.arch]};
+    if (cp && cp->a.noseZ >= 0) { P.a.open = kArch[sh.arch].open; P.a.bed = kArch[sh.arch].bed; }
     const ArchSpec& A = P.a;
     const double L = v.lengthM, W = v.widthM * (v.widebody ? 1.04 : 1.0), H = v.heightM;
     const double ride = v.rideHeightM;
@@ -198,6 +205,8 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     else if (sh.arch == P911) { flareF = 0.025; flareR = 0.05; }
     else if (sh.arch == MUSCLE_NOTCH || sh.arch == MUSCLE_FAST || sh.arch == FRONT_LONG) flareR = 0.035;
     else if (sh.arch == MID_ENGINE || sh.arch == WEDGE) flareR = 0.04;
+    if (cp && cp->flF >= 0) flareF = cp->flF;
+    if (cp && cp->flR >= 0) flareR = cp->flR;
     if (v.widebody) { flareF += 0.03; flareR += 0.035; }
     // Ustten gorunus: burun ve kuyruk yumusak daralir (modern araclarda daha cok), camurluklarda siskinlik
     const double noseW = classic ? 0.86 : 0.78, tailW = classic ? 0.90 : 0.84;
@@ -264,7 +273,8 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const bool cab = P.cabin(s0) && P.cabin(s1) && P.roof(sm) * H > topZ(sm) + 0.02 * H;
         const bool steep = cab && P.steep(s0, s1, L, H);
         const double rearLen = A.backX - A.roofRX;
-        const double sideEnd = rearLen > 0.15 ? A.roofRX + 0.30 * rearLen : A.backX;      // fastback: C direk yelkeni
+        const double sideEnd = cp && cp->sideEnd > 0 ? cp->sideEnd
+                             : rearLen > 0.15 ? A.roofRX + 0.30 * rearLen : A.backX;      // fastback: C direk yelkeni
         const bool sideGlass = cab && sm <= sideEnd;
         const double bm = P.belt(sm), rm = P.roof(sm);
         const bool rearSlope = sm > A.roofRX;
@@ -462,13 +472,77 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     }
 
     // ---- aero ----
-    if (v.wing) {
-        const double xw = -L * 0.44, zw = std::max(H * A.deckZ + 0.22, H * 0.78);
-        B.box(xw - 0.22, xw + 0.06, -W * 0.46, W * 0.46, zw, zw + 0.028, MatTrim);
-        for (double sg : {-1.0, 1.0}) {
-            B.box(xw - 0.05, xw, sg * W * 0.30 - 0.015, sg * W * 0.30 + 0.015, H * A.deckZ, zw, MatTrim);
-            B.box(xw - 0.22, xw + 0.06, sg * W * 0.46 - 0.01, sg * W * 0.46 + 0.01, zw - 0.05, zw + 0.06, MatTrim);
+    // Kanat: fabrika kanadi (profil tablosu) yol araclarinda; yaris araci / genel super icin yuksek kanat.
+    // VehicleDef.wing super araclarda varsayilan acik; profilde kanat tipi tanimliysa gercek araca uyulur.
+    int wingType = v.wing ? (v.body == Body::Super && v.streetLegal && !v.widebody ? K1 : K3) : K0;   // yol super: entegre dudak
+    if (cp && v.streetLegal && !v.widebody) wingType = std::max(cp->wing, v.wing && v.body != Body::Super ? (int)K3 : (int)K0);
+    {
+        const double sw = std::max(A.backX, 0.80);                                   // kanat bolgesi: bagaj / kuyruk
+        const double xw = -L * 0.44, zDeck = topZ(std::clamp(0.94, sw, 0.97));
+        const int wm = v.year >= 1990 ? MatPaint : MatTrim;
+        switch (wingType) {
+        case K0: break;
+        case K1: {                                                                      // dudak / ducktail: kuyruk ust kenarinda
+            const double xt = -L * 0.5 + 0.03, zt = topZ(0.985);
+            const double hwT = halfW(0.97) * 0.86;
+            if (sh.arch == P911) {                                                      // 911 ducktail: yukari kalkik kapak ucu
+                B.panel(xt + 0.32, hwT, zt + 0.07, xt, hwT, zt + 0.10, xt, -hwT, zt + 0.10, xt + 0.32, -hwT, zt + 0.07, wm);
+                B.panel(xt, hwT, zt + 0.10, xt, hwT, zt - 0.02, xt, -hwT, zt - 0.02, xt, -hwT, zt + 0.10, MatDark);
+            } else B.box(xt - 0.01, xt + 0.14, -hwT, hwT, zt + 0.005, zt + 0.045, wm);
+        } break;
+        case K2: case K3: {                                                             // ayakli kanat (orta / yuksek)
+            const double zw = K2 == wingType ? zDeck + 0.13 : std::max(zDeck + 0.22, H * 0.80);
+            const double span = wingType == K2 ? W * 0.43 : W * 0.46;
+            B.box(xw - 0.20, xw + 0.05, -span, span, zw, zw + 0.026, wingType == K2 ? wm : MatTrim);
+            for (double sg : {-1.0, 1.0}) {
+                B.box(xw - 0.06, xw - 0.01, sg * W * 0.30 - 0.015, sg * W * 0.30 + 0.015, zDeck - 0.02, zw, MatTrim);
+                B.box(xw - 0.20, xw + 0.05, sg * span - 0.01, sg * span + 0.01, zw - 0.045, zw + 0.05, MatTrim);
+            }
+        } break;
+        case K4: {                                                                      // tavan spoyleri: arka cam ustu
+            const double sr = A.roofRX, xr0 = L * (0.5 - sr) + 0.05, zr = H * P.roof(sr);
+            const double hwr = halfW(sr) * A.roofW;
+            B.panel(xr0, hwr, zr + 0.01, xr0 - 0.24, hwr, zr - 0.03, xr0 - 0.24, -hwr, zr - 0.03, xr0, -hwr, zr + 0.01, wm);
+            B.box(xr0 - 0.26, xr0 - 0.22, -hwr, hwr, zr - 0.07, zr - 0.02, MatDark);
+        } break;
+        case K5: {                                                                      // balina kuyrugu: kalin, genis, lastik kenarli
+            const double zw = zDeck + (sh.arch == P911 ? 0.06 : 0.16);
+            const double hwT = halfW(0.92) * 0.92;
+            B.box(xw - 0.24, xw + 0.14, -hwT, hwT, zw, zw + 0.05, wm);
+            B.box(xw - 0.26, xw - 0.22, -hwT, hwT, zw + 0.02, zw + 0.075, MatDark);
+            if (sh.arch != P911) {
+                for (double sg : {-1.0, 1.0}) B.box(xw - 0.08, xw, sg * hwT * 0.75 - 0.02, sg * hwT * 0.75 + 0.02, zDeck - 0.02, zw, wm);
+            } else B.box(xw - 0.2, xw + 0.14, -hwT, hwT, zDeck - 0.01, zw, wm);
+        } break;
         }
+    }
+    if (cp && (cp->fx & FX_STRAKE)) {                                                   // yan izgaralar: kapidan arka tekere
+        const double s0 = A.roofFX + 0.06, s1 = sRear - 0.07;
+        for (int k = 0; k < 5; ++k) {
+            const double sm = 0.5 * (s0 + s1), zk = ride + 0.20 + (H * P.belt(sm) - 0.08 - ride - 0.20) * k / 4.0;
+            for (double sg : {-1.0, 1.0})
+                B.panel(L * (0.5 - s0), sg * (sideY(s0) + 0.02), zk, L * (0.5 - s1), sg * (sideY(s1) + 0.02), zk,
+                        L * (0.5 - s1), sg * (sideY(s1) + 0.02), zk + 0.022, L * (0.5 - s0), sg * (sideY(s0) + 0.02), zk + 0.022, MatPaint);
+        }
+        for (double sg : {-1.0, 1.0}) {                                                 // izgara arkasi koyu bosluk
+            const double sm = 0.5 * (s0 + s1);
+            B.panel(L * (0.5 - s0), sg * (sideY(s0) + 0.012), ride + 0.18, L * (0.5 - s1), sg * (sideY(s1) + 0.012), ride + 0.18,
+                    L * (0.5 - s1), sg * (sideY(s1) + 0.012), H * P.belt(sm) - 0.06, L * (0.5 - s0), sg * (sideY(s0) + 0.012), H * P.belt(sm) - 0.06, MatDark);
+        }
+    }
+    if (cp && (cp->fx & FX_LOUVER)) {                                                   // arka cam / motor kapagi panjurlari
+        const double s0 = A.roofRX + 0.03, s1 = std::min(A.backX, 0.95);
+        for (int k = 0; k < 6; ++k) {
+            const double sk = s0 + (s1 - s0) * (k + 0.5) / 6.0, xk = L * (0.5 - sk), zk = std::max(H * P.roof(sk), topZ(sk)) + 0.012;
+            const double hk = halfW(sk) * A.roofW * 0.85;
+            B.panel(xk + 0.03, hk, zk, xk - 0.03, hk, zk + 0.02, xk - 0.03, -hk, zk + 0.02, xk + 0.03, -hk, zk, MatDark);
+        }
+    }
+    if (cp && (cp->fx & FX_VENT)) {                                                     // kaput hava girisi / cikisi
+        const double s0 = A.cowlX * 0.35, s1 = A.cowlX * 0.70;
+        const double x0 = L * (0.5 - s0), x1 = L * (0.5 - s1), z0 = topZ(s0) + 0.012, z1 = topZ(s1) + 0.012;
+        B.panel(x0, 0.20, z0 + 0.045, x1, 0.18, z1, x1, -0.18, z1, x0, -0.20, z0 + 0.045, MatPaint);     // onu acik kepce
+        B.panel(x0, 0.20, z0 + 0.045, x0, 0.20, z0 - 0.01, x0, -0.20, z0 - 0.01, x0, -0.20, z0 + 0.045, MatDark);
     }
     if (v.hoodScoop) {
         const double s0 = A.cowlX * 0.45, s1 = A.cowlX * 0.85;
