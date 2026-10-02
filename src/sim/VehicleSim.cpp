@@ -433,6 +433,7 @@ void VehicleSim::updateHeatAndStress(double dt) {
 }
 
 void VehicleSim::step(double dt, const VehicleInputs& in) {
+    if (fuelKg_ <= 0.0 && burnMul_ > 1.0) pt_->setThrottle(0.0);       // maraton: depo bitti, motor tekler / guc yok
     updateElectronics(dt, in.brake);
     updateNitrous(dt);
     updateHeatAndStress(dt);
@@ -490,7 +491,7 @@ void VehicleSim::step(double dt, const VehicleInputs& in) {
     }
     axF_ += (axRaw_ - axF_) * std::min(1.0, dt / 0.08);       // govde pitch gecikmesi (suspansiyon)
     dist_ += V_ * dt;
-    fuelKg_ = std::max(0.0, cfg_.fuelLiters * fuelDensity_ - pt.fuelGrams() * 1e-3);
+    fuelKg_ = std::max(0.0, (cfg_.fuelLiters + fuelAdded_) * fuelDensity_ - pt.fuelGrams() * 1e-3 * burnMul_);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -573,7 +574,7 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
     Y_ += (vx_ * s + vy_ * c) * dt;
     dist_ += std::sqrt(vx_ * vx_ + vy_ * vy_) * dt;
     V_ = vx_;
-    fuelKg_ = std::max(0.0, cfg_.fuelLiters * fuelDensity_ - pt.fuelGrams() * 1e-3);
+    fuelKg_ = std::max(0.0, (cfg_.fuelLiters + fuelAdded_) * fuelDensity_ - pt.fuelGrams() * 1e-3 * burnMul_);
 }
 
 // Anlik manifold basinci (bar, gosterge): asiri beslemeli motorda gaz x dolma (turbo: dolma araligi; kompresor: devirle

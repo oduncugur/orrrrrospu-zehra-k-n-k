@@ -359,6 +359,37 @@ int main() {
         std::printf("    %s: %.0f km/h, en buyuk govde kaymasi %.1f derece, serit sapmasi %.2f m\n", sup->model, a.sim().speed() * 3.6, maxBeta * 57.3, maxLat);
         CHECK(maxBeta < 0.10, "duz yolda govde kaymasi < 6 derece");
     }
+    std::printf("[F] Maraton: yakit biter, benzinlikte dolar, rakip molayla bitirir\n");
+    {
+        RoadSession rs(RoadSession::Mode::Marathon, 5, nullptr, 227, nullptr, 3u);
+        double t = 0, minFuel = 99, playerStopS = -1;
+        int rivalStops = 0; bool wasRef = false;
+        while (rs.phase() != RoadSession::Phase::Finished && t < 900.0) {
+            RoadControls c = rs.player().aiControls(-rs.lane(), 0.55);
+            rs.update(1.0 / 60.0, c);
+            t += 1.0 / 60.0;
+            minFuel = std::min(minFuel, rs.player().sim().fuelLiters());
+            if (playerStopS < 0 && rs.player().sim().fuelLiters() <= 0.0) playerStopS = rs.player().s();
+            if (rs.refueling(1) && !wasRef) ++rivalStops;
+            wasRef = rs.refueling(1);
+            if (playerStopS > 0 && rs.rivalTime() > 0) break;
+        }
+        std::printf("    yakitsiz oyuncu %.0f m'de kaldi; rakip %d mola, sure %.0f s\n", playerStopS, rivalStops, rs.rivalTime());
+        CHECK(playerStopS > 3000 && playerStopS < 17000, "benzinliksiz yakit yolda biter");
+        CHECK(rivalStops >= 1 && rs.rivalTime() > 0, "rakip benzinlikte durup yarisi bitirir");
+        // Oyuncu otopilotu ayni stratejiyle: benzinlige girip yaris bitirir
+        RoadSession r2(RoadSession::Mode::Marathon, 5, nullptr, 227, nullptr, 3u);
+        double t2 = 0; int pStops = 0; bool pw = false;
+        while (r2.phase() != RoadSession::Phase::Finished && t2 < 1500.0) {
+            RoadControls c = r2.player().aiControls(-r2.lane(), 0.55);
+            r2.pitControls(0, 0.55, c);
+            r2.update(1.0 / 60.0, c); t2 += 1.0 / 60.0;
+            if (r2.refueling(0) && !pw) ++pStops;
+            pw = r2.refueling(0);
+        }
+        std::printf("    stratejili oyuncu: %d mola, %.0f m (sure %.0f s), rakip %.0f s\n", pStops, r2.player().s(), r2.playerTime(), r2.rivalTime());
+        CHECK(pStops >= 1 && r2.player().s() > 12000.0, "benzinlikte dolup depo menzilinin cok otesine gider");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

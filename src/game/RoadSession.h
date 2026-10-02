@@ -22,16 +22,26 @@ public:
     // Karma: duz bolumler drag gorunumunde, virajli bolumler 3B; rakipli, trafiksiz (RoadPath::karma)
     // Chase: polis kovalamacasi (polis arkadan baslar; 400 m acilip 4 s tut ya da 5 km'yi bitir = kactin;
     // polis dibindeyken yavaslamak / temas yakalanma gostergesini doldurur)
-    enum class Mode { Free, Race, Flow, Karma, Chase };
+    // Marathon: 18 km otoban yarisi, kucuk depo + tuketim carpani; yol kenarindaki BENZINLIKLERDE (sag serit, dur) yakit alinir
+    enum class Mode { Free, Race, Flow, Karma, Chase, Marathon };
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
     double raceLength() const {                       // m
         if (mode_ == Mode::Karma) return road_.length() - kStartS - 300.0;
         if (mode_ == Mode::Chase) return 5000.0;
+        if (mode_ == Mode::Marathon) return 18000.0;
         return kind_ == Kind::Touge ? 3000.0 : 4000.0;
     }
-    bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma; }
+    bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma || mode_ == Mode::Marathon; }
+    // Benzinlik (maraton): istasyon baslangiclari (yol s'si), alan boyu, dolum hizi, depo / tuketim
+    static constexpr double kStationLen = 70.0, kRefuelLps = 2.0, kMarathonTank = 8.0, kMarathonBurn = 4.0;
+    std::vector<double> stations() const;
+    double nextStation(double s) const;            // s'den sonraki ilk benzinlige kalan (m; yoksa -1)
+    bool inStation(double s) const;
+    bool refueling(int car) const { return refuel_[car]; }   // 0 oyuncu, 1 rakip
+    // Yakit stratejisi (rakip; oyuncu otopilotu / testler): mola gerekiyorsa kontrolleri doldurur ve true doner
+    bool pitControls(int car, double pace, RoadControls& out);
     static constexpr double kStartS = 20.0;
     static constexpr double kLane = 1.8;             // serit merkezi (sag: -1.8, karsi: +1.8); dag yolunda lane()
     double lane() const { return kind_ == Kind::Touge ? 1.5 : kLane; }
@@ -50,7 +60,7 @@ public:
     double reaction() const { return reaction_; }
     double rivalReaction() const { return rivalReact_; }
     // Odul carpani: karma uzun yol (8-10 km) -> mesafeyle orantili (4 km yol yarisi = 1)
-    double prizeScale() const { return mode_ == Mode::Karma ? std::clamp(raceLength() / 4000.0, 1.0, 2.5) : 1.0; }
+    double prizeScale() const { return mode_ == Mode::Karma ? std::clamp(raceLength() / 4000.0, 1.0, 2.5) : mode_ == Mode::Marathon ? 3.0 : 1.0; }
     double raceTime() const { return raceT_; }
     const RoadPath& road() const { return road_; }
     RoadCar& player() { return *player_; }
@@ -110,6 +120,11 @@ private:
     std::vector<std::string> msgs_;
     bool crashEv_ = false, touching_ = false;
     double bust_ = 0, escapeT_ = 0, contactKick_ = 0;
+    bool refuel_[2] = {false, false};
+    double pitAt_[2] = {-1, -1};                     // benzinlik durma noktasi (s; -1: mola yok)
+    double refilled_[2] = {0, 0};                    // alinan toplam yakit (tuketim tahmini)
+    bool lowFuelMsg_ = false;
+    void fuelStep(double dt);
     double rnd();
 };
 

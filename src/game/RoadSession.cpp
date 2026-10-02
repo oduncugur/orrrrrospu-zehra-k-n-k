@@ -33,7 +33,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         phase_ = Phase::Countdown; countdown_ = 3.0;
         msgs_.push_back("POLIS! KAC!");
     }
-    if (mode == Mode::Race || mode == Mode::Karma) {
+    if (mode == Mode::Race || mode == Mode::Karma || mode == Mode::Marathon) {
         // Rakip yan seritte, ayni cizgide
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_, +lane());
         rival_->slowClutch = true;                   // otomatik debriyajli oyuncu gibi gec kavrar (hata payi)
@@ -44,6 +44,15 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
             const EngineSpec& e = rival_->sim().engineSpec();
             rival_->launchRpm = std::max(e.idleRpm + 800.0, 0.30 * e.redlineRpm);
             rivalReact_ = 0.15 + 0.20 * rnd();
+        }
+    }
+    if (mode == Mode::Marathon) {                                        // kucuk depo: en az bir benzinlik molasi
+        // Tuketim carpani guce gore normallesir (yakit ~ guc): her arac bir depoyla ~7 km gider, en az bir mola sart
+        for (RoadCar* c : {player_.get(), rival_.get()}) {
+            double hp = 0;
+            for (auto* cv : {&c->sim().engineSpec().lowCam, &c->sim().engineSpec().highCam})
+                for (auto& p : *cv) if (p.first <= c->sim().engineSpec().redlineRpm) hp = std::max(hp, p.second * p.first / 7120.9);
+            c->sim().setFuelSystem(kMarathonTank, kMarathonBurn * 141.0 / std::max(60.0, hp));
         }
     }
     if (mode == Mode::Flow) {
@@ -116,9 +125,56 @@ void RoadSession::collide(RoadCar& car, bool isPlayer) {
 }
 
 // YZ rakip: sag seritte yavas trafik varsa karsi serit bossa sollar, degilse arkasinda bekler
+std::vector<double> RoadSession::stations() const {
+    if (mode_ != Mode::Marathon) return {};
+    return {startS_ + 4500.0, startS_ + 9000.0, startS_ + 13500.0};
+}
+double RoadSession::nextStation(double s) const {
+    for (double st : stations()) if (st + kStationLen > s) return std::max(0.0, st - s);
+    return -1.0;
+}
+bool RoadSession::inStation(double s) const {
+    for (double st : stations()) if (s >= st && s <= st + kStationLen) return true;
+    return false;
+}
+// Benzinlik: istasyon alaninda, sag seritte (yola gore saga), neredeyse durmus arac depo dolana dek yakit alir
+void RoadSession::fuelStep(double dt) {
+    RoadCar* cars[2] = {player_.get(), rival_.get()};
+    for (int i = 0; i < 2; ++i) {
+        refuel_[i] = false;
+        RoadCar* c = cars[i];
+        if (!c || !inStation(c->s()) || c->sim().speed() > 1.5 || c->lateral() > 0.0) continue;
+        if (c->sim().fuelLiters() < c->sim().tankLiters() - 0.01) { c->sim().addFuel(kRefuelLps * dt); refuel_[i] = true; refilled_[i] += kRefuelLps * dt; }
+    }
+}
+
+// Yakit stratejisi (rakip ve oyuncu otopilotu): ortalama tuketimle bir sonraki benzinlige / bitise yetmeyecekse bu
+// benzinlikte dur: durma noktasi karar aninda sabitlenir (istasyon ortasi), sag seritte yavaslar, depo dolunca devam.
+bool RoadSession::pitControls(int car, double pace, RoadControls& out) {
+    RoadCar& r = car == 0 ? *player_ : *rival_;
+    const double s = r.s();
+    const double perM = s > startS_ + 300.0 ? std::max(1e-5, (r.sim().tankLiters() - r.sim().fuelLiters() + refilled_[car]) / (s - startS_)) : 1.0 / 7000.0;
+    const double toNext = nextStation(s);
+    if (pitAt_[car] < 0 && toNext >= 0 && toNext < 400.0 && !inStation(s)) {
+        double after = startS_ + raceLength() - s;                          // bu istasyondan sonra gerekli yol
+        for (double st : stations()) if (st > s + toNext + 10.0) { after = st - s; break; }
+        if (r.sim().fuelLiters() < perM * after * 1.15) pitAt_[car] = s + toNext + kStationLen * 0.5;
+    }
+    if (pitAt_[car] < 0) return false;
+    if (r.sim().fuelLiters() >= r.sim().tankLiters() - 0.05 || s > pitAt_[car] + kStationLen) { pitAt_[car] = -1; return false; }   // dolu / gecti
+    const double dist = pitAt_[car] - s;
+    out = r.aiControls(-lane(), pace, dist > 0 ? std::sqrt(2.0 * 3.5 * dist) : 0.0);
+    if (dist < 3.0 || (inStation(s) && r.sim().speed() < 1.0)) { out.throttle = 0.0; out.brake = 1.0; }
+    return true;
+}
+
 RoadControls RoadSession::rivalControls() {
     RoadCar& r = *rival_;
     const double pace = rivalPace_ * (rain_ ? 0.85 : 1.0);
+    if (mode_ == Mode::Marathon) {
+        RoadControls c;
+        if (pitControls(1, pace, c)) { rivalLane_ = -lane(); return c; }
+    }
     if (mode_ == Mode::Karma) return r.aiControls(+lane(), pace + 0.05);   // kapali yol: kendi (sol) seridinde kalir
     const double s = r.s(), v = r.sim().speed();
     double cap = 1e9, blockV = -1;
@@ -222,6 +278,12 @@ void RoadSession::update(double dt, const RoadControls& in) {
         return;
     }
     player_->update(dt, in);
+    if (mode_ == Mode::Marathon) {
+        fuelStep(dt);
+        static const double kWarn = 1.0;
+        if (player_->sim().fuelLiters() < kWarn && !lowFuelMsg_) { lowFuelMsg_ = true; msgs_.push_back("YAKIT AZ! BENZINLIGE GIR"); }
+        if (player_->sim().fuelLiters() > 2.0) lowFuelMsg_ = false;
+    }
     if (player_->takeRecovered()) msgs_.push_back("ARAC YOLA ALINDI");
     if (player_->takeStalled()) msgs_.push_back("MOTOR STOP ETTI");
     collide(*player_, true);

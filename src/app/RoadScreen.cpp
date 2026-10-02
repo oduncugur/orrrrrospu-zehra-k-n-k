@@ -40,11 +40,11 @@ void RoadScreen::setupLayout() {
     W = land_ ? 640 : 360; H = land_ ? 360 : 640;
     if (land_) {
         free_ = {90, 100, 314, 146}; flow_ = {326, 100, 550, 146}; race_ = {90, 156, 314, 202}; touge_ = {326, 156, 550, 202};
-        karma_ = {90, 212, 314, 258}; chase_ = {326, 212, 550, 258};
+        karma_ = {90, 212, 314, 258}; chase_ = {326, 212, 550, 258}; marathon_ = {90, 268, 550, 300};
         assistBtn_ = {470, 2, 576, 34}; tiltBtn_ = {362, 2, 466, 34};
     } else {
         free_ = {40, 186, 320, 234}; flow_ = {40, 244, 320, 292}; race_ = {40, 302, 320, 350}; touge_ = {40, 360, 320, 408};
-        karma_ = {40, 418, 320, 466}; chase_ = {40, 476, 320, 524};
+        karma_ = {40, 418, 320, 466}; chase_ = {40, 476, 320, 524}; marathon_ = {40, 534, 320, 582};
         assistBtn_ = {252, 4, 356, 26}; tiltBtn_ = {252, 30, 356, 52};
     }
     cockpit_.setPortrait(!land_);
@@ -60,7 +60,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
         const std::string n = m;
         start(n == "free" ? RoadSession::Mode::Free : n == "flow" ? RoadSession::Mode::Flow : n == "karma" ? RoadSession::Mode::Karma
-              : n == "chase" ? RoadSession::Mode::Chase : RoadSession::Mode::Race,
+              : n == "chase" ? RoadSession::Mode::Chase : n == "marathon" ? RoadSession::Mode::Marathon : RoadSession::Mode::Race,
               n == "touge" ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
     }
     else if (autopilot_) start(RoadSession::Mode::Free);
@@ -70,6 +70,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
         case EventMode::Touge: start(RoadSession::Mode::Race, RoadSession::Kind::Touge); break;
         case EventMode::Karma: start(RoadSession::Mode::Karma); break;
         case EventMode::Flow: start(RoadSession::Mode::Flow); break;
+        case EventMode::Marathon: start(RoadSession::Mode::Marathon); break;
         case EventMode::Chase:
             start(RoadSession::Mode::Chase, leagueEvents()[app_.activeEvent].league == 3 ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
             break;
@@ -80,7 +81,7 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
 
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
-    if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma || m == RoadSession::Mode::Chase) {
+    if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma || m == RoadSession::Mode::Chase || m == RoadSession::Mode::Marathon) {
         const Opponent o = app_.activeEvent >= 0 ? app_.lastOpp : app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
         app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
@@ -130,6 +131,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
           : m == RoadSession::Mode::Flow ? "OTOBAN AKISI: YAKIN GEC, HIZLI GIT"
           : m == RoadSession::Mode::Karma ? "KARMA: DUZDE DRAG, VIRAJDA SURUS"
           : m == RoadSession::Mode::Chase ? "POLIS! 400 M ACIL VE TUT"
+          : m == RoadSession::Mode::Marathon ? "MARATON 18 KM: YAKIT AZALINCA BENZINLIGE GIR"
           : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM" : "YOL YARISI 4 KM", 2.5);
 }
 
@@ -220,6 +222,7 @@ void RoadScreen::update(double dt) {
         for (const TrafficCar& t : ses_->traffic())
             if (!t.oncoming && t.s > P.s() && t.s - P.s() < 40.0) cap = std::min(cap, t.v);
         c = P.aiControls(-ses_->lane(), 0.55, cap);
+        if (ses_->mode() == RoadSession::Mode::Marathon) ses_->pitControls(0, 0.55, c);   // otopilot da benzinlige girer
         P.manual = false; P.slowClutch = false;
     }
     ses_->update(dt, c);
@@ -322,7 +325,7 @@ void RoadScreen::spawnSmoke(const RoadCar& car, double dt) {
 
 void RoadScreen::drawMenu(Renderer& r) {
     r.gradientV(0, 0, W, H, {0.10f, 0.12f, 0.2f}, {0.05f, 0.05f, 0.07f});
-    const float ty = land_ ? 30 : 110, by = chase_.y1;                   // baslik / dugmelerin alti
+    const float ty = land_ ? 30 : 110, by = marathon_.y1;                // baslik / dugmelerin alti
     r.textCentered(W / 2.0f, ty, "ACIK YOL", 4, {1.0f, 0.62f, 0.05f});
     r.textCentered(W / 2.0f, ty + 40, "ARA TASLAK", 1, {0.6f, 0.6f, 0.65f});
     button(r, free_, "SERBEST SURUS", Color{0.15f, 0.45f, 0.7f}, 2);
@@ -331,6 +334,7 @@ void RoadScreen::drawMenu(Renderer& r) {
     button(r, touge_, "DAG YOLU 3 KM", Color{0.55f, 0.2f, 0.6f}, 2);
     button(r, karma_, land_ ? "KARMA" : "KARMA: DRAG + VIRAJ", Color{0.7f, 0.15f, 0.15f}, 2);
     button(r, chase_, "POLIS KACIS", Color{0.12f, 0.2f, 0.55f}, 2);
+    button(r, marathon_, "MARATON 18 KM (YAKIT + BENZINLIK)", Color{0.45f, 0.35f, 0.08f}, 2);
     r.textCentered(W / 2.0f, by + 18, "AKIS: YAKIN GECIS + HIZ + VIRAJ = SKOR", 1, {0.7f, 0.7f, 0.75f});
     r.textCentered(W / 2.0f, by + 30, "YARISLAR: RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
     if (app_.career.bestFlow > 0)
@@ -595,6 +599,47 @@ void RoadScreen::drawWorld(Renderer& r) {
                 if (l0.ok && l1.ok && l2.ok && l3.ok) { triP(r, l0, l1, l2, lc); triP(r, l0, l2, l3, lc); }
             }
             continue;
+        }
+        for (double st : ses_->stations()) {                       // benzinlik: sag tarafta beton saha + sacak + pompa + tabela
+            if (!(P[i].s <= st + 0.5 * RoadSession::kStationLen && P[j].s > st + 0.5 * RoadSession::kStationLen)) continue;
+            const int ia = std::max(0, i - (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep)), ib = std::min(n - 1, i + (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep));
+            const double o0 = -(P[i].hw + 0.6), o1 = -(P[i].hw + 13.0);
+            const Proj c0 = pt(ia, o0, 0.02), c1 = pt(ib, o0, 0.02), c2 = pt(ib, o1, 0.02), c3 = pt(ia, o1, 0.02);
+            if (c0.ok && c1.ok && c2.ok && c3.ok) { const Color cc = fog(L({0.62f, 0.62f, 0.60f}), c0.w); triP(r, c0, c1, c2, cc); triP(r, c0, c2, c3, cc); }
+            const int ka = ia + (ib - ia) / 4, kb = ib - (ib - ia) / 4;          // sacak (5 m yukseklikte) + direkler
+            const double so0 = -(P[i].hw + 3.0), so1 = -(P[i].hw + 10.0);
+            const Proj r0 = pt(ka, so0, 5.0), r1 = pt(kb, so0, 5.0), r2 = pt(kb, so1, 5.0), r3 = pt(ka, so1, 5.0);
+            const Proj r0b = pt(ka, so0, 4.4), r1b = pt(kb, so0, 4.4);
+            for (int pk = 0; pk < 4; ++pk) {                                      // direkler
+                const int pi = pk < 2 ? ka : kb; const double po = (pk % 2) ? so1 : so0;
+                const Proj p0 = pt(pi, po, 0.0), p1 = pt(pi, po, 4.4);
+                if (p0.ok && p1.ok) { r.setDepthW(p0.w); const float pw = std::max(0.8f, 0.15f * pxPerM / p0.w); r.rect(p0.x - pw, p1.y, p0.x + pw, p0.y, fog(L({0.85f, 0.85f, 0.88f}), p0.w)); }
+            }
+            for (int pk = 0; pk < 3; ++pk) {                                      // pompalar
+                const int pi = ka + (kb - ka) * (pk + 1) / 4;
+                const Proj a0 = pt(pi, -(P[i].hw + 6.5), 0.0), a1 = pt(pi, -(P[i].hw + 6.5), 1.6);
+                if (!a0.ok || !a1.ok) continue;
+                r.setDepthW(a0.w);
+                const float pw = std::max(1.0f, 0.4f * pxPerM / a0.w);
+                r.rect(a0.x - pw, a1.y, a0.x + pw, a0.y, fog(L({0.85f, 0.15f, 0.12f}), a0.w));
+                r.rect(a0.x - pw * 0.7f, a1.y + (a0.y - a1.y) * 0.15f, a0.x + pw * 0.7f, a1.y + (a0.y - a1.y) * 0.4f, fog(L({0.15f, 0.2f, 0.25f}), a0.w));
+            }
+            if (r0.ok && r1.ok && r2.ok && r3.ok) {
+                const Color roof = fog(night_ ? Color{0.95f, 0.95f, 0.9f} : L({0.92f, 0.92f, 0.94f}), r0.w), band = fog(L({0.85f, 0.15f, 0.12f}), r0.w);
+                triP(r, r0, r1, r2, roof); triP(r, r0, r2, r3, roof);
+                if (r0b.ok && r1b.ok) { triP(r, r0b, r1b, r1, band); triP(r, r0b, r1, r0, band); }   // kirmizi sacak bandi
+            }
+            {   // tabela: yuksek direk + BENZIN + fiyat
+                const Proj g0 = pt(ia, -(P[i].hw + 1.8), 0.0), g1 = pt(ia, -(P[i].hw + 1.8), 7.0);
+                if (g0.ok && g1.ok) {
+                    r.setDepthW(g0.w);
+                    const float sc = pxPerM / g0.w;
+                    r.rect(g0.x - 0.12f * sc, g1.y, g0.x + 0.12f * sc, g0.y, fog(L({0.5f, 0.5f, 0.55f}), g0.w));
+                    r.rect(g1.x - 1.4f * sc, g1.y - 1.6f * sc, g1.x + 1.4f * sc, g1.y, fog(L({0.85f, 0.15f, 0.12f}), g0.w));
+                    const float ts = std::min(4.0f, std::floor(sc * 0.07f));             // yazi tabelaya sigar (2.8 m)
+                    if (ts >= 1.0f) { r.textCentered(g1.x, g1.y - 1.45f * sc, "BENZIN", ts, {1, 1, 1}); r.textCentered(g1.x, g1.y - 0.7f * sc, "42.90", ts, {1.0f, 0.9f, 0.3f}); }
+                }
+            }
         }
         if (zone == 1 && i % 10 == 0) {                            // sehir: binalar (cephe + uc yuz, pencereler)
             for (int side = -1; side <= 1; side += 2) {
@@ -1017,6 +1062,19 @@ void RoadScreen::drawHud(Renderer& r) {
             else std::snprintf(b, sizeof b, "DRAG  BITIS DUZLUGU");
             r.text(x0, infoY + 12, b, 1, ses_->road().curvyAt(s) ? Color{1.0f, 0.75f, 0.2f} : Color{0.5f, 0.85f, 1.0f});
         }
+        if (ses_->mode() == RoadSession::Mode::Marathon) {               // yakit + benzinlik
+            const double fl = sim.fuelLiters(), tank = sim.tankLiters(), ns = ses_->nextStation(Pc.s());
+            const float bx = x0, by = infoY + 13, bw = 120;
+            const bool low = fl < 1.5;
+            r.rect(bx, by, bx + bw, by + 8, {0.12f, 0.12f, 0.14f, 0.9f});
+            r.rect(bx, by, bx + bw * (float)std::clamp(fl / tank, 0.0, 1.0), by + 8, low && std::fmod(envT_, 0.5) < 0.25 ? Color{1.0f, 0.2f, 0.15f} : Color{1.0f, 0.75f, 0.15f});
+            if (ses_->refueling(0)) std::snprintf(b, sizeof b, "YAKIT %.1f L  DOLDURULUYOR...", fl);
+            else if (ns >= 0) std::snprintf(b, sizeof b, "YAKIT %.1f L  BENZINLIK %.1f KM", fl, ns / 1000.0);
+            else std::snprintf(b, sizeof b, "YAKIT %.1f L  SON BENZINLIK GECTI", fl);
+            r.text(bx + bw + 6, by, b, 1, low ? Color{1.0f, 0.45f, 0.3f} : Color{1.0f, 0.85f, 0.4f});
+            if (ses_->inStation(Pc.s()) && !ses_->refueling(0) && fl < tank - 0.05)
+                r.textCentered(W / 2.0f, infoY + 32, "SAG SERITTE DUR: YAKIT AL", 2, {1.0f, 0.85f, 0.3f});
+        }
         const double left = std::max(0.0, RoadSession::kStartS + ses_->raceLength() - Pc.s());
         const double gap = ses_->gapMeters();
         std::snprintf(b, sizeof b, "%s  KALAN %.2f KM  %+.0f M   %.1f S", gap >= 0 ? "1." : "2.", left / 1000.0, gap, ses_->raceTime());
@@ -1132,6 +1190,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
         else if (touge_.hit(x, y)) start(RoadSession::Mode::Race, RoadSession::Kind::Touge);
         else if (karma_.hit(x, y)) start(RoadSession::Mode::Karma);
         else if (chase_.hit(x, y)) start(RoadSession::Mode::Chase);
+        else if (marathon_.hit(x, y)) start(RoadSession::Mode::Marathon);
         return;
     }
     if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { app_.goGarage(); return; }

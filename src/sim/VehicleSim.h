@@ -68,6 +68,11 @@ public:
     double accel() const { return axRaw_; }
     double accelFiltered() const { return axF_; }
     double fuelKg() const { return fuelKg_; }
+    // Maraton yakiti: depo (L) ve tuketim carpani (uzun yarisi kisa surede anlamli kilar); dolum depoyu asmaz
+    void setFuelSystem(double tankL, double burnMul) { cfg_.fuelLiters = tankL; tankL_ = tankL; burnMul_ = burnMul; fuelAdded_ = 0.0; fuelKg_ = tankL * fuelDensity_; }
+    double fuelLiters() const { return fuelKg_ / fuelDensity_; }
+    double tankLiters() const { return tankL_ > 0 ? tankL_ : cfg_.fuelLiters; }
+    void addFuel(double liters) { const double room = tankLiters() - fuelLiters(); if (room > 0) { fuelAdded_ += std::min(liters, room); fuelKg_ += std::min(liters, room) * fuelDensity_; } }
     double hapticIntensity() const { return haptic_; }
     const WheelSimulation& wheel(int i) const { return w_[i]; }
     // Aci yolda arac kurtarma: konum/yon ayarla, hizlar sifir
@@ -160,6 +165,7 @@ private:
     double tireWear_ = 0, valveSafeRpm_ = 0, fineKnock_ = 0, heatMul_ = 1.0;
     bool reverse_ = false; double revThr_ = 0.0;
     double spoolLo_ = 0, spoolHi_ = 0; bool superOnly_ = false;
+    double fuelAdded_ = 0, burnMul_ = 1.0, tankL_ = 0;
     bool valveWarned_ = false;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;

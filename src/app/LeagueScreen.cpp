@@ -83,6 +83,7 @@ void LeagueScreen::render(Renderer& r) {
         if (e.rival >= 0) sub += std::string("  ") + rivals()[e.rival].name;
         else if (e.mode == EventMode::Flow) { std::snprintf(b, sizeof b, "  HEDEF %ld", e.flowTarget); sub += b; }
         else if (e.mode == EventMode::Chase) sub += "  400 M ACIL";
+        else if (e.mode == EventMode::Marathon) sub += "  18 KM, BENZINLIK";
         else sub += "  DENGI RAKIP";
         r.text(18, y + kRowH - 22, sub.substr(0, 40), 1, kUiDim);
         std::string right = won ? "KAZANILDI" : e.pink ? "ARABA" : money(e.prize);
@@ -106,7 +107,7 @@ void LeagueScreen::render(Renderer& r) {
             std::snprintf(b, sizeof b, "PARCA: %s   TAHMINI 1/4: %.2f S", pre[std::clamp(rv.preset, 0, 2)], tableEt(rv.carId, rv.preset));
             r.text(16, py + 34, b, 1, kUiDim);
             if (rv.boss) r.textFit(16, py - 14, std::string("\"") + bossLine(e.rival, 0) + "\"", 1, 336, {1.0f, 0.85f, 0.45f});   // meydan okuma
-        } else r.text(16, py + 6, e.mode == EventMode::Flow ? "SKOR HEDEFINI GEC" : e.mode == EventMode::Chase ? "POLISTEN KAC: 400 M ACIL VE 4 S TUT"
+        } else r.text(16, py + 6, e.mode == EventMode::Flow ? "SKOR HEDEFINI GEC" : e.mode == EventMode::Chase ? "POLISTEN KAC: 400 M ACIL VE 4 S TUT" : e.mode == EventMode::Marathon ? "18 KM: YAKIT BITMEDEN BENZINLIGE GIR"
                                                                                                               : "SENIN SEVIYENDE BIR RAKIP", 1, {1, 1, 1});
         if (e.pink) r.text(16, py + 50, "PINK SLIP: KAYBEDERSEN ARABAN GIDER!", 1, {1.0f, 0.4f, 0.5f});
         else if (!avail) r.text(16, py + 50, why, 1, {1.0f, 0.4f, 0.3f});

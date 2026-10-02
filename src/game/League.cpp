@@ -25,6 +25,7 @@ const char* eventModeName(EventMode m) {
     case EventMode::Karma: return "KARMA";
     case EventMode::Flow: return "OTOBAN AKISI";
     case EventMode::Chase: return "POLIS KACIS";
+    case EventMode::Marathon: return "MARATON";
     }
     return "";
 }
@@ -100,6 +101,8 @@ const std::vector<EventDef>& leagueEvents() {
         {"MAHALLE KACISI", 0, M::Chase, -1, 450, 10, false, 0}, {"POLIS CEVIRMESI", 1, M::Chase, -1, 1300, 18, false, 0},
         {"OTOBAN KACISI", 2, M::Chase, -1, 3200, 30, false, 0}, {"DAG KACISI", 3, M::Chase, -1, 6000, 42, false, 0},
         {"SON KACIS", 4, M::Chase, -1, 12000, 58, false, 0},
+        // Maratonlar: 18 km, yakit + benzinlik (sona eklenir)
+        {"SEHIRLERARASI MARATON", 2, M::Marathon, -1, 6500, 40, false, 0}, {"PIST MARATONU", 4, M::Marathon, -1, 20000, 80, false, 0},
     };
     return e;
 }
