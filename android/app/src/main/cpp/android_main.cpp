@@ -427,9 +427,9 @@ void android_main(android_app* app) {
                 // Dikey tutus: telefon sola yatinca x ivmesi +; ~30 derece = tam direksiyon; alcak geciren suzgec
                 ASensorEvent ev;
                 while (ASensorEventQueue_getEvents(p.sensorQ, &ev, 1) > 0) {
-                    // Ekranin saga dogru ekseni boyunca ivme: dikeyde +x, 90'da +y, 180'de -x, 270'te -y. Sola egim +.
+                    // Ekranin saga dogru ekseni (cihaz ekseninde): dikeyde +x, 90da -y, 180de -x, 270te +y. Sola egim +.
                     const float ax = ev.acceleration.x, ay = ev.acceleration.y;
-                    const float side = p.rotation == 1 ? ay : p.rotation == 2 ? -ax : p.rotation == 3 ? -ay : ax;
+                    const float side = p.rotation == 1 ? -ay : p.rotation == 2 ? -ax : p.rotation == 3 ? ay : ax;
                     const float t = std::clamp(side / (9.81f * 0.5f), -1.0f, 1.0f);
                     p.tiltLp += (t - p.tiltLp) * 0.25f;
                     p.game->setTilt(p.tiltLp);

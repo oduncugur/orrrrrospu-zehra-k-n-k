@@ -240,10 +240,9 @@ bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, 
     const bool turboEngine = e.induction == Induction::Turbo || e.induction == Induction::TwinTurbo;
     if (c == PartCat::Turbo && level > 0 && e.induction == Induction::Supercharger) return no("KOMPRESORLU MOTORA TURBO YOK");
     if ((c == PartCat::Turbine || c == PartCat::Wastegate || c == PartCat::BoostCtl) && level > 0 && t && t->turbo == 0 && !turboEngine)
-        return no("ONCE TURBO GEREKLI");
+        return no(e.induction == Induction::Supercharger ? "KOMPRESORDE TURBO PARCASI YOK" : "ONCE TURBO GEREKLI");
     if (c == PartCat::Intercooler && level > 0 && t && t->turbo == 0 && t->superch == 0 && !turboEngine && e.induction != Induction::Supercharger)
         return no("ASIRI BESLEME YOK");
-    if (c == PartCat::Supercharger && level > 0 && e.induction == Induction::Supercharger) return no("FABRIKADA KOMPRESOR VAR");
     if (c == PartCat::EngineSwap && level > 0 && swapEngines()[level - 1] == v.engine) return no("FABRIKA MOTORU");
     // Atolye satirlari: once ozel parca uretilmeli (PARCA URET)
     if (level > 0 && level == customOption(c) && t) {
