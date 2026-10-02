@@ -16,16 +16,16 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     Builder B{m};
     const double L = v.lengthM, W = v.widthM, HW = W * 0.5;
     // Yan profil (z, m): ust yuzey (kaput / cam / tavan / bagaj), bel cizgisi, alt
-    static const double kTop[][2] = {{0.0, 0.58}, {0.012, 0.66}, {0.035, 0.72}, {0.08, 0.775}, {0.16, 0.815}, {0.26, 0.845}, {0.335, 0.865},
+    static const double kTop[][2] = {{0.0, 0.68}, {0.012, 0.715}, {0.035, 0.74}, {0.08, 0.775}, {0.16, 0.815}, {0.26, 0.845}, {0.335, 0.865},
                                      {0.465, 1.36}, {0.56, 1.38}, {0.655, 1.345}, {0.72, 1.17}, {0.795, 0.985}, {0.90, 0.995},
                                      {0.96, 0.985}, {0.985, 0.94}, {1.0, 0.84}};
-    static const double kBelt[][2] = {{0.0, 0.56}, {0.04, 0.68}, {0.20, 0.79}, {0.335, 0.85}, {0.55, 0.89}, {0.72, 0.93}, {0.80, 0.95},
+    static const double kBelt[][2] = {{0.0, 0.64}, {0.04, 0.70}, {0.20, 0.80}, {0.335, 0.85}, {0.55, 0.89}, {0.72, 0.93}, {0.80, 0.95},
                                       {0.965, 0.93}, {1.0, 0.82}};
     static const double kBot[][2] = {{0.0, 0.30}, {0.03, 0.21}, {0.08, 0.17}, {0.92, 0.17}, {0.975, 0.22}, {1.0, 0.31}};
-    static const double kHw[][2] = {{0.0, 0.76}, {0.015, 0.88}, {0.05, 0.955}, {0.13, 0.985}, {0.5, 1.0}, {0.86, 0.99}, {0.955, 0.955},
+    static const double kHw[][2] = {{0.0, 0.87}, {0.015, 0.935}, {0.05, 0.97}, {0.13, 0.985}, {0.5, 1.0}, {0.86, 0.99}, {0.955, 0.955},
                                     {0.99, 0.90}, {1.0, 0.86}};
     constexpr int nT = sizeof kTop / sizeof *kTop, nB = sizeof kBelt / sizeof *kBelt, nBo = sizeof kBot / sizeof *kBot, nH = sizeof kHw / sizeof *kHw;
-    const double cowl = 0.335, roofF = 0.465, roofR = 0.655, deck = 0.795, sideGlass0 = 0.355, sideGlass1 = 0.71;
+    const double cowl = 0.335, roofF = 0.465, roofR = 0.655, deck = 0.795, sideGlass0 = 0.36, sideGlass1 = 0.665;
     // Teker: E46 M3 on cikinti ~0.80 m, arka ~0.96 m; 18" (r 0.33)
     const double r = 0.33, ovF = 0.80, xFront = L * 0.5 - ovF, xRear = xFront - v.wheelbaseM;
     const double sF = ovF / L, sR = (L * 0.5 - xRear) / L;
@@ -79,7 +79,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         if (j == 0) return (int)MatDark;
         if (j == 6 && s > sideGlass0 && s < sideGlass1) return (int)MatGlass;         // yan camlar (cercevesiz kupe)
         if (j == 7 && ((s > cowl && s < roofF) || (s > roofR && s < deck))) return (int)MatGlass;   // on / arka cam
-        if (j == 6 && cabin(s)) return (int)MatDark;                     // direkler / cam cercevesi
+        if (j == 6 && cabin(s)) return (int)MatPaint;                    // A / C direkleri govde renginde (kalin C diregi)
         return (int)MatPaint;
     };
     for (size_t i = 0; i + 1 < rings.size(); ++i) {
@@ -98,18 +98,14 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     const double xF = X(0.0), xB = X(1.0);
     // ---- on yuz: bobrek izgara, angel-eye farlar, alt hava girisi, sis farlari, plaka
     for (double sg : {1.0, -1.0}) {
-        B.diskX(xF + 0.016, sg * 0.105, 0.575, 0.075, 0.062, 10, MatChrome);       // bobrek cercevesi
-        B.diskX(xF + 0.020, sg * 0.105, 0.575, 0.060, 0.050, 10, MatDark);
-        // Far muhafazasi (egik, damla): ic dar, dis genis; kaput kenarinin hemen alti
-        const double yi = 0.21, yo = HW * 0.83;
-        B.panel(X(0.008) + 0.012, sg * yi, 0.585, X(0.008) + 0.012, sg * yi, 0.635,
-                X(0.045) + 0.010, sg * yo, 0.700, X(0.040) + 0.010, sg * yo, 0.625, MatDark);
-        for (double yc : {0.36, 0.56}) {                                  // cift yuvarlak angel-eye
-            const double s = yc < 0.4 ? 0.02 : 0.035, xs = X(s) + 0.022;
-            B.diskX(xs, sg * yc, 0.640, 0.052, 0.040, 12, MatLight);
-            B.diskX(xs + 0.002, sg * yc, 0.640, 0.032, 0.024, 10, MatChrome);
+        B.diskX(xF + 0.010, sg * 0.105, 0.585, 0.088, 0.070, 10, MatChrome);       // bobrek cercevesi
+        B.diskX(xF + 0.014, sg * 0.105, 0.585, 0.072, 0.056, 10, MatDark);
+        B.panel(xF + 0.006, sg * 0.21, 0.545, xF + 0.006, sg * 0.21, 0.655, xF + 0.006, sg * HW * 0.86, 0.665, xF + 0.006, sg * HW * 0.86, 0.565, MatDark);   // far muhafazasi
+        for (double yc : {0.33, 0.55}) {                                  // cift yuvarlak angel-eye
+            B.diskX(xF + 0.012, sg * yc, 0.605, 0.050, 0.046, 12, MatLight);
+            B.diskX(xF + 0.016, sg * yc, 0.605, 0.030, 0.027, 10, MatChrome);
         }
-        B.diskX(X(0.004) + 0.012, sg * 0.60, 0.355, 0.038, 0.030, 10, MatLight);   // sis fari
+        B.diskX(xF + 0.010, sg * 0.60, 0.385, 0.038, 0.030, 10, MatLight);   // sis fari
     }
     B.panel(xF + 0.012, 0.50, 0.46, xF + 0.012, 0.50, 0.32, xF + 0.012, -0.50, 0.32, xF + 0.012, -0.50, 0.46, MatDark);   // alt hava girisi
     B.panel(xF + 0.016, 0.24, 0.47, xF + 0.016, 0.24, 0.39, xF + 0.016, -0.24, 0.39, xF + 0.016, -0.24, 0.47, MatPlate);

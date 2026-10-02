@@ -61,6 +61,15 @@ GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carI
 void GalleryScreen::render(Renderer& r) {
     if (std::getenv("ZK_SHEET")) {                    // test: 12 aracin model tablosu (yandan + 3/4 on)
         r.begin(360, 640, {0.16f, 0.17f, 0.21f});
+        if (std::atoi(std::getenv("ZK_SHEET")) == 3) {   // test: tek arac 4 aci (yan, 3/4 on, 3/4 arka, on)
+            const VehicleDef* c = findVehicle(carId_);
+            const float L = c ? (float)c->lengthM : 4.5f;
+            const Mat4 views[4] = {matLookAt(0.0f, 0.7f, 2.2f * L, 0.0f, 0.62f, 0.0f), matLookAt(1.0f * L, 0.8f + 0.12f * L, 1.2f * L, 0.0f, 0.55f, 0.0f),
+                                   matLookAt(-1.0f * L, 0.8f + 0.12f * L, 1.2f * L, 0.0f, 0.55f, 0.0f), matLookAt(1.6f * L, 0.9f, 0.0f, 0.0f, 0.6f, 0.0f)};
+            for (int k = 0; c && k < 4; ++k)
+                r.drawCar(c->id, 0, k * 160.0f, 360, 160, matPerspective(0.45f, 360.0f / 160.0f, 0.1f, 50.0f), views[k], matRotY(0.0f));
+            return;
+        }
         const bool side = std::atoi(std::getenv("ZK_SHEET")) == 2;
         for (int k = 0; k < 6; ++k) {
             const VehicleDef* c = findVehicle(carId_ + k);
