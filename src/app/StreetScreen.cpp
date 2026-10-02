@@ -91,7 +91,7 @@ void StreetScreen::render(Renderer& r) {
             r.text(16, R.y0 + 72, "ARAC GARAJINA GELIR,", 1, kUiDim);
             r.text(16, R.y0 + 86, "HEDEFE ULASINCA TESLIM ET", 1, kUiDim);
             if (taken) r.textCentered(jobBtn(k).cx(), jobBtn(k).y0 + 14, "ALINDI", 1, {0.4f, 1.0f, 0.5f});
-            else button(r, jobBtn(k), "ISI AL", c.garageFull() ? Color{0.25f, 0.25f, 0.28f} : kUiGreen, 2);
+            else button(r, jobBtn(k), "KABUL ET", c.garageFull() ? Color{0.25f, 0.25f, 0.28f} : kUiGreen, 2);
         }
     }
     button(r, kBackSt, "< HARITA", kUiBtn, 2);
