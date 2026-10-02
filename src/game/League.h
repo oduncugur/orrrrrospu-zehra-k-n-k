@@ -33,6 +33,8 @@ struct EventDef {
 };
 
 const char* leagueName(int league);
+// Patron sozleri (kariyer hikayesi): kind 0 = yaris oncesi meydan okuma, 1 = oyuncu kazandi, 2 = oyuncu kaybetti. Patron degilse "".
+const char* bossLine(int rival, int kind);
 double leagueIndexCap(int league);              // sinif siniri (performans endeksi; 0: sinirsiz)
 const std::vector<RivalDef>& rivals();
 const std::vector<EventDef>& leagueEvents();

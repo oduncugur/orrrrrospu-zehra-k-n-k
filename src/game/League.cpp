@@ -1,6 +1,9 @@
 #include "League.h"
 
 #include <algorithm>
+#include <string>
+
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 
@@ -23,6 +26,20 @@ const char* eventModeName(EventMode m) {
     case EventMode::Flow: return "OTOBAN AKISI";
     case EventMode::Chase: return "POLIS KACIS";
     }
+    return "";
+}
+
+const char* bossLine(int rival, int kind) {
+    if (rival < 0 || rival >= (int)rivals().size() || !rivals()[rival].boss) return "";
+    static const struct { const char* name; const char* l[3]; } kLines[] = {
+        {"MAHALLENIN KRALI SEDAT", {"BU SOKAKLAR BENIM, CAYLAK.", "SANS ESERI... BIR DAHAKINE BAKARIZ.", "MAHALLEYE HOS GELDIN. EVINE DON."}},
+        {"GECE KUSU ASLI", {"GECE BENIM SAATIM. YETISEBILIRSEN.", "ISIKLARI SEN SONDURDUN. SAYGI.", "STOPLARIMI BILE GOREMEDIN."}},
+        {"BASKAN", {"BU YOLLARIN KURALINI BEN KOYARIM.", "DEMEK KURALLAR DEGISTI.", "OYLAMA BITTI. KAYBETTIN."}},
+        {"DAGIN HAYALETI", {"VIRAJLARI KIMSE BENIM GIBI BILMEZ.", "SISIN ICINDEN CIKTIN... KIMSIN SEN?", "HAYALETI YAKALAYAMAZSIN."}},
+        {"EFSANE", {"BUTUN O YOLLAR BURAYA CIKIYORDU.", "ARTIK EFSANE SENSIN.", "EFSANELER KOLAY OLMEZ."}},
+    };
+    for (const auto& k : kLines)
+        if (std::string(k.name) == rivals()[rival].name) return k.l[std::clamp(kind, 0, 2)];
     return "";
 }
 

@@ -87,6 +87,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
     ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind);
+    if (app_.career.car().carId == carId_) ses_->player().sim().setNosFill(app_.career.car().nosFill);   // tupte kalan
     {   // Ortam: gece %30, yagmur %25 (tohumdan); test icin ZK_NIGHT / ZK_RAIN
         const uint32_t w = seed * 2246822519u + 0x9E3779B9u;
         night_ = (w >> 7) % 100 < 30 || std::getenv("ZK_NIGHT");
@@ -155,6 +156,7 @@ void RoadScreen::finishRace() {
     }
     const VehicleSim& ps = ses_->player().sim();
     app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());
+    app_.career.recordNosUse(ps.nitrousLeft());
     app_.saveCareer();
 }
 

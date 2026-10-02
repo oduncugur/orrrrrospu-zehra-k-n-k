@@ -616,6 +616,18 @@ bool usedAvailable(PartCat c, int level) {
     return true;
 }
 int usedPrice(int newPrice) { return newPrice * 55 / 100 / 10 * 10; }
+// Parca pazari: kategori fiyati haftadan haftaya %80-%120 arasi dalgalanir (%5 adim; ayni hafta herkes icin ayni)
+double marketMul(PartCat c, int week) {
+    if (week < 0) return 1.0;
+    uint32_t x = (uint32_t)week * 2654435761u ^ ((uint32_t)c + 1u) * 40503u;
+    x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15;
+    return 0.80 + 0.05 * (int)(x % 9u);
+}
+int Career::marketWeek() const { return marketOff ? -1 : todayIndex() / 7; }
+int Career::shopPrice(PartCat c, int level) const {
+    const int p = partPrice(c, level, *findVehicle(car().carId));
+    return p <= 0 ? p : (int)std::round(p * marketMul(c, marketWeek()) / 10.0) * 10;
+}
 void applyUsedWear(Tune& t, PartCat c) {
     auto add = [](double& w, double d) { w = std::max(w, d); };   // birikmez: ikinci el parca en fazla kendi yipranmasini getirir
     switch (c) {
@@ -652,6 +664,21 @@ bool applySetupString(const std::string& s, Tune& t) {
     t = n;
     return true;
 }
+// NOS tupu: yarista harcanan kalir; dolum kit fiyatinin %12'si x bos kisim
+void Career::recordNosUse(double leftFrac) { if (car().tune.nitrous > 0) car().nosFill = std::clamp(leftFrac, 0.0, 1.0); }
+int Career::nosRefillPrice() const {
+    const OwnedCar& oc = car();
+    if (oc.tune.nitrous <= 0 || oc.nosFill >= 0.999) return 0;
+    return std::max(10, (int)std::round(partPrice(PartCat::Nitrous, oc.tune.nitrous, *findVehicle(oc.carId)) * 0.12 * (1.0 - oc.nosFill) / 10.0) * 10);
+}
+bool Career::refillNos(std::string* why) {
+    const int p = nosRefillPrice();
+    if (p <= 0) { if (why) *why = "TUP DOLU"; return false; }
+    if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= p; car().nosFill = 1.0;
+    return true;
+}
+
 void Career::saveProfile(int k) { if (k >= 0 && k < 3) car().profile[k] = setupString(car().tune); }
 bool Career::loadProfile(int k) { return k >= 0 && k < 3 && !car().profile[k].empty() && applySetupString(car().profile[k], car().tune); }
 
@@ -663,7 +690,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     if (partLevel(oc.tune, c, v) == level) { if (why) *why = "ZATEN TAKILI"; return false; }
     if (!partAvailable(c, level, v, why, &oc.tune)) return false;
     if (used && !usedAvailable(c, level)) { if (why) *why = "IKINCI EL YOK"; return false; }
-    const int p = used ? usedPrice(partPrice(c, level, v)) : partPrice(c, level, v);
+    const int p = used ? usedPrice(shopPrice(c, level)) : shopPrice(c, level);   // haftalik pazar fiyati
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
     const int old = partLevel(oc.tune, c, v);
     const int oldPrice = old > 0 && old != customOption(c) ? partPrice(c, old, v) : 0;
@@ -677,6 +704,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     }
     setPartLevel(oc.tune, c, level, v);
     clampSetup(oc.tune);                                               // parca degisti: gecersiz kurulum ayari sifirlanir
+    if (c == PartCat::Nitrous) oc.nosFill = 1.0;                       // yeni kit dolu gelir
     if (used) applyUsedWear(oc.tune, c);
     dailyAdd(TaskType::BuyParts, 1);
     return true;
@@ -1075,6 +1103,7 @@ std::string Career::serialize() const {
         }
         o << "tun2=" << tuneV2String(t) << "\n";
         for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
+        if (c.nosFill < 0.999) { std::snprintf(buf, sizeof buf, "nosf=%.3f\n", c.nosFill); o << buf; }
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
@@ -1140,6 +1169,7 @@ bool Career::parse(const std::string& text, Career& out) {
         }
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
+        else if (k == "nosf" && !c.cars.empty()) c.cars.back().nosFill = std::clamp(std::atof(v.c_str()), 0.0, 1.0);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
             oc.tune.partsVer = 1;                                  // "pv" yoksa eski kayit: tek liste secimleri donusturulur

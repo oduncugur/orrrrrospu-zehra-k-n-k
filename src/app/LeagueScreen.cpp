@@ -105,6 +105,7 @@ void LeagueScreen::render(Renderer& r) {
             static const char* pre[3] = {"STOK", "SOKAK PAKETI", "DRAG PAKETI"};
             std::snprintf(b, sizeof b, "PARCA: %s   TAHMINI 1/4: %.2f S", pre[std::clamp(rv.preset, 0, 2)], tableEt(rv.carId, rv.preset));
             r.text(16, py + 34, b, 1, kUiDim);
+            if (rv.boss) r.textFit(16, py - 14, std::string("\"") + bossLine(e.rival, 0) + "\"", 1, 336, {1.0f, 0.85f, 0.45f});   // meydan okuma
         } else r.text(16, py + 6, e.mode == EventMode::Flow ? "SKOR HEDEFINI GEC" : e.mode == EventMode::Chase ? "POLISTEN KAC: 400 M ACIL VE 4 S TUT"
                                                                                                               : "SENIN SEVIYENDE BIR RAKIP", 1, {1, 1, 1});
         if (e.pink) r.text(16, py + 50, "PINK SLIP: KAYBEDERSEN ARABAN GIDER!", 1, {1.0f, 0.4f, 0.5f});
@@ -129,7 +130,7 @@ void LeagueScreen::render(Renderer& r) {
         r.textCentered(180, 562, "BIR ETKINLIK SEC", 1, kUiDim);
     }
     button(r, kBackL, "< HARITA", kUiBtn, 2);
-    if (msgT_ > 0) { r.rect(0, 430, 360, 462, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 440, msg_, 2, kUiGold); }
+    if (msgT_ > 0) { r.rect(0, 430, 360, 462, {0.02f, 0.02f, 0.04f, 0.92f}); r.textFit(180, 440, msg_, 2, 344, kUiGold, true); }
 }
 
 void LeagueScreen::pointerDown(int, float x, float y) {

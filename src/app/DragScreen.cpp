@@ -53,6 +53,7 @@ void DragScreen::restart() {
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
     race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
+    if (career_ && app_.career.car().carId == carIds_[0]) race_->lane(0).sim->setNosFill(app_.career.car().nosFill);   // tupte kalan
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
     run_.clear(); runAcc_ = 0; ghostSaved_ = false; ghost_.clear(); ghostEt_ = 0;
@@ -283,6 +284,8 @@ void DragScreen::update(double dt) {
             prize_ = app_.career.recordEvent(app_.activeEvent, won, s.finished && !s.redLight ? s.quarter : 0.0, 0, &pink);
             if (pink > 0) app_.eventNote = "PINK SLIP: " + upperS(findVehicle(pink)->model) + " SENIN!";
             else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
+            else if (const int rv = leagueEvents()[app_.activeEvent].rival; *bossLine(rv, 0))   // patron: yaris sonrasi sozu
+                app_.eventNote = std::string(rivals()[rv].name) + ": " + bossLine(rv, won ? 1 : 2);
         } else if (app_.activeTour) {                                   // haftalik turnuva turu
             prize_ = app_.career.recordTour(won);
             char nb[64];
@@ -293,6 +296,7 @@ void DragScreen::update(double dt) {
         } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
         app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());
+        if (app_.career.car().carId == carIds_[0]) app_.career.recordNosUse(ps.nitrousLeft());
         app_.saveCareer();
     }
 

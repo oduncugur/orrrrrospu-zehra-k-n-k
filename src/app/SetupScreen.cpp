@@ -19,7 +19,7 @@ Rect minusR(int i) { return {214, kY0 + i * kH + 6, 254, kY0 + i * kH + 36}; }
 Rect plusR(int i) { return {312, kY0 + i * kH + 6, 352, kY0 + i * kH + 36}; }
 Rect loadR(int k) { return {8 + k * 116.0f, 444, 120 + k * 116.0f, 474}; }
 Rect saveR(int k) { return {8 + k * 116.0f, 480, 120 + k * 116.0f, 510}; }
-const Rect kReset{8, 530, 352, 562}, kBackS{8, 596, 352, 634};
+const Rect kReset{8, 530, 176, 562}, kRefill{184, 530, 352, 562}, kBackS{8, 596, 352, 634};
 
 double defaultPsi(const Tune& t) { return t.tires == TireType::DragSlick ? 16.0 : t.tires == TireType::SemiSlick ? 26.0 : 32.0; }
 // Satirin kilidi (bos: acik)
@@ -72,7 +72,12 @@ void SetupScreen::render(Renderer& r) {
         button(r, loadR(k), std::string(kProfName[k]) + (has ? " YUKLE" : " BOS"), has ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 1);
         button(r, saveR(k), std::string(kProfName[k]) + " KAYDET", kUiBtn, 1);
     }
-    button(r, kReset, "AYARLARI SIFIRLA", Color{0.45f, 0.20f, 0.15f}, 2);
+    button(r, kReset, "SIFIRLA", Color{0.45f, 0.20f, 0.15f}, 2);
+    if (t.nitrous > 0) {                                               // NOS tupu: doluluk + dolum
+        const int p = app_.career.nosRefillPrice();
+        std::snprintf(b, sizeof b, p > 0 ? "NOS %%%.0f DOLDUR %s" : "NOS TUPU DOLU", oc.nosFill * 100.0, money(p).c_str());
+        button(r, kRefill, b, p > 0 ? (app_.career.money >= p ? kUiGreen : Color{0.3f, 0.3f, 0.32f}) : Color{0.18f, 0.30f, 0.20f}, 1);
+    }
     button(r, kBackS, "< GARAJ", kUiBtn, 2);
     if (msgT_ > 0) { r.rect(0, 560, 360, 590, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 568, msg_, 2, kUiGold); }
 }
@@ -110,6 +115,11 @@ void SetupScreen::pointerDown(int, float x, float y) {
             msgT_ = 1.4;
             return;
         }
+    }
+    if (kRefill.hit(x, y) && t.nitrous > 0) {
+        std::string why;
+        if (c.refillNos(&why)) { app_.saveCareer(); msg_ = "NOS TUPU DOLDU"; } else msg_ = why;
+        msgT_ = 1.4; return;
     }
     if (kReset.hit(x, y)) {
         Tune& m = c.cars[c.current].tune;

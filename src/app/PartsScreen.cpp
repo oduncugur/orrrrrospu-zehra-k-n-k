@@ -203,7 +203,10 @@ void PartsScreen::render(Renderer& r) {
         const PartCat c = (PartCat)cat_;
         r.text(8, 104, partCatName(c), 2, kUiGold);
         const auto& opts = partOptions(c);
-        char b[32]; std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
+        char b[48];
+        const int mk = (int)std::lround((marketMul(c, app_.career.marketWeek()) - 1.0) * 100.0);
+        if (mk) std::snprintf(b, sizeof b, "PAZAR %+d%%  %zu SECENEK", mk, opts.size());   // haftalik fiyat
+        else std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
         if (c == PartCat::Ecu) button(r, kSoftP, "YAZILIM >", {0.15f, 0.35f, 0.6f}, 1);
         else r.text(352 - r.textWidth(b, 1), 110, b, 1, kUiDim);
         const int cur = partLevel(oc.tune, c, v);
@@ -216,7 +219,7 @@ void PartsScreen::render(Renderer& r) {
             if (y0 < kListY0 - 1 || y0 + kRowH - 4 > kListY0 + listH + 1) continue;   // kismen gorunen satir cizilmez
             std::string why;
             const bool avail = partAvailable(c, i, v, &why, &oc.tune);
-            const int price = partPrice(c, i, v);
+            const int price = app_.career.shopPrice(c, i);
             const bool mine = i == cur, afford = app_.career.money >= price;
             r.rect(8, y0, 352, y0 + kRowH - 4, mine ? Color{0.12f, 0.3f, 0.16f} : i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
             if (i == sel_) r.rect(8, y0, 12, y0 + kRowH - 4, kUiOrange);
@@ -234,7 +237,7 @@ void PartsScreen::render(Renderer& r) {
         if (sel_ >= 0) drawPreview(r, 450);
         if (confirm_ && sel_ >= 0) {
             r.rect(0, 540, 360, 596, {0.03f, 0.03f, 0.05f, 0.95f});
-            const int np = partPrice(c, sel_, v);
+            const int np = app_.career.shopPrice(c, sel_);
             if (usedAvailable(c, sel_) && np > 0) {                       // yeni / ikinci el
                 button(r, kNewP, "YENI", kUiGreen, 2);
                 r.textCentered(kNewP.cx(), kNewP.y1 - 11, money(np), 1, {0.85f, 1.0f, 0.85f});
@@ -315,7 +318,7 @@ void PartsScreen::tap(float x, float y) {
     if (!partAvailable(c, i, v, &why, &oc.tune)) { msg_ = why; msgT_ = 1.8; return; }
     if (sel_ != i) select(i);
     else {
-        const int np = partPrice(c, i, v);
+        const int np = app_.career.shopPrice(c, i);
         if (app_.career.money < (usedAvailable(c, i) ? usedPrice(np) : np)) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
         confirm_ = true;
     }

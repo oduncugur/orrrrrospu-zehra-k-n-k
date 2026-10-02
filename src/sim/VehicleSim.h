@@ -126,6 +126,7 @@ public:
     bool hasNitrous() const { return nosHp_ > 0.0; }
     double nosHp() const { return nosHp_; }
     double nosBottleS() const { return nosBottle_; }
+    void setNosFill(double f) { nosLeft_ = nosBottle_ * std::clamp(f, 0.0, 1.0); }   // kariyer: tupte kalan (0..1)
     bool nitrousActive() const { return nosActive_; }
     double nitrousLeft() const { return nosBottle_ > 0 ? nosLeft_ / nosBottle_ : 0.0; }
     double downforceN() const { return dfK_ * speed() * speed(); }

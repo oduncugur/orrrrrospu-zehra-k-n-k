@@ -29,6 +29,7 @@ struct OwnedCar {
     int paint = -1, finish = 0, stripe = 0, stripeCol = 0, rimCol = -1;
     // Kurulum profilleri (DRAG / YOL / PIST): kurulum alanlari tuneV2String bicimiyle; bos = kayitli degil
     std::string profile[3];
+    double nosFill = 1.0;         // NOS tupu doluluk (yarista harcanir, garajda parayla dolar)
     bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
@@ -58,6 +59,7 @@ const char* partTabName(int tab);
 int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
 int  usedPrice(int newPrice);               // %55
+double marketMul(PartCat c, int week);       // haftalik parca pazari carpani (0.80..1.20; week < 0: 1)
 void applyUsedWear(Tune& t, PartCat c);     // ikinci el parcanin yipranmasi
 int  ecuSwPrice(int sw, int level, const VehicleDef& v);   // yazilim modulunun bu seviyesinin fiyati (arac sinifina gore)
 void migrateTune(Tune& t);                  // eski kayit: tek yakit sistemi / ECU paketi -> ayri parcalar + yazilim
@@ -156,7 +158,13 @@ struct Career {
     // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).
     // Sokulen eski (stok olmayan) parca %35'e satilir: refund (verildiyse) ciktisi.
     // Kurulum profilleri (0 DRAG, 1 YOL, 2 PIST): kaydet / yukle (gecerli parcalara gore sinirlanir)
+    int  marketWeek() const;                     // pazar haftasi (-1: kapali, testler)
+    int  shopPrice(PartCat c, int level) const;  // dukkan fiyati: liste x haftalik pazar
+    bool marketOff = false;                      // testler: sabit liste fiyati (kaydedilmez)
     void saveProfile(int k);
+    void recordNosUse(double leftFrac);          // yaris sonu tupte kalan (0..1)
+    int  nosRefillPrice() const;                 // 0: dolu / kit yok
+    bool refillNos(std::string* why = nullptr);
     bool loadProfile(int k);
     bool buyPart(PartCat c, int level, std::string* why = nullptr, bool used = false, long* refund = nullptr);
     // ECU yazilimi: modulu bir seviye yukselt (yuva / ECU siniri / para) ya da bir seviye dusur (iade yok)

@@ -24,6 +24,7 @@ static bool sameTune(const Tune& a, const Tune& b) {
 int main() {
     std::printf("[1] Yeni oyun\n");
     Career c = Career::newGame();
+    c.marketOff = true;                                   // sabit liste fiyati (haftalik pazar kapali)
     CHECK(c.money == 6000 && c.cars.size() == 1 && c.car().carId == 217, "6000 $, tek arac (#217)");
 
     std::printf("[2] Fiyatlar\n");
@@ -217,6 +218,7 @@ int main() {
     std::printf("[U] Ikinci el parca + eski parca satisi\n");
     {
         Career c = Career::newGame();
+        c.marketOff = true;                                   // sabit liste fiyati (haftalik pazar kapali)
         c.money = 100000; c.dailyDay = todayIndex(); c.dailyDone = 7;   // gunluk gorev odulu karismasin
         const VehicleDef& v = *findVehicle(c.car().carId);
         const int p3 = partPrice(PartCat::Brakes, 3, v), p4 = partPrice(PartCat::Brakes, 4, v);
@@ -278,6 +280,21 @@ int main() {
         CHECK(!e.tourOut && e.tourRound == 0 && e.tourAvailable(), "yeni hafta sifirlanir");
         Career d;
         CHECK(Career::parse(c.serialize(), d) && d.tourRound == c.tourRound && d.tourWeek == c.tourWeek, "turnuva durumu kayitta");
+    }
+    std::printf("[P] Parca pazari: haftalik fiyat %80-%120, dukkan fiyati odenir\n");
+    {
+        Career c = Career::newGame(); c.money = 1000000;
+        bool differ = false, inRange = true;
+        for (int w = 0; w < 30; ++w) {
+            const double m = marketMul(PartCat::Turbo, w);
+            inRange = inRange && m >= 0.799 && m <= 1.201;
+            differ = differ || std::fabs(m - marketMul(PartCat::Turbo, 0)) > 1e-9;
+        }
+        CHECK(inRange && differ, "carpan aralikta ve haftadan haftaya degisir");
+        const long m0 = c.money; const int sp = c.shopPrice(PartCat::Intake, 2);
+        CHECK(c.buyPart(PartCat::Intake, 2) && c.money == m0 - sp, "satin alma pazar fiyatindan");
+        c.marketOff = true;
+        CHECK(c.shopPrice(PartCat::Intake, 3) == partPrice(PartCat::Intake, 3, *findVehicle(c.car().carId)), "pazar kapali: liste fiyati");
     }
     std::printf("[11] Satis\n");
     {
