@@ -29,9 +29,10 @@ inline void rgbOf(unsigned c, float o[3]) { o[0] = ((c >> 16) & 255) / 255.f; o[
 inline Renderer::CarLook lookOf(const Tune* t) {
     Renderer::CarLook L;
     if (!t) return L;
-    const auto& at = aeroTable();
-    L.aero = std::clamp(t->aero, 0, (int)at.size() - 1);
-    if (L.aero == 8) L.aero = 0;                                         // drag paketi: puruzsuz govde
+    // Arka aero satiri -> kit bicimi (Renderer::kitMesh: 3 spoiler, 4 ducktail, 5 GT, 6 yaris, 9 ozel); drag paketi: puruzsuz
+    static const int kit[10] = {0, 3, 5, 3, 4, 5, 6, 6, 0, 9};
+    L.aero = kit[std::clamp(t->aero, 0, 9)];
+    L.aeroFront = t->aeroFront > 0; L.aeroSide = t->aeroSide > 0; L.aeroUnder = t->aeroUnder > 0;
     L.wingH = (float)std::clamp(0.15 + t->custWingN / 2500.0, 0.15, 0.45);
     const auto& st = suspTable();
     L.drop = (float)std::clamp(st[std::clamp(t->susp, 0, (int)st.size() - 1)].lowerMm / 1000.0, -0.03, 0.06);

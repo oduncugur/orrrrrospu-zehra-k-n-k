@@ -34,13 +34,18 @@ static RoadCar* runWot(const VehicleDef& v, const Tune& t, double seconds) {
 }
 
 int main() {
-    std::printf("[1] Kategori kapsami (en az 10 secenek; lastik ve turbo 30; motor swap tum motorlar)\n");
+    std::printf("[1] Kategori kapsami (ana parcalar 10, bilesenler en az 5 secenek; lastik ve turbo 30; motor swap tum motorlar)\n");
     {
         int few = 0;
-        for (int i = 0; i < (int)PartCat::Count; ++i) if (partOptions((PartCat)i).size() < 10) { ++few; std::printf("    %s: %zu\n", partCatName((PartCat)i), partOptions((PartCat)i).size()); }
+        int ten = 0;
+        for (int i = 0; i < (int)PartCat::Count; ++i) {
+            if (partOptions((PartCat)i).size() < 5) { ++few; std::printf("    %s: %zu\n", partCatName((PartCat)i), partOptions((PartCat)i).size()); }
+            ten += partOptions((PartCat)i).size() >= 10;
+        }
+        std::printf("    %d kategorinin %d'inde 10+ secenek\n", (int)PartCat::Count, ten);
         std::printf("    %d kategori, lastik %zu, turbo %zu, sanziman %zu, motor swap %zu\n", (int)PartCat::Count,
                     partOptions(PartCat::Tires).size(), partOptions(PartCat::Turbo).size(), partOptions(PartCat::Gearbox).size(), partOptions(PartCat::EngineSwap).size());
-        CHECK(few == 0, "her kategori en az 10 secenek");
+        CHECK(few == 0 && ten >= 30, "her kategori en az 5 secenek, 30+ kategoride 10+");
         CHECK(partOptions(PartCat::Tires).size() >= 30 && partOptions(PartCat::Turbo).size() >= 30 && partOptions(PartCat::Gearbox).size() >= 30,
               "lastik / turbo / sanziman 30 secenek");
         CHECK(partOptions(PartCat::EngineSwap).size() == engineTable().size() + 1, "motor swap: katalogdaki tum motorlar");
@@ -158,6 +163,36 @@ int main() {
         migrateTune(old);
         CHECK(old.fuelSys == 0 && old.fuelPump == 7 && old.injector == 7 && old.ecu == 0 && old.ecuHw == 4 && old.swLaunch == 1 && old.swFlat == 1,
               "eski yakit sistemi / ECU paketi yeni parcalara cevrilir");
+    }
+    std::printf("[3e] Bilesenler ayni anda takilir (emme, egzoz, fren, hafifletme, aero) + eski kayit donusumu\n");
+    {
+        auto mass = [&](const Tune& t) { VehicleSimConfig c; c.car = &sahin; c.tune = &t; return VehicleSim(c).baseMassKg(); };
+        Tune st, in1, in2, all;
+        in1.intake = 2; in2.throttleBody = 4; all.intake = 2; all.throttleBody = 4; all.intakeMani = 1; all.header = 1; all.catalyst = 4;
+        const double h0 = peakHp(sahin, st), h1 = peakHp(sahin, in1), h2 = peakHp(sahin, in2), hA = peakHp(sahin, all);
+        std::printf("    emme: stok %.0f, filtre %.0f, kelebek %.0f, filtre+kelebek+manifold+header+katalizor %.0f HP\n", h0, h1, h2, hA);
+        CHECK(hA > h1 && hA > h2 && hA > h0 * 1.12, "emme / egzoz bilesenleri birlikte guc katar");
+        Tune w; w.weight = 3; w.weightBody = 3; w.weightGlass = 1; w.weightChassis = 1;
+        std::printf("    hafifletme: ic 60 + kaporta 22 + cam 8 + sasi 15 = %d kg, kutle %.0f -> %.0f\n", w.totalWeightKg(), mass(st), mass(w));
+        CHECK(w.totalWeightKg() == 105 && std::fabs(mass(st) - mass(w) - 105.0) < 1e-6, "hafifletme parcalari toplanir");
+        Career c = Career::newGame();
+        c.money = 1000000; c.dailyDay = todayIndex(); c.dailyDone = 7;
+        CHECK(c.buyPart(PartCat::Brakes, 2) && c.buyPart(PartCat::BrakeDisc, 4) && c.buyPart(PartCat::BrakeCaliper, 2)
+              && c.car().tune.brakes == 2 && c.car().tune.brakeDisc == 4 && c.car().tune.brakeCaliper == 2, "balata + disk + kaliper birlikte takili");
+        CHECK(c.buyPart(PartCat::AeroFront, 1) && c.buyPart(PartCat::Aero, 5) && c.buyPart(PartCat::AeroUnder, 2)
+              && c.car().tune.aeroFront == 1 && c.car().tune.aero == 5, "on lip + GT kanat + difuzor birlikte");
+        // Eski kayit (parca surumu 1): tek listedeki "6 pistonlu kit", "-140 kg", "on lip", "ITB", "header", "ARP saplama"
+        Tune old; old.partsVer = 1; old.brakes = 5; old.weight = 3; old.aero = 1; old.intake = 9; old.exhaust = 5; old.gasket = 8;
+        old.cooling = 9; old.oil = 3; old.intercooler = 8; old.bearing = 9;
+        migrateTune(old);
+        std::printf("    donusum: fren %d/%d/%d, hafifletme %d kg, aero on %d, manifold %d, header %d, saplama %d, radyator %d fan %d,"
+                    " yag sogutucu %d, metanol %d, yatak %d + destek %d\n", old.brakes, old.brakeDisc, old.brakeCaliper, old.totalWeightKg(),
+                    old.aeroFront, old.intakeMani, old.header, old.headStud, old.cooling, old.fan, old.oilCooler, old.meth, old.bearing, old.mainSupport);
+        CHECK(old.partsVer == 2 && old.brakeCaliper == 2 && old.totalWeightKg() == 140 && old.aeroFront == 1 && old.aero == 0 && old.intakeMani == 8
+              && old.header == 1 && old.headStud == 3 && old.gasket == 0 && old.fan == 5 && old.oilCooler == 2 && old.meth == 3 && old.mainSupport == 5,
+              "eski tek liste secimleri denk bilesenlere cevrilir");
+        Tune fresh; migrateTune(fresh);
+        CHECK(fresh.signature() == Tune{}.signature(), "yeni kayit donusturulmez");
     }
     std::printf("[4] Atolye ve kayit\n");
     {

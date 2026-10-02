@@ -66,8 +66,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
     s.gearboxLoad = peakT / std::max(1.0, sim.gearboxRatingNm());
     // Isi yuku: tam guc / sogutma kapasitesi (1.0 = 40 m/s'de 105 C dengesi)
     const double factoryHp = peakPowerHp(v);
-    const CoolOpt& co = coolingTable()[std::clamp(t.cooling, 0, (int)coolingTable().size() - 1)];
-    s.heatLoad = s.hp / std::max(1.0, factoryHp * 1.33 * co.cap * (t.oil > 0 ? 1.06 : 1.0));   // stok ~%75
+    s.heatLoad = s.hp / std::max(1.0, factoryHp * 1.33 * coolingCapMul(t));   // stok ~%75 (radyator x fan x termostat x yag sogutucu)
     // Aks riski (tahmin): debriyajin aktarabilecegi tork / aksin kirilma torku
     double TmaxF = 0;
     const EngineSpec f = buildEngineSpec(v);
@@ -175,7 +174,8 @@ void PartsScreen::render(Renderer& r) {
     if (cat_ < 0) {
         // Sekmeler + kategori listesi
         for (int t = 0; t < kPartTabs; ++t) {
-            const Rect tr{4.0f + t * 70.8f, 102, 72.0f + t * 70.8f, 126};
+            const float tw = 352.0f / kPartTabs;
+            const Rect tr{4.0f + t * tw, 102, 2.0f + (t + 1) * tw, 126};
             r.rect(tr.x0, tr.y0, tr.x1, tr.y1, t == tab_ ? kUiOrange : kUiPanel);
             r.textCentered(tr.cx(), tr.y0 + 9, partTabName(t), 1, {1, 1, 1});
         }
@@ -286,8 +286,9 @@ void PartsScreen::tap(float x, float y) {
     const OwnedCar& oc = app_.career.car();
     const VehicleDef& v = *findVehicle(oc.carId);
     if (cat_ < 0) {
+        const float tw = 352.0f / kPartTabs;
         for (int t = 0; t < kPartTabs; ++t)
-            if (Rect{4.0f + t * 70.8f, 102, 72.0f + t * 70.8f, 126}.hit(x, y)) { tab_ = t; return; }
+            if (Rect{4.0f + t * tw, 102, 2.0f + (t + 1) * tw, 126}.hit(x, y)) { tab_ = t; return; }
         int row = 0;
         for (int i = 0; i < (int)PartCat::Count; ++i) {
             if (partTab((PartCat)i) != tab_) continue;

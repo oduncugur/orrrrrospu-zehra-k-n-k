@@ -624,8 +624,9 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
     glUniform1f(uAlpha_, look.alpha);
     if (look.alpha < 1.0f) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
-    if (look.aero > 0) {
-        const Mesh& K = kitMesh(carId, look.aero, look.wingH);
+    for (int kit : {look.aero, look.aeroFront ? 1 : 0, look.aeroSide ? 2 : 0, look.aeroUnder ? 7 : 0}) {   // arka + on + yan + alt
+        if (kit <= 0) continue;
+        const Mesh& K = kitMesh(carId, kit, look.wingH);
         if (K.count) { glBindVertexArray(K.vao); glDrawArrays(GL_TRIANGLES, 0, K.count); }
     }
     glBindVertexArray(M.vao);

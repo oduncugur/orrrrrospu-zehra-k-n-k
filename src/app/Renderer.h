@@ -71,6 +71,7 @@ public:
         float wingH = 0.3f;                     // ozel kanat yuksekligi (m)
         float drop = 0.0f;                      // govde alcalmasi (m; teker yerinde kalir)
         float alpha = 1.0f;                     // < 1: yari saydam (drag hayaleti); golge cizilmez
+        bool aeroFront = false, aeroSide = false, aeroUnder = false;   // on lip / yan etek / difuzor (arka kanattan ayri)
     };
     void setCarLook(const CarLook& l) { look_ = l; }
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,

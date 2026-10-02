@@ -39,6 +39,12 @@ struct Tune {
     int fuelPump = 0, injector = 0, fuelLine = 0;
     // ECU donanimi (yazilim yuvasi + modul seviye siniri) ve yazilim modulleri. Eski ecu alani: rakip paketleri / eski kayit.
     int ecuHw = 0, swMap = 0, swRev = 0, swLaunch = 0, swFlat = 0, swAntiLag = 0, swFlex = 0, swKnock = 0;
+    // Bilesen parcalari (ayni anda takilabilen gercek parcalar; etkiler carpilir / toplanir)
+    int throttleBody = 0, intakeMani = 0, header = 0, catalyst = 0, meth = 0, headStud = 0, mainSupport = 0;
+    int brakeDisc = 0, brakeCaliper = 0, weightBody = 0, weightGlass = 0, weightChassis = 0;
+    int aeroFront = 0, aeroSide = 0, aeroUnder = 0, fan = 0, coolMisc = 0, oilCooler = 0, oilPump = 0;
+    int partsVer = 2;                         // parca tablolari surumu (eski kayit < 2: tek liste secimleri bilesenlere cevrilir)
+    int totalWeightKg() const;                // ic + kaporta + cam + sasi hafifletmesi
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi
     double custTurboMm = 0, custTurboAr = 0, custCamDeg = 0, custDisp = 0, custFinal = 0, custWingN = 0;
     double custGear[8] = {0, 0, 0, 0, 0, 0, 0, 0};   // vites basina fabrika oranina carpan (0 = fabrika)

@@ -19,10 +19,10 @@ const std::vector<IntakeOpt>& intakeTable() {
         {"PANEL FILTRE", 150, 1.01, 1.01},
         {"KONIK FILTRE", 250, 1.02, 1.025},
         {"KISA EMME BORUSU", 450, 1.035, 1.04},
-        {"BUYUK GAZ KELEBEGI", 700, 1.0, 1.07},
-        {"PORTLU MANIFOLD", 1400, 0.98, 1.10},
-        {"KARBON AIRBOX", 2200, 1.05, 1.09},
-        {"ITB TEKIL KELEBEK", 4200, 1.04, 1.13},
+        {"KARBON AIRBOX", 1600, 1.04, 1.06},
+        {"RAM AIR KAPUT GIRISI", 1300, 1.03, 1.06},
+        {"CIFT KONIK FILTRE", 500, 1.025, 1.035},
+        {"YARIS HAVA KUTUSU", 1800, 1.05, 1.07},
     };
     return t;
 }
@@ -33,11 +33,11 @@ const std::vector<ShapeOpt>& exhaustTable() {
         {"DUZ BORU", 1200, 1.0 + 0.03 * 2, 1.0 + 0.03 * 2},
         {"ARKA SUSTURUCU", 300, 1.01, 1.015},
         {"CAT-BACK", 800, 1.02, 1.03},
-        {"HEADER 4-2-1", 1300, 1.05, 1.04},
-        {"HEADER 4-1 (TEPE)", 1600, 0.99, 1.08},
-        {"TUBULAR MANIFOLD", 2000, 1.03, 1.08},
-        {"KATALIZOR IPTAL", 400, 1.02, 1.03},
-        {"TITANYUM YARIS", 3800, 1.04, 1.10},
+        {"3 INC HAT", 700, 1.02, 1.035},
+        {"CIFT CIKIS", 650, 1.015, 1.03},
+        {"VALFLI SUSTURUCU", 1100, 1.02, 1.035},
+        {"YARIS SUSTURUCU", 900, 1.025, 1.045},
+        {"TITANYUM YARIS HATTI", 3000, 1.03, 1.06},
     };
     return t;
 }
@@ -105,8 +105,8 @@ const std::vector<CrankOpt>& crankTable() {
 const std::vector<BearingOpt>& bearingTable() {
     static const std::vector<BearingOpt> t = {
         {"STOK", 0, 1.0}, {"YARIS YATAK", 400, 1.10}, {"KAPLAMALI YATAK", 550, 1.15}, {"TRI-METAL", 650, 1.20},
-        {"GENIS YATAK", 800, 1.25}, {"ANA YATAK KUSAGI", 1400, 1.30}, {"ARP ANA CIVATA", 500, 1.15},
-        {"BILLET ANA KAPAK", 1900, 1.35}, {"KUSAK + ARP", 2200, 1.45}, {"TAM BLOK DESTEK", 3600, 1.60},
+        {"GENIS YATAK", 800, 1.25}, {"ACL RACE", 700, 1.22}, {"KING XP", 750, 1.25}, {"CALICO KAPLAMA", 900, 1.28},
+        {"YARIS TRI-METAL", 1000, 1.30}, {"PRO MOD YATAK", 1500, 1.35},
     };
     return t;
 }
@@ -114,8 +114,8 @@ const std::vector<GasketOpt>& gasketTable() {
     static const std::vector<GasketOpt> t = {
         {"STOK", 0, 0.0, 1.0}, {"MLS 0.5 MM (YUKSEK CR)", 300, 0.50, 1.10}, {"MLS 0.7 MM", 300, 0.70, 1.20},
         {"MLS 1.0 MM", 350, 1.00, 1.30}, {"MLS 1.3 MM (BOOST)", 400, 1.30, 1.45}, {"BAKIR CONTA", 600, 1.00, 1.60},
-        {"O-RING BLOK", 1500, 0.90, 1.90}, {"BAKIR + O-RING", 1900, 1.10, 2.20}, {"ARP KAPAK SAPLAMASI", 600, 0.0, 1.30},
-        {"SAPLAMA + MLS 1.0", 850, 1.00, 1.55},
+        {"O-RING BLOK", 1500, 0.90, 1.90}, {"BAKIR + O-RING", 1900, 1.10, 2.20}, {"COOPER RING", 1700, 1.00, 2.30},
+        {"YARIS MLS 1.5 MM", 500, 1.50, 1.70},
     };
     return t;
 }
@@ -155,9 +155,8 @@ const std::vector<GbStrOpt>& gbStrengthTable() {
 const std::vector<CoolOpt>& coolingTable() {
     static const std::vector<CoolOpt> t = {
         {"STOK", 0, 1.0, 0.40}, {"ALU RADYATOR 2 SIRA", 500, 1.25, 0.40}, {"ALU RADYATOR 3 SIRA", 750, 1.45, 0.40},
-        {"BUYUK ALU RADYATOR", 1000, 1.70, 0.45}, {"ELEKTRIK FAN", 350, 1.15, 0.70}, {"CIFT FAN", 550, 1.25, 0.85},
-        {"DUSUK ISI TERMOSTAT", 120, 1.10, 0.45}, {"SU KATKISI", 60, 1.08, 0.42}, {"YARIS RADYATORU + FAN", 1800, 2.10, 0.85},
-        {"TAM YARIS SOGUTMA", 3200, 2.60, 1.00},
+        {"BUYUK ALU RADYATOR", 1000, 1.70, 0.45}, {"CIFT SIRA BAKIR", 650, 1.30, 0.40}, {"YARIS RADYATORU", 1500, 1.90, 0.45},
+        {"ON + YAN RADYATOR", 2400, 2.20, 0.50}, {"TAM YARIS RADYATORU", 3000, 2.40, 0.50},
     };
     return t;
 }
@@ -216,7 +215,7 @@ const std::vector<IcOpt>& intercoolerTable() {
     static const std::vector<IcOpt> t = {
         {"STOK / YOK", 0, 1.0}, {"KUCUK ON MONTAJ", 450, 1.02}, {"ORTA ON MONTAJ", 700, 1.04}, {"BUYUK ON MONTAJ", 1000, 1.06},
         {"BAR-PLATE YARIS", 1400, 1.08}, {"SU-HAVA", 1800, 1.09}, {"SU-HAVA + BUZ KUTUSU", 2400, 1.12},
-        {"METANOL ENJEKSIYON", 1600, 1.08}, {"SU + METANOL", 2000, 1.10}, {"CO2 SOGUTMA SPREYI", 1200, 1.05},
+        {"DEV ON MONTAJ", 1300, 1.07}, {"CIFT GECIS", 1500, 1.075}, {"YARIS SU-HAVA", 2600, 1.10},
     };
     return t;
 }
@@ -228,6 +227,159 @@ const std::vector<FuelSysOpt>& fuelSysTable() {
     };
     return t;
 }
+// ---- bilesen tablolari (ayni anda takilabilen parcalar)
+const std::vector<IntakeOpt>& throttleTable() {
+    static const std::vector<IntakeOpt> t = {
+        {"STOK KELEBEK", 0, 1.0, 1.0}, {"+2 MM", 250, 1.0, 1.015}, {"+4 MM", 400, 1.0, 1.03}, {"+6 MM", 550, 1.0, 1.045},
+        {"BUYUK GAZ KELEBEGI", 700, 1.0, 1.07}, {"70 MM", 800, 0.995, 1.075}, {"75 MM", 900, 0.99, 1.08}, {"80 MM", 1050, 0.985, 1.085},
+        {"CIFT KELEBEK", 1400, 0.99, 1.09}, {"YARIS ELEKTRONIK KELEBEK", 1700, 1.0, 1.09},
+    };
+    return t;
+}
+const std::vector<IntakeOpt>& intakeManiTable() {
+    static const std::vector<IntakeOpt> t = {
+        {"STOK MANIFOLD", 0, 1.0, 1.0}, {"PORTLU MANIFOLD", 1400, 0.98, 1.10}, {"UZUN YOLLU (TORK)", 900, 1.05, 0.99},
+        {"KISA YOLLU (DEVIR)", 1000, 0.97, 1.08}, {"DEGISKEN UZUNLUK", 1900, 1.04, 1.06}, {"BUYUK PLENUM", 1300, 0.98, 1.09},
+        {"KOMPOZIT MANIFOLD", 700, 1.01, 1.04}, {"BILLET MANIFOLD", 2600, 1.0, 1.11}, {"ITB TEKIL KELEBEK", 4200, 1.04, 1.13},
+        {"YARIS PLENUMU", 3000, 0.99, 1.12},
+    };
+    return t;
+}
+const std::vector<ShapeOpt>& headerTable() {
+    static const std::vector<ShapeOpt> t = {
+        {"STOK MANIFOLD", 0, 1.0, 1.0}, {"HEADER 4-2-1", 1300, 1.05, 1.04}, {"HEADER 4-1 (TEPE)", 1600, 0.99, 1.08},
+        {"TUBULAR MANIFOLD", 2000, 1.03, 1.08}, {"PASLANMAZ 4-2-1", 900, 1.04, 1.035}, {"KISA HEADER", 600, 1.02, 1.03},
+        {"SERAMIK KAPLAMA HEADER", 1700, 1.05, 1.05}, {"ESIT UZUNLUK", 2200, 1.04, 1.07}, {"INCONEL", 3400, 1.04, 1.09},
+        {"YARIS 4-1 MEGAFON", 2800, 0.97, 1.11},
+    };
+    return t;
+}
+const std::vector<ShapeOpt>& catalystTable() {
+    static const std::vector<ShapeOpt> t = {
+        {"STOK KATALIZOR", 0, 1.0, 1.0}, {"200 HUCRE", 400, 1.01, 1.015}, {"100 HUCRE METAL", 700, 1.015, 1.025},
+        {"SPOR KATALIZOR", 900, 1.02, 1.03}, {"TEST BORUSU (IPTAL)", 400, 1.02, 1.03}, {"DOWNPIPE + IPTAL", 700, 1.025, 1.04},
+    };
+    return t;
+}
+const std::vector<IcOpt>& methTable() {
+    static const std::vector<IcOpt> t = {
+        {"YOK", 0, 1.0}, {"SU ENJEKSIYONU", 900, 1.03}, {"METANOL ENJEKSIYON", 1600, 1.06}, {"SU + METANOL", 2000, 1.08},
+        {"CIFT NOZUL SU + METANOL", 2500, 1.09}, {"CO2 SOGUTMA SPREYI", 1200, 1.03},
+    };
+    return t;
+}
+const std::vector<BearingOpt>& headStudTable() {
+    static const std::vector<BearingOpt> t = {
+        {"STOK CIVATA", 0, 1.0}, {"ARP KAPAK SAPLAMASI", 600, 1.15}, {"ARP 2000", 800, 1.22}, {"ARP L19", 1100, 1.30},
+        {"CUSTOM AGE 625", 1600, 1.38},
+    };
+    return t;
+}
+const std::vector<BearingOpt>& mainSupportTable() {
+    static const std::vector<BearingOpt> t = {
+        {"STOK", 0, 1.0}, {"ARP ANA CIVATA", 500, 1.08}, {"ANA YATAK KUSAGI", 1400, 1.15}, {"BILLET ANA KAPAK", 1900, 1.18},
+        {"KUSAK + ARP", 2200, 1.25}, {"TAM BLOK DESTEK", 3600, 1.35},
+    };
+    return t;
+}
+const std::vector<BrakeOpt>& brakeDiscTable() {
+    static const std::vector<BrakeOpt> t = {
+        {"STOK DISK", 0, 1.0}, {"DELIKLI DISK", 450, 1.05}, {"YIVLI DISK", 400, 1.06}, {"DELIKLI + YIVLI", 600, 1.08},
+        {"BUYUK DISK 330 MM", 1400, 1.12}, {"IKI PARCA DISK", 2200, 1.16}, {"BUYUK DISK 380 MM", 3200, 1.20},
+        {"KARBON SERAMIK", 7000, 1.32}, {"KARBON-KARBON", 10000, 1.42},
+    };
+    return t;
+}
+const std::vector<BrakeOpt>& brakeCaliperTable() {
+    static const std::vector<BrakeOpt> t = {
+        {"STOK KALIPER", 0, 1.0}, {"4 PISTONLU", 1600, 1.10}, {"6 PISTONLU", 2600, 1.18}, {"MONOBLOK 6", 3400, 1.22},
+        {"8 PISTONLU", 4200, 1.26}, {"YARIS KALIPERI", 5000, 1.30},
+    };
+    return t;
+}
+const std::vector<WeightOpt>& weightBodyTable() {
+    static const std::vector<WeightOpt> t = {
+        {"STOK", 0, 0}, {"KARBON BAGAJ -10 KG", 900, 10}, {"KARBON KAPUT -12 KG", 1200, 12}, {"KAPUT + BAGAJ -22 KG", 2000, 22},
+        {"FIBER KAPILAR -30 KG", 2600, 30}, {"KARBON PANELLER -70 KG", 5500, 70}, {"KOMPLE KARBON KASA -110 KG", 9000, 110},
+    };
+    return t;
+}
+const std::vector<WeightOpt>& weightGlassTable() {
+    static const std::vector<WeightOpt> t = {
+        {"STOK", 0, 0}, {"LEXAN ARKA CAM -8 KG", 600, 8}, {"LEXAN YAN CAMLAR -12 KG", 900, 12},
+        {"LEXAN ARKA + YAN -20 KG", 1400, 20}, {"TUM LEXAN -28 KG", 2200, 28},
+    };
+    return t;
+}
+const std::vector<WeightOpt>& weightChassisTable() {
+    static const std::vector<WeightOpt> t = {
+        {"STOK", 0, 0}, {"ALU SALINCAKLAR -15 KG", 1500, 15}, {"ALU SUBFRAME -25 KG", 2500, 25}, {"BORU ON SASI -45 KG", 6000, 45},
+        {"BORU SASI -90 KG", 12000, 90},
+    };
+    return t;
+}
+const std::vector<AeroOpt>& aeroFrontTable() {
+    static const std::vector<AeroOpt> t = {
+        {"STOK", 0, 1.0, 0}, {"ON LIP", 300, 0.99, 120}, {"SPLITTER", 650, 1.0, 200}, {"CANARD", 450, 1.01, 90},
+        {"YARIS ON TAMPONU", 1500, 0.99, 260},
+    };
+    return t;
+}
+const std::vector<AeroOpt>& aeroSideTable() {
+    static const std::vector<AeroOpt> t = {
+        {"STOK", 0, 1.0, 0}, {"YAN ETEK", 400, 0.99, 40}, {"KARBON YAN ETEK", 900, 0.985, 50}, {"YAN KANATCIK", 500, 1.005, 60},
+        {"GENIS KASA KITI", 3500, 1.03, 120},
+    };
+    return t;
+}
+const std::vector<AeroOpt>& aeroUnderTable() {
+    static const std::vector<AeroOpt> t = {
+        {"STOK", 0, 1.0, 0}, {"ALT KAPLAMA", 600, 0.98, 60}, {"DIFUZOR + ALT KAPLAMA", 1800, 0.97, 260}, {"DUZ TABAN", 1400, 0.96, 150},
+        {"YARIS DIFUZORU", 2800, 0.97, 380},
+    };
+    return t;
+}
+const std::vector<CoolOpt>& fanTable() {
+    static const std::vector<CoolOpt> t = {
+        {"STOK FAN", 0, 1.0, 0.40}, {"ELEKTRIK FAN", 350, 1.05, 0.70}, {"CIFT FAN", 550, 1.08, 0.85}, {"YUKSEK DEBI FAN", 500, 1.06, 0.90},
+        {"CIFT YUKSEK DEBI", 800, 1.10, 1.00}, {"DAVLUMBAZ + CIFT FAN", 1100, 1.12, 1.00},
+    };
+    return t;
+}
+const std::vector<CoolOpt>& coolMiscTable() {
+    static const std::vector<CoolOpt> t = {
+        {"STOK", 0, 1.0, 0}, {"DUSUK ISI TERMOSTAT", 120, 1.10, 0}, {"SU KATKISI", 60, 1.08, 0}, {"TERMOSTAT + KATKI", 170, 1.18, 0},
+        {"YARIS SU POMPASI", 600, 1.12, 0},
+    };
+    return t;
+}
+const std::vector<CoolOpt>& oilCoolerTable() {
+    static const std::vector<CoolOpt> t = {
+        {"YOK", 0, 1.0, 0}, {"KUCUK YAG SOGUTUCU", 400, 1.04, 0}, {"BUYUK YAG SOGUTUCU", 650, 1.07, 0},
+        {"TERMOSTATLI SOGUTUCU", 800, 1.08, 0}, {"YARIS YAG SOGUTUCU", 1200, 1.10, 0},
+    };
+    return t;
+}
+const std::vector<OilOpt>& oilPumpTable() {
+    static const std::vector<OilOpt> t = {
+        {"STOK POMPA", 0, false, 0.0}, {"YUKSEK HACIMLI", 700, false, 1.0}, {"YUKSEK BASINC", 600, false, 0.5},
+        {"AKUMULATOR", 800, false, 1.1}, {"YARIS POMPASI", 1500, false, 1.5},
+    };
+    return t;
+}
+namespace {
+template <class T> const T& rowOf(const std::vector<T>& t, int i) { return t[std::clamp(i, 0, (int)t.size() - 1)]; }
+}
+double coolingCapMul(const Tune& t) {
+    return rowOf(coolingTable(), t.cooling).cap * rowOf(fanTable(), t.fan).cap * rowOf(coolMiscTable(), t.coolMisc).cap
+         * rowOf(oilCoolerTable(), t.oilCooler).cap;
+}
+double coolingLowSpeed(const Tune& t) { return std::max(rowOf(coolingTable(), t.cooling).lowSpeed, rowOf(fanTable(), t.fan).lowSpeed); }
+int Tune::totalWeightKg() const {
+    return weightKg(weight) + (int)rowOf(weightBodyTable(), weightBody).kg + (int)rowOf(weightGlassTable(), weightGlass).kg
+         + (int)rowOf(weightChassisTable(), weightChassis).kg;
+}
+
 const std::vector<FuelSysOpt>& fuelPumpTable() {
     static const std::vector<FuelSysOpt> t = {
         {"STOK POMPA", 0, 1.35}, {"190 LPH", 250, 1.60}, {"255 LPH", 400, 2.00}, {"340 LPH", 600, 2.50}, {"450 LPH", 850, 3.00},
@@ -356,9 +508,8 @@ const std::vector<FuelOpt>& fuelTable() {
 const std::vector<OilOpt>& oilTable() {
     static const std::vector<OilOpt> t = {
         {"ISLAK KARTER", 0, false, 4.5}, {"KURU KARTER", 3500, true, 4.5}, {"BAFILLI KARTER", 450, false, 5.0},
-        {"YAG SOGUTUCU", 600, false, 5.0}, {"AKUMULATOR", 800, false, 5.6}, {"GENIS KARTER", 900, false, 6.5},
-        {"YUKSEK HACIMLI POMPA", 700, false, 5.5}, {"KURU KARTER 3 KADEME", 4200, true, 6.0},
-        {"KURU KARTER 5 KADEME", 5800, true, 7.0}, {"YARIS YAG SISTEMI", 7500, true, 8.0},
+        {"GENIS KARTER", 900, false, 6.5}, {"KANATLI KARTER", 650, false, 5.2}, {"ALU YARIS KARTERI", 1300, false, 6.0},
+        {"KURU KARTER 3 KADEME", 4200, true, 6.0}, {"KURU KARTER 5 KADEME", 5800, true, 7.0}, {"YARIS YAG SISTEMI", 7500, true, 8.0},
     };
     return t;
 }
@@ -414,10 +565,8 @@ const std::vector<GearOpt>& gearTable() {
 }
 const std::vector<WeightOpt>& weightTable() {
     static const std::vector<WeightOpt> t = {
-        {"STOK", 0, 0}, {"-40 KG", 600, 40}, {"-85 KG", 1800, 85}, {"-140 KG", 4000, 140},
-        {"STEPNE + BAGAJ -15 KG", 100, 15}, {"ARKA KOLTUK -25 KG", 250, 25}, {"IC DOSEME -60 KG", 900, 60},
-        {"KARBON KAPUT + BAGAJ -110 KG", 3000, 110}, {"LEXAN CAM + KARBON -175 KG", 5200, 175},
-        {"TAM YARIS ICI -220 KG", 7000, 220}, {"KARBON PANELLER -280 KG", 9800, 280}, {"BORU SASI ON -350 KG", 14000, 350},
+        {"STOK", 0, 0}, {"STEPNE + BAGAJ -15 KG", 100, 15}, {"ARKA KOLTUK -25 KG", 250, 25}, {"IC DOSEME -60 KG", 900, 60},
+        {"YARIS KOLTUKLARI -75 KG", 1500, 75}, {"TAM YARIS ICI -110 KG", 3000, 110},
     };
     return t;
 }
@@ -456,17 +605,16 @@ const std::vector<SuspOpt>& suspTable() {
 }
 const std::vector<BrakeOpt>& brakeTable() {
     static const std::vector<BrakeOpt> t = {
-        {"STOK", 0, 1.0}, {"SPOR BALATA", 200, 1.10}, {"DELIKLI DISK", 450, 1.15}, {"YARIS BALATA", 400, 1.22},
-        {"4 PISTONLU KIT", 1600, 1.32}, {"6 PISTONLU KIT", 2600, 1.45}, {"BUYUK DISK 380 MM", 3200, 1.55},
-        {"YARIS KITI", 4200, 1.70}, {"KARBON SERAMIK", 7800, 1.90}, {"KARBON-KARBON", 11000, 2.10},
+        {"STOK", 0, 1.0}, {"SPOR BALATA", 200, 1.10}, {"YARIS BALATA", 400, 1.22}, {"SERAMIK SOKAK", 250, 1.08},
+        {"PERFORMANS", 300, 1.15}, {"PIST BALATASI", 550, 1.28}, {"KARBON METALIK", 700, 1.32}, {"DRAG BALATASI", 350, 1.12},
     };
     return t;
 }
 const std::vector<AeroOpt>& aeroTable() {
     static const std::vector<AeroOpt> t = {
-        {"STOK", 0, 1.0, 0}, {"ON LIP", 300, 0.99, 120}, {"YAN ETEK", 400, 0.99, 40}, {"ARKA SPOILER", 500, 1.01, 180},
+        {"STOK", 0, 1.0, 0}, {"LIP SPOILER", 300, 1.00, 80}, {"KUCUK KANAT", 700, 1.02, 250}, {"ARKA SPOILER", 500, 1.01, 180},
         {"DUCKTAIL", 650, 1.00, 140}, {"GT KANAT", 1500, 1.05, 450}, {"YARIS KANADI", 2600, 1.08, 700},
-        {"DIFUZOR + ALT KAPLAMA", 1800, 0.97, 260}, {"DRAG PAKETI (DUSUK SURTUNME)", 1400, 0.90, 0},
+        {"SWAN NECK KANAT", 3200, 1.06, 750}, {"DRAG PAKETI (DUSUK SURTUNME)", 1400, 0.90, 0},
         {"OZEL KANAT (ATOLYE)", 0, 1.0, 0},
     };
     return t;
@@ -556,6 +704,14 @@ std::string Tune::signature() const {
     std::snprintf(w, sizeof w, "|w%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", wearEngine, wearTires, wearBrakes, wearSusp, wearBody, wearElec);
     std::string out = std::string(b) + w;
     if (launchRpm > 0) { char l[16]; std::snprintf(l, sizeof l, "|L%d", launchRpm); out += l; }
+    if (throttleBody || intakeMani || header || catalyst || meth || headStud || mainSupport || brakeDisc || brakeCaliper || weightBody
+        || weightGlass || weightChassis || aeroFront || aeroSide || aeroUnder || fan || coolMisc || oilCooler || oilPump) {
+        char c[160];
+        std::snprintf(c, sizeof c, "|C%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", throttleBody, intakeMani, header, catalyst, meth,
+                      headStud, mainSupport, brakeDisc, brakeCaliper, weightBody, weightGlass, weightChassis, aeroFront, aeroSide, aeroUnder,
+                      fan, coolMisc, oilCooler, oilPump);
+        out += c;
+    }
     if (fuelPump || injector || fuelLine || ecuNewSystem(*this)) {
         char e[96];
         std::snprintf(e, sizeof e, "|F%d,%d,%d|E%d,%d,%d,%d,%d,%d,%d,%d", fuelPump, injector, fuelLine, ecuHw, swMap, swRev, swLaunch, swFlat,
@@ -583,12 +739,12 @@ Durability durability(const VehicleDef& v, const Tune* t) {
     auto rowT = [](const auto& tab, int i) -> const auto& { return tab[std::clamp(i, 0, (int)tab.size() - 1)]; };
     double weakest = std::min({rowT(pistonTable(), t->piston).strength, rowT(rodTable(), t->rod).strength,
                                rowT(crankTable(), t->crank).strength});
-    double gasket = rowT(gasketTable(), t->gasket).strength;
+    double gasket = rowT(gasketTable(), t->gasket).strength * rowT(headStudTable(), t->headStud).strength;
     if (t->turbo == 1 || t->turbo == 2) { weakest = std::max(weakest, 1.9); gasket = std::max(gasket, 1.6); }   // v1 kitleri dovme ic aksamli
     const EngineDef& ed = engineTable()[effectiveEngine(v, t)];
     const bool boosted = ed.induction == Induction::Turbo || ed.induction == Induction::TwinTurbo ||
                          ed.induction == Induction::Supercharger || t->turbo > 0 || t->superch > 0;
-    const double eng = tf * 1.30 * weakest * rowT(bearingTable(), t->bearing).strength * (boosted ? std::min(gasket, 1.0 + (weakest - 1.0)) : 1.0);
+    const double eng = tf * 1.30 * weakest * rowT(bearingTable(), t->bearing).strength * rowT(mainSupportTable(), t->mainSupport).strength * (boosted ? std::min(gasket, 1.0 + (weakest - 1.0)) : 1.0);
     double box = factoryBox;
     if (t->gearSwap > 0 && t->gearSwap < (int)gearTable().size() && gearTable()[t->gearSwap].strengthNm > 0) box = gearTable()[t->gearSwap].strengthNm;
     box *= rowT(gbStrengthTable(), t->gbStrength).mul;

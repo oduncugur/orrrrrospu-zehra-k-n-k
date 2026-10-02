@@ -89,7 +89,18 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             scaleCurves(eng_, shapeMul, &a); scaleCurves(eng_, shapeMul, &b);
             double m = ecuMul; scaleCurves(eng_, constMul, &m);
         }
-        const double ic = row(intercoolerTable(), tune->intercooler).eff;
+        {   // Bilesenler: gaz kelebegi, emme manifoldu, egzoz manifoldu, katalizor (0 = stok: etkisiz)
+            const IntakeOpt& TH = row(throttleTable(), tune->throttleBody);
+            const IntakeOpt& MA = row(intakeManiTable(), tune->intakeMani);
+            const ShapeOpt& HE = row(headerTable(), tune->header);
+            const ShapeOpt& CT = row(catalystTable(), tune->catalyst);
+            auto apply = [&](double lo, double hi) { ShapeCtx c{red0, lo, hi}; scaleCurves(eng_, shapeMul, &c); };
+            if (tune->throttleBody > 0) apply(TH.low, TH.high);
+            if (tune->intakeMani > 0) apply(MA.low, MA.high);
+            if (tune->header > 0) apply(HE.low, HE.high);
+            if (tune->catalyst > 0) apply(CT.low, CT.high);
+        }
+        const double ic = row(intercoolerTable(), tune->intercooler).eff * row(methTable(), tune->meth).eff;   // + su-metanol
         const TurbineOpt& TB = row(turbineTable(), tune->turbine);
         boostFac_ = boostTot_ = ed ? ed->boostBar : 0.0;
         icCredit_ = (ic - 1.0) * 60.0;                                         // soguk sarj: 1.12 -> ~7 oktan
@@ -176,10 +187,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const Durability du = durability(*car, tune);
         engRating_ = du.engineNm; gbRating_ = du.gearboxNm;
         const double factoryW = peakHp(buildEngineSpec(*car)) * 745.7;
-        const CoolOpt& CO = row(coolingTable(), tune ? tune->cooling : 0);
-        coolCap_ = factoryW * 0.33 / 105.0 * CO.cap;                         // W/K (tam yuk, 40 m/s'de 105 C dengesi)
-        coolLow_ = CO.lowSpeed;
-        if (tune && tune->oil > 0) coolCap_ *= 1.06;                          // yag sogutucu / genis karter
+        coolCap_ = factoryW * 0.33 / 105.0 * coolingCapMul(*tune);           // W/K (tam yuk, 40 m/s'de 105 C dengesi)
+        coolLow_ = coolingLowSpeed(*tune);                                    // radyator x fan x termostat x yag sogutucu
     }
     pt_ = std::make_unique<PowertrainCore>(eng_, clutch, diff, gbx_);
     tmax_ = std::max(1.0, Tmax);
@@ -217,6 +226,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     }
     double oilL = cfg.oilLiters;
     if (tune && tune->oil > 0) { const OilOpt& O = row(oilTable(), tune->oil); cfg_.drySump = cfg_.drySump || O.dry; oilL = O.liters; }
+    if (tune && tune->oilPump > 0) oilL += row(oilPumpTable(), tune->oilPump).liters;   // yag pompasi / akumulator
     fail_ = std::make_unique<DrivetrainFailure>(axle, LubeSpec{cfg_.drySump, oilL, 3.0});
 
     const double ambient = 25.0;
@@ -255,7 +265,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     if (cfg.laneAsymmetry) w_[dL_].setSurfaceMu(0.96);
 
     fuelDensity_ = (cfg_.fuel == FuelType::E85) ? 0.785 : 0.745;
-    baseMass_ = (car ? car->massKg : 1080.0) + 75.0 - (tune ? Tune::weightKg(tune->weight) : 0);   // kuru arac + surucu - hafifletme
+    baseMass_ = (car ? car->massKg : 1080.0) + 75.0 - (tune ? tune->totalWeightKg() : 0);   // kuru arac + surucu - hafifletme
     if (tune && car) baseMass_ += swapMassDelta(*car, *tune) + 45.0 * std::clamp(tune->wearBody, 0.0, 1.0);   // pas / macun
     fuelKg_ = cfg.fuelLiters * fuelDensity_;
     const SuspOpt& SU = row(suspTable(), tune ? tune->susp : 0);
@@ -284,11 +294,13 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     }
     brakeTotal_ = 7000.0 * (baseMass_ / 1155.0);
     if (tune) {
-        brakeTotal_ *= row(brakeTable(), tune->brakes).mul * (1.0 - 0.5 * std::clamp(tune->wearBrakes, 0.0, 1.0));
+        brakeTotal_ *= row(brakeTable(), tune->brakes).mul * row(brakeDiscTable(), tune->brakeDisc).mul * row(brakeCaliperTable(), tune->brakeCaliper).mul
+                     * (1.0 - 0.5 * std::clamp(tune->wearBrakes, 0.0, 1.0));     // balata x disk x kaliper
         CdA_ *= 1.0 + 0.05 * std::clamp(tune->wearBody, 0.0, 1.0);
         const AeroOpt A = tune->aero == kCustomAero ? customAero(*tune) : row(aeroTable(), tune->aero);
-        CdA_ *= A.cd;
-        dfK_ = A.downforce / (27.78 * 27.78);                               // N / (m/s)^2
+        const AeroOpt& F = row(aeroFrontTable(), tune->aeroFront), &S = row(aeroSideTable(), tune->aeroSide), &U = row(aeroUnderTable(), tune->aeroUnder);
+        CdA_ *= A.cd * F.cd * S.cd * U.cd;                                    // arka + on + yan + alt
+        dfK_ = (A.downforce + F.downforce + S.downforce + U.downforce) / (27.78 * 27.78);   // N / (m/s)^2
     }
     // Yaw ataleti: ~ m * (dingil/2)^2 * 1.1 (tipik binek: 1200 kg, 2.6 m -> ~2200 kg m^2)
     Iz_ = vl_.mass * std::pow(0.5 * vl_.wheelbase, 2.0) * 1.1 + 0.08 * vl_.mass * vl_.track * vl_.track;

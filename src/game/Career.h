@@ -29,20 +29,25 @@ struct OwnedCar {
 };
 
 // Parca kategorileri (dukkan; PartTables tablolari). Her secenek Tune'da tek bir alani degistirir. Sekmeler: partTab().
+// Ayni anda takilabilen gercek parcalar ayri kategoridir (filtre + kelebek + manifold, balata + disk + kaliper ...).
 enum class PartCat {
     // MOTOR
-    Head, Valve, Cam, Piston, Rod, Crank, Bearing, Gasket, Flywheel, EngineSwap,
-    // BESLEME
-    Intake, Exhaust, Turbo, Turbine, Wastegate, BoostCtl, Supercharger, Intercooler, Nitrous, FuelPump, Injector, FuelLine, Fuel,
+    Head, Valve, Cam, Piston, Rod, Crank, Bearing, MainSupport, Gasket, HeadStud, Flywheel, EngineSwap,
+    // EMME / EGZOZ
+    Intake, Throttle, IntakeMani, Header, Catalyst, Exhaust,
+    // TURBO / YAKIT
+    Turbo, Turbine, Wastegate, BoostCtl, Supercharger, Intercooler, Meth, Nitrous, FuelPump, Injector, FuelLine, Fuel,
     // AKTARMA
     Clutch, Gearbox, GbStrength, FinalDrive, Diff, Axles,
     // SASI
-    Tires, Rims, Suspension, Brakes, Weight, Aero,
-    // ECU / SOGUTMA
-    Ecu, Electronics, Cooling, DrySump,
+    Tires, Rims, Suspension, Brakes, BrakeDisc, BrakeCaliper,
+    // KAPORTA (hafifletme + aero)
+    Weight, WeightBody, WeightGlass, WeightChassis, AeroFront, AeroSide, Aero, AeroUnder,
+    // ECU / SOGUTMA / YAG
+    Ecu, Electronics, Cooling, Fan, CoolMisc, DrySump, OilCooler, OilPump,
     Count
 };
-constexpr int kPartTabs = 5;
+constexpr int kPartTabs = 7;
 const char* partTabName(int tab);
 int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)

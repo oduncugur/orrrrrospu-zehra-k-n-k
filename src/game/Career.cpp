@@ -24,12 +24,13 @@ template <class T> int clampRow(const std::vector<T>& t, int i) { return std::cl
 } // namespace
 
 const char* partTabName(int tab) {
-    static const char* n[kPartTabs] = {"MOTOR", "BESLEME", "AKTARMA", "SASI", "ECU+SOGUTMA"};
+    static const char* n[kPartTabs] = {"MOTOR", "EMME", "TURBO", "AKTARMA", "SASI", "KAPORTA", "ECU"};
     return n[std::clamp(tab, 0, kPartTabs - 1)];
 }
 int partTab(PartCat c) {
     const int i = (int)c;
-    return i <= (int)PartCat::EngineSwap ? 0 : i <= (int)PartCat::Fuel ? 1 : i <= (int)PartCat::Axles ? 2 : i <= (int)PartCat::Aero ? 3 : 4;
+    return i <= (int)PartCat::EngineSwap ? 0 : i <= (int)PartCat::Exhaust ? 1 : i <= (int)PartCat::Fuel ? 2 : i <= (int)PartCat::Axles ? 3
+         : i <= (int)PartCat::BrakeCaliper ? 4 : i <= (int)PartCat::AeroUnder ? 5 : 6;
 }
 int customOption(PartCat c) {
     switch (c) {
@@ -45,12 +46,15 @@ int customOption(PartCat c) {
 
 const char* partCatName(PartCat c) {
     static const char* n[(int)PartCat::Count] = {
-        "SILINDIR KAPAGI", "SUPAP + YAY", "KAM MILI", "PISTON", "BIYEL", "KRANK", "YATAK", "KAPAK CONTASI", "VOLAN", "MOTOR SWAP",
-        "EMME", "EGZOZ", "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "NITRO (NOS)",
+        "SILINDIR KAPAGI", "SUPAP + YAY", "KAM MILI", "PISTON", "BIYEL", "KRANK", "YATAK", "ANA YATAK DESTEGI", "KAPAK CONTASI",
+        "KAPAK SAPLAMASI", "VOLAN", "MOTOR SWAP",
+        "HAVA FILTRESI / EMME", "GAZ KELEBEGI", "EMME MANIFOLDU", "EGZOZ MANIFOLDU", "KATALIZOR", "EGZOZ HATTI / SUSTURUCU",
+        "TURBO", "TURBIN", "WASTEGATE", "BOOST KONTROL", "KOMPRESOR", "INTERCOOLER", "SU / METANOL", "NITRO (NOS)",
         "YAKIT POMPASI", "ENJEKTOR", "YAKIT HATTI / REGULATOR", "YAKIT",
         "DEBRIYAJ", "SANZIMAN SWAP", "SANZIMAN GUCLENDIRME", "SON DISLI", "DIFERANSIYEL", "AKS",
-        "LASTIK", "JANT", "SUSPANSIYON", "FREN", "HAFIFLETME", "AERO",
-        "ECU", "ELEKTRONIK", "SOGUTMA", "YAG / KARTER"};
+        "LASTIK", "JANT", "SUSPANSIYON", "FREN BALATASI", "FREN DISKI", "KALIPER",
+        "IC HAFIFLETME", "KAPORTA HAFIFLETME", "CAM", "SASI HAFIFLETME", "ON AERO", "YAN AERO", "ARKA KANAT / SPOILER", "ALT AERO",
+        "ECU", "ELEKTRONIK", "RADYATOR", "FAN", "TERMOSTAT / KATKI", "KARTER", "YAG SOGUTUCU", "YAG POMPASI"};
     return n[(int)c];
 }
 
@@ -64,6 +68,17 @@ const std::vector<PartOption>& partOptions(PartCat c) {
         t[(int)PartCat::Rod] = opts(rodTable());            t[(int)PartCat::Crank] = opts(crankTable());
         t[(int)PartCat::Bearing] = opts(bearingTable());    t[(int)PartCat::Gasket] = opts(gasketTable());
         t[(int)PartCat::Flywheel] = opts(flywheelTable());
+        t[(int)PartCat::MainSupport] = opts(mainSupportTable()); t[(int)PartCat::HeadStud] = opts(headStudTable());
+        t[(int)PartCat::Throttle] = opts(throttleTable());  t[(int)PartCat::IntakeMani] = opts(intakeManiTable());
+        t[(int)PartCat::Header] = opts(headerTable());      t[(int)PartCat::Catalyst] = opts(catalystTable());
+        t[(int)PartCat::Meth] = opts(methTable());
+        t[(int)PartCat::BrakeDisc] = opts(brakeDiscTable()); t[(int)PartCat::BrakeCaliper] = opts(brakeCaliperTable());
+        t[(int)PartCat::WeightBody] = opts(weightBodyTable()); t[(int)PartCat::WeightGlass] = opts(weightGlassTable());
+        t[(int)PartCat::WeightChassis] = opts(weightChassisTable());
+        t[(int)PartCat::AeroFront] = opts(aeroFrontTable()); t[(int)PartCat::AeroSide] = opts(aeroSideTable());
+        t[(int)PartCat::AeroUnder] = opts(aeroUnderTable());
+        t[(int)PartCat::Fan] = opts(fanTable());            t[(int)PartCat::CoolMisc] = opts(coolMiscTable());
+        t[(int)PartCat::OilCooler] = opts(oilCoolerTable()); t[(int)PartCat::OilPump] = opts(oilPumpTable());
         {   // Motor swap: fabrika + tum motorlar (guce gore); ad: kod + duzen + guc
             static std::vector<std::string> names;
             names.reserve(swapEngines().size() + 1);
@@ -102,6 +117,16 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     case PartCat::Rod: return t.rod;             case PartCat::Crank: return t.crank;
     case PartCat::Bearing: return t.bearing;     case PartCat::Gasket: return t.gasket;
     case PartCat::Flywheel: return t.flywheel;   case PartCat::EngineSwap: return t.engineSwap;
+    case PartCat::MainSupport: return t.mainSupport; case PartCat::HeadStud: return t.headStud;
+    case PartCat::Throttle: return t.throttleBody; case PartCat::IntakeMani: return t.intakeMani;
+    case PartCat::Header: return t.header;       case PartCat::Catalyst: return t.catalyst;
+    case PartCat::Meth: return t.meth;
+    case PartCat::BrakeDisc: return t.brakeDisc; case PartCat::BrakeCaliper: return t.brakeCaliper;
+    case PartCat::WeightBody: return t.weightBody; case PartCat::WeightGlass: return t.weightGlass;
+    case PartCat::WeightChassis: return t.weightChassis;
+    case PartCat::AeroFront: return t.aeroFront; case PartCat::AeroSide: return t.aeroSide; case PartCat::AeroUnder: return t.aeroUnder;
+    case PartCat::Fan: return t.fan;             case PartCat::CoolMisc: return t.coolMisc;
+    case PartCat::OilCooler: return t.oilCooler; case PartCat::OilPump: return t.oilPump;
     case PartCat::Intake: return t.intake;       case PartCat::Exhaust: return t.exhaust;
     case PartCat::Turbo: return t.turbo;         case PartCat::Turbine: return t.turbine;
     case PartCat::Wastegate: return t.wastegate; case PartCat::BoostCtl: return t.boostCtl;
@@ -137,6 +162,16 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::Rod: t.rod = l; break;             case PartCat::Crank: t.crank = l; break;
     case PartCat::Bearing: t.bearing = l; break;     case PartCat::Gasket: t.gasket = l; break;
     case PartCat::Flywheel: t.flywheel = l; break;   case PartCat::EngineSwap: t.engineSwap = l; break;
+    case PartCat::MainSupport: t.mainSupport = l; break; case PartCat::HeadStud: t.headStud = l; break;
+    case PartCat::Throttle: t.throttleBody = l; break; case PartCat::IntakeMani: t.intakeMani = l; break;
+    case PartCat::Header: t.header = l; break;       case PartCat::Catalyst: t.catalyst = l; break;
+    case PartCat::Meth: t.meth = l; break;
+    case PartCat::BrakeDisc: t.brakeDisc = l; break; case PartCat::BrakeCaliper: t.brakeCaliper = l; break;
+    case PartCat::WeightBody: t.weightBody = l; break; case PartCat::WeightGlass: t.weightGlass = l; break;
+    case PartCat::WeightChassis: t.weightChassis = l; break;
+    case PartCat::AeroFront: t.aeroFront = l; break; case PartCat::AeroSide: t.aeroSide = l; break; case PartCat::AeroUnder: t.aeroUnder = l; break;
+    case PartCat::Fan: t.fan = l; break;             case PartCat::CoolMisc: t.coolMisc = l; break;
+    case PartCat::OilCooler: t.oilCooler = l; break; case PartCat::OilPump: t.oilPump = l; break;
     case PartCat::Intake: t.intake = l; break;       case PartCat::Exhaust: t.exhaust = l; break;
     case PartCat::Turbo: t.turbo = l; break;         case PartCat::Turbine: t.turbine = l; break;
     case PartCat::Wastegate: t.wastegate = l; break; case PartCat::BoostCtl: t.boostCtl = l; break;
@@ -359,7 +394,9 @@ std::string tuneSummary(const Tune& t) {
     if (t.fuel == FuelType::E85) add("E85");
     int more = 0;                                                  // diger parcalar
     for (int x : {t.cam, t.valve, t.head, t.piston, t.rod, t.crank, t.bearing, t.gasket, t.flywheel, t.turbine, t.wastegate,
-                  t.boostCtl, t.intercooler, t.fuelSys, t.fuelPump, t.injector, t.fuelLine, t.gbStrength, t.gearSwap, t.finalSel, t.rims, t.susp, t.brakes, t.aero, t.cooling})
+                  t.boostCtl, t.intercooler, t.fuelSys, t.fuelPump, t.injector, t.fuelLine, t.gbStrength, t.throttleBody, t.intakeMani,
+                  t.header, t.catalyst, t.meth, t.headStud, t.mainSupport, t.brakeDisc, t.brakeCaliper, t.weightBody, t.weightGlass,
+                  t.weightChassis, t.aeroFront, t.aeroSide, t.aeroUnder, t.fan, t.coolMisc, t.oilCooler, t.oilPump, t.gearSwap, t.finalSel, t.rims, t.susp, t.brakes, t.aero, t.cooling})
         more += x > 0;
     if (more) add("+" + std::to_string(more) + " PARCA");
     return s;
@@ -434,6 +471,72 @@ void migrateTune(Tune& t) {
         t.fuelPump = pump[f]; t.injector = inj[f]; t.fuelLine = f == 9 ? 9 : 0;
         t.fuelSys = 0;
     }
+    if (t.partsVer < 2) {
+        // Emme: 6 buyuk kelebek, 7 portlu manifold, 8 karbon airbox, 9 ITB
+        switch (t.intake) {
+        case 6: t.intake = 0; t.throttleBody = 4; break;
+        case 7: t.intake = 0; t.intakeMani = 1; break;
+        case 8: t.intake = 6; t.throttleBody = 1; break;
+        case 9: t.intake = 0; t.intakeMani = 8; break;
+        default: break;
+        }
+        // Egzoz: 5-7 header, 8 katalizor iptal, 9 titanyum (tam sistem)
+        switch (t.exhaust) {
+        case 5: t.exhaust = 0; t.header = 1; break;
+        case 6: t.exhaust = 0; t.header = 2; break;
+        case 7: t.exhaust = 0; t.header = 3; break;
+        case 8: t.exhaust = 0; t.catalyst = 4; break;
+        case 9: t.exhaust = 9; t.header = 3; break;
+        default: break;
+        }
+        // Sogutma: 4-5 fan, 6-7 termostat / katki, 8-9 radyator + fan
+        switch (t.cooling) {
+        case 4: t.cooling = 0; t.fan = 1; break;
+        case 5: t.cooling = 0; t.fan = 2; break;
+        case 6: t.cooling = 0; t.coolMisc = 1; break;
+        case 7: t.cooling = 0; t.coolMisc = 2; break;
+        case 8: t.cooling = 5; t.fan = 2; break;
+        case 9: t.cooling = 7; t.fan = 5; break;
+        default: break;
+        }
+        {   // Fren: balata / disk / kaliper
+            static const int pad[10] = {0, 1, 0, 2, 0, 0, 0, 5, 0, 6}, disc[10] = {0, 0, 1, 0, 0, 0, 6, 5, 7, 8}, cal[10] = {0, 0, 0, 0, 1, 2, 0, 2, 2, 4};
+            const int b = std::clamp(t.brakes, 0, 9);
+            t.brakes = pad[b]; t.brakeDisc = disc[b]; t.brakeCaliper = cal[b];
+        }
+        {   // Hafifletme: paket -> ic / kaporta / cam / sasi
+            static const int in[12] = {0, 2, 3, 5, 1, 2, 3, 3, 5, 5, 5, 5}, bd[12] = {0, 1, 3, 3, 0, 0, 0, 4, 3, 5, 6, 6};
+            static const int gl[12] = {0, 0, 0, 1, 0, 0, 0, 2, 4, 4, 4, 4}, ch[12] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 4};
+            const int w = std::clamp(t.weight, 0, 11);
+            t.weight = in[w]; t.weightBody = bd[w]; t.weightGlass = gl[w]; t.weightChassis = ch[w];
+        }
+        // Aero: 1 on lip, 2 yan etek, 7 difuzor ayri kategoriye
+        if (t.aero == 1) { t.aero = 0; t.aeroFront = 1; }
+        else if (t.aero == 2) { t.aero = 0; t.aeroSide = 1; }
+        else if (t.aero == 7) { t.aero = 0; t.aeroUnder = 2; }
+        // Karter: 3 yag sogutucu, 4 akumulator, 5 genis, 6 yuksek hacimli pompa, 7-9 kuru karter / yaris
+        switch (t.oil) {
+        case 3: t.oil = 0; t.oilCooler = 2; break;
+        case 4: t.oil = 0; t.oilPump = 3; break;
+        case 5: t.oil = 3; break;
+        case 6: t.oil = 0; t.oilPump = 1; break;
+        case 7: t.oil = 6; break;
+        case 8: t.oil = 7; break;
+        case 9: t.oil = 8; break;
+        default: break;
+        }
+        // Intercooler: 7 metanol, 8 su + metanol, 9 CO2 sprey -> su / metanol
+        if (t.intercooler >= 7) { t.meth = t.intercooler == 7 ? 2 : t.intercooler == 8 ? 3 : 5; t.intercooler = 0; }
+        // Conta: 8 ARP saplama, 9 saplama + MLS
+        if (t.gasket == 8) { t.gasket = 0; t.headStud = 3; }
+        else if (t.gasket == 9) { t.gasket = 3; t.headStud = 1; }
+        {   // Yatak: 5-9 ana yatak destegi
+            static const int brg[10] = {0, 1, 2, 3, 4, 1, 1, 1, 2, 3}, sup[10] = {0, 0, 0, 0, 0, 2, 1, 3, 4, 5};
+            const int b = std::clamp(t.bearing, 0, 9);
+            t.bearing = brg[b]; t.mainSupport = sup[b];
+        }
+        t.partsVer = 2;
+    }
     if (t.ecu > 0 && !ecuNewSystem(t)) {
         struct M { int hw, map, rev, lc, flat, al, flex; };
         static const M m[10] = {{0, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0}, {4, 2, 0, 0, 0, 0, 0}, {5, 3, 0, 0, 0, 0, 0},
@@ -447,7 +550,7 @@ void migrateTune(Tune& t) {
 }
 
 bool usedAvailable(PartCat c, int level) {
-    if (partTab(c) == 2 || level <= 0 || level == customOption(c)) return false;   // aktarma: ikinci el yok
+    if (partTab(c) == 3 || level <= 0 || level == customOption(c)) return false;   // aktarma: ikinci el yok
     return true;
 }
 int usedPrice(int newPrice) { return newPrice * 55 / 100 / 10 * 10; }
@@ -455,15 +558,16 @@ void applyUsedWear(Tune& t, PartCat c) {
     auto add = [](double& w, double d) { w = std::clamp(w + d, 0.0, 1.0); };
     switch (c) {
     case PartCat::Tires: t.wearTires = std::max(t.wearTires, 0.40); return;          // yarim dis
-    case PartCat::Brakes: add(t.wearBrakes, 0.25); return;
+    case PartCat::Brakes: case PartCat::BrakeDisc: case PartCat::BrakeCaliper: add(t.wearBrakes, 0.25); return;
     case PartCat::Suspension: add(t.wearSusp, 0.20); return;
-    case PartCat::Rims: case PartCat::Weight: case PartCat::Aero: add(t.wearBody, 0.08); return;
+    case PartCat::Rims: add(t.wearBody, 0.08); return;
     default: break;
     }
     switch (partTab(c)) {
     case 0: add(t.wearEngine, 0.10); break;                                       // motor ic aksami
-    case 1: add(t.wearEngine, 0.06); break;                                       // besleme
-    case 4: add(t.wearElec, 0.08); break;                                         // ecu / sogutma
+    case 1: case 2: add(t.wearEngine, 0.06); break;                               // emme / egzoz, turbo / yakit
+    case 5: add(t.wearBody, 0.08); break;                                         // kaporta: hafifletme / aero
+    case 6: add(t.wearElec, 0.08); break;                                         // ecu / sogutma / yag
     default: break;
     }
 }
@@ -635,6 +739,11 @@ const IntField kIntFields[] = {
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
     {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 10}, {"slc", &Tune::swLaunch, 1},
     {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1},
+    {"pv", &Tune::partsVer, 9}, {"thr", &Tune::throttleBody, 9}, {"imf", &Tune::intakeMani, 9}, {"hdr", &Tune::header, 9},
+    {"cat", &Tune::catalyst, 5}, {"meth", &Tune::meth, 5}, {"stud", &Tune::headStud, 4}, {"msup", &Tune::mainSupport, 5},
+    {"bdsc", &Tune::brakeDisc, 8}, {"bcal", &Tune::brakeCaliper, 5}, {"wbdy", &Tune::weightBody, 6}, {"wgls", &Tune::weightGlass, 4},
+    {"wch", &Tune::weightChassis, 4}, {"aef", &Tune::aeroFront, 4}, {"aes", &Tune::aeroSide, 4}, {"aeu", &Tune::aeroUnder, 4},
+    {"fan", &Tune::fan, 5}, {"cmsc", &Tune::coolMisc, 4}, {"oclr", &Tune::oilCooler, 4}, {"opmp", &Tune::oilPump, 4},
 };
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},
@@ -937,6 +1046,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
+            oc.tune.partsVer = 1;                                  // "pv" yoksa eski kayit: tek liste secimleri donusturulur
             if (std::sscanf(v.c_str(), "%d;%d;%d;%lf;%d;%d;%lf;%d;%d;%d;%lf;%d;%d;%d;%d;%d;%d;%d", &oc.carId, &oc.races, &oc.wins,
                             &oc.bestEt, &oc.paidParts, &tires, &oc.tune.psi, &oc.tune.clutch, &oc.tune.axles, &diff,
                             &oc.tune.finalDrive, &oc.tune.weight, &oc.tune.intake, &oc.tune.exhaust, &oc.tune.ecu,

@@ -98,7 +98,7 @@ void GarageScreen::render(Renderer& r) {
     r.setCarLook(lookOf(oc));
     r.drawCar(v.id, 0, 64, 360, 230, proj, view, matRotY(spin_));
 
-    std::snprintf(b, sizeof b, "%d %s %s %.0fKG", v.year, bodyName(v.body), driveName(v.drive), v.massKg - Tune::weightKg(oc.tune.weight));
+    std::snprintf(b, sizeof b, "%d %s %s %.0fKG", v.year, bodyName(v.body), driveName(v.drive), v.massKg - oc.tune.totalWeightKg());
     r.text(8, 298, upper(b), 2, kUiText);
     std::snprintf(b, sizeof b, "%s %s %.1fL %s", e.code, layoutName(e.layout), e.displacementL, inductionName(e.induction));
     r.text(8, 318, upper(b).substr(0, 23), 2, kUiText);

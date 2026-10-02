@@ -71,6 +71,30 @@ const std::vector<IcOpt>&      intercoolerTable();
 const std::vector<FuelSysOpt>& fuelSysTable();
 const std::vector<NosOpt>&     nosTable();
 const std::vector<EcuOpt>&     ecuTable();
+// Bilesen tablolari (ayni anda takilabilen parcalar): gaz kelebegi, emme manifoldu, egzoz manifoldu, katalizor,
+// su-metanol, kapak saplamasi, ana yatak destegi, fren diski / kaliper, kaporta / cam / sasi hafifletme, on / yan / alt
+// aero, fan, termostat-katki, yag sogutucu, yag pompasi
+const std::vector<IntakeOpt>&  throttleTable();
+const std::vector<IntakeOpt>&  intakeManiTable();
+const std::vector<ShapeOpt>&   headerTable();
+const std::vector<ShapeOpt>&   catalystTable();
+const std::vector<IcOpt>&      methTable();
+const std::vector<BearingOpt>& headStudTable();
+const std::vector<BearingOpt>& mainSupportTable();
+const std::vector<BrakeOpt>&   brakeDiscTable();
+const std::vector<BrakeOpt>&   brakeCaliperTable();
+const std::vector<WeightOpt>&  weightBodyTable();
+const std::vector<WeightOpt>&  weightGlassTable();
+const std::vector<WeightOpt>&  weightChassisTable();
+const std::vector<AeroOpt>&    aeroFrontTable();
+const std::vector<AeroOpt>&    aeroSideTable();
+const std::vector<AeroOpt>&    aeroUnderTable();
+const std::vector<CoolOpt>&    fanTable();
+const std::vector<CoolOpt>&    coolMiscTable();
+const std::vector<CoolOpt>&    oilCoolerTable();
+const std::vector<OilOpt>&     oilPumpTable();
+double coolingCapMul(const Tune& t);                 // radyator x fan x termostat-katki x yag sogutucu
+double coolingLowSpeed(const Tune& t);               // dusuk hizda hava akisi (radyator / fan)
 // Yakit sistemi parcalari (FuelSysOpt.cap: fabrika HP x cap). Sinir = min(pompa, enjektor) x hat carpani
 const std::vector<FuelSysOpt>& fuelPumpTable();
 const std::vector<FuelSysOpt>& injectorTable();
