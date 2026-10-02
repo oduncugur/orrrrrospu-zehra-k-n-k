@@ -398,8 +398,25 @@ void Renderer::circle(float cx, float cy, float r, int seg, Color c) {
         tri(cx, cy, cx + r * std::cos(a0), cy + r * std::sin(a0), cx + r * std::cos(a1), cy + r * std::sin(a1), c);
     }
 }
-void Renderer::text(float x, float y, const std::string& src, float sc, Color c) {
-    const std::string& s = translate(lang, src);
+void Renderer::text(float x, float y, const std::string& src, float sc, Color c) { textRaw(x, y, translate(lang, src), sc, c); }
+
+void Renderer::textFit(float x, float y, const std::string& src, float scale, float maxW, Color c, bool center) {
+    std::string t = translate(lang, src);
+    float sc = scale;
+    while (sc > 1.0f && rawWidth(t, sc) > maxW) sc -= 1.0f;
+    if (rawWidth(t, sc) > maxW) {                                       // olcek 1'de de sigmiyor: kod noktasi kirp + "."
+        while (!t.empty() && rawWidth(t + ".", sc) > maxW) {
+            size_t k = t.size() - 1;
+            while (k > 0 && ((unsigned char)t[k] & 0xC0) == 0x80) --k;    // UTF-8 karakter sinirina kadar
+            t.erase(k);
+        }
+        t += ".";
+    }
+    const float yy = y + 3.5f * (scale - sc);
+    textRaw(center ? x - rawWidth(t, sc) * 0.5f : x, yy, t, sc, c);
+}
+
+void Renderer::textRaw(float x, float y, const std::string& s, float sc, Color c) {
     for (size_t i = 0; i < s.size();) {
         if (const char* g = glyphU(nextCp(s, i))) {
             for (int row = 0; row < 7; ++row)

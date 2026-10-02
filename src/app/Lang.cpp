@@ -386,6 +386,7 @@ const Entry kEnWords[] = {
     {"GALERIDE", "DEALER"},
     {"KACIRDIN", "MISSED"},
     {"TAMAMLANDI", "COMPLETED"}, {"YAZILIM", "SOFTWARE"}, {"YUKLENDI", "INSTALLED"},
+    {"KESICI", "LIMITER"},
 };
 
 #include "LangMore.inc"

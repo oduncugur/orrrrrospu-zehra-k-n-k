@@ -125,7 +125,7 @@ void GarageScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "YAG %.1f BAR", pt_->oilPressureBar());
     r.text(8, 452, b, 1, {0.7f, 0.8f, 0.7f});
 #ifndef __ANDROID__
-    r.text(112, 452, "<> ARAC ENTER YARIS PGUP YOL", 1, {0.55f, 0.75f, 1.0f});
+    r.textFit(112, 452, "<> ARAC ENTER YARIS PGUP YOL", 1, 172, {0.55f, 0.75f, 1.0f});
 #endif
 
     // Garajdaki araclar

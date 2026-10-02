@@ -40,9 +40,9 @@ inline void button(Renderer& r, const Rect& b, const std::string& label, Color b
     r.rect(b.x0, b.y0, b.x1, b.y0 + 1, mul(1.45f));                                   // ust parlak kenar
     r.rect(b.x0, b.y1 - 3, b.x1, b.y1, mul(0.6f));                                    // alt kalinlik
     r.rect(b.x0, b.y0, b.x0 + 1, b.y1, mul(0.75f)); r.rect(b.x1 - 1, b.y0, b.x1, b.y1, mul(0.75f));
-    const float ty = b.cy() - 3.5f * scale - 1.0f;
-    r.textCentered(b.cx() + scale * 0.5f, ty + scale * 0.5f, label, scale, {0, 0, 0, 0.45f});
-    r.textCentered(b.cx(), ty, label, scale, fg);
+    const float ty = b.cy() - 3.5f * scale - 1.0f, maxW = b.x1 - b.x0 - 6;   // uzun ceviri: kuculur / kisaltilir
+    r.textFit(b.cx() + scale * 0.5f, ty + scale * 0.5f, label, scale, maxW, {0, 0, 0, 0.45f}, true);
+    r.textFit(b.cx(), ty, label, scale, maxW, fg, true);
 }
 
 inline std::string money(long v) {

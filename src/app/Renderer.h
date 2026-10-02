@@ -47,6 +47,15 @@ public:
     void tri(float ax, float ay, float bx, float by, float cx, float cy, Color c);
     void circle(float cx, float cy, float r, int seg, Color c);
     void text(float x, float y, const std::string& s, float scale, Color c);
+    // Ceviri olmadan cizim (zaten cevrilmis metin; tekrar cevirmek "ON" -> "FRONT" gibi bozar)
+    void textRaw(float x, float y, const std::string& s, float scale, Color c);
+    std::string tr(const std::string& s) const { return translate(lang, s); }
+    static float rawWidth(const std::string& s, float scale) {
+        size_t n = 0; for (unsigned char ch : s) n += (ch & 0xC0) != 0x80;
+        return n * 6.0f * scale - scale;
+    }
+    // Genislige sigdir: once olcek kuculur (dikeyde ortalanir), olcek 1'de de sigmazsa kisaltilir ("."). center: x merkez
+    void textFit(float x, float y, const std::string& s, float scale, float maxW, Color c, bool center = false);
     float textWidth(const std::string& s, float scale) const {      // UTF-8: kod noktasi sayisi
         const std::string& t = translate(lang, s);
         size_t n = 0; for (unsigned char c : t) n += (c & 0xC0) != 0x80;

@@ -326,10 +326,16 @@ int racePrize(const VehicleDef& opponent, bool won) {
 
 Tune opponentPreset(int i) {
     Tune t;
-    if (i == 1) { t.intake = 1; t.exhaust = 1; t.tires = TireType::SemiSlick; t.diff = DiffType::OneAndHalfWay; }
-    if (i == 2) {
-        t.intake = 2; t.exhaust = 2; t.ecu = 1; t.tires = TireType::DragSlick;
+    // Rakip paketleri bilesen parcalarini da kullanir (ET tablosu bu paketlerle olculur: zehra_ettable gen)
+    if (i == 1) {                                                   // SOKAK: emme / egzoz, kelebek, katalizor, fren, hafif ic
+        t.intake = 1; t.exhaust = 1; t.tires = TireType::SemiSlick; t.diff = DiffType::OneAndHalfWay;
+        t.throttleBody = 2; t.catalyst = 1; t.brakes = 1; t.brakeDisc = 1; t.weight = 1;
+    }
+    if (i == 2) {                                                   // DRAG: ECU + yazilim, header, yakit, hafifletme, dusuk surtunme
+        t.intake = 2; t.exhaust = 2; t.tires = TireType::DragSlick;
         t.clutch = 1; t.axles = 1; t.diff = DiffType::OneAndHalfWay;
+        t.ecuHw = 4; t.swMap = 2; t.swLaunch = 1; t.header = 1; t.throttleBody = 4; t.catalyst = 4;
+        t.fuelPump = 2; t.injector = 2; t.weight = 3; t.weightBody = 3; t.aero = 8;
     }
     return t;
 }

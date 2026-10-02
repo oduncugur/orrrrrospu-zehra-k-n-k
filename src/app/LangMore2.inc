@@ -260,6 +260,7 @@ const Multi2 kMulti2[] = {
     {"YAN", "БОК", "БІК", "ΠΛΑΪ", "BOK", "ZIJ", "SAMPING"},
     {"DEGISIKLIK", "ИЗМЕНЕНИЙ", "ЗМІН", "ΑΛΛΑΓΗ", "ZMIANY", "WIJZIGING", "PERUBAHAN"},
     {"UYGULA", "ПРИМЕНИТЬ", "ЗАСТОСУВАТИ", "ΕΦΑΡΜΟΓΗ", "ZASTOSUJ", "TOEPASSEN", "TERAPKAN"},
-    {"YAZILIM", "ПРОШИВКА", "ПРОШИВКА", "ΛΟΓΙΣΜΙΚΟ", "OPROGRAMOWANIE", "SOFTWARE", "PERANGKAT LUNAK"},
+    {"YAZILIM", "ПРОГРАММА", "ПРОГРАМА", "ΛΟΓΙΣΜΙΚΟ", "OPROGRAMOWANIE", "SOFTWARE", "PERANGKAT LUNAK"},
     {"YUKLENDI", "ЗАГРУЖЕНО", "ЗАВАНТАЖЕНО", "ΦΟΡΤΩΘΗΚΕ", "WGRANO", "GELADEN", "DIMUAT"},
+    {"KESICI", "ОТСЕЧКА", "ВІДСІЧКА", "ΚΟΦΤΗΣ", "ODCIECIE", "BEGRENZER", "LIMITER"},
 };

@@ -181,10 +181,10 @@ void SettingsScreen::render(Renderer& r) {
         const bool sel = (int)i == sel_;
         r.rect(8, row.y, 352, row.y + kRowH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
         if (sel) r.rect(8, row.y, 11, row.y + kRowH, kUiOrange);
-        r.text(16, row.y + 7, label(row.item), 2, {1, 1, 1});
+        r.textFit(16, row.y + 7, label(row.item), 2, kArrowL0 - 20, {1, 1, 1});
         r.text(kArrowL0 + 2, row.y + 7, "<", 2, kUiDim);
         r.text(kArrowR1 - 12, row.y + 7, ">", 2, kUiDim);
-        r.textCentered((kArrowL1 + kArrowR0) / 2 + 2, row.y + 7, value(row.item), 2, kUiGold);
+        r.textFit((kArrowL0 + kArrowR1) / 2 + 2, row.y + 7, value(row.item), 2, kArrowR1 - kArrowL0 - 30, kUiGold, true);
     }
     if (sel_ >= 0 && sel_ < (int)rows_.size()) {
         const It it = rows_[sel_].item;
