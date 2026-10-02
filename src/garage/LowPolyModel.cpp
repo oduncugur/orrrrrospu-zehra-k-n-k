@@ -165,7 +165,10 @@ void materialColor(int m, unsigned paint, float c[3]) {
     } else { c[0] = t[m][0]; c[1] = t[m][1]; c[2] = t[m][2]; }
 }
 
+#include "HandModels.inc"
+
 LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
+    { LowPolyMesh hm; if (buildHandModel(v, hm)) return hm; }
     LowPolyMesh m; m.paintRGB = v.paintRGB;
     Builder B{m};
     CarShape tmp;
