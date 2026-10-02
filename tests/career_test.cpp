@@ -1,5 +1,6 @@
 // Kariyer / ekonomi / kayit testleri
 #include "game/Career.h"
+#include "game/SaveCode.h"
 #include "game/Achievements.h"
 #include "game/DragRace.h"
 #include "sim/VehicleSim.h"
@@ -228,6 +229,21 @@ int main() {
               "yeni parca: eskisi %35'e satilir");
         CHECK(!c.buyPart(PartCat::Gearbox, 2, &why, true) && why == "IKINCI EL YOK", "aktarma parcasi ikinci el yok");
         CHECK(c.buyPart(PartCat::Tires, 5, &why, true) && c.car().tune.wearTires >= 0.40, "ikinci el lastik yarim dis");
+    }
+    std::printf("[K] Kayit kodu: kariyer -> kod -> ayni kariyer; bozuk kod reddedilir\n");
+    {
+        Career c = Career::newGame();
+        c.money = 123456; c.wins = 7; c.buyCar(227); c.cars[0].tune.ecuHw = 4; c.cars[0].tune.swRev = 2;
+        const std::string code = makeSaveCode(c.serialize());
+        std::string text; Career d;
+        std::printf("    kod uzunlugu %zu karakter\n", code.size());
+        CHECK(code.rfind("ZK1-", 0) == 0 && readSaveCode(code, text) && Career::parse(text, d) && d.serialize() == c.serialize(),
+              "kod ayni kariyeri geri verir");
+        std::string spaced = code; spaced.insert(40, "\n "); spaced = "  " + spaced + "\n";
+        CHECK(readSaveCode(spaced, text) && Career::parse(text, d) && d.money == c.money, "bosluk / satir sonu eklenmis kod da okunur");
+        std::string bad = code; bad[bad.size() / 2] = bad[bad.size() / 2] == 'A' ? 'B' : 'A';
+        CHECK(!(readSaveCode(bad, text) && Career::parse(text, d)), "bozuk kod reddedilir (checksum)");
+        CHECK(!readSaveCode("merhaba", text), "kod olmayan metin reddedilir");
     }
     std::printf("[11] Satis\n");
     {

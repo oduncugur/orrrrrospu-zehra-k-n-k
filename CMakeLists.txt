@@ -47,7 +47,7 @@ target_link_libraries(zehra_ettable PRIVATE zk_sim)
 find_package(SDL3 CONFIG QUIET)
 if(SDL3_FOUND)
   add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp
-                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/PartsScreen.cpp src/app/JunkScreens.cpp src/app/Lang.cpp src/app/LeagueScreen.cpp src/app/BodyShopScreen.cpp src/app/AchievementsScreen.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/Cockpit.cpp src/app/GLApi.cpp)
+                 src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/PartsScreen.cpp src/app/JunkScreens.cpp src/app/Lang.cpp src/app/LeagueScreen.cpp src/app/BodyShopScreen.cpp src/app/AchievementsScreen.cpp src/app/SaveCodeScreen.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/Cockpit.cpp src/app/GLApi.cpp)
   target_include_directories(zehra_game PRIVATE src third_party/khronos)
   if(TARGET SDL3::SDL3-static)
     target_link_libraries(zehra_game PRIVATE zk_sim SDL3::SDL3-static)

@@ -108,6 +108,7 @@ struct Jni {
     jmethodID setOrientation = nullptr;
     jobject display = nullptr; jmethodID getRotation = nullptr;   // Display.getRotation()
     jobject vibrator = nullptr; jclass effectCls = nullptr; jmethodID createOneShot = nullptr, vibrate = nullptr;
+    jobject clipboard = nullptr;             // android.content.ClipboardManager
 };
 
 void clearEx(JNIEnv* env) { if (env->ExceptionCheck()) env->ExceptionClear(); }
@@ -121,6 +122,23 @@ void jniInit(Jni& j, android_app* app) {
     j.setOrientation = env->GetMethodID(actCls, "setRequestedOrientation", "(I)V");
     jmethodID getSys = env->GetMethodID(actCls, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
     clearEx(env);
+    {   // ClipboardManager bir Handler olusturur: bu native thread'de Java Looper hazirlanir (zaten hazirsa istisna yutulur)
+        jclass looper = env->FindClass("android/os/Looper");
+        clearEx(env);
+        if (looper) {
+            jmethodID prep = env->GetStaticMethodID(looper, "prepare", "()V");
+            clearEx(env);
+            if (prep) { env->CallStaticVoidMethod(looper, prep); clearEx(env); }
+            env->DeleteLocalRef(looper);
+        }
+        if (getSys) {
+            jstring name = env->NewStringUTF("clipboard");
+            jobject cb = env->CallObjectMethod(j.activity, getSys, name);
+            clearEx(env);
+            env->DeleteLocalRef(name);
+            if (cb) { j.clipboard = env->NewGlobalRef(cb); env->DeleteLocalRef(cb); }
+        }
+    }
     if (getSys) {
         jstring name = env->NewStringUTF("vibrator");
         jobject vib = env->CallObjectMethod(j.activity, getSys, name);
@@ -180,8 +198,71 @@ void jniShutdown(Jni& j) {
     if (j.vibrator) j.env->DeleteGlobalRef(j.vibrator);
     if (j.effectCls) j.env->DeleteGlobalRef(j.effectCls);
     if (j.display) j.env->DeleteGlobalRef(j.display);
+    if (j.clipboard) j.env->DeleteGlobalRef(j.clipboard);
     j.vm->DetachCurrentThread();
     j.env = nullptr;
+}
+
+// Pano: ClipData.newPlainText -> setPrimaryClip; okuma getPrimaryClip().getItemAt(0).getText()
+void setClipboard(Jni& j, const std::string& text) {
+    JNIEnv* env = j.env;
+    if (!env || !j.clipboard) return;
+    jclass cd = env->FindClass("android/content/ClipData");
+    clearEx(env);
+    if (!cd) return;
+    jmethodID mk = env->GetStaticMethodID(cd, "newPlainText", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/content/ClipData;");
+    jclass cmCls = env->GetObjectClass(j.clipboard);
+    jmethodID setClip = env->GetMethodID(cmCls, "setPrimaryClip", "(Landroid/content/ClipData;)V");
+    clearEx(env);
+    if (mk && setClip) {
+        jstring label = env->NewStringUTF("ZEHRA KINIK"), t = env->NewStringUTF(text.c_str());
+        jobject clip = env->CallStaticObjectMethod(cd, mk, label, t);
+        clearEx(env);
+        if (clip) { env->CallVoidMethod(j.clipboard, setClip, clip); clearEx(env); env->DeleteLocalRef(clip); }
+        env->DeleteLocalRef(label); env->DeleteLocalRef(t);
+    }
+    env->DeleteLocalRef(cmCls); env->DeleteLocalRef(cd);
+}
+std::string getClipboard(Jni& j) {
+    JNIEnv* env = j.env;
+    std::string out;
+    if (!env || !j.clipboard) return out;
+    jclass cmCls = env->GetObjectClass(j.clipboard);
+    jmethodID getClip = env->GetMethodID(cmCls, "getPrimaryClip", "()Landroid/content/ClipData;");
+    clearEx(env);
+    jobject clip = getClip ? env->CallObjectMethod(j.clipboard, getClip) : nullptr;
+    clearEx(env);
+    if (clip) {
+        jclass cd = env->GetObjectClass(clip);
+        jmethodID itemAt = env->GetMethodID(cd, "getItemAt", "(I)Landroid/content/ClipData$Item;");
+        clearEx(env);
+        jobject item = itemAt ? env->CallObjectMethod(clip, itemAt, 0) : nullptr;
+        clearEx(env);
+        if (item) {
+            jclass ic = env->GetObjectClass(item);
+            jmethodID getText = env->GetMethodID(ic, "getText", "()Ljava/lang/CharSequence;");
+            clearEx(env);
+            jobject cs = getText ? env->CallObjectMethod(item, getText) : nullptr;
+            clearEx(env);
+            if (cs) {
+                jclass csCls = env->GetObjectClass(cs);
+                jmethodID toStr = env->GetMethodID(csCls, "toString", "()Ljava/lang/String;");
+                clearEx(env);
+                jstring js = toStr ? (jstring)env->CallObjectMethod(cs, toStr) : nullptr;
+                clearEx(env);
+                if (js) {
+                    const char* c = env->GetStringUTFChars(js, nullptr);
+                    if (c) { out = c; env->ReleaseStringUTFChars(js, c); }
+                    env->DeleteLocalRef(js);
+                }
+                env->DeleteLocalRef(csCls); env->DeleteLocalRef(cs);
+            }
+            env->DeleteLocalRef(ic); env->DeleteLocalRef(item);
+        }
+        env->DeleteLocalRef(cd); env->DeleteLocalRef(clip);
+    }
+    env->DeleteLocalRef(cmCls);
+    return out;
 }
 
 // Activity.setRequestedOrientation: 6 = SENSOR_LANDSCAPE, 7 = SENSOR_PORTRAIT
@@ -324,6 +405,8 @@ void android_main(android_app* app) {
     jniInit(jni, app);
     p.game->onOrientation = [&jni, &p](bool landscape) { requestOrientation(jni, landscape); p.rotationDirty = true; };
     p.game->onHaptic = [&jni](int ms, int amp) { vibrate(jni, ms, amp); };
+    p.game->onSetClipboard = [&jni](const std::string& t) { setClipboard(jni, t); };
+    p.game->onGetClipboard = [&jni]() { return getClipboard(jni); };
     requestOrientation(jni, p.game->landscape());
     p.sensorMgr = ASensorManager_getInstance();
     if (p.sensorMgr) {

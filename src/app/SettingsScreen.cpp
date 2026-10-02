@@ -9,7 +9,7 @@ namespace zk {
 
 namespace {
 using It = SettingsScreen::Item;
-const Rect kDefaults{8, 596, 128, 634}, kBack{136, 596, 352, 634};
+const Rect kDefaults{8, 596, 104, 634}, kSaveCode{108, 596, 212, 634}, kBack{216, 596, 352, 634};
 constexpr float kRowH = 26, kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
 const char* const kSections[] = {"GORUNTU", "SES", "KONTROL", "OYUN"};
 
@@ -198,6 +198,7 @@ void SettingsScreen::render(Renderer& r) {
     r.text(8, 582, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, {0.55f, 0.75f, 1.0f});
 #endif
     button(r, kDefaults, "VARSAYILAN", kUiBtn, 1);
+    button(r, kSaveCode, "KAYIT KODU", {0.15f, 0.35f, 0.55f}, 1);
     button(r, kBack, "< GARAJ", kUiBtn, 2);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.9f});
@@ -207,6 +208,7 @@ void SettingsScreen::render(Renderer& r) {
 
 void SettingsScreen::pointerDown(int, float x, float y) {
     if (kBack.hit(x, y)) { app_.goGarage(); return; }
+    if (kSaveCode.hit(x, y)) { app_.goSaveCode(); return; }
     if (kDefaults.hit(x, y)) {
         app_.settings = Settings{};
         app_.applySettings();

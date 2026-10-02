@@ -142,6 +142,7 @@ void App::goJunkyard() { setScreen(std::make_unique<JunkyardScreen>(*this)); }
 void App::goBodyShop() { setScreen(std::make_unique<BodyShopScreen>(*this)); }
 void App::goAchievements() { setScreen(std::make_unique<AchievementsScreen>(*this)); }
 void App::goEcu() { setScreen(std::make_unique<EcuScreen>(*this)); }
+void App::goSaveCode() { setScreen(std::make_unique<SaveCodeScreen>(*this)); }
 void App::goRestore() { setScreen(std::make_unique<RestoreScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }

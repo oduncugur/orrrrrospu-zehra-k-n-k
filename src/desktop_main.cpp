@@ -127,6 +127,8 @@ int main(int argc, char** argv) {
         }
     }
     size_t tapPos = 0;
+    game.onSetClipboard = [](const std::string& t) { SDL_SetClipboardText(t.c_str()); };
+    game.onGetClipboard = []() { char* t = SDL_GetClipboardText(); std::string r = t ? t : ""; SDL_free(t); return r; };
     if (const char* tv = std::getenv("ZK_TUNE")) parseTuneV2(tv, game.career.cars[game.career.current].tune);   // test: "aero:6,susp:3"
     if (const char* lk = std::getenv("ZK_LOOK")) {                // test: "boya;cila;serit;seritRenk;jant"
         OwnedCar& oc = game.career.cars[game.career.current];
