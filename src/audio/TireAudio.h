@@ -1,8 +1,11 @@
 #pragma once
-// Lastik sesi (v4): kaucuk yolda yapis-kay (stick-slip) yapar; her "kayma" bir darbe uretir.
-// Darbe dizisi (periyodu titreyen gevseme osilatoru) lastik yanaginin/sirtinin UYUMSUZ (inharmonik)
-// titresim modlarini (dar bant rezonatorler) uyarir -> sentetik duduk degil, kaucuk "cigligi".
-// Buyuk patinajda (burnout) cigligin yerini genis bantli, dalgalanan "kavurma" ugultusu alir.
+// Lastik sesi (v5). Gercek kayitlarin bilinen yapisi:
+//  * Viraj / fren / kalkis cigligi: dar bantli, neredeyse sinuzoidal TON (~600-1400 Hz), birkac zayif harmonik;
+//    perdesi yavas gezinir (yuk / kayma), hizli duzensiz titrer (yapis-kay), siddeti dalgalanir; etrafinda
+//    tonun bandinda hafif hisirti. (v4'teki darbe dizisi + rezonator "vizilti" uretiyordu.)
+//  * Burnout: tonun yerini genis bantli kavurma alir: 200 Hz-5 kHz kaucuk parcalanma hisirtisi, lastik
+//    donusu / dis bloklarindan gelen 25-70 Hz puruzlu genlik dalgasi (kukreme), alt ugultu, citirtilar ve
+//    araya giren kisa ciglik patlamalari.
 #include <cstdint>
 
 namespace zk {
@@ -15,12 +18,13 @@ public:
     void render(float* out, int n, double slip, float gain);
 
 private:
-    struct Res { double f, q, b0 = 0, a1 = 0, a2 = 0, y1 = 0, y2 = 0, g; };
-    static constexpr int kModes = 5;
+    struct Bq { double b0 = 0, b1 = 0, b2 = 0, a1 = 0, a2 = 0, x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+                void bandpass(double f, double q, int fs); void lowpass(double f, double q, int fs); void highpass(double f, double q, int fs);
+                double run(double x); };
     int fs_;
-    Res m_[kModes];
-    double ph_ = 0, jit_ = 0, amJ_ = 0, env_ = 0, burn_ = 0, lastF_ = -1;
-    double r1_ = 0, r2_ = 0, rb_ = 0, flut_ = 0, hs_ = 0, hs2_ = 0, crackEnv_ = 0;
+    double ph_ = 0, wander_ = 0, wander2_ = 0, trem_ = 0, env_ = 0, burn_ = 0, chirp_ = 0, chirpEnv_ = 0, crackEnv_ = 0;
+    double rough_ = 0, roughPh_ = 0, lastF_ = -1, hissOne_ = 0;
+    Bq toneBand_, hissBp_, hissLp_, rumbleLp_, rumbleHp_, crackHp_;
     uint32_t rng_ = 0x1234567u;
     double rnd();
 };

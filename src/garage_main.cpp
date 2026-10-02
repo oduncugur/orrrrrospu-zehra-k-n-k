@@ -4,15 +4,20 @@
 //   ./zehra_garage --info=5               arac detay + tork egrisi + vites oranlari
 //   ./zehra_garage --car=5 --wav=a.wav    sesi render et (rolanti -> redline -> kesici -> gaz kesme)
 //   ./zehra_garage --car=5 --obj=out/     modeli disa aktar
+//   ./zehra_garage --tirewav=t.wav        lastik sesi demosu (viraj cigligi -> kalkis -> burnout -> fren)
 //   ./zehra_garage --export=out/ [--no-wav]  tum katalogu disa aktar
 //   --dev : gercek arac/motor referanslarini da goster (yalniz gelistirici)
 #include "audio/ProceduralEngineAudio.h"
+#include "audio/TireAudio.h"
 #include "garage/LowPolyModel.h"
 #include "garage/VehicleCatalog.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
@@ -63,6 +68,19 @@ int main(int argc, char** argv) {
         else if (!std::strncmp(a, "--car=", 6)) car = std::atoi(a + 6);
         else if (!std::strncmp(a, "--info=", 7)) info = std::atoi(a + 7);
         else if (!std::strncmp(a, "--wav=", 6)) wav = a + 6;
+        else if (!std::strncmp(a, "--tirewav=", 10)) {   // kayma programi: 3 s viraj (2-3 m/s dalgali), 2 s kalkis (6->2), 5 s burnout (20), 2 s fren (4->0)
+            TireAudio t(44100);
+            std::vector<float> o(44100 * 13, 0.0f);
+            for (size_t k = 0; k < o.size(); k += 256) {
+                const double ts = k / 44100.0;
+                const double slip = ts < 3 ? 2.5 + 0.8 * std::sin(ts * 2.1) : ts < 5 ? 6.0 - 2.0 * (ts - 3) : ts < 5.5 ? 0.0
+                                  : ts < 10.5 ? 20.0 + 3.0 * std::sin(ts * 1.3) : ts < 12.5 ? 4.0 - 2.0 * (ts - 10.5) : 0.0;
+                t.render(o.data() + k, (int)std::min<size_t>(256, o.size() - k), slip, 0.5f);
+            }
+            writeWav16(a + 10, o, 44100);
+            std::printf("Lastik sesi yazildi: %s\n", a + 10);
+            return 0;
+        }
         else if (!std::strncmp(a, "--obj=", 6)) objDir = a + 6;
         else if (!std::strncmp(a, "--export=", 9)) exportDir = a + 9;
         else { std::fprintf(stderr, "Bilinmeyen secenek: %s (bkz. kaynak basligi)\n", a); return 1; }
