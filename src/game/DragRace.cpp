@@ -389,7 +389,7 @@ void DragRace::timing(LaneState& L, int idx) {
     if (L.slip.t330 < 0 && d >= k330) L.slip.t330 = et;
     if (L.slip.eighth < 0 && d >= k660) { L.slip.eighth = et; L.slip.eighthKmh = v * 3.6; }
     if (L.slip.t1000 < 0 && d >= k1000) L.slip.t1000 = et;
-    if (d >= kQuarterMile) {
+    if (d >= length_) {
         L.slip.quarter = et; L.slip.trapKmh = v * 3.6; L.slip.finished = true;
         events_.push_back(std::string(who) + ": BITIS " + fmt("%.3f s", et) + " @ " + fmt("%.1f km/h", v * 3.6));
     }

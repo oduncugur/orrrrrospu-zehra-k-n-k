@@ -27,6 +27,7 @@ struct Settings {
     int   haptics = 100;             // titresim gucu (%); 0 = kapali
     bool  tiltSteer = true;          // telefon egimiyle direksiyon (Android, acik yol)
     int   tiltSens = 100;            // egim hassasiyeti (%), 50..200
+    int   dragDist = 0;              // drag mesafesi: 0 = 1/4 mil, 1 = 1/2 mil, 2 = 1 mil
     bool  tiltInvert = false;        // egim yonu ters (telefon / tutus farki)
     bool  assist = true;             // acik yol surus yardimi (ESP + otomatik debriyaj) varsayilani
     bool  manualGears = false;       // (eski) acik yolda manuel vites varsayilani; artik vites kolu sanziman tipinden

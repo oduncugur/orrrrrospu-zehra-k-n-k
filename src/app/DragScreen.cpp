@@ -25,6 +25,9 @@ constexpr float kRowTop = 266, kRowMid = 303, kRowBot = 340;
 constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 350};
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
 constexpr float kLcDn[4] = {352, 62, 382, 88}, kLcUp[4] = {484, 62, 514, 88};   // 2-step kalkis devri (yesilden once)
+constexpr float kDist[4] = {140, 62, 244, 88};                                      // yaris mesafesi (yesilden once)
+const double kDistM[3] = {DragRace::kQuarterMile, DragRace::kHalfMile, DragRace::kMile};
+const char* const kDistName[3] = {"1/4 MIL", "1/2 MIL", "1 MIL"};
 constexpr float kAgain[4] = {120, 262, 250, 296}, kGarage[4] = {260, 262, 390, 296}, kGraph[4] = {400, 262, 520, 296};
 constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekranin solundan 8 m sagda
 
@@ -53,7 +56,8 @@ void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
-    race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour || app_.activeMeet ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
+    race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour || app_.activeMeet ? app_.eventHandicap : 1.6);
+    race_->setLength(kDistM[std::clamp(app_.settings.dragDist, 0, 2)]);   // rakip insan gibi hata yapar
     if (career_ && app_.career.car().carId == carIds_[0]) race_->lane(0).sim->setNosFill(app_.career.car().nosFill);   // tupte kalan
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
@@ -129,6 +133,11 @@ void DragScreen::pointerDown(int id, float x, float y) {
         if (in(kGraph, x, y)) { showGraph_ = !showGraph_; return; }
     }
     if (ph == RacePhase::Burnout && in(kStageBtn, x, y)) { race_->skipBurnout(); return; }
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging) && in(kDist, x, y)) {   // mesafe: 1/4 -> 1/2 -> 1 mil (yaris yeniden kurulur)
+        app_.settings.dragDist = (app_.settings.dragDist + 1) % 3; app_.saveSettings();
+        restart();
+        return;
+    }
     if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
         && race_->lane(0).sim->gearboxType() != Gearbox::TorqueConverter && (in(kLcDn, x, y) || in(kLcUp, x, y))) {
         adjustLaunch(in(kLcUp, x, y) ? +250 : -250);
@@ -218,12 +227,12 @@ void DragScreen::update(double dt) {
     race_->advance(dt, pc_);
     {   // Hayalet izi: kalkistan bitise 20 Hz mesafe; bitiste en iyiyse saklanir
         const LaneState& L0 = race_->lane(0);
-        if (L0.left && !L0.slip.finished && run_.size() < 1200)
+        if (L0.left && !L0.slip.finished && run_.size() < 1200 && race_->isQuarter())
             while (runAcc_ <= race_->clock() - L0.leaveTime) { run_.push_back((float)L0.sim->distance()); runAcc_ += 0.05; }
         if (L0.slip.finished && !ghostSaved_) {
             ghostSaved_ = true;
             const TimeSlip& sl = L0.slip;
-            if (!sl.redLight && !sl.broke && sl.quarter > 0) {
+            if (!sl.redLight && !sl.broke && sl.quarter > 0 && race_->isQuarter()) {   // hayalet yalniz 1/4 mil
                 App::Ghost& g = app_.ghosts[carIds_[0]];
                 if (g.et <= 0 || sl.quarter < g.et) {
                     run_.push_back(402.336f);
@@ -282,7 +291,7 @@ void DragScreen::update(double dt) {
         const double diff = o.carId == race_->lane(1).car->id && o.estEt > 0 && o.playerEt > 0 ? prizeDifficulty(o.playerEt - o.estEt) : 1.0;
         if (app_.activeEvent >= 0) {                                    // lig etkinligi
             int pink = 0;
-            prize_ = app_.career.recordEvent(app_.activeEvent, won, s.finished && !s.redLight ? s.quarter : 0.0, 0, &pink);
+            prize_ = app_.career.recordEvent(app_.activeEvent, won, s.finished && !s.redLight && race_->isQuarter() ? s.quarter : 0.0, 0, &pink);
             if (pink > 0) app_.eventNote = "PINK SLIP: " + upperS(findVehicle(pink)->model) + " SENIN!";
             else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
             else if (const int rv = leagueEvents()[app_.activeEvent].rival; *bossLine(rv, 0))   // patron: yaris sonrasi sozu
@@ -301,7 +310,7 @@ void DragScreen::update(double dt) {
             std::snprintf(nb, sizeof nb, "%s%s", won ? ("BULUSMA KAZANILDI +" + money(prize_)).c_str() : "BULUSMA KAYBEDILDI",
                           fine > 0 ? ("  POLIS BASKINI! CEZA " + money(fine)).c_str() : "");
             app_.eventNote = nb;
-        } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
+        } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight && race_->isQuarter() ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
         app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());
         if (app_.career.car().carId == carIds_[0]) app_.career.recordNosUse(ps.nitrousLeft());
@@ -482,18 +491,21 @@ void DragScreen::drawWorld(Renderer& r) {
     // Baslangic ve bitis cizgisi, tabelalar
     const float start = sx(0.0f, 1.0f);
     r.rect(start - 1, kFar0, start + 2, kWorldBottom - 4, {0.95f, 0.95f, 0.95f});
-    const float fin = sx((float)DragRace::kQuarterMile, 1.0f);
+    const float fin = sx((float)race_->length(), 1.0f);
     for (int i = 0; i < 16; ++i)
         for (int j = 0; j < 2; ++j)
             r.rect(fin + j * 5, kFar0 + i * 4.75f, fin + j * 5 + 5, kFar0 + (i + 1) * 4.75f, ((i + j) % 2) ? Color{0.05f, 0.05f, 0.05f} : Color{0.95f, 0.95f, 0.95f});
     struct Mark { double m; const char* label; };
-    static const Mark marks[] = {{18.288, "60 FT"}, {100.584, "330 FT"}, {201.168, "1/8"}, {304.8, "1000 FT"}, {402.336, "BITIS"}};
+    static const Mark marks[] = {{18.288, "60 FT"}, {100.584, "330 FT"}, {201.168, "1/8"}, {304.8, "1000 FT"}, {402.336, "1/4"},
+                                 {804.672, "1/2"}, {1207.0, "3/4"}, {1609.344, "1 MIL"}};
     for (const Mark& mk : marks) {
+        if (mk.m > race_->length() + 1.0) continue;
+        const bool finish = mk.m > race_->length() - 1.0;
         const float x = sx((float)mk.m, 1.0f);
         if (x < -80 || x > 720) continue;
         r.rect(x - 1, kWall0 - 34, x + 1, kWall0, {0.3f, 0.3f, 0.3f});
         r.rect(x - 34, kWall0 - 46, x + 34, kWall0 - 32, {0.1f, 0.1f, 0.1f});
-        r.textCentered(x, kWall0 - 43, mk.label, 1, {1.0f, 0.85f, 0.2f});
+        r.textCentered(x, kWall0 - 43, finish ? "BITIS" : mk.label, 1, {1.0f, 0.85f, 0.2f});
     }
     // Pist agaci (baslangicta, bariyer uzerinde)
     {
@@ -518,6 +530,10 @@ void DragScreen::drawHud(Renderer& r) {
 
     // ---- ust serit ----
     r.rect(0, 0, 640, kWorldTop, {0.07f, 0.07f, 0.09f, 0.95f});
+    if (ph == RacePhase::Burnout || ph == RacePhase::Staging) {          // mesafe secimi (dokun: 1/4 -> 1/2 -> 1 mil)
+        r.rect(kDist[0], kDist[1], kDist[2], kDist[3], {0.30f, 0.20f, 0.08f, 0.9f});
+        r.textCentered((kDist[0] + kDist[2]) / 2, kDist[1] + 9, kDistName[std::clamp(app_.settings.dragDist, 0, 2)], 1, {1.0f, 0.85f, 0.3f});
+    }
     if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
         && box != Gearbox::TorqueConverter) {
         r.rect(kLcDn[0], kLcDn[1], kLcUp[2], kLcUp[3], {0.05f, 0.05f, 0.08f, 0.8f});
@@ -709,7 +725,7 @@ void DragScreen::drawResults(Renderer& r) {
     row(3, "1/8", sec(P.slip.eighth), sec(O.slip.eighth));
     row(4, app_.settings.mph ? "1/8 MPH" : "1/8 KMH", kmh(P.slip.eighthKmh), kmh(O.slip.eighthKmh));
     row(5, "1000 FT", sec(P.slip.t1000), sec(O.slip.t1000));
-    row(6, "1/4 ET", sec(P.slip.quarter), sec(O.slip.quarter));
+    row(6, (std::string(kDistName[std::clamp(app_.settings.dragDist, 0, 2)]).substr(0, 3) + " ET").c_str(), sec(P.slip.quarter), sec(O.slip.quarter));
     row(7, "TRAP", kmh(P.slip.trapKmh), kmh(O.slip.trapKmh));
     if (P.slip.broke || O.slip.broke || P.slip.stalled || O.slip.stalled) {
         std::string n = std::string(P.slip.broke ? "SEN: AKS KIRIK " : "") + (O.slip.broke ? "RAKIP: AKS KIRIK " : "") +

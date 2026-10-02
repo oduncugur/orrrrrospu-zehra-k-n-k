@@ -64,7 +64,7 @@ struct LaneState {
 
 class DragRace {
 public:
-    static constexpr double kQuarterMile = 402.336;
+    static constexpr double kQuarterMile = 402.336, kHalfMile = 804.672, kMile = 1609.344;
     static constexpr double kStep = 5e-5;   // 20 kHz (olculdu: 10 us referansina gore teker titresimi +%8)
 
     DragRace(int playerCarId, int opponentCarId, TreeType tree, uint32_t seed, bool withBurnout,
@@ -92,9 +92,14 @@ public:
     using LaunchPlan = zk::LaunchPlan;
     static LaunchPlan planLaunch(const VehicleDef* car, const Tune* tune);
     void setPlayerLaunchRpm(int rpm) { tunes_[0].launchRpm = rpm; }   // 2-step (sim bu Tune'u okur)
+    // Yaris mesafesi (m): 1/4 mil (varsayilan), 1/2 mil, 1 mil. Yesilden once ayarlanir; slip.quarter = bu mesafenin ET'si.
+    void setLength(double m) { length_ = m; }
+    double length() const { return length_; }
+    bool isQuarter() const { return length_ < kQuarterMile + 1.0; }
     static QuarterEstimate estimateQuarter(const VehicleDef* car, const Tune* tune);   // pahali: arka planda
 
 private:
+    double length_ = kQuarterMile;
     void stepPhysics(const PlayerControls& pc);
     void playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs& in);
     void aiDrive(LaneState& L, VehicleInputs& in);

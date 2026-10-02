@@ -213,6 +213,23 @@ int main() {
         std::printf("    Mustang rakip: kusursuz %.3f s, hata payli %.3f s (tepki + ET)\n", t[0], t[1]);
         CHECK(t[1] > t[0] + 0.15, "hata payli rakip belirgin yavas");
     }
+    std::printf("[M] Yaris mesafesi: 1/4, 1/2, 1 mil\n");
+    {
+        double et[3] = {0, 0, 0}, trap[3] = {0, 0, 0};
+        const double len[3] = {DragRace::kQuarterMile, DragRace::kHalfMile, DragRace::kMile};
+        for (int k = 0; k < 3; ++k) {
+            Tune t; t.tires = TireType::SemiSlick;
+            DragRace r(36, 36, TreeType::Pro, 11, false, &t, &t);
+            r.setLength(len[k]);
+            r.setPlayerAutopilot(true);
+            PlayerControls pc; double tt = 0;
+            while (!(r.lane(0).slip.finished && r.lane(1).slip.finished) && tt < 150) { r.advance(1.0 / 60.0, pc); tt += 1.0 / 60.0; }
+            et[k] = r.lane(1).slip.quarter; trap[k] = r.lane(1).slip.trapKmh;
+        }
+        std::printf("    #36: 1/4 %.2f s @ %.0f, 1/2 %.2f s @ %.0f, 1 mil %.2f s @ %.0f km/h\n", et[0], trap[0], et[1], trap[1], et[2], trap[2]);
+        CHECK(et[0] > 0 && et[1] > et[0] + 3.0 && et[2] > et[1] + 5.0, "uzun mesafe bitiyor ve daha uzun suruyor");
+        CHECK(trap[1] > trap[0] && trap[2] >= trap[1] - 1.0, "uzun mesafede cikis hizi yuksek (azami hiza yaklasir)");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

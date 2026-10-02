@@ -63,6 +63,7 @@ std::string Settings::serialize() const {
     o << "tilt_steer=" << (tiltSteer ? 1 : 0) << "\n";
     o << "tilt_sensitivity=" << tiltSens << "\n";
     o << "tilt_invert=" << (tiltInvert ? 1 : 0) << "\n";
+    o << "drag_distance=" << dragDist << "\n";
     o << "assist=" << (assist ? 1 : 0) << "\n";
     o << "manual_gears=" << (manualGears ? 1 : 0) << "\n";
     o << "auto_clutch=" << (autoClutch ? 1 : 0) << "      # H-desen: 0 oyuncu debriyaji, 1 otomatik (odul %75)\n";
@@ -102,6 +103,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "tilt_steer") s.tiltSteer = v != 0;
         else if (k == "tilt_sensitivity") s.tiltSens = snap(tiltSensOptions(), v);
         else if (k == "tilt_invert") s.tiltInvert = v != 0;
+        else if (k == "drag_distance") s.dragDist = std::clamp(v, 0, 2);
         else if (k == "assist") s.assist = v != 0;
         else if (k == "manual_gears") s.manualGears = v != 0;
         else if (k == "auto_clutch") s.autoClutch = v != 0;
