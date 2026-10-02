@@ -134,13 +134,17 @@ int main(int argc, char** argv) {
         OwnedCar& oc = game.career.cars[game.career.current];
         std::sscanf(lk, "%d;%d;%d;%d;%d", &oc.paint, &oc.finish, &oc.stripe, &oc.stripeCol, &oc.rimCol);
     }
+    if (const char* gg = std::getenv("ZK_GAUGE")) {               // test: kadran stili (0-3) + turbo gostergesi
+        OwnedCar& oc = game.career.cars[game.career.current];
+        oc.gauge = std::atoi(gg) & 3; oc.gaugeOwned = 0x10F; oc.boostGauge = true;
+    }
     if (const char* ss = std::getenv("ZK_START_SCREEN")) {       // test: dogrudan bir ekran
         const std::string n = ss;
         if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
         else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
-        else if (n == "junk") game.goJunkyard(); else if (n == "paint") game.goBodyShop(); else if (n == "ach") game.goAchievements(); else if (n == "ecu") game.goEcu(); else if (n == "setup") game.goSetup(); else if (n == "street") game.goStreet(); else if (n == "map") game.goMap(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore();
+        else if (n == "junk") game.goJunkyard(); else if (n == "paint") game.goBodyShop(); else if (n == "ach") game.goAchievements(); else if (n == "ecu") game.goEcu(); else if (n == "setup") game.goSetup(); else if (n == "street") game.goStreet(); else if (n == "gauges") game.goGauges(); else if (n == "map") game.goMap(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore();
     }
     if (startDrag) game.goDrag(game.selectedCar, 227, std::getenv("ZK_AUTOPILOT") != nullptr);
     int pw = 0, ph = 0;

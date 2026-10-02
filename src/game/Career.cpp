@@ -499,6 +499,29 @@ bool Career::cancelJob() {
     return true;
 }
 
+int gaugeStylePrice(int style) { static const int p[4] = {0, 400, 650, 950}; return p[std::clamp(style, 0, 3)]; }
+bool Career::selectGauge(int style, std::string* why) {
+    if (style < 0 || style > 3) return false;
+    OwnedCar& oc = car();
+    if (style > 0 && !((oc.gaugeOwned >> style) & 1)) {
+        const int p = gaugeStylePrice(style);
+        if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
+        money -= p; oc.gaugeOwned |= 1 << style;
+    }
+    oc.gauge = style;
+    return true;
+}
+bool Career::toggleBoostGauge(std::string* why) {
+    OwnedCar& oc = car();
+    if (!((oc.gaugeOwned >> 8) & 1)) {
+        if (money < kBoostGaugePrice) { if (why) *why = "PARA YETMIYOR"; return false; }
+        money -= kBoostGaugePrice; oc.gaugeOwned |= 1 << 8; oc.boostGauge = true;
+        return true;
+    }
+    oc.boostGauge = !oc.boostGauge;
+    return true;
+}
+
 long Career::tourEntry() const { return 400L * (1 + leagueUnlocked()); }
 long Career::tourPrize() const { return 3000L * (1 + leagueUnlocked()) * (1 + leagueUnlocked()) / 2 + 2000L; }
 bool Career::tourAvailable(std::string* why) const {
@@ -1238,6 +1261,7 @@ std::string Career::serialize() const {
         for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
         if (c.nosFill < 0.999) { std::snprintf(buf, sizeof buf, "nosf=%.3f\n", c.nosFill); o << buf; }
         if (c.jobHp > 0) { std::snprintf(buf, sizeof buf, "job=%d;%ld\n", c.jobHp, c.jobReward); o << buf; }
+        if (c.gaugeOwned) { std::snprintf(buf, sizeof buf, "gauge=%d;%d;%d\n", c.gauge, c.gaugeOwned, c.boostGauge ? 1 : 0); o << buf; }
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
@@ -1305,6 +1329,10 @@ bool Career::parse(const std::string& text, Career& out) {
         else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
         else if (k == "nosf" && !c.cars.empty()) c.cars.back().nosFill = std::clamp(std::atof(v.c_str()), 0.0, 1.0);
         else if (k == "job" && !c.cars.empty()) { OwnedCar& oc = c.cars.back(); if (std::sscanf(v.c_str(), "%d;%ld", &oc.jobHp, &oc.jobReward) != 2) oc.jobHp = 0; }
+        else if (k == "gauge" && !c.cars.empty()) {
+            OwnedCar& oc = c.cars.back(); int bg = 0;
+            if (std::sscanf(v.c_str(), "%d;%d;%d", &oc.gauge, &oc.gaugeOwned, &bg) == 3) { oc.gauge = std::clamp(oc.gauge, 0, 3); oc.boostGauge = bg != 0; }
+        }
         else if (k == "street") std::sscanf(v.c_str(), "%d;%d;%d;%d", &c.meetDone, &c.dynoWeek, &c.jobDay, &c.jobMask);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;

@@ -161,6 +161,7 @@ void App::goBodyShop() { setScreen(std::make_unique<BodyShopScreen>(*this)); }
 void App::goAchievements() { setScreen(std::make_unique<AchievementsScreen>(*this)); }
 void App::goEcu() { setScreen(std::make_unique<EcuScreen>(*this)); }
 void App::goSetup() { setScreen(std::make_unique<SetupScreen>(*this)); }
+void App::goGauges() { setScreen(std::make_unique<GaugeShopScreen>(*this)); }
 void App::goStreet() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); }
 void App::startMeet() {
     std::string why;

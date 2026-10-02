@@ -32,6 +32,8 @@ struct OwnedCar {
     double nosFill = 1.0;         // NOS tupu doluluk (yarista harcanir, garajda parayla dolar)
     // Musteri araci (sokak / musteri isi): hedef beygir ve odeme; 0 = kendi aracin. Yarisamaz, satilamaz.
     int  jobHp = 0; long jobReward = 0;
+    // Kadran (gosterge): secili stil (0 fabrika, 1 analog, 2 dijital, 3 ikisi), satin alinanlar (bit: stil; 8 turbo gostergesi)
+    int  gauge = 0, gaugeOwned = 0; bool boostGauge = false;
     bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0 && jobHp == 0; }
@@ -61,6 +63,8 @@ const char* partTabName(int tab);
 int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
 int  usedPrice(int newPrice);               // %55
+int  gaugeStylePrice(int style);             // kadran stili fiyati (0: fabrika)
+constexpr int kBoostGaugePrice = 350;        // turbo basinc gostergesi
 double marketMul(PartCat c, int week);
 double peakHpOf(const VehicleDef& v, const Tune& t);   // fizikteki en yuksek beygir (kesici altinda)       // haftalik parca pazari carpani (0.80..1.20; week < 0: 1)
 void applyUsedWear(Tune& t, PartCat c);     // ikinci el parcanin yipranmasi
@@ -226,6 +230,9 @@ struct Career {
     bool acceptJob(int k, std::string* why = nullptr);
     bool deliverJob(long* paid, std::string* why = nullptr);   // secili musteri araci hedefe ulastiysa
     bool cancelJob();                      // musteri aracini geri ver (takilan parcalar gider)
+    // Kadran: alinmamissa satin al ve sec, alinmissa ucretsiz sec; turbo gostergesi: al / ac-kapa
+    bool selectGauge(int style, std::string* why = nullptr);
+    bool toggleBoostGauge(std::string* why = nullptr);
     long repairCost() const;                                                    // secili arac
     bool repairCurrent(std::string* why = nullptr);
 

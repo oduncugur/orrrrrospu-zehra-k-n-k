@@ -1,4 +1,5 @@
 #include "Screens.h"
+#include "Gauges.h"
 #include "Ui.h"
 #include "app/Hints.h"
 #include "app/Looks.h"
@@ -605,23 +606,42 @@ void DragScreen::drawHud(Renderer& r) {
     // ---- gosterge paneli ----
     r.rect(62, kWorldBottom, 580, 360, {0.09f, 0.09f, 0.11f});
     const int gear = pt.gear();
+    const float rpm = (float)pt.rpm(), red = (float)es.redlineRpm, shiftAt = (float)P.sim->shiftRpm();
+    // Satin alinan kadran (kariyer araci): analog devir saati + turbo gostergesi; yazilar saga kayar
+    const bool mine = app_.career.car().carId == carIds_[0];
+    const int gstyle = mine ? app_.career.car().gauge : 0;
+    const bool analog = gstyle == 1 || gstyle == 3, boostG = mine && app_.career.car().boostGauge && P.sim->boostMax() > 0;
+    float tx = 136;
+    if (analog || boostG) {
+        GaugeData gd;
+        gd.rpm = rpm; gd.redline = red; gd.shiftRpm = shiftAt; gd.gear = gear == 0 ? "N" : std::to_string(gear);
+        gd.gearCol = P.grind ? kRed : Color{1, 1, 1}; gd.t = t_;
+        boostShown_ += ((float)P.sim->boostNow() - boostShown_) * 0.15f;
+        gd.boost = boostShown_; gd.boostMax = (float)P.sim->boostMax();
+        float gx = 66;
+        if (analog) { drawAnalogTach(r, 110, 311, 44, gd); gx = 158; }
+        else { r.rect(66, 268, 128, 354, {0.14f, 0.14f, 0.17f}); r.textCentered(97, 283, gd.gear, 8, gd.gearCol); gx = 132; }
+        if (boostG) { drawBoostGauge(r, gx + 28, 311, 26, gd); gx += 58; }
+        tx = gx + 4;
+    } else {
     r.rect(66, 268, 128, 354, {0.14f, 0.14f, 0.17f});
     r.textCentered(97, 283, gear == 0 ? "N" : std::to_string(gear), 8, P.grind ? kRed : Color{1, 1, 1});
+    }
     // Devir seridi (30 segment) + vites isigi
-    const float rpm = (float)pt.rpm(), red = (float)es.redlineRpm, shiftAt = (float)P.sim->shiftRpm();
+    if (!analog)
     for (int i = 0; i < 30; ++i) {
         const float segRpm = red * 1.05f * (i + 1) / 30.0f;
         const bool lit = rpm >= segRpm - red * 1.05f / 30.0f;
         Color c = segRpm > red ? kRed : segRpm > shiftAt - 800 ? kAmber : kGreen;
         if (!lit) c = {c.r * 0.18f, c.g * 0.18f, c.b * 0.18f};
-        r.rect(136 + i * 9.8f, 268, 136 + i * 9.8f + 8, 290, c);
+        r.rect(tx + i * 9.8f * (430 - tx) / 294.0f, 268, tx + (i * 9.8f + 8) * (430 - tx) / 294.0f, 290, c);
     }
-    if (rpm > shiftAt - 150 && std::fmod(t_, 0.12) < 0.06) r.rect(136, 264, 430, 267, {0.3f, 0.6f, 1.0f});
+    if (rpm > shiftAt - 150 && std::fmod(t_, 0.12) < 0.06) r.rect(tx, 264, 430, 267, {0.3f, 0.6f, 1.0f});
     std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
-    r.text(136, 296, b, 2, pt.limiterHit() ? kAmber : Color{1, 1, 1});
-    if (pt.vtecActive()) r.text(268, 296, "VTEC", 2, kRed);
+    r.text(tx, analog ? 274 : 296, b, 2, pt.limiterHit() ? kAmber : Color{1, 1, 1});
+    if (pt.vtecActive()) r.text(tx + 132, analog ? 274 : 296, "VTEC", 2, kRed);
     std::snprintf(b, sizeof b, "%3.0f %s", P.sim->speed() * app_.settings.speedFactor(), app_.settings.speedUnit());
-    r.text(320, 296, b, 2, {1, 1, 1});
+    r.text(analog ? tx : 320, analog ? 296 : 296, b, 2, {1, 1, 1});
     // Talimat
     const char* hint = "";
     const bool autoClutch = box == Gearbox::DCT || box == Gearbox::TorqueConverter;
@@ -629,10 +649,10 @@ void DragScreen::drawHud(Renderer& r) {
     else if ((ph == RacePhase::Staging || ph == RacePhase::Tree) && !P.armed) hint = autoClutch ? "FRENE BAS VE TUT" : "DEBRIYAJA BAS VE TUT";
     else if (ph == RacePhase::Staging || ph == RacePhase::Tree) hint = autoClutch ? "FREN + GAZ, YESILDE FRENI BIRAK" : "DEBRIYAJ + GAZ, YESILDE BIRAK";
     else if (ph == RacePhase::Run) hint = box == Gearbox::HPattern ? "VITES: DEBRIYAJ BAS + KOL" : box == Gearbox::TorqueConverter ? "OTOMATIK: SADECE GAZ" : "VITES: + / -";
-    r.text(136, 322, hint, 1, {0.75f, 0.8f, 0.9f});
+    r.text(tx, 322, hint, 1, {0.75f, 0.8f, 0.9f});
     std::snprintf(b, sizeof b, "YAG %.1f BAR  BALATA %.0fC  LASTIK %.0fC", pt.oilPressureBar(), pt.clutchTempC(),
                   P.sim->wheel(P.sim->drivenLeft()).tempC());
-    r.text(136, 336, b, 1, {0.6f, 0.65f, 0.6f});
+    r.text(tx, 336, b, 1, {0.6f, 0.65f, 0.6f});
 #ifndef __ANDROID__
     r.text(136, 349, "W GAZ  S FREN  BOSLUK DEBR  1-6/N  E/Q  ESC", 1, {0.55f, 0.75f, 1.0f});
 #endif

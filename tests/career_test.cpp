@@ -334,6 +334,19 @@ int main() {
         CHECK(reached && j.deliverJob(&paid) && paid == o.reward && j.money == jm + o.reward && j.cars.size() == n0, "hedefe ulasinca teslim: odeme, arac gider");
         CHECK(j.acceptJob(1) && j.cancelJob() && j.cars.size() == n0, "iptal: arac geri verilir");
     }
+    std::printf("[G] Kadran: satin al, ucretsiz degistir, turbo gostergesi, kayit\n");
+    {
+        Career c = Career::newGame(); c.money = 5000;
+        const long m0 = c.money;
+        CHECK(c.selectGauge(1) && c.car().gauge == 1 && c.money == m0 - gaugeStylePrice(1), "analog kadran satin alinir");
+        CHECK(c.selectGauge(0) && c.selectGauge(1) && c.money == m0 - gaugeStylePrice(1), "alinmis kadrana donus ucretsiz");
+        CHECK(c.toggleBoostGauge() && c.car().boostGauge && c.money == m0 - gaugeStylePrice(1) - kBoostGaugePrice, "turbo gostergesi alinir");
+        CHECK(c.toggleBoostGauge() && !c.car().boostGauge && c.money == m0 - gaugeStylePrice(1) - kBoostGaugePrice, "turbo gostergesi ucretsiz kapanir");
+        Career r;
+        CHECK(Career::parse(c.serialize(), r) && r.car().gauge == 1 && r.car().gaugeOwned == c.car().gaugeOwned, "kadran kayitta");
+        Career poor = Career::newGame(); poor.money = 100; std::string why;
+        CHECK(!poor.selectGauge(3, &why) && why == "PARA YETMIYOR" && poor.car().gauge == 0, "para yoksa takilmaz");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

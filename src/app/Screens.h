@@ -56,6 +56,7 @@ public:
     void key(Key k, bool down) override;
 
 private:
+    float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
     enum class Ctl { None, Clutch, Throttle, Shifter, Brake, PaddleUp, PaddleDown };
     struct Touch { int id; Ctl ctl; };
     struct Smoke { float x, lane, y, vx, vy, life, size; };
@@ -290,6 +291,23 @@ private:
     std::string msg_; double msgT_ = 0;
 };
 
+// Kadran dukkani: analog / dijital / ikisi kadran + turbo basinc gostergesi (canli onizleme)
+class GaugeShopScreen : public Screen {
+public:
+    explicit GaugeShopScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; t_ += dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
+    int sel_ = 1;
+    float redline_ = 7000, shift_ = 6700, boostMax_ = 0;
+    double t_ = 0;
+    std::string msg_; double msgT_ = 0;
+};
+
 // Basarimlar: liste (kazanilan altin, odul), ilerleme
 class AchievementsScreen : public Screen {
 public:
@@ -440,6 +458,7 @@ private:
     double spinP_ = 0, spinR_ = 0;
     bool night_ = false, rain_ = false;          // ortam: gece / yagmur (yaris basinda tohumdan)
     double envT_ = 0;                            // yagmur damlasi animasyonu
+    float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
     int lastGear_ = -2;                          // vites sesi icin
     std::string msgNote_;                        // ortam notu (HUD, ilk saniyeler)
     struct Puff { double x, y, z, vx, vy, vz, life, size; };

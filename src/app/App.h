@@ -102,7 +102,8 @@ public:
     void goAchievements();
     void goEcu();
     void goSetup();                              // kurulum (suspansiyon / lastik / profiller)
-    void goStreet();                             // sokak: bulusma / dyno yarismasi / musteri isleri
+    void goStreet();
+    void goGauges();                             // kadran dukkani                             // sokak: bulusma / dyno yarismasi / musteri isleri
     void startMeet();                            // gece bulusmasi: bahisli drag
     bool activeMeet = false;
     void goSaveCode();

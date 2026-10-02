@@ -129,6 +129,8 @@ public:
     void setNosFill(double f) { nosLeft_ = nosBottle_ * std::clamp(f, 0.0, 1.0); }   // kariyer: tupte kalan (0..1)
     bool nitrousActive() const { return nosActive_; }
     double nitrousLeft() const { return nosBottle_ > 0 ? nosLeft_ / nosBottle_ : 0.0; }
+    double boostNow() const;                        // anlik manifold basinci (bar; gaz kesik: vakum, atmosferik: 0)
+    double boostMax() const { return boostTot_; }   // tam dolmus basinc (bar)
     double downforceN() const { return dfK_ * speed() * speed(); }
     // Motor isisi (C) ve zorlanma: 0..1 (1 = patladi / kirildi); dayanim N*m
     double coolantC() const { return coolT_; }
@@ -157,6 +159,7 @@ private:
     bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
     double tireWear_ = 0, valveSafeRpm_ = 0, fineKnock_ = 0, heatMul_ = 1.0;
     bool reverse_ = false; double revThr_ = 0.0;
+    double spoolLo_ = 0, spoolHi_ = 0; bool superOnly_ = false;
     bool valveWarned_ = false;
     double engRating_ = 0, gbRating_ = 0;
     bool engBlown_ = false, gbBroken_ = false;

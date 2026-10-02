@@ -103,6 +103,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double ic = row(intercoolerTable(), tune->intercooler).eff * row(methTable(), tune->meth).eff;   // + su-metanol
         const TurbineOpt& TB = row(turbineTable(), tune->turbine);
         boostFac_ = boostTot_ = ed ? ed->boostBar : 0.0;
+        superOnly_ = ed && ed->induction == Induction::Supercharger;
         icCredit_ = (ic - 1.0) * 60.0;                                         // soguk sarj: 1.12 -> ~7 oktan
         ecuAgg_ = boostFac_ > 0 || tune->turbo > 0 || tune->superch > 0 ? (EC.forced - 1.0) * 20.0 : (EC.na - 1.0) * 30.0;
         knockSensor_ = knockSensor;                                            // standalone (vuruntu modulu yok) / eski yaris haritasi
@@ -115,16 +116,19 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (T.spoolLo - EC.spool + TB.spool),
                        eng_.redlineRpm * (T.spoolHi - EC.spool + TB.spool)};
             scaleCurves(eng_, turboMul, &t);
+            spoolLo_ = t.spoolStart; spoolHi_ = t.spoolFull;
         } else if (ed && ed->boostBar > 0.0 && (tune->turbine || tune->wastegate || tune->boostCtl)) {
             // Fabrika turbosu: wastegate / boost kontrol / turbin fabrika boostunu yukseltir (spool fabrika egrisinde)
             const double b0 = ed->boostBar, b1 = b0 * gate * TB.top * ic;
             boostTot_ = b1 / ic;
             TurboCtx t{(1.0 + b1) / (1.0 + b0), eng_.redlineRpm * (0.25 + TB.spool), eng_.redlineRpm * (0.45 + TB.spool)};
             scaleCurves(eng_, turboMul, &t);
+            spoolLo_ = t.spoolStart; spoolHi_ = t.spoolFull;
         }
         if (tune->superch > 0) {
             const SuperOpt& S = row(superTable(), tune->superch);
             SuperCtx sc{red0, ed ? ed->boostBar : 0.0, S.bar * ic, S.type};
+            if (tune->turbo == 0 && !(ed && ed->induction != Induction::Supercharger && ed->boostBar > 0)) superOnly_ = true;
             boostTot_ += S.bar;
             scaleCurves(eng_, superMul, &sc);
         }
@@ -562,6 +566,21 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
     dist_ += std::sqrt(vx_ * vx_ + vy_ * vy_) * dt;
     V_ = vx_;
     fuelKg_ = std::max(0.0, cfg_.fuelLiters * fuelDensity_ - pt.fuelGrams() * 1e-3);
+}
+
+// Anlik manifold basinci (bar, gosterge): asiri beslemeli motorda gaz x dolma (turbo: dolma araligi; kompresor: devirle
+// dogrusal) x toplam boost; gaz kesikken vakum. Atmosferik motorda 0.
+double VehicleSim::boostNow() const {
+    if (boostTot_ <= 0.0) return 0.0;
+    const double rpm = pt_->rpm(), thr = pt_->throttleEffective(), red = eng_.redlineRpm;
+    double spool;
+    if (superOnly_) spool = std::clamp(rpm / (0.6 * red), 0.0, 1.0);
+    else {
+        const double lo = spoolLo_ > 0 ? spoolLo_ : 0.30 * red, hi = spoolHi_ > lo ? spoolHi_ : std::max(lo + 300.0, 0.55 * red);
+        const double x = std::clamp((rpm - lo) / (hi - lo), 0.0, 1.0);
+        spool = x * x * (3.0 - 2.0 * x);
+    }
+    return thr * boostTot_ * spool - (1.0 - thr) * 0.65;
 }
 
 } // namespace zk

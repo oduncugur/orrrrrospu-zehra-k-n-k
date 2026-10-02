@@ -21,7 +21,8 @@ const Rect kSellG{284, 66, 352, 94};          // 3B gorunumun sag ustu (2+ arac 
 const Rect kRestoreG{8, 66, 112, 94};         // sol ust: hasar / yipranma varsa
 const Rect kPaintG{284, 100, 352, 128};       // sag ust: boyahane
 const Rect kCashG{284, 134, 352, 160};
-const Rect kSetupG{284, 168, 352, 196};      // kurulum (suspansiyon / lastik / profiller)        // TEST: her basista +10.000 $ (yayin oncesi kaldirilacak)
+const Rect kSetupG{284, 168, 352, 196};      // kurulum (suspansiyon / lastik / profiller)
+const Rect kGaugeG{284, 202, 352, 230};      // kadran dukkani        // TEST: her basista +10.000 $ (yayin oncesi kaldirilacak)
 
 double peakHp(const EngineSpec& e) {
     double hp = 0;
@@ -169,6 +170,7 @@ void GarageScreen::render(Renderer& r) {
     button(r, kPaintG, "BOYA", Color{0.35f, 0.18f, 0.45f, 0.95f}, 2);
     button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.95f}, 2);
     button(r, kSetupG, "KURULUM", Color{0.15f, 0.30f, 0.40f, 0.95f}, 1);
+    button(r, kGaugeG, "KADRAN", Color{0.40f, 0.30f, 0.10f, 0.95f}, 1);
     if (msgT_ > 0) {
         r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.85f});
         r.textCentered(180, 258, msg_, 2, kUiGold);
@@ -196,6 +198,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
     if (kPaintG.hit(x, y)) { app_.goBodyShop(); return; }
     if (kSetupG.hit(x, y)) { app_.goSetup(); return; }
+    if (kGaugeG.hit(x, y)) { app_.goGauges(); return; }
     if (kCashG.hit(x, y)) {                                      // TEST: para
         app_.career.money += 10000;
         app_.saveCareer();

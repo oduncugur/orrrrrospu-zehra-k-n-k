@@ -2,6 +2,7 @@
 // Kontroller (Cockpit): analog gaz / fren (/ debriyaj), sanzimana gore vites kolu. Direksiyon: telefonda egim,
 // masaustunde klavye (ekranda sag/sol tusu yok).
 #include "Screens.h"
+#include "Gauges.h"
 #include "app/Hints.h"
 #include "Ui.h"
 #include "app/Looks.h"
@@ -827,9 +828,13 @@ void RoadScreen::drawHud(Renderer& r) {
     const float x0 = land_ ? 126.0f : 8.0f, infoY = land_ ? 40.0f : 62.0f;
     if (land_) r.rect(120, 0, 578, 36, {0.02f, 0.02f, 0.04f, 0.72f});
     else { r.rect(0, 0, W, 58, {0.02f, 0.02f, 0.04f, 0.72f}); r.rect(0, 58, W, 74, {0.02f, 0.02f, 0.04f, 0.5f}); }
+    const bool careerCar = app_.career.car().carId == carId_;
+    const int gstyle = careerCar ? app_.career.car().gauge : 0;           // satin alinan kadran
+    if (!gstyle) {
     std::snprintf(b, sizeof b, "%3.0f", sim.speed() * app_.settings.speedFactor());
     r.text(x0, 4, b, 4, {1, 1, 1});
     r.text(x0 + 74, 22, app_.settings.speedUnit(), 1, {0.7f, 0.7f, 0.75f});
+    }
     const int gear = pt.gear();
     const bool autoBox = cockpit_.lever() == Cockpit::Lever::Automatic;
     std::string gs = gear == 0 ? "N" : std::to_string(gear);
@@ -840,6 +845,16 @@ void RoadScreen::drawHud(Renderer& r) {
         else if (ap == Cockpit::AutoPos::S) gc = {1.0f, 0.3f, 0.25f};          // spor: kirmizi
         else if (ap == Cockpit::AutoPos::M) gc = {0.45f, 0.8f, 1.0f};          // elle: mavi
     }
+    if (gstyle) {                                                        // kadran: yatayda alt orta, dikeyde yol goruntusunun alti
+        GaugeData gd;
+        gd.rpm = (float)pt.rpm(); gd.redline = (float)sim.engineSpec().redlineRpm; gd.shiftRpm = (float)sim.shiftRpm();
+        gd.speed = (float)(sim.speed() * app_.settings.speedFactor()); gd.speedMax = app_.settings.speedFactor() > 3.0 ? 260.0f : 160.0f;
+        gd.unit = app_.settings.speedUnit(); gd.gear = gs; gd.gearCol = Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : gc; gd.t = envT_;
+        boostShown_ += ((float)sim.boostNow() - boostShown_) * 0.15f;     // ibre gecikmesi
+        gd.boost = boostShown_; gd.boostMax = (float)sim.boostMax();
+        if (land_) drawGaugeCluster(r, 142, 250, 398, 356, gstyle, app_.career.car().boostGauge, gd);
+        else drawGaugeCluster(r, 40, 352, 320, 436, gstyle, app_.career.car().boostGauge, gd);
+    } else {
     r.text(x0 + 106, 4, gs, 4, Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : gc);
     const float red = (float)sim.engineSpec().redlineRpm, fill = std::clamp((float)pt.rpm() / (red * 1.05f), 0.0f, 1.0f);
     const float rx = x0 + 136, rw = land_ ? 94.0f : 100.0f;
@@ -847,6 +862,7 @@ void RoadScreen::drawHud(Renderer& r) {
     r.rect(rx, 6, rx + rw * fill, 16, pt.rpm() > red * 0.9 ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
     std::snprintf(b, sizeof b, "%5.0f RPM", pt.rpm());
     r.text(rx, 22, b, 1, {1, 1, 1});
+    }
     const bool tiltOn = app_.settings.tiltSteer;
     if (app_.tiltAvailable) button(r, tiltBtn_, tiltOn ? "EGIM ACIK" : "EGIM KAPALI", tiltOn ? Color{0.12f, 0.35f, 0.18f, 0.85f} : Color{0.25f, 0.25f, 0.28f, 0.85f}, 1);
     if (!sim.hasTc()) button(r, assistBtn_, sim.hasAbs() ? "ABS  TC YOK" : "ABS/TC YOK", Color{0.25f, 0.25f, 0.28f, 0.85f}, 1);
