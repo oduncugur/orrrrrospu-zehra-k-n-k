@@ -137,7 +137,8 @@ struct Career {
     void dailyRefresh();
     long dailyAdd(TaskType t, long amount);
     // Rakip sec: oyuncunun tahmini ET'sine (+ forma gore hedef) yakin, son rakipten farkli
-    Opponent pickOpponentFor(uint32_t seed) const;
+    // etOffset: hedef ET kaydirmasi (negatif = daha hizli rakip; haftalik turnuva turlari)
+    Opponent pickOpponentFor(uint32_t seed, double etOffset = 0.0) const;
 
     static Career newGame();
     OwnedCar& car() { return cars[current]; }
@@ -164,6 +165,22 @@ struct Career {
     // Polis kovalamacasi: kacis odulu (temassiz +%50), yakalanma cezasi (donus negatif)
     long recordChase(bool escaped, int collisions);
     int  chaseEscapes = 0;
+    // Garaj yuvalari: baslangic 4, en fazla 12; dolu garaja galeri / hurdalik / pink slip araci giremez
+    static constexpr int kStartSlots = 4, kMaxSlots = 12;
+    int  garageSlots = kStartSlots;
+    bool garageFull() const { return (int)cars.size() >= garageSlots; }
+    long slotPrice() const;                // sonraki yuvanin fiyati (her yuva %60 pahali)
+    bool buySlot(std::string* why = nullptr);
+    // Haftalik turnuva: 3 tur drag eleme (her tur rakip hizlanir), kaybeden o hafta elenir; 3 tur = buyuk odul + un
+    static constexpr int kTourRounds = 3;
+    int  tourWeek = -1, tourRound = 0;
+    bool tourOut = false;
+    void tourRefresh();                    // yeni hafta: sifirla
+    long tourEntry() const;                // giris ucreti (ilk tur)
+    long tourPrize() const;                // sampiyonluk odulu (acik lige gore)
+    bool tourAvailable(std::string* why = nullptr) const;
+    bool tourStart(std::string* why = nullptr);   // ilk turda giris ucreti alinir
+    long recordTour(bool won);             // donus: verilen odul (yalniz son tur galibiyetinde)
     long repairCost() const;                                                    // secili arac
     bool repairCurrent(std::string* why = nullptr);
 

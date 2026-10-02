@@ -19,10 +19,10 @@ constexpr float kRowY0 = 114;
 float rowH(size_t n) { return std::min(44.0f, (464.0f - kRowY0) / std::max<size_t>(1, n)); }   // lig 9 etkinlige kadar sigar
 }
 
-LeagueScreen::LeagueScreen(App& app) : app_(app) {
+LeagueScreen::LeagueScreen(App& app, int tab) : app_(app) {
     app_.hint(HintLeague, hintTexts()[HintLeague]);
     app_.career.dailyRefresh();
-    tab_ = app_.career.leagueUnlocked();
+    tab_ = tab >= 0 ? std::min(tab, kLeagues - 1) : app_.career.leagueUnlocked();
     if (!app_.eventNote.empty()) { msg_ = app_.eventNote; msgT_ = 3.5; app_.eventNote.clear(); }
 }
 
@@ -128,7 +128,7 @@ void LeagueScreen::render(Renderer& r) {
         }
         r.textCentered(180, 562, "BIR ETKINLIK SEC", 1, kUiDim);
     }
-    button(r, kBackL, "< GARAJ", kUiBtn, 2);
+    button(r, kBackL, "< HARITA", kUiBtn, 2);
     if (msgT_ > 0) { r.rect(0, 430, 360, 462, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 440, msg_, 2, kUiGold); }
 }
 
@@ -137,7 +137,7 @@ void LeagueScreen::pointerDown(int, float x, float y) {
         if (kYesL.hit(x, y)) { app_.startEvent(sel_); return; }
         if (kNoL.hit(x, y)) { confirm_ = false; return; }
     }
-    if (kBackL.hit(x, y)) { app_.activeEvent = -1; app_.goGarage(); return; }
+    if (kBackL.hit(x, y)) { app_.goMap(); return; }
     if (kAchL.hit(x, y)) { app_.goAchievements(); return; }
     for (int l = 0; l < kLeagues; ++l)
         if (Rect{4.0f + l * 70.8f, 64, 72.0f + l * 70.8f, 92}.hit(x, y)) { tab_ = l; sel_ = -1; confirm_ = false; return; }
@@ -154,7 +154,7 @@ void LeagueScreen::pointerDown(int, float x, float y) {
 
 void LeagueScreen::key(Key k, bool down) {
     if (!down) return;
-    if (k == Key::Back) { if (confirm_) confirm_ = false; else if (sel_ >= 0) sel_ = -1; else { app_.activeEvent = -1; app_.goGarage(); } }
+    if (k == Key::Back) { if (confirm_) confirm_ = false; else if (sel_ >= 0) sel_ = -1; else app_.goMap(); }
     if (k == Key::Left) { tab_ = std::max(0, tab_ - 1); sel_ = -1; }
     if (k == Key::Right) { tab_ = std::min(kLeagues - 1, tab_ + 1); sel_ = -1; }
     if (k == Key::Enter && sel_ >= 0) { if (confirm_) app_.startEvent(sel_); else if (app_.career.eventAvailable(sel_)) confirm_ = true; }

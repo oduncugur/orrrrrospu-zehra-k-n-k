@@ -105,8 +105,14 @@ void GalleryScreen::render(Renderer& r) {
     for (int i = 0; i < 4; ++i) button(r, kGNav[i], i == 0 ? "<<" : i == 1 ? "<" : i == 2 ? ">" : ">>", kUiBtn, 3);
     bool owned = false;
     for (const OwnedCar& oc : app_.career.cars) owned |= oc.carId == carId_;
+    const Career& cr = app_.career;
     if (owned) button(r, kBuy, "GARAJINDA", {0.12f, 0.3f, 0.16f}, 2);
-    else button(r, kBuy, "SATIN AL " + ps, app_.career.money >= price ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
+    else if (cr.garageFull()) {                                         // garaj dolu: once yuva
+        if (cr.garageSlots >= Career::kMaxSlots) button(r, kBuy, "GARAJ DOLU (EN BUYUK)", {0.25f, 0.25f, 0.28f}, 2);
+        else button(r, kBuy, "GARAJ DOLU: YUVA AL " + money(cr.slotPrice()), cr.money >= cr.slotPrice() ? Color{0.15f, 0.35f, 0.6f} : Color{0.25f, 0.25f, 0.28f}, 2);
+    } else button(r, kBuy, "SATIN AL " + ps, app_.career.money >= price ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
+    std::snprintf(b, sizeof b, "GARAJ %zu / %d", cr.cars.size(), cr.garageSlots);
+    r.text(8, 408, b, 1, cr.garageFull() ? Color{1.0f, 0.6f, 0.3f} : kUiDim);
     const OwnedCar& cur = app_.career.car();
     if (app_.career.cars.size() > 1) {
         std::snprintf(b, sizeof b, "SAT: %s %s", upper(findVehicle(cur.carId)->model).substr(0, 14).c_str(), money(sellPrice(cur)).c_str());
@@ -189,6 +195,12 @@ void GalleryScreen::pointerDown(int, float x, float y) {
         bool owned = false;
         for (const OwnedCar& oc : app_.career.cars) owned |= oc.carId == carId_;
         if (owned) return;
+        if (app_.career.garageFull()) {                                   // yuva al (tek dokunus: kucuk tutar, geri alinamaz degil)
+            std::string why;
+            if (app_.career.buySlot(&why)) { msg_ = "YENI YUVA ACILDI"; app_.saveCareer(); } else msg_ = why;
+            msgT_ = 1.8;
+            return;
+        }
         if (app_.career.money < carPrice(*findVehicle(carId_))) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
         confirm_ = Confirm::Buy;
         return;

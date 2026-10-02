@@ -106,7 +106,10 @@ public:
     // Satirlar '\n' ile ayrilir. Test calistirmalarinda (ZK_START_SCREEN / ZK_AUTOPILOT / ZK_START_DRAG) kapali.
     void hint(int id, const char* text);
     bool hintOpen() const { return !hint_.empty(); }
-    void goLeague();
+    void goLeague(int tab = -1);
+    void goMap();                                // bolge haritasi (kariyer girisi)
+    void startTour();                            // haftalik turnuva: siradaki tur
+    bool activeTour = false;
     // Lig etkinligi baslat: rakip (isimli ya da dengi), mod; sonuc ekranindan donus lig ekranina
     void startEvent(int idx);
     int activeEvent = -1;                        // suren lig etkinligi (-1: yok)

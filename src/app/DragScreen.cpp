@@ -1,4 +1,5 @@
 #include "Screens.h"
+#include "Ui.h"
 #include "app/Hints.h"
 #include "app/Looks.h"
 #include "garage/VehicleCatalog.h"
@@ -51,7 +52,7 @@ void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
-    race_->setOpponentHandicap(app_.activeEvent >= 0 ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
+    race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
     run_.clear(); runAcc_ = 0; ghostSaved_ = false; ghost_.clear(); ghostEt_ = 0;
@@ -282,6 +283,13 @@ void DragScreen::update(double dt) {
             prize_ = app_.career.recordEvent(app_.activeEvent, won, s.finished && !s.redLight ? s.quarter : 0.0, 0, &pink);
             if (pink > 0) app_.eventNote = "PINK SLIP: " + upperS(findVehicle(pink)->model) + " SENIN!";
             else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
+        } else if (app_.activeTour) {                                   // haftalik turnuva turu
+            prize_ = app_.career.recordTour(won);
+            char nb[64];
+            if (!won) std::snprintf(nb, sizeof nb, "TURNUVA: %d. TURDA ELENDIN", app_.career.tourRound + 1);
+            else if (prize_ > 0) std::snprintf(nb, sizeof nb, "TURNUVA SAMPIYONU! +%s", money(prize_).c_str());
+            else std::snprintf(nb, sizeof nb, "TURNUVA: %d. TUR KAZANILDI", app_.career.tourRound);
+            app_.eventNote = nb;
         } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;
         app_.career.recordDamage(s.broke, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());

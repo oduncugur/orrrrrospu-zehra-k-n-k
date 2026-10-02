@@ -21,6 +21,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/BodyShopScreen.cpp
     ${ZK_ROOT}/src/app/AchievementsScreen.cpp
     ${ZK_ROOT}/src/app/SaveCodeScreen.cpp
+    ${ZK_ROOT}/src/app/RegionMapScreen.cpp
     ${ZK_ROOT}/src/app/RoadScreen.cpp
     ${ZK_ROOT}/src/app/SettingsScreen.cpp
     ${ZK_ROOT}/src/app/Cockpit.cpp

@@ -100,10 +100,27 @@ void App::setScreen(std::unique_ptr<Screen> s) {
 }
 void App::goGarage() {
     setVoice(1, nullptr);
-    if (activeEvent >= 0) { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this)); return; }   // etkinlikten donus
+    if (activeEvent >= 0) {                                                       // etkinlikten donus: o lig
+        const int tab = leagueEvents()[activeEvent].league;
+        activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); return;
+    }
+    if (activeTour) { activeTour = false; setScreen(std::make_unique<RegionMapScreen>(*this)); return; }   // turnuvadan donus
     setScreen(std::make_unique<GarageScreen>(*this));
 }
-void App::goLeague() { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this)); }
+void App::goLeague(int tab) { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); }
+void App::goMap() { activeEvent = -1; activeTour = false; setScreen(std::make_unique<RegionMapScreen>(*this)); }
+void App::startTour() {
+    std::string why;
+    if (!career.tourStart(&why)) return;
+    const OwnedCar& oc = career.car();
+    const int r = career.tourRound;                                    // her tur rakip daha hizli ve keskin
+    Opponent o = career.pickOpponentFor((uint32_t)career.tourWeek * 131u + (uint32_t)r * 977u + 7u, -0.12 - 0.12 * r);
+    eventHandicap = std::max(1.1, 1.5 - 0.15 * r);
+    lastOpp = o;
+    activeEvent = -1; activeTour = true;
+    saveCareer();
+    setScreen(std::make_unique<DragScreen>(*this, oc.carId, o.carId, &oc.tune, &o.tune, true));
+}
 void App::startEvent(int idx) {
     const auto& ev = leagueEvents();
     if (idx < 0 || idx >= (int)ev.size() || !career.eventAvailable(idx)) return;
@@ -130,7 +147,7 @@ void App::goDrag(int p, int o, bool autopilot) {
     setScreen(std::move(s));
 }
 void App::goCareerRace() {
-    if (true) { goLeague(); return; }                 // kariyer artik lig ekranindan
+    if (true) { goMap(); return; }                    // kariyer: bolge haritasi -> lig
     const OwnedCar& oc = career.car();
     const Opponent opp = career.pickOpponentFor((uint32_t)career.races * 7919u + raceSeed_++);
     lastOpp = opp;

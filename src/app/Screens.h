@@ -198,7 +198,7 @@ private:
 // Kariyer: lig sekmeleri, etkinlik listesi (rakip, mod, odul, un), secili etkinlik ayrintisi / gunluk gorevler.
 class LeagueScreen : public Screen {
 public:
-    explicit LeagueScreen(App& app);
+    explicit LeagueScreen(App& app, int tab = -1);
     bool landscape() const override { return false; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
@@ -210,6 +210,21 @@ private:
     int tab_ = 0, sel_ = -1;
     bool confirm_ = false;
     std::string msg_; double msgT_ = 0;
+};
+
+// Bolge haritasi: 5 bolge (lig) yollarla bagli; kilitli gri, patronu yenilen altin. Dokunus: o ligin etkinlikleri.
+// Altta haftalik turnuva (3 tur drag eleme).
+class RegionMapScreen : public Screen {
+public:
+    explicit RegionMapScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; t_ += dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
+    std::string msg_; double msgT_ = 0, t_ = 0;
 };
 
 // Kayit kodu: kariyeri panoya kod olarak kopyala / panodaki kodu yukle (onayli). Telefon <-> bilgisayar tasima.

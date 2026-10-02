@@ -245,6 +245,40 @@ int main() {
         CHECK(!(readSaveCode(bad, text) && Career::parse(text, d)), "bozuk kod reddedilir (checksum)");
         CHECK(!readSaveCode("merhaba", text), "kod olmayan metin reddedilir");
     }
+    std::printf("[Y] Garaj yuvalari\n");
+    {
+        Career c = Career::newGame();
+        c.money = 10000000; c.dailyDay = todayIndex(); c.dailyDone = 7;
+        std::string why;
+        for (int id : {5, 227, 78}) c.buyCar(id);
+        CHECK(c.cars.size() == 4 && c.garageFull() && !c.buyCar(269, &why) && why == "GARAJ DOLU", "4 yuva dolunca arac alinmaz");
+        const long p1 = c.slotPrice();
+        CHECK(c.buySlot() && c.garageSlots == 5 && c.slotPrice() > p1 && c.buyCar(269), "yuva alinca arac girer, sonraki yuva pahali");
+        while (c.garageSlots < Career::kMaxSlots) c.buySlot();
+        CHECK(!c.buySlot(&why) && c.garageSlots == Career::kMaxSlots, "en fazla 12 yuva");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.garageSlots == Career::kMaxSlots, "yuva sayisi kayitta");
+    }
+    std::printf("[T] Haftalik turnuva: 3 tur, elenme, odul bir kez, yeni hafta sifirlar\n");
+    {
+        Career c = Career::newGame();
+        c.money = 100000; c.dailyDay = todayIndex(); c.dailyDone = 7;
+        const long m0 = c.money;
+        CHECK(c.tourStart() && c.money == m0 - c.tourEntry(), "ilk turda giris ucreti");
+        CHECK(c.recordTour(true) == 0 && c.tourStart() && c.money == m0 - c.tourEntry(), "2. tur ucretsiz");
+        c.recordTour(true);
+        const long m1 = c.money, prize = c.tourPrize();
+        CHECK(c.tourStart() && c.recordTour(true) == prize && c.money == m1 + prize && c.tourRound == Career::kTourRounds, "3 tur = odul");
+        std::string why;
+        CHECK(!c.tourAvailable(&why) && why == "BU HAFTA SAMPIYONSUN", "ayni hafta tekrar yok");
+        Career e = Career::newGame(); e.money = 100000;
+        e.tourStart(); e.recordTour(false);
+        CHECK(e.tourOut && !e.tourAvailable(&why) && why == "BU HAFTA ELENDIN", "kaybeden elenir");
+        e.tourWeek -= 1; e.tourRefresh();
+        CHECK(!e.tourOut && e.tourRound == 0 && e.tourAvailable(), "yeni hafta sifirlanir");
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.tourRound == c.tourRound && d.tourWeek == c.tourWeek, "turnuva durumu kayitta");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();
