@@ -3,6 +3,7 @@
 #include "Screens.h"
 #include "Ui.h"
 #include "Gauges.h"
+#include "app/Hints.h"
 #include "sim/VehicleSim.h"
 
 #include <algorithm>
@@ -18,6 +19,7 @@ const Rect kApply{8, 500, 352, 544}, kBackG{8, 596, 352, 634};
 }
 
 GaugeShopScreen::GaugeShopScreen(App& app) : app_(app) {
+    app_.hint(HintGauges, hintTexts()[HintGauges]);
     const OwnedCar& oc = app_.career.car();
     VehicleSimConfig cfg; cfg.car = findVehicle(oc.carId); cfg.tune = &oc.tune;
     const VehicleSim s(cfg);

@@ -2,6 +2,7 @@
 // Kariyer mantigi Career (meet* / dyno* / job*); bu ekran yalniz gosterir ve baslatir.
 #include "Screens.h"
 #include "Ui.h"
+#include "app/Hints.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -18,6 +19,7 @@ Rect jobBtn(int k) { return {232, 176 + k * 120.0f, 344, 214 + k * 120.0f}; }
 }
 
 StreetScreen::StreetScreen(App& app) : app_(app) {
+    app_.hint(HintStreet, hintTexts()[HintStreet]);
     if (!app_.eventNote.empty()) { msg_ = app_.eventNote; msgT_ = 4.0; app_.eventNote.clear(); }
 }
 

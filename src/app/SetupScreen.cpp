@@ -3,6 +3,7 @@
 #include "Screens.h"
 #include "Ui.h"
 #include "sim/PartTables.h"
+#include "app/Hints.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -31,7 +32,7 @@ const char* lockOf(const Tune& t, int row) {
 }
 }
 
-SetupScreen::SetupScreen(App& app) : app_(app) {}
+SetupScreen::SetupScreen(App& app) : app_(app) { app_.hint(HintSetup, hintTexts()[HintSetup]); }
 
 void SetupScreen::render(Renderer& r) {
     const OwnedCar& oc = app_.career.car();
