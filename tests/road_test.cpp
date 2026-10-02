@@ -391,6 +391,33 @@ int main() {
         CHECK(l100[StyleEco] < l100[StyleFlatOut], "eko surucu 100 km'de daha az yakar");
         CHECK(rs.runPosition() >= 1 && rs.runPosition() <= rs.runCount(), "siralama tutarli");
     }
+    std::printf("[B] Fren: hafif basista kilitlenmez, tam basista guclu yavaslar (ABS'siz Sahin)\n");
+    {
+        const RoadPath straight(7u, 20000.0, 4000.0);
+        auto brakeRun = [&](double pedal, double& maxSlip, double& decel) {
+            RoadCar a(findVehicle(217), nullptr, straight, 0.0, -1.8);
+            a.manual = false; a.assist = false;
+            RoadControls k; k.throttle = 1.0;
+            for (double t = 0; t < 30.0 && a.sim().speed() < 100 / 3.6; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            const double v0 = a.sim().speed();
+            k.throttle = 0.0; k.brake = pedal; maxSlip = 0;
+            for (int i = 0; i < 60; ++i) {
+                a.update(1.0 / 60.0, k);
+                for (int w = 0; w < 4; ++w) {
+                    const auto& wh = a.sim().wheel(w);
+                    maxSlip = std::max(maxSlip, (a.sim().speed() - wh.omega() * wh.rEff()) / std::max(a.sim().speed(), 3.0));
+                }
+            }
+            decel = (v0 - a.sim().speed()) / 1.0 / 9.81;
+        };
+        double sL, dL, sF, dF, sM, dM;
+        brakeRun(0.35, sL, dL); brakeRun(1.0, sF, dF); brakeRun(0.6, sM, dM);
+        std::printf("    %%35 pedal: en buyuk teker kaymasi %.2f, %.2f g | tam pedal: kayma %.2f, %.2f g\n", sL, dL, sF, dF);
+        CHECK(sL < 0.15 && dL > 0.15, "hafif frende teker kilitlenmez, yavaslar");
+        CHECK(dF > 0.7, "tam frende guclu yavaslama (> 0.7 g; ABS'siz arac tam basista kilitlenebilir)");
+        std::printf("    %%60 pedal: kayma %.2f, %.2f g\n", sM, dM);
+        CHECK(sM < 0.2 && dM > 0.5, "%60 frende kilitlenmez, guclu yavaslar");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

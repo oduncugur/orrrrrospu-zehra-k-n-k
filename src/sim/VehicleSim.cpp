@@ -293,7 +293,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     const SuspOpt& SU = row(suspTable(), tune ? tune->susp : 0);
     const bool adj = tune && suspAdjustable(*tune);                         // kurulum ayarlari (ayarli suspansiyon)
     const double hCoG = (car ? 0.36 * car->heightM : 0.50) - (cfg_.drySump ? 0.012 : 0.0) - SU.lowerMm * 0.0008
-                      + (adj ? std::clamp(tune->setRide, -40, 20) * 0.0008 : 0.0);   // yukseklik: kucuk = alcak agirlik merkezi
+                      + (adj ? 0.5 * (std::clamp(tune->setRide, -40, 20) + std::clamp(tune->setRideR, -40, 20)) * 0.0008 : 0.0);   // yukseklik: kucuk = alcak agirlik merkezi
     vl_ = VehicleLoad{baseMass_ + fuelKg_, car ? car->wheelbaseM : 2.62, car ? car->widthM * 0.85 : 1.50, hCoG,
                       car ? car->frontWeight : 0.62};
     // Suspansiyon: kasa tipine gore dogal frekans (Hz); yaris araclari sert
@@ -306,12 +306,17 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         }
         if (!car->streetLegal) fRide_ = 2.8;
         fRide_ *= SU.ride * (tune ? 1.0 - 0.30 * std::clamp(tune->wearSusp, 0.0, 1.0) : 1.0);   // bitik amortisor: yumusak
-        if (adj) fRide_ *= 1.0 + 0.05 * std::clamp(tune->setSpring, -5, 5);
+        // (on / arka yay ayari asagida aks basina)
     }
     {
-        const double dz = adj ? 1.0 + 0.08 * std::clamp(tune->setDamp, -5, 5) : 1.0;
+        // Kurulum: on / arka yay (dogal frekans %5 adim) ve amortisor (sonum %8 adim) ayri
+        const double kF = adj ? 1.0 + 0.05 * std::clamp(tune->setSpring, -5, 5) : 1.0, kR = adj ? 1.0 + 0.05 * std::clamp(tune->setSpringR, -5, 5) : 1.0;
         SuspensionSetup ss = SuspensionSetup::fromVehicle(vl_.mass, vl_.wheelbase, vl_.track, vl_.hCoG, vl_.frontStatic,
-                                                          fRide_, fRide_ * 1.1, 0.30 * dz, 0.60 * dz);
+                                                          fRide_ * kF, fRide_ * 1.1 * kR, 0.30, 0.60);
+        if (adj) {
+            const double dF = 1.0 + 0.08 * std::clamp(tune->setDamp, -5, 5), dR = 1.0 + 0.08 * std::clamp(tune->setDampR, -5, 5);
+            ss.front.bumpC *= dF; ss.front.reboundC *= dF; ss.rear.bumpC *= dR; ss.rear.reboundC *= dR;
+        }
         if (adj) { ss.arbFront *= 1.0 + 0.2 * std::clamp(tune->setArbF, -3, 3); ss.arbRear *= 1.0 + 0.2 * std::clamp(tune->setArbR, -3, 3); }
         susp_ = std::make_unique<Suspension>(ss);
     }
@@ -322,7 +327,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
                         : car->body == Body::Van ? 0.48 : car->body == Body::Muscle ? 0.40 : 0.34;
         CdA_ = cd * car->widthM * car->heightM * 0.85;
     }
-    brakeTotal_ = 7000.0 * (baseMass_ / 1155.0);
+    brakeTotal_ = 4800.0 * (baseMass_ / 1155.0);                         // tam pedal ~1.35 g (sokak lastigi tam basista kilitlenebilir)
     if (tune) {
         brakeTotal_ *= row(brakeTable(), tune->brakes).mul * row(brakeDiscTable(), tune->brakeDisc).mul * row(brakeCaliperTable(), tune->brakeCaliper).mul
                      * (1.0 - 0.5 * std::clamp(tune->wearBrakes, 0.0, 1.0));     // balata x disk x kaliper
@@ -466,9 +471,10 @@ void VehicleSim::step(double dt, const VehicleInputs& in) {
             wasAir_[c] = susp_->airborne(c); wasStop_[c] = susp_->onBumpStop(c);
         }
     }
-    const double bias = 0.65;
-    const double bF = in.brake * brakeTotal_ * bias * 0.5;
-    const double bR = in.brake * brakeTotal_ * (1 - bias) * 0.5 + in.handbrake * 1500.0;
+    const double bias = 0.70;                                          // on agirlikli (oransal valf): arka kilitlenip dondurmesin
+    const double pedal = std::pow(std::clamp(in.brake, 0.0, 1.0), 1.6);  // ilerleyici pedal: hafif basis hassas
+    const double bF = pedal * brakeTotal_ * bias * 0.5;
+    const double bR = pedal * brakeTotal_ * (1 - bias) * 0.5 + in.handbrake * 1500.0;
     double sumFx = 0.0;
     for (int i = 0; i < 4; ++i) {
         w_[i].setNormalLoad(susp_->tireLoad(i) + 0.25 * dfK_ * V_ * V_);
@@ -529,9 +535,10 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
 
     const double a = vl_.wheelbase * (1.0 - vl_.frontStatic), b = vl_.wheelbase * vl_.frontStatic, t2 = 0.5 * vl_.track;
     const double xs[4] = {a, a, -b, -b}, ys[4] = {t2, -t2, t2, -t2};
-    const double bias = 0.65;
-    const double bF = in.brake * brakeTotal_ * bias * 0.5;
-    const double bR = in.brake * brakeTotal_ * (1 - bias) * 0.5 + in.handbrake * 1500.0;
+    const double bias = 0.70;                                          // on agirlikli (oransal valf): arka kilitlenip dondurmesin
+    const double pedal = std::pow(std::clamp(in.brake, 0.0, 1.0), 1.6);  // ilerleyici pedal: hafif basis hassas
+    const double bF = pedal * brakeTotal_ * bias * 0.5;
+    const double bR = pedal * brakeTotal_ * (1 - bias) * 0.5 + in.handbrake * 1500.0;
     double Fx = 0.0, Fy = 0.0, Mz = 0.0;
     for (int i = 0; i < 4; ++i) {
         const double d = i < 2 ? in.steer : 0.0, cd = std::cos(d), sd = std::sin(d);

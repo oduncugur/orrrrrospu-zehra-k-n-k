@@ -861,14 +861,15 @@ void applyUsedWear(Tune& t, PartCat c) {
 // Kurulum profili: ayarlanabilir alanlar (lastik basinci, suspansiyon, LSD, NOS memesi, kalkis devri, dyno ECU ayari)
 std::string setupString(const Tune& t) {
     char b[160];
-    std::snprintf(b, sizeof b, "%.1f;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", t.psi, t.setRide, t.setSpring, t.setDamp, t.setArbF, t.setArbR,
-                  t.setPreload, t.setNos, t.launchRpm, t.ecuTiming, t.ecuAfr, t.ecuBoost);
+    std::snprintf(b, sizeof b, "%.1f;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", t.psi, t.setRide, t.setSpring, t.setDamp, t.setArbF, t.setArbR,
+                  t.setPreload, t.setNos, t.launchRpm, t.ecuTiming, t.ecuAfr, t.ecuBoost, t.setRideR, t.setSpringR, t.setDampR);
     return b;
 }
 bool applySetupString(const std::string& s, Tune& t) {
     Tune n = t;
-    if (std::sscanf(s.c_str(), "%lf;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", &n.psi, &n.setRide, &n.setSpring, &n.setDamp, &n.setArbF, &n.setArbR,
-                    &n.setPreload, &n.setNos, &n.launchRpm, &n.ecuTiming, &n.ecuAfr, &n.ecuBoost) != 12) return false;
+    const int got = std::sscanf(s.c_str(), "%lf;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d", &n.psi, &n.setRide, &n.setSpring, &n.setDamp, &n.setArbF, &n.setArbR,
+                    &n.setPreload, &n.setNos, &n.launchRpm, &n.ecuTiming, &n.ecuAfr, &n.ecuBoost, &n.setRideR, &n.setSpringR, &n.setDampR);
+    if (got != 12 && got != 15) return false;                          // eski profil: arka = on yok sayilir (0)
     n.psi = std::clamp(n.psi, 0.0, 45.0);
     n.ecuTiming = std::clamp(n.ecuTiming, -4, 6); n.ecuAfr = n.ecuAfr ? std::clamp(n.ecuAfr, 115, 135) : 0; n.ecuBoost = std::clamp(n.ecuBoost, -3, 5);
     n.launchRpm = std::clamp(n.launchRpm, 0, 12000);
@@ -1072,6 +1073,7 @@ const IntField kIntFields[] = {
     {"etim", &Tune::ecuTiming, 6, -4}, {"eafr", &Tune::ecuAfr, 135, 0}, {"ebst", &Tune::ecuBoost, 5, -3},
     {"kri", &Tune::setRide, 20, -40}, {"ksp", &Tune::setSpring, 5, -5}, {"kdm", &Tune::setDamp, 5, -5}, {"karf", &Tune::setArbF, 3, -3},
     {"karr", &Tune::setArbR, 3, -3}, {"kpl", &Tune::setPreload, 5, -5}, {"knos", &Tune::setNos, 95},
+    {"krr", &Tune::setRideR, 20, -40}, {"kspr", &Tune::setSpringR, 5, -5}, {"kdmr", &Tune::setDampR, 5, -5},
 };
 const DblField kDblFields[] = {
     {"ctmm", &Tune::custTurboMm, 100}, {"ctar", &Tune::custTurboAr, 1.4}, {"ccam", &Tune::custCamDeg, 330},

@@ -159,7 +159,7 @@ void RunField::update(double dt, const RoadPath& road, const std::vector<double>
         const double dl2 = std::clamp(target - R.lane, -2.2 * dt, 2.2 * dt);
         R.lane += dl2;
         R.steer = (float)std::clamp(dl2 / std::max(dt, 1e-3) * 0.05 + here.curvature * 2.6, -0.5, 0.5);
-        R.spin += R.v * dt / 0.31;
+        R.spin += std::min(R.v * dt / 0.31, 0.55);                        // gorsel donus (karede sinirli)
         if (R.s >= goalS) { R.finished = true; R.finishT = raceT; }
     }
 }

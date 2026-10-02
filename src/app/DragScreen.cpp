@@ -270,6 +270,10 @@ void DragScreen::update(double dt) {
         app_.haptic(60, 200);
     }
     for (auto& e : race_->lane(0).sim->drainFailEvents()) { ticker_.push_back("SEN: " + e); tickerT_ = 3.0; app_.haptic(400, 255); }
+    for (int l = 0; l < 2; ++l) {                                        // gorsel teker donusu (tahrikli teker: patinaj gorunur)
+        const VehicleSim& s = *race_->lane(l).sim;
+        spinD_[l] += (float)std::clamp(s.wheel(s.drivenLeft()).omega() * dt, -0.55, 0.55);
+    }
     for (auto& e : race_->drainEvents()) {
         const bool mine = e.rfind("SEN:", 0) == 0;
         if (e == "YESIL!") { flash_ = "YESIL!"; flashColor_ = {0.2f, 1.0f, 0.3f}; flashT_ = 0.9; continue; }
@@ -401,7 +405,7 @@ void DragScreen::drawCarAt(Renderer& r, int lane, float sx, float groundY, float
                                                                                         : lookOf(hasTune_[lane] ? &tunes_[lane] : nullptr);
     if (alpha < 1.0f) { lk.alpha = alpha; lk.paintOn = true; lk.paint[0] = 0.55f; lk.paint[1] = 0.85f; lk.paint[2] = 1.0f; lk.stripe = 0; }
     r.setCarLook(lk);
-    r.drawCar(v->id, sx - w / 2, y, w, h, proj, view, model);
+    r.drawCar(v->id, sx - w / 2, y, w, h, proj, view, model, alpha < 1.0f ? 0.0f : spinD_[lane]);
     if (alpha < 1.0f) return;                                            // hayalet: alev yok
 
     // Egzoz alevi: devir kesici / dogbox atesleme kesme

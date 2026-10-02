@@ -49,7 +49,8 @@ struct Tune {
     // Kurulum (KURULUM ekrani; 0 = orta / fabrika): yukseklik mm (-40..+20, ayarli suspansiyon), yay ve amortisor
     // (-5..+5, %5 / %8 adim), viraj demiri on / arka (-3..+3, %20 adim), LSD on yuku (-5..+5, %15 adim; plakali LSD),
     // NOS memesi (% guc; 0 = %100, 50..95: daha az guc, daha uzun tup)
-    int setRide = 0, setSpring = 0, setDamp = 0, setArbF = 0, setArbR = 0, setPreload = 0, setNos = 0;
+    int setRide = 0, setSpring = 0, setDamp = 0, setArbF = 0, setArbR = 0, setPreload = 0, setNos = 0;   // ride / spring / damp: ON aks
+    int setRideR = 0, setSpringR = 0, setDampR = 0;                            // ARKA aks (yukseklik / yay / amortisor)
     int partsVer = 2;                         // parca tablolari surumu (eski kayit < 2: tek liste secimleri bilesenlere cevrilir)
     int totalWeightKg() const;                // ic + kaporta + cam + sasi hafifletmesi
     // Atolye (ozel uretim) degerleri; 0 = uretilmedi

@@ -56,6 +56,7 @@ public:
     void key(Key k, bool down) override;
 
 private:
+    float spinD_[2] = {0, 0};                    // gorsel teker donusu
     float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
     enum class Ctl { None, Clutch, Throttle, Shifter, Brake, PaddleUp, PaddleDown };
     struct Touch { int id; Ctl ctl; };
@@ -462,6 +463,7 @@ private:
     double envT_ = 0;                            // yagmur damlasi animasyonu
     float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
     int runLane_ = 1; double laneCool_ = 0;      // The Run: duzlukte secilen serit
+    double tiltF_ = 0;                           // egim: ek yumusatma
     double l100_ = 0, lastRunS_ = 0, lastFuel_ = 0, usedRun_ = 0;   // The Run: anlik L/100, harcanan yakit
     int lastGear_ = -2;                          // vites sesi icin
     std::string msgNote_;                        // ortam notu (HUD, ilk saniyeler)

@@ -202,9 +202,14 @@ void RoadScreen::update(double dt) {
     const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0) + slipAllow, 0.035, 0.50);
     double target = (kL_ ? maxSteer : 0.0) - (kR_ ? maxSteer : 0.0);
     if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer) {   // olu bolge %6
-        const double t = std::clamp((app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0), dz = 0.06;
+        // Kararli ve hiza duyarli egim: ek suzgec (~0.12 s); olu bolge %5; tepki egrisi hizla sertlesir (u^p, p 1 -> 1.8):
+        // yuksek hizda kucuk egimler az direksiyon verir, telefon cok cevrilince tepki normale yaklasir (tam kilit ayni)
+        const double raw = std::clamp((app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0);
+        tiltF_ += (raw - tiltF_) * std::min(1.0, dt / 0.12);
+        const double dz = 0.05, t = tiltF_;
         const double u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);
-        target = u * maxSteer;
+        const double p = 1.0 + 0.8 * std::clamp((v - 8.0) / 32.0, 0.0, 1.0);
+        target = std::copysign(std::pow(std::fabs(u), p), u) * maxSteer;
     }
     const double rate = (std::fabs(target) > std::fabs(steer_) ? 1.0 : 2.5) * dt;
     steer_ += std::clamp(target - steer_, -rate, rate);
@@ -264,9 +269,9 @@ void RoadScreen::update(double dt) {
     }
     ses_->update(dt, c);
     // Teker donusu ve lastik dumani
-    spinP_ += P.sim().wheel(0).omega() * dt;
+    spinP_ += std::clamp(P.sim().wheel(0).omega() * dt, -0.55, 0.55);   // gorsel: vagon tekerlegi yanilsamasi olmasin
     envT_ += dt;
-    if (RoadCar* rv = ses_->rival()) spinR_ += rv->sim().wheel(0).omega() * dt;
+    if (RoadCar* rv = ses_->rival()) spinR_ += std::clamp(rv->sim().wheel(0).omega() * dt, -0.55, 0.55);
     spawnSmoke(P, dt);
     if (RoadCar* rv = ses_->rival()) spawnSmoke(*rv, dt);
     for (Puff& p : smoke_) { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz *= 0.98; p.life -= dt; p.size += dt * 1.6; }
@@ -924,7 +929,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         const RoadPoint q = R.at(t.s);
         Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
         o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
-        o.spin = (float)((t.oncoming ? -t.s : t.s) / 0.31);
+        o.spin = (float)(envT_ * std::min(t.v / 0.31, 33.0) * (t.oncoming ? -1.0 : 1.0));   // en fazla ~0.55 rad / kare
         o.d = (o.x - ex) * dx + (o.y - ey) * dy; objs.push_back(o);   // kamera bakis yonunde derinlik
     }
     if (ses_->mode() == RoadSession::Mode::Marathon)                   // The Run alani (gorus mesafesindekiler)

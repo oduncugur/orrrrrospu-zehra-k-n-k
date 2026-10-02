@@ -11,16 +11,16 @@
 namespace zk {
 
 namespace {
-enum Row { RPsi, RRide, RSpring, RDamp, RArbF, RArbR, RPreload, RNos, RCount };
-const char* const kRowName[RCount] = {"LASTIK BASINCI", "YUKSEKLIK", "YAY SERTLIGI", "AMORTISOR", "ON VIRAJ DEMIRI", "ARKA VIRAJ DEMIRI",
-                                      "LSD ON YUKU", "NOS MEMESI"};
+enum Row { RPsi, RRide, RRideR, RSpring, RSpringR, RDamp, RDampR, RArbF, RArbR, RPreload, RNos, RCount };
+const char* const kRowName[RCount] = {"LASTIK BASINCI", "ON YUKSEKLIK", "ARKA YUKSEKLIK", "ON YAY", "ARKA YAY", "ON AMORTISOR", "ARKA AMORTISOR",
+                                      "ON VIRAJ DEMIRI", "ARKA VIRAJ DEMIRI", "LSD ON YUKU", "NOS MEMESI"};
 const char* const kProfName[3] = {"DRAG", "YOL", "PIST"};
-constexpr float kY0 = 66, kH = 44;
-Rect minusR(int i) { return {214, kY0 + i * kH + 6, 254, kY0 + i * kH + 36}; }
-Rect plusR(int i) { return {312, kY0 + i * kH + 6, 352, kY0 + i * kH + 36}; }
-Rect loadR(int k) { return {8 + k * 116.0f, 444, 120 + k * 116.0f, 474}; }
-Rect saveR(int k) { return {8 + k * 116.0f, 480, 120 + k * 116.0f, 510}; }
-const Rect kReset{8, 530, 176, 562}, kRefill{184, 530, 352, 562}, kBackS{8, 596, 352, 634};
+constexpr float kY0 = 62, kH = 37;
+Rect minusR(int i) { return {214, kY0 + i * kH + 4, 254, kY0 + i * kH + 31}; }
+Rect plusR(int i) { return {312, kY0 + i * kH + 4, 352, kY0 + i * kH + 31}; }
+Rect loadR(int k) { return {8 + k * 116.0f, 486, 120 + k * 116.0f, 512}; }
+Rect saveR(int k) { return {8 + k * 116.0f, 516, 120 + k * 116.0f, 542}; }
+const Rect kReset{8, 550, 176, 584}, kRefill{184, 550, 352, 584}, kBackS{8, 598, 352, 634};
 
 double defaultPsi(const Tune& t) { return t.tires == TireType::DragSlick ? 16.0 : t.tires == TireType::SemiSlick ? 26.0 : 32.0; }
 // Satirin kilidi (bos: acik)
@@ -45,29 +45,32 @@ void SetupScreen::render(Renderer& r) {
     for (int i = 0; i < RCount; ++i) {
         const float y = kY0 + i * kH;
         const char* lock = lockOf(t, i);
-        r.rect(8, y, 352, y + kH - 4, kUiPanel);
-        r.text(16, y + 6, kRowName[i], 1, *lock ? kUiDim : Color{1, 1, 1});
-        if (*lock) { r.text(16, y + 22, lock, 1, {0.6f, 0.4f, 0.35f}); continue; }
+        r.rect(8, y, 352, y + kH - 3, kUiPanel);
+        r.text(16, y + 5, kRowName[i], 1, *lock ? kUiDim : Color{1, 1, 1});
+        if (*lock) { r.text(16, y + 19, lock, 1, {0.6f, 0.4f, 0.35f}); continue; }
         switch (i) {
         case RPsi: std::snprintf(b, sizeof b, "%.0f PSI", t.psi > 0 ? t.psi : defaultPsi(t)); break;
         case RRide: std::snprintf(b, sizeof b, "%+d MM", t.setRide); break;
+        case RRideR: std::snprintf(b, sizeof b, "%+d MM", t.setRideR); break;
         case RSpring: std::snprintf(b, sizeof b, "%+d%%", 5 * t.setSpring); break;
+        case RSpringR: std::snprintf(b, sizeof b, "%+d%%", 5 * t.setSpringR); break;
         case RDamp: std::snprintf(b, sizeof b, "%+d%%", 8 * t.setDamp); break;
+        case RDampR: std::snprintf(b, sizeof b, "%+d%%", 8 * t.setDampR); break;
         case RArbF: std::snprintf(b, sizeof b, "%+d%%", 20 * t.setArbF); break;
         case RArbR: std::snprintf(b, sizeof b, "%+d%%", 20 * t.setArbR); break;
         case RPreload: std::snprintf(b, sizeof b, "%+d%%", 15 * t.setPreload); break;
         default: std::snprintf(b, sizeof b, "%%%d", t.setNos ? t.setNos : 100); break;
         }
         const bool def = i == RPsi ? t.psi <= 0 : std::string(b).find_first_of("123456789") == std::string::npos || (i == RNos && !t.setNos);
-        r.textFit(283, y + 15, b, 1, 54, def ? kUiText : kUiGold, true);
-        static const char* const kHint[RCount] = {"DUSUK: KALKIS TUTUSU, YUKSEK: HIZ", "ALCAK: VIRAJ, YUKSEK: DRAG YUK AKTARIMI",
-                                                  "SERT: VIRAJ TEPKISI", "SERT: AZ YALPA", "SERT: ONDEN KAYAR", "SERT: ARKADAN KAYAR",
-                                                  "YUKSEK: KILITLI, CEKISLI", "KUCUK MEME: UZUN TUP"};
-        r.textFit(16, y + 22, kHint[i], 1, 192, kUiDim);
+        r.textFit(283, y + 13, b, 1, 54, def ? kUiText : kUiGold, true);
+        static const char* const kHint[RCount] = {"DUSUK: KALKIS TUTUSU, YUKSEK: HIZ", "ALCAK: AGIRLIK MERKEZI DUSER", "YUKSEK ARKA: DRAG YUK AKTARIMI",
+                                                  "SERT ON: ONDEN KAYAR", "SERT ARKA: ARKADAN KAYAR", "SERT: AZ DALIS (FREN)", "YUMUSAK: KALKISTA ARKA COKER",
+                                                  "SERT: ONDEN KAYAR", "SERT: ARKADAN KAYAR", "YUKSEK: KILITLI, CEKISLI", "KUCUK MEME: UZUN TUP"};
+        r.textFit(16, y + 19, kHint[i], 1, 192, kUiDim);
         button(r, minusR(i), "-", kUiBtn, 2);
         button(r, plusR(i), "+", kUiBtn, 2);
     }
-    r.text(8, 428, "PROFILLER", 1, kUiGold);
+    r.text(8, 474, "PROFILLER", 1, kUiGold);
     for (int k = 0; k < 3; ++k) {
         const bool has = oc.profile[k].size() > 0;
         button(r, loadR(k), std::string(kProfName[k]) + (has ? " YUKLE" : " BOS"), has ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 1);
@@ -88,8 +91,11 @@ void SetupScreen::change(int row, int dir) {
     switch (row) {
     case RPsi: t.psi = std::clamp((t.psi > 0 ? t.psi : defaultPsi(t)) + dir, 10.0, 40.0); break;
     case RRide: t.setRide += 5 * dir; break;
+    case RRideR: t.setRideR += 5 * dir; break;
     case RSpring: t.setSpring += dir; break;
+    case RSpringR: t.setSpringR += dir; break;
     case RDamp: t.setDamp += dir; break;
+    case RDampR: t.setDampR += dir; break;
     case RArbF: t.setArbF += dir; break;
     case RArbR: t.setArbR += dir; break;
     case RPreload: t.setPreload += dir; break;
@@ -125,6 +131,7 @@ void SetupScreen::pointerDown(int, float x, float y) {
     if (kReset.hit(x, y)) {
         Tune& m = c.cars[c.current].tune;
         m.psi = 0; m.setRide = m.setSpring = m.setDamp = m.setArbF = m.setArbR = m.setPreload = m.setNos = 0;
+        m.setRideR = m.setSpringR = m.setDampR = 0;
         app_.saveCareer(); msg_ = "FABRIKA AYARI"; msgT_ = 1.4;
     }
 }

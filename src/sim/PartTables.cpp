@@ -429,8 +429,9 @@ const std::vector<EcuHwOpt>& ecuHwTable() {
 bool suspAdjustable(const Tune& t) { const int s = t.susp; return s == 2 || s == 3 || s == 4 || s == 7 || s == 8 || s == 9; }
 bool lsdAdjustable(const Tune& t) { const int d = (int)t.diff; return d == 1 || d == 2 || d == 6 || d == 7 || d == 8; }
 void clampSetup(Tune& t) {
-    if (!suspAdjustable(t)) t.setRide = t.setSpring = t.setDamp = t.setArbF = t.setArbR = 0;
+    if (!suspAdjustable(t)) t.setRide = t.setSpring = t.setDamp = t.setArbF = t.setArbR = t.setRideR = t.setSpringR = t.setDampR = 0;
     t.setRide = std::clamp(t.setRide, -40, 20); t.setSpring = std::clamp(t.setSpring, -5, 5); t.setDamp = std::clamp(t.setDamp, -5, 5);
+    t.setRideR = std::clamp(t.setRideR, -40, 20); t.setSpringR = std::clamp(t.setSpringR, -5, 5); t.setDampR = std::clamp(t.setDampR, -5, 5);
     t.setArbF = std::clamp(t.setArbF, -3, 3); t.setArbR = std::clamp(t.setArbR, -3, 3);
     t.setPreload = lsdAdjustable(t) ? std::clamp(t.setPreload, -5, 5) : 0;
     t.setNos = t.nitrous > 0 && t.setNos >= 50 ? std::min(t.setNos, 95) : 0;
@@ -732,6 +733,7 @@ std::string Tune::signature() const {
         out += e;
         if (swTcu) { char g[16]; std::snprintf(g, sizeof g, "|T%d", swTcu); out += g; }
     }
+    if (setRideR || setSpringR || setDampR) { char q[48]; std::snprintf(q, sizeof q, "|Q%d,%d,%d", setRideR, setSpringR, setDampR); out += q; }
     if (setRide || setSpring || setDamp || setArbF || setArbR || setPreload || setNos) {
         char k[64];
         std::snprintf(k, sizeof k, "|K%d,%d,%d,%d,%d,%d,%d", setRide, setSpring, setDamp, setArbF, setArbR, setPreload, setNos);
