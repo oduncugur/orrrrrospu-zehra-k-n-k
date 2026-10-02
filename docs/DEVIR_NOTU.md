@@ -484,3 +484,33 @@ Olcum: `ideal60.cpp` (YZ'siz en iyi sabit gaz/debriyaj) Mustang sokak lastiginde
 - Kalan (sonraki adaylar): kendi en iyi kosuna karsi drag (ghost), polis / trafik modlari, ikinci el parca pazari,
   bulut kayit, bolge haritasi ekrani, gercekci arac modelleri (kullanici erteledi).
 - Cihazda dogrulanacaklar (kullanici): oyun kolu, gece / yagmur performansi, yeni dillerin okunurlugu.
+
+## Guncelleme — 2026-10-02 (aksam): ECU / yakit bilesenleri, polis, sokak, kurulum, otomatik sanziman, CJK (ara taslak)
+- Parcalar gercek bilesenlere ayrildi (PartCat 7 sekme, 58 kategori; ayni anda takilanlar birbirini sokmez).
+  ECU = donanim (ecuHwTable: yuva + modul seviye siniri) + yazilim (EcuSw: harita, devir, launch, flat, anti-lag,
+  flex, vuruntu, TCU). Yakit = pompa / enjektor / hat (sinir en zayif halka). Dyno'da ECU ince ayari (avans, AFR, boost).
+- Kesici mekanik parcalarla (supap / kam / kafa / krank) yukselince tork egrisi yeni kesiciye orantili esnetilir;
+  yalniz ECU ile acilan devir dusen egride kalir (supap siniri ustu supap atar).
+- Ikinci el parca: %55 fiyat, yipranma birikmez (max). Haftalik parca pazari: kategori fiyati %80-%120
+  (Career::shopPrice, marketMul; testlerde marketOff).
+- Polis kovalamacasi (RoadSession::Mode::Chase), 5 kovalamaca etkinligi; patron sozleri (League bossLine).
+- Bolge haritasi + haftalik turnuva (3 tur drag eleme) + garaj yuvalari (4..12); kayit kodu (ZK1-, panodan tasima).
+- SOKAK ekrani (haritadan): gece bulusmasi (3 saatlik dilim, bahis x2, %18 polis baskini), haftalik dyno yarismasi
+  (9 seviyeye uygun rakip + oyuncu, ilk uce odul), musteri isleri (gunde 3; arac garaja gelir, hedef beygire cikar,
+  TESLIM ET / IPTAL; OwnedCar::jobHp > 0 yarisamaz / satilamaz).
+- KURULUM ekrani (garaj sag): lastik basinci; ayarli suspansiyonla yukseklik / yay / amortisor / viraj demirleri;
+  plakali LSD on yuku; NOS memesi; DRAG / YOL / PIST profilleri (OwnedCar::profile). NOS tupu arac basina doluluk
+  tutar, yarista harcanir, kurulumda parayla dolar.
+- Otomatik sanziman: kol yukaridan S-D-N-R-P + M kapisi (+/-); D'de vites noktasi gaza oranli, kickdown, S spor,
+  M elle; R geri vites (VehicleSim::setReverse, vx >= -4.5). Oyun kolu tetikleri analog pedal. Egim yonu ayarda
+  KAPALI / ACIK / TERS (Android getRotation remap: 90 -> +y, 270 -> -y).
+- Lastik sesi v5 (TireAudio): ciglik = gezinen ton + harmonik, burnout = koyu kavurma + dis blogu puruzu + citirti.
+  zehra_garage --tirewav=dosya.wav demo uretir. Kulakla onay kullanicida.
+- Diller: 15 (+ ZH, JA). CJK glifleri GNU Unifont 16x16 alt kumesi (CjkGlyphs.inc, OFL), tools/gen_cjk_font.py
+  tablolari ve glifleri yeniden uretir (unifont .hex yolunu arguman ver). Sonradan eklenen kelimeler LangMore3.inc.
+- Modeller: BMW M3 E46 elle (garage/HandModels.inc, buildHandModel ref ile); ZK_SHEET=3 tek arac 4 aci. Kullanici
+  modelleri en sona birakti ("once oyun bitsin").
+- Test kancalari: ZK_START_SCREEN += setup, street. road_test [A] otomatik sanziman, tune_test [K] kurulum,
+  career_test [P] pazar, [S] sokak.
+- Kalan (kullaniciyla): kadran / gosterge reworku, turbo basinc bari, hasar gorseli, hava / saat (kullanici
+  istemedi), arac modelleri, replay. Telefonda dogrulanacak: yeni vites kolu, egim yonu, lastik sesi.
