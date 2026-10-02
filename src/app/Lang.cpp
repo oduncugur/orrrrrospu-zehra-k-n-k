@@ -391,6 +391,7 @@ const Entry kEnWords[] = {
 
 #include "LangMore.inc"
 #include "LangMore2.inc"
+#include "LangCJK.inc"
 
 struct Table { std::unordered_map<std::string, std::string> phrases, words; };
 
@@ -440,6 +441,11 @@ const Table* tableFor(Lang l) {
         static const Table extra[6] = {buildMulti2(0, en), buildMulti2(1, en), buildMulti2(2, en), buildMulti2(3, en), buildMulti2(4, en), buildMulti2(5, en)};
         return &extra[(int)l - (int)Lang::RU];
     }
+    case Lang::ZH: case Lang::JA: {
+        static const Table cjk[2] = {[&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.zh; return t; }(),
+                                     [&] { Table t; t.words = en.words; for (const Multi3& m : kMulti3) t.words[m.tr] = m.ja; return t; }()};
+        return &cjk[(int)l - (int)Lang::ZH];
+    }
     default: return nullptr;
     }
 }
@@ -467,7 +473,7 @@ std::string translateWords(const Table& t, const std::string& s) {
 
 const char* langName(Lang l) {
     static const char* n[(int)Lang::Count] = {"TURKCE", "ENGLISH", "DEUTSCH", "ESPANOL", "FRANCAIS", "ITALIANO", "PORTUGUES",
-                                              "РУССКИЙ", "УКРАЇНСЬКА", "ΕΛΛΗΝΙΚΑ", "POLSKI", "NEDERLANDS", "INDONESIA"};
+                                              "РУССКИЙ", "УКРАЇНСЬКА", "ΕΛΛΗΝΙΚΑ", "POLSKI", "NEDERLANDS", "INDONESIA", "中文", "日本語"};
     return n[(int)l];
 }
 
@@ -482,6 +488,18 @@ const std::string& translate(Lang l, const std::string& s) {
     if (c.size() > 6000) c.clear();                              // dinamik metinler (sayilar) onbellegi sisirmesin
     auto p = t->phrases.find(s);
     std::string r = p != t->phrases.end() ? p->second : translateWords(*t, s);
+    if (l == Lang::ZH || l == Lang::JA) {                        // Cince / Japonca: iki genis karakter arasindaki bosluk atilir
+        auto wide = [&](size_t k, bool back) {                       // k: bosluktan onceki / sonraki baytin UTF-8 baslangici
+            if (back) { while (k > 0 && ((unsigned char)r[k] & 0xC0) == 0x80) --k; }
+            return k < r.size() && (unsigned char)r[k] >= 0xE2 && (unsigned char)r[k] < 0xF0 && (unsigned char)r[k] != 0xE2;
+        };
+        std::string o; o.reserve(r.size());
+        for (size_t k = 0; k < r.size(); ++k) {
+            if (r[k] == ' ' && k > 0 && k + 1 < r.size() && wide(k - 1, true) && wide(k + 1, false)) continue;
+            o += r[k];
+        }
+        r = std::move(o);
+    }
     return c.emplace(s, std::move(r)).first->second;
 }
 

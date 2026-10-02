@@ -153,6 +153,21 @@ const char* glyphU(uint32_t cp) {
     }
 }
 
+// Cince / Japonca: GNU Unifont 16x16 glifleri (yalniz ceviri tablosunda gecen karakterler; CjkGlyphs.inc uretilir:
+// tools/gen_cjk_font.py). Satir basina 16 bit, en soldaki piksel en yuksek bit.
+struct CjkGlyph { uint32_t cp; uint16_t rows[16]; };
+#include "CjkGlyphs.inc"
+const uint16_t* cjkGlyph(uint32_t cp) {
+    if (cp < 0x2E80) return nullptr;
+    size_t lo = 0, hi = sizeof kCjkGlyphs / sizeof *kCjkGlyphs;
+    while (lo < hi) {
+        const size_t m = (lo + hi) / 2;
+        if (kCjkGlyphs[m].cp < cp) lo = m + 1; else hi = m;
+    }
+    return lo < sizeof kCjkGlyphs / sizeof *kCjkGlyphs && kCjkGlyphs[lo].cp == cp ? kCjkGlyphs[lo].rows : nullptr;
+}
+constexpr float kCjkAdv = 8.5f;                      // genis karakter ilerlemesi (olcek birimi; Latin 6)
+
 // UTF-8 cozumleme (gecersiz bayt: tek karakter sayilir)
 uint32_t nextCp(const std::string& s, size_t& i) {
     const unsigned char c = (unsigned char)s[i++];
@@ -416,9 +431,31 @@ void Renderer::textFit(float x, float y, const std::string& src, float scale, fl
     textRaw(center ? x - rawWidth(t, sc) * 0.5f : x, yy, t, sc, c);
 }
 
+float Renderer::rawWidth(const std::string& s, float scale) {
+    float w = 0;
+    for (size_t i = 0; i < s.size();) w += nextCp(s, i) >= 0x2E80 ? kCjkAdv : 6.0f;
+    return w * scale - scale;
+}
+
 void Renderer::textRaw(float x, float y, const std::string& s, float sc, Color c) {
     for (size_t i = 0; i < s.size();) {
-        if (const char* g = glyphU(nextCp(s, i))) {
+        const uint32_t cp = nextCp(s, i);
+        if (cp >= 0x2E80) {                              // 16x16 glif yarim piksel: Latin (7 satir) ile ayni boy
+            if (const uint16_t* g = cjkGlyph(cp)) {
+                const float p = sc * 0.5f, y0 = y - sc * 0.5f;
+                for (int row = 0; row < 16; ++row)
+                    for (int col = 0; col < 16; ++col)
+                        if (g[row] & (0x8000 >> col)) {
+                            int run = 1;                 // yatay ardisik pikselleri tek dikdortgen
+                            while (col + run < 16 && (g[row] & (0x8000 >> (col + run)))) ++run;
+                            rect(x + col * p, y0 + row * p, x + (col + run) * p, y0 + (row + 1) * p, c);
+                            col += run - 1;
+                        }
+            }
+            x += kCjkAdv * sc;
+            continue;
+        }
+        if (const char* g = glyphU(cp)) {
             for (int row = 0; row < 7; ++row)
                 for (int col = 0; col < 5; ++col)
                     if (g[row * 5 + col] == '#') rect(x + col * sc, y + row * sc, x + (col + 1) * sc, y + (row + 1) * sc, c);

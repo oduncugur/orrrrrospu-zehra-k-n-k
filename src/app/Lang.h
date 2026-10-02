@@ -7,7 +7,7 @@
 
 namespace zk {
 
-enum class Lang { TR = 0, EN, DE, ES, FR, IT, PT, RU, UK, EL, PL, NL, ID, Count };
+enum class Lang { TR = 0, EN, DE, ES, FR, IT, PT, RU, UK, EL, PL, NL, ID, ZH, JA, Count };
 const char* langName(Lang l);                 // ayarlar ekraninda (kendi dilinde)
 // Metni cevirir (TR ise aynen dondurur). Sonuclar onbellekte (kare basina tekrar eden metinler ucuz).
 const std::string& translate(Lang l, const std::string& s);
