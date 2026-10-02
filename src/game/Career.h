@@ -30,9 +30,11 @@ struct OwnedCar {
     // Kurulum profilleri (DRAG / YOL / PIST): kurulum alanlari tuneV2String bicimiyle; bos = kayitli degil
     std::string profile[3];
     double nosFill = 1.0;         // NOS tupu doluluk (yarista harcanir, garajda parayla dolar)
+    // Musteri araci (sokak / musteri isi): hedef beygir ve odeme; 0 = kendi aracin. Yarisamaz, satilamaz.
+    int  jobHp = 0; long jobReward = 0;
     bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
-    bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0; }
+    bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0 && jobHp == 0; }
 };
 
 // Parca kategorileri (dukkan; PartTables tablolari). Her secenek Tune'da tek bir alani degistirir. Sekmeler: partTab().
@@ -59,7 +61,8 @@ const char* partTabName(int tab);
 int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
 int  usedPrice(int newPrice);               // %55
-double marketMul(PartCat c, int week);       // haftalik parca pazari carpani (0.80..1.20; week < 0: 1)
+double marketMul(PartCat c, int week);
+double peakHpOf(const VehicleDef& v, const Tune& t);   // fizikteki en yuksek beygir (kesici altinda)       // haftalik parca pazari carpani (0.80..1.20; week < 0: 1)
 void applyUsedWear(Tune& t, PartCat c);     // ikinci el parcanin yipranmasi
 int  ecuSwPrice(int sw, int level, const VehicleDef& v);   // yazilim modulunun bu seviyesinin fiyati (arac sinifina gore)
 void migrateTune(Tune& t);                  // eski kayit: tek yakit sistemi / ECU paketi -> ayri parcalar + yazilim
@@ -198,6 +201,31 @@ struct Career {
     bool tourAvailable(std::string* why = nullptr) const;
     bool tourStart(std::string* why = nullptr);   // ilk turda giris ucreti alinir
     long recordTour(bool won);             // donus: verilen odul (yalniz son tur galibiyetinde)
+    // ---- Sokak: gece bulusmasi (3 saatte bir yeni rakip, bahisli drag, polis baskini riski),
+    //      haftalik dyno yarismasi (en yuksek beygir), musteri isleri (araci hedef beygire cikar, teslim et)
+    int  clockSlot = -1;                   // testler: sabit 3 saatlik dilim (-1: gercek saat)
+    int  meetSlot() const;                 // 3 saatlik dilim (bulusma rakibi bu dilimde sabit)
+    int  meetDone = -1;                    // son yarisilan dilim
+    long meetStake() const;                // bahis (aracin degerine gore)
+    Opponent meetOpponent() const;
+    bool meetAvailable(std::string* why = nullptr) const;
+    bool meetStart(std::string* why = nullptr);   // bahis masaya konur
+    long recordMeet(bool won, long* fine); // net kazanc (+2 x bahis ya da 0) ; fine: polis cezasi (baskin yoksa 0)
+    static constexpr double kRaidChance = 0.18;
+    struct DynoEntry { const char* name; int carId; double hp; bool player; };
+    int  dynoWeek = -1;                    // son katilinan hafta
+    long dynoEntryFee() const;
+    std::vector<DynoEntry> dynoField() const;    // bu haftanin 9 rakibi (oyuncunun seviyesinde)
+    bool dynoAvailable(std::string* why = nullptr) const;
+    // Katil: giris ucreti alinir, siralama hesaplanir; place 1..10, prize odul (ilk uce)
+    bool dynoEnter(int* place, long* prize, std::vector<DynoEntry>* board = nullptr, std::string* why = nullptr);
+    struct JobOffer { int carId; int targetHp; long reward; int stockHp; };
+    int  jobDay = -1, jobMask = 0;         // bugun kabul edilen teklifler (bit)
+    JobOffer jobOffer(int k) const;        // bugunun 3 teklifi
+    bool jobTaken(int k) const;
+    bool acceptJob(int k, std::string* why = nullptr);
+    bool deliverJob(long* paid, std::string* why = nullptr);   // secili musteri araci hedefe ulastiysa
+    bool cancelJob();                      // musteri aracini geri ver (takilan parcalar gider)
     long repairCost() const;                                                    // secili arac
     bool repairCurrent(std::string* why = nullptr);
 

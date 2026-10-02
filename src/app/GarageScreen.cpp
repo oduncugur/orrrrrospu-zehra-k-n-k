@@ -135,7 +135,13 @@ void GarageScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "ARAC %d/%zu", c.current + 1, c.cars.size());
     r.textCentered((kPrev.x1 + kNext.x0) / 2, 482, b, 2, {1, 1, 1});
 
-    if (!c.car().raceable()) {
+    if (c.car().jobHp > 0) {                                           // musteri araci: hedef + teslim
+        const double hp = peakHpOf(*findVehicle(c.car().carId), c.car().tune);
+        const bool ok = hp + 0.5 >= c.car().jobHp;
+        button(r, kRace, ok ? "TESLIM ET" : "IPTAL", ok ? kUiGreen : Color{0.45f, 0.20f, 0.15f}, 2);
+        std::snprintf(b, sizeof b, "MUSTERI: %.0f / %d HP  ODEME %s", hp, c.car().jobHp, money(c.car().jobReward).c_str());
+        r.text(8, 462, b, 1, ok ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
+    } else if (!c.car().raceable()) {
         button(r, kRace, "TAMIR ET", Color{0.75f, 0.15f, 0.12f}, 2);
         std::string d = "HASAR:";
         if (c.car().axleBroken) d += " AKS KIRIK";
@@ -214,6 +220,13 @@ void GarageScreen::pointerDown(int id, float x, float y) {
 // ikinci basista (tamir parasi yoksa) yine de yarisa girilir.
 void GarageScreen::raceOrRepair() {
     Career& c = app_.career;
+    if (c.car().jobHp > 0) {                                              // musteri araci: teslim ya da (ikinci basista) iptal
+        long paid = 0; std::string why;
+        if (c.deliverJob(&paid, &why)) { app_.saveCareer(); msg_ = "TESLIM EDILDI +" + money(paid); msgT_ = 2.5; select(c.current); return; }
+        if (cancelArm_) { c.cancelJob(); app_.saveCareer(); msg_ = "IS IPTAL: ARAC GERI VERILDI"; msgT_ = 2.0; cancelArm_ = false; select(c.current); return; }
+        cancelArm_ = true; msg_ = why + " - IPTAL ICIN TEKRAR BAS"; msgT_ = 2.5;
+        return;
+    }
     if (c.car().raceable()) { app_.goCareerRace(); return; }
     app_.goRestore();                                                     // yarisamaz: restorasyon atolyesi
 }

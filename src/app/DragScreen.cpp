@@ -52,7 +52,7 @@ void DragScreen::restart() {
     seed_ = seed_ * 1103515245u + 12345u;
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
-    race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
+    race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour || app_.activeMeet ? app_.eventHandicap : 1.6);   // rakip insan gibi hata yapar
     if (career_ && app_.career.car().carId == carIds_[0]) race_->lane(0).sim->setNosFill(app_.career.car().nosFill);   // tupte kalan
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
@@ -292,6 +292,13 @@ void DragScreen::update(double dt) {
             if (!won) std::snprintf(nb, sizeof nb, "TURNUVA: %d. TURDA ELENDIN", app_.career.tourRound + 1);
             else if (prize_ > 0) std::snprintf(nb, sizeof nb, "TURNUVA SAMPIYONU! +%s", money(prize_).c_str());
             else std::snprintf(nb, sizeof nb, "TURNUVA: %d. TUR KAZANILDI", app_.career.tourRound);
+            app_.eventNote = nb;
+        } else if (app_.activeMeet) {                                   // gece bulusmasi
+            long fine = 0;
+            prize_ = app_.career.recordMeet(won, &fine);
+            char nb[96];
+            std::snprintf(nb, sizeof nb, "%s%s", won ? ("BULUSMA KAZANILDI +" + money(prize_)).c_str() : "BULUSMA KAYBEDILDI",
+                          fine > 0 ? ("  POLIS BASKINI! CEZA " + money(fine)).c_str() : "");
             app_.eventNote = nb;
         } else app_.career.recordRace(*race_->lane(1).car, won, s.finished && !s.redLight ? s.quarter : 0.0, &prize_, diff);
         const VehicleSim& ps = *race_->lane(0).sim;

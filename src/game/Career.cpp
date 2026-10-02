@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -273,6 +274,15 @@ SaleQuote saleQuote(const OwnedCar& c) {
 
 int sellPrice(const OwnedCar& c) { return saleQuote(c).total; }
 
+double peakHpOf(const VehicleDef& v, const Tune& t) {
+    VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
+    const VehicleSim s(cfg);
+    double hp = 0;
+    for (auto* c : {&s.engineSpec().lowCam, &s.engineSpec().highCam})
+        for (auto& p : *c) if (p.first <= s.engineSpec().redlineRpm) hp = std::max(hp, p.second * p.first * 2 * 3.14159265 / 60 / 745.7);
+    return hp;
+}
+
 double performanceIndex(const VehicleDef& v, const Tune& t) {
     VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
     const VehicleSim s(cfg);
@@ -367,13 +377,135 @@ void Career::tourRefresh() {
     const int w = todayIndex() / 7;
     if (w != tourWeek) { tourWeek = w; tourRound = 0; tourOut = false; }
 }
+// ---------------- Sokak ----------------
+namespace {
+uint32_t mix32(uint32_t x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+long r50(double v) { return (long)std::lround(v / 50.0) * 50; }
+}
+int Career::meetSlot() const { return clockSlot >= 0 ? clockSlot : (int)(std::time(nullptr) / (3 * 3600)); }
+long Career::meetStake() const {
+    const VehicleDef& v = *findVehicle(car().carId);
+    return std::clamp(r50(carPrice(v) * 0.08 + 300.0 * (1 + leagueUnlocked())), 500L, 30000L);
+}
+Opponent Career::meetOpponent() const { return pickOpponentFor((uint32_t)meetSlot() * 7919u + 13u, -0.05); }
+bool Career::meetAvailable(std::string* why) const {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (meetDone == meetSlot()) return no("BU GECE YARISTIN");
+    if (!car().raceable()) return no(car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI");
+    if (money < meetStake()) return no("BAHSE PARA YETMIYOR");
+    return true;
+}
+bool Career::meetStart(std::string* why) {
+    if (!meetAvailable(why)) return false;
+    money -= meetStake(); meetDone = meetSlot();
+    return true;
+}
+long Career::recordMeet(bool won, long* fine) {
+    const long stake = meetStake();
+    ++races;
+    long net = 0;
+    if (won) { ++wins; net = 2 * stake; money += net; earnings += stake; rep += 2; dailyAdd(TaskType::WinDrag, 1); dailyAdd(TaskType::WinAny, 1); }
+    const bool raid = (mix32((uint32_t)meetSlot() * 977u + 5u) % 1000u) < (uint32_t)(kRaidChance * 1000.0);
+    const long f = raid ? std::min(money, stake / 2) : 0;
+    money -= f;
+    if (fine) *fine = f;
+    return net;
+}
+
+long Career::dynoEntryFee() const {
+    return std::clamp(r50(carPrice(*findVehicle(car().carId)) * 0.02 + 150.0 * (1 + leagueUnlocked())), 200L, 6000L);
+}
+std::vector<Career::DynoEntry> Career::dynoField() const {
+    static const char* const kNames[9] = {"TURBO TAYFUN", "ATOLYE KEMAL", "SESSIZ DENIZ", "CAKAR ERCAN", "KISA KOLLU CAN",
+                                          "ROT BALANS UGUR", "GAZCI GIZEM", "DUZCE MURAT", "ESKI TOPRAK HALUK"};
+    std::vector<DynoEntry> f;
+    const uint32_t w = (uint32_t)(todayIndex() / 7);
+    for (int k = 0; k < 9; ++k) {
+        const Opponent o = pickOpponentFor(w * 104729u + (uint32_t)k * 7919u + 3u, -0.30 + 0.07 * k);
+        f.push_back({kNames[k], o.carId, peakHpOf(*findVehicle(o.carId), o.tune), false});
+    }
+    return f;
+}
+bool Career::dynoAvailable(std::string* why) const {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (dynoWeek == todayIndex() / 7) return no("BU HAFTA KATILDIN");
+    if (car().jobHp) return no("MUSTERI ARACIYLA OLMAZ");
+    if (money < dynoEntryFee()) return no("GIRISE PARA YETMIYOR");
+    return true;
+}
+bool Career::dynoEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) {
+    if (!dynoAvailable(why)) return false;
+    const long fee = dynoEntryFee();
+    money -= fee; dynoWeek = todayIndex() / 7;
+    std::vector<DynoEntry> f = dynoField();
+    f.push_back({"SEN", car().carId, peakHpOf(*findVehicle(car().carId), car().tune), true});
+    std::stable_sort(f.begin(), f.end(), [](const DynoEntry& a, const DynoEntry& b) { return a.hp > b.hp; });
+    int p = 1;
+    while (!f[p - 1].player) ++p;
+    static const double kMul[3] = {5.0, 2.5, 1.2};
+    const long pr = p <= 3 ? r50(fee * kMul[p - 1]) : 0;
+    money += pr; earnings += pr;
+    if (p == 1) rep += 3;
+    if (place) *place = p;
+    if (prize) *prize = pr;
+    if (board) *board = f;
+    return true;
+}
+
+Career::JobOffer Career::jobOffer(int k) const {
+    // Bugunun teklifleri: ucuz sokak araclari; hedef fabrika gucunun %25-%60 ustu; odeme beygir basina ~45 $ + iscilik
+    static std::vector<int> pool;
+    if (pool.empty())
+        for (const auto& v : vehicleCatalog()) if (v.streetLegal && carPrice(v) <= 30000) pool.push_back(v.id);
+    const uint32_t x = mix32((uint32_t)todayIndex() * 2654435761u + (uint32_t)k * 40503u + 17u);
+    const int id = pool[x % pool.size()];
+    const VehicleDef& v = *findVehicle(id);
+    const double stock = peakHpOf(v, Tune{});
+    const double mul = 1.25 + 0.12 * k + 0.01 * (int)((x >> 12) % 11u);
+    const int target = (int)std::lround(stock * mul / 5.0) * 5;
+    const long reward = r50((700.0 + 48.0 * (target - stock)) * (1.0 + 0.10 * k));
+    return {id, target, reward, (int)std::lround(stock)};
+}
+bool Career::jobTaken(int k) const { return jobDay == todayIndex() && (jobMask >> k) & 1; }
+bool Career::acceptJob(int k, std::string* why) {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (k < 0 || k > 2) return no("GECERSIZ");
+    if (jobTaken(k)) return no("ALINDI");
+    if (garageFull()) return no("GARAJ DOLU");
+    const JobOffer o = jobOffer(k);
+    OwnedCar oc; oc.carId = o.carId; oc.jobHp = o.targetHp; oc.jobReward = o.reward;
+    cars.push_back(oc);
+    current = (int)cars.size() - 1;
+    if (jobDay != todayIndex()) { jobDay = todayIndex(); jobMask = 0; }
+    jobMask |= 1 << k;
+    return true;
+}
+bool Career::deliverJob(long* paid, std::string* why) {
+    OwnedCar& oc = cars[current];
+    if (oc.jobHp <= 0) { if (why) *why = "MUSTERI ARACI DEGIL"; return false; }
+    const double hp = peakHpOf(*findVehicle(oc.carId), oc.tune);
+    if (hp + 0.5 < oc.jobHp) { if (why) *why = "HEDEF GUCE ULASILMADI"; return false; }
+    const long r = oc.jobReward;
+    money += r; earnings += r; rep += 1;
+    if (paid) *paid = r;
+    cars.erase(cars.begin() + current);
+    current = std::min(current, (int)cars.size() - 1);
+    return true;
+}
+bool Career::cancelJob() {
+    if (cars[current].jobHp <= 0) return false;
+    cars.erase(cars.begin() + current);
+    current = std::min(current, (int)cars.size() - 1);
+    return true;
+}
+
 long Career::tourEntry() const { return 400L * (1 + leagueUnlocked()); }
 long Career::tourPrize() const { return 3000L * (1 + leagueUnlocked()) * (1 + leagueUnlocked()) / 2 + 2000L; }
 bool Career::tourAvailable(std::string* why) const {
     auto no = [&](const char* m) { if (why) *why = m; return false; };
     if (tourOut) return no("BU HAFTA ELENDIN");
     if (tourRound >= kTourRounds) return no("BU HAFTA SAMPIYONSUN");
-    if (!car().raceable()) return no("ARAC HASARLI");
+    if (!car().raceable()) return no(car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI");
     if (tourRound == 0 && money < tourEntry()) return no("GIRIS UCRETI YETMIYOR");
     return true;
 }
@@ -487,6 +619,7 @@ bool Career::buyCar(int carId, std::string* why) {
 }
 
 bool Career::sellCurrent(std::string* why) {
+    if (cars[current].jobHp > 0) { if (why) *why = "MUSTERI ARACI SATILAMAZ"; return false; }
     if (cars.size() <= 1) { if (why) *why = "SON ARACINI SATAMAZSIN"; return false; }
     money += sellPrice(cars[current]);
     cars.erase(cars.begin() + current);
@@ -742,7 +875,7 @@ bool Career::eventAvailable(int idx, std::string* why) const {
     if (e.pink && cars.size() < 2) return no("PINK SLIP ICIN 2 ARAC GEREK");
     if (e.pink && garageFull()) return no("PINK SLIP ICIN GARAJDA YER GEREK");
     if (e.pink && eventWon(idx)) return no("ARABASINI ZATEN ALDIN");
-    if (!car().raceable()) return no("ARAC HASARLI - TAMIR");
+    if (!car().raceable()) return no(car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI - TAMIR");
     const double cap = leagueIndexCap(e.league);
     if (cap > 0 && performanceIndex(*findVehicle(car().carId), car().tune) > cap) {
         char b[48]; std::snprintf(b, sizeof b, "SINIF ASIMI (ENDEKS > %.0f)", cap);
@@ -1081,7 +1214,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\n";
     {
         char lb[160];
         std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
@@ -1104,6 +1237,7 @@ std::string Career::serialize() const {
         o << "tun2=" << tuneV2String(t) << "\n";
         for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
         if (c.nosFill < 0.999) { std::snprintf(buf, sizeof buf, "nosf=%.3f\n", c.nosFill); o << buf; }
+        if (c.jobHp > 0) { std::snprintf(buf, sizeof buf, "job=%d;%ld\n", c.jobHp, c.jobReward); o << buf; }
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
     }
     const std::string body = o.str();
@@ -1170,6 +1304,8 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
         else if (k == "nosf" && !c.cars.empty()) c.cars.back().nosFill = std::clamp(std::atof(v.c_str()), 0.0, 1.0);
+        else if (k == "job" && !c.cars.empty()) { OwnedCar& oc = c.cars.back(); if (std::sscanf(v.c_str(), "%d;%ld", &oc.jobHp, &oc.jobReward) != 2) oc.jobHp = 0; }
+        else if (k == "street") std::sscanf(v.c_str(), "%d;%d;%d;%d", &c.meetDone, &c.dynoWeek, &c.jobDay, &c.jobMask);
         else if (k == "car") {
             OwnedCar oc; int tires, diff, dry, fuel;
             oc.tune.partsVer = 1;                                  // "pv" yoksa eski kayit: tek liste secimleri donusturulur

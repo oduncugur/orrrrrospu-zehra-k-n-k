@@ -105,10 +105,11 @@ void App::goGarage() {
         activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); return;
     }
     if (activeTour) { activeTour = false; setScreen(std::make_unique<RegionMapScreen>(*this)); return; }   // turnuvadan donus
+    if (activeMeet) { activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); return; }       // bulusmadan donus
     setScreen(std::make_unique<GarageScreen>(*this));
 }
 void App::goLeague(int tab) { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); }
-void App::goMap() { activeEvent = -1; activeTour = false; setScreen(std::make_unique<RegionMapScreen>(*this)); }
+void App::goMap() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<RegionMapScreen>(*this)); }
 void App::startTour() {
     std::string why;
     if (!career.tourStart(&why)) return;
@@ -160,6 +161,18 @@ void App::goBodyShop() { setScreen(std::make_unique<BodyShopScreen>(*this)); }
 void App::goAchievements() { setScreen(std::make_unique<AchievementsScreen>(*this)); }
 void App::goEcu() { setScreen(std::make_unique<EcuScreen>(*this)); }
 void App::goSetup() { setScreen(std::make_unique<SetupScreen>(*this)); }
+void App::goStreet() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); }
+void App::startMeet() {
+    std::string why;
+    if (!career.meetStart(&why)) return;
+    const OwnedCar& oc = career.car();
+    Opponent o = career.meetOpponent();
+    eventHandicap = 1.35;
+    lastOpp = o;
+    activeEvent = -1; activeTour = false; activeMeet = true;
+    saveCareer();
+    setScreen(std::make_unique<DragScreen>(*this, oc.carId, o.carId, &oc.tune, &o.tune, true));
+}
 void App::goSaveCode() { setScreen(std::make_unique<SaveCodeScreen>(*this)); }
 void App::goRestore() { setScreen(std::make_unique<RestoreScreen>(*this)); }
 void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }

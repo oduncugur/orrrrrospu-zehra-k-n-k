@@ -102,6 +102,9 @@ public:
     void goAchievements();
     void goEcu();
     void goSetup();                              // kurulum (suspansiyon / lastik / profiller)
+    void goStreet();                             // sokak: bulusma / dyno yarismasi / musteri isleri
+    void startMeet();                            // gece bulusmasi: bahisli drag
+    bool activeMeet = false;
     void goSaveCode();
     // Pano (platform baglar: masaustu SDL, Android ClipboardManager). Yoksa bos / etkisiz.
     std::function<void(const std::string&)> onSetClipboard;

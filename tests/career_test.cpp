@@ -296,6 +296,44 @@ int main() {
         c.marketOff = true;
         CHECK(c.shopPrice(PartCat::Intake, 3) == partPrice(PartCat::Intake, 3, *findVehicle(c.car().carId)), "pazar kapali: liste fiyati");
     }
+    std::printf("[S] Sokak: gece bulusmasi, dyno yarismasi, musteri isleri\n");
+    {
+        Career c = Career::newGame(); c.money = 200000; c.clockSlot = 12345;
+        const long stake = c.meetStake(), m0 = c.money;
+        CHECK(stake >= 500 && c.meetAvailable() && c.meetStart() && c.money == m0 - stake, "bulusma: bahis masaya konur");
+        std::string why;
+        CHECK(!c.meetAvailable(&why) && why == "BU GECE YARISTIN", "ayni dilimde ikinci bulusma yok");
+        long fine = -1;
+        const long net = c.recordMeet(true, &fine);
+        CHECK(net == 2 * stake && c.money == m0 + stake - fine && fine >= 0 && fine <= stake / 2, "kazanan bahsi iki kat alir (baskinda ceza)");
+        int raids = 0;
+        for (int sl = 0; sl < 1000; ++sl) { Career r = Career::newGame(); r.money = 100000; r.clockSlot = sl; r.meetStart(); long f = 0; r.recordMeet(false, &f); raids += f > 0; }
+        std::printf("    1000 bulusmada polis baskini: %d\n", raids);
+        CHECK(raids > 120 && raids < 240, "polis baskini ~%18");
+        Career d = Career::newGame(); d.money = 100000;
+        int place = 0; long prize = 0; std::vector<Career::DynoEntry> board;
+        const long d0 = d.money, fee = d.dynoEntryFee();
+        CHECK(d.dynoEnter(&place, &prize, &board) && board.size() == 10 && place >= 1 && place <= 10 && board[place - 1].player, "dyno: 10 arac, oyuncu siralamada");
+        CHECK(d.money == d0 - fee + prize && (place <= 3) == (prize > 0), "giris ucreti alinir, ilk uce odul");
+        bool sorted = true; for (size_t i = 1; i < board.size(); ++i) sorted = sorted && board[i - 1].hp >= board[i].hp;
+        CHECK(sorted && !d.dynoAvailable(&why) && why == "BU HAFTA KATILDIN", "siralama guce gore; haftada bir");
+        Career j = Career::newGame(); j.money = 100000;
+        const Career::JobOffer o = j.jobOffer(0);
+        CHECK(o.targetHp > o.stockHp && o.reward > 0, "musteri teklifi: hedef fabrikadan yuksek, odeme var");
+        const size_t n0 = j.cars.size();
+        CHECK(j.acceptJob(0) && j.cars.size() == n0 + 1 && j.car().jobHp == o.targetHp && !j.car().raceable(), "isi al: arac garaja gelir, yarisamaz");
+        CHECK(!j.sellCurrent(&why) && why == "MUSTERI ARACI SATILAMAZ" && !j.acceptJob(0), "musteri araci satilamaz, ayni teklif tekrar alinmaz");
+        long paid = 0;
+        CHECK(!j.deliverJob(&paid, &why) && why == "HEDEF GUCE ULASILMADI", "hedefe ulasmadan teslim yok");
+        Career k2;
+        CHECK(Career::parse(j.serialize(), k2) && k2.car().jobHp == o.targetHp && k2.car().jobReward == o.reward && k2.jobTaken(0), "musteri isi kayitta");
+        j.cars[j.current].tune.engineSwap = 0;
+        for (int sw = 1; sw < 300 && peakHpOf(*findVehicle(j.car().carId), j.car().tune) < o.targetHp; ++sw) j.cars[j.current].tune.engineSwap = sw;   // guclu motor
+        const long jm = j.money;
+        const bool reached = peakHpOf(*findVehicle(j.car().carId), j.car().tune) >= o.targetHp;
+        CHECK(reached && j.deliverJob(&paid) && paid == o.reward && j.money == jm + o.reward && j.cars.size() == n0, "hedefe ulasinca teslim: odeme, arac gider");
+        CHECK(j.acceptJob(1) && j.cancelJob() && j.cars.size() == n0, "iptal: arac geri verilir");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

@@ -35,6 +35,7 @@ private:
     App& app_;
     std::unique_ptr<PowertrainCore> pt_;
     double tunedHp_ = 0, stockHp_ = 0;
+    bool cancelArm_ = false;                     // musteri isi iptali: ikinci basis onaylar
     std::string msg_; double msgT_ = 0;
     bool selling_ = false;                       // satis onay penceresi acik
     float throttle_ = 0; int throttlePtr_ = -1; bool throttleKey_ = false;
@@ -270,6 +271,22 @@ public:
 private:
     void change(int row, int dir);
     App& app_;
+    std::string msg_; double msgT_ = 0;
+};
+
+// Sokak: gece bulusmasi, haftalik dyno yarismasi, musteri isleri (sekmeler)
+class StreetScreen : public Screen {
+public:
+    explicit StreetScreen(App& app);
+    bool landscape() const override { return false; }
+    void update(double dt) override { msgT_ -= dt; }
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+private:
+    App& app_;
+    int tab_ = 0;
+    std::vector<Career::DynoEntry> board_;
     std::string msg_; double msgT_ = 0;
 };
 

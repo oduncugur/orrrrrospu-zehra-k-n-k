@@ -18,7 +18,7 @@ const Node kNodes[kLeagues] = {
     {130, 110, {0.85f, 0.25f, 0.25f}},  // PIST
 };
 constexpr float kR = 30;
-const Rect kTour{8, 528, 352, 566}, kBackM{8, 596, 352, 634};
+const Rect kTour{8, 528, 352, 566}, kBackM{8, 596, 176, 634}, kStreetM{184, 596, 352, 634};
 
 bool bossBeaten(const Career& c, int league) {
     const auto& ev = leagueEvents();
@@ -108,11 +108,13 @@ void RegionMapScreen::render(Renderer& r) {
     char tb[48]; std::snprintf(tb, sizeof tb, "TUR %d: DRAG ELEME >", c.tourRound + 1);
     button(r, kTour, can ? std::string(tb) : why, can ? kUiOrange : Color{0.25f, 0.25f, 0.28f}, 2);
     button(r, kBackM, "< GARAJ", kUiBtn, 2);
+    button(r, kStreetM, "SOKAK >", {0.35f, 0.15f, 0.45f}, 2);
     if (msgT_ > 0) { r.rect(0, 440, 360, 470, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 448, msg_, 2, kUiGold); }
 }
 
 void RegionMapScreen::pointerDown(int, float x, float y) {
     if (kBackM.hit(x, y)) { app_.goGarage(); return; }
+    if (kStreetM.hit(x, y)) { app_.goStreet(); return; }
     if (kTour.hit(x, y)) {
         std::string why;
         if (!app_.career.tourAvailable(&why)) { msg_ = why; msgT_ = 2.0; return; }
