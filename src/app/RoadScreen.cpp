@@ -422,6 +422,39 @@ void RoadScreen::drawWorld(Renderer& r) {
                          night_ ? Color{0.2f, 0.2f, 0.25f, 0.25f} : rain_ ? Color{0.3f, 0.32f, 0.35f, 0.55f} : Color{1.0f, 1.0f, 1.0f, 0.28f});
         }
     }
+    if (!mtn && !sideCam) {
+        // Uzak manzara (dunya yonune sabit, bulutlar gibi): iki kat yuvarlak tepe; sehirde gokdelen silueti
+        const float yaw = (float)std::atan2(dy, dx), hfov = 2.0f * std::atan(std::tan((float)camFov * 0.5f) * W / H);
+        auto azX = [&](float az) { return W * 0.5f - std::remainder(az - yaw, 6.2831853f) / hfov * W; };
+        const bool city = zoneAt(ps) == 1;
+        for (int layer = 0; layer < 2; ++layer) {
+            const float k0 = layer == 0 ? 0.55f : 0.35f;                     // uzak kat sise karisir
+            const Color hc{(0.34f + 0.2f * k0) * amb + fogCol.r * k0 * 0.5f, (0.48f + 0.08f * k0) * amb + fogCol.g * k0 * 0.4f,
+                           (0.36f + 0.25f * k0) * amb + fogCol.b * k0 * 0.5f};
+            const int nseg = 64;
+            for (int k = 0; k < nseg; ++k) {
+                const float a0 = 6.2831853f * k / nseg, a1 = 6.2831853f * (k + 1) / nseg;
+                const float x0 = azX(a0), x1 = azX(a1);
+                if ((x0 < -40 && x1 < -40) || (x0 > W + 40 && x1 > W + 40) || std::fabs(x1 - x0) > W) continue;
+                auto hgt = [&](int kk) {                                         // yumusak gurultu (iki frekans)
+                    const float u = kk * 0.37f + layer * 11.0f;
+                    return (layer == 0 ? 22.0f : 12.0f) * (0.55f + 0.45f * std::sin(u) * std::cos(u * 0.53f + 1.7f)) + 6.0f * hashf(kk * 7 + layer);
+                };
+                const float h0 = hgt(k) * H / 360.0f, h1 = hgt(k + 1) * H / 360.0f;
+                r.tri(x0, horizon, x1, horizon, x1, horizon - h1, hc); r.tri(x0, horizon, x1, horizon - h1, x0, horizon - h0, hc);
+            }
+            if (city && layer == 0)                                         // gokdelenler: uzak, puslu
+                for (int k = 0; k < 40; ++k) {
+                    const float x = azX(k * 0.157f + 0.05f * hashf(k)), bw = (8.0f + 10.0f * hashf(k * 3)) * W / 640.0f;
+                    if (x < -20 || x > W + 20) continue;
+                    const float bh = (20.0f + 55.0f * hashf(k * 5) * hashf(k * 9 + 1)) * H / 360.0f;
+                    const Color bc{0.42f * amb + fogCol.r * 0.35f, 0.45f * amb + fogCol.g * 0.35f, 0.52f * amb + fogCol.b * 0.35f};
+                    r.rect(x - bw * 0.5f, horizon - bh, x + bw * 0.5f, horizon, bc);
+                    if (night_) for (int w2 = 0; w2 < 6; ++w2) if (hashf(k * 13 + w2) > 0.55f)
+                        r.rect(x - bw * 0.3f + (w2 % 2) * bw * 0.35f, horizon - bh + 4 + (w2 / 2) * 6, x - bw * 0.3f + (w2 % 2) * bw * 0.35f + 2, horizon - bh + 6 + (w2 / 2) * 6, {1.0f, 0.85f, 0.5f, 0.8f});
+                }
+        }
+    }
     if (mtn)   // uzak daglar (siluet)
         for (int k = 0; k < 10; ++k) { const float x0 = k * 70.0f - 30.0f, hh = 30.0f + 25.0f * hashf(k + 3); r.tri(x0, horizon, x0 + 100, horizon, x0 + 50, horizon - hh, {0.25f, 0.24f, 0.36f}); }
     if (sideCam) {
@@ -479,6 +512,13 @@ void RoadScreen::drawWorld(Renderer& r) {
             if (gL0.ok && gL1.ok) { triP(r, gL0, aL, bL, gc); triP(r, gL0, bL, gL1, gc); }
             if (gR0.ok && gR1.ok) { triP(r, aR, gR0, gR1, gc); triP(r, aR, gR1, bR, gc); }
         }
+        if (zone == 0) {                                                // banket: toprak / cakil (cim ile bordur arasi)
+            const Proj sL0 = edgeW(i, 1, -2.6), sL1 = edgeW(j, 1, -2.6), sR0 = edgeW(i, -1, -2.6), sR1 = edgeW(j, -1, -2.6);
+            const float v = 0.92f + 0.08f * hashf(i * 3);
+            const Color sc = fog(L(mtn ? Color{0.45f * v, 0.42f * v, 0.38f * v} : Color{0.52f * v, 0.46f * v, 0.36f * v}), aL.w);
+            if (sL0.ok && sL1.ok) { triP(r, sL0, aL, bL, sc); triP(r, sL0, bL, sL1, sc); }
+            if (sR0.ok && sR1.ok) { triP(r, aR, sR0, sR1, sc); triP(r, aR, sR1, bR, sc); }
+        }
         const Color curb = fog(mtn ? (band ? Color{0.62f, 0.64f, 0.66f} : Color{0.8f, 0.8f, 0.78f})      // dag: celik bariyer
                                    : (band ? Color{0.85f, 0.15f, 0.12f} : Color{0.92f, 0.92f, 0.9f}), aL.w);
         { const Color cb = fog(L(curb), aL.w); triP(r, aL, aR, bR, cb); triP(r, aL, bR, bL, cb); }
@@ -508,6 +548,25 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const double o = sg * P[i].hw * 0.5, o2 = sg * P[j].hw * 0.5;
                 const Proj m0 = edge(i, o + 0.07), m1 = edge(i, o - 0.07), m2 = edge(j, o2 + 0.07), m3 = edge(j, o2 - 0.07);
                 triP(r, m0, m1, m3, wc); triP(r, m0, m3, m2, wc);
+            }
+        }
+        if (night_ && i % 5 == 3 && cL.w < 160.0f) {                // gece: kedi gozu reflektorler (farda parlar)
+            const Proj q = edge(i, 0.0);
+            if (q.ok) { r.setDepthW(q.w - 0.05f); const float s2 = std::max(1.0f, 0.12f * pxPerM / q.w); r.rect(q.x - s2, q.y - s2 * 0.6f, q.x + s2, q.y, {1.0f, 0.85f, 0.4f, lit}); }
+        }
+        if (zone == 0 && !mtn && P[i].hw > 4.6) {                     // otoban: celik bariyer (ray + direk)
+            for (double sg : {-1.0, 1.0}) {
+                if (camBlend_ < 0.5 && sg < 0) continue;
+                const double o0 = sg * (P[i].hw + 2.0), o1 = sg * (P[j].hw + 2.0);
+                const Proj g0 = pt(i, o0, 0.55), g1 = pt(j, o1, 0.55), g2 = pt(j, o1, 0.80), g3 = pt(i, o0, 0.80), gb = pt(i, o0, 0.0);
+                if (!g0.ok || !g1.ok || !g2.ok || !g3.ok) continue;
+                const Color rc = fog(L(band ? Color{0.72f, 0.74f, 0.76f} : Color{0.62f, 0.64f, 0.67f}), g0.w);
+                triP(r, g0, g1, g2, rc); triP(r, g0, g2, g3, rc);
+                if (gb.ok && (i & 1) == 0) {
+                    r.setDepthW(g0.w);
+                    const float pw = std::max(0.6f, 0.08f * pxPerM / g0.w);
+                    r.rect(gb.x - pw, g3.y, gb.x + pw, gb.y, fog(L({0.35f, 0.35f, 0.38f}), g0.w));
+                }
             }
         }
         if ((i % 5) < 2) {                                         // orta kesik cizgi (4 m cizgi, 6 m bosluk)
@@ -550,12 +609,29 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const Color face = fog(L({base.r * 0.85f, base.g * 0.85f, base.b * 0.85f}), f0.w), endc = fog(L({base.r * 0.62f, base.g * 0.62f, base.b * 0.62f}), f0.w);
                 triP(r, f0, e0, e3, endc); triP(r, f0, e3, f3, endc);
                 triP(r, f0, f1, f2, face); triP(r, f0, f2, f3, face);
+                {   // zemin kat dukkan bandi (renkli) + tente, cati korkulugu (acik renk)
+                    const Proj s0 = pt(i, side * d, 3.2), s1 = pt(ie, side * d, 3.2), c0 = pt(i, side * d, hgt - 0.7), c1 = pt(ie, side * d, hgt - 0.7);
+                    if (s0.ok && s1.ok && c0.ok && c1.ok) {
+                        static const Color shop[5] = {{0.75f, 0.2f, 0.18f}, {0.15f, 0.42f, 0.7f}, {0.85f, 0.65f, 0.15f}, {0.2f, 0.55f, 0.3f}, {0.55f, 0.25f, 0.55f}};
+                        const Color sc2 = fog(L(shop[key % 5]), f0.w), roof = fog(L({base.r * 1.05f, base.g * 1.05f, base.b * 1.05f}), f0.w);
+                        triP(r, f0, f1, s1, fog(L({0.12f, 0.13f, 0.16f}), f0.w)); triP(r, f0, s1, s0, fog(L({0.12f, 0.13f, 0.16f}), f0.w));   // vitrin
+                        const Proj a0 = pt(i, side * (d - 1.2), 3.0), a1 = pt(ie, side * (d - 1.2), 3.0);
+                        if (a0.ok && a1.ok) { triP(r, s0, s1, a1, sc2); triP(r, s0, a1, a0, sc2); }                                     // tente
+                        triP(r, c0, c1, f2, roof); triP(r, c0, f2, f3, roof);                                                          // korkuluk
+                        if (night_ && hashf(key * 41) > 0.5f) {                                                                       // neon tabela
+                            const Proj n0 = pt(i + 3, side * (d - 0.1), 4.0), n1 = pt(i + 6, side * (d - 0.1), 4.8);
+                            if (n0.ok && n1.ok) { r.setDepthW(n0.w - 0.1f); r.rect(std::min(n0.x, n1.x), std::min(n0.y, n1.y), std::max(n0.x, n1.x), std::max(n0.y, n1.y), {shop[(key + 2) % 5].r + 0.3f, shop[(key + 2) % 5].g + 0.3f, shop[(key + 2) % 5].b + 0.3f, 0.9f}); }
+                        }
+                    }
+                }
                 r.setDepthW(f0.w - 0.05f);
                 if (f0.w < 260.0f) {                                   // pencereler (gece yanik)
                     const int floors = std::max(2, (int)(hgt / 3.5)), cols = 5;
                     for (int fl = 0; fl < floors; ++fl)
                         for (int cl = 0; cl < cols; ++cl) {
-                            const float u0 = (cl + 0.25f) / cols, u1 = (cl + 0.75f) / cols, v0 = (fl + 0.3f) / floors, v1 = (fl + 0.75f) / floors;
+                            const float u0 = (cl + 0.25f) / cols, u1 = (cl + 0.75f) / cols;
+                            const float vb = 3.6f / (float)hgt, vt = 1.0f - 0.9f / (float)hgt;   // dukkan katinin ustu .. korkulugun alti
+                            const float v0 = vb + (vt - vb) * (fl + 0.3f) / floors, v1 = vb + (vt - vb) * (fl + 0.75f) / floors;
                             auto bl = [&](float u, float v) { return std::pair<float, float>{f0.x + (f1.x - f0.x) * u + (f3.x - f0.x) * v + (f2.x - f1.x - f3.x + f0.x) * u * v,
                                                                                             f0.y + (f1.y - f0.y) * u + (f3.y - f0.y) * v + (f2.y - f1.y - f3.y + f0.y) * u * v}; };
                             const auto a = bl(u0, v0), b = bl(u1, v0), c = bl(u1, v1), dd = bl(u0, v1);
@@ -608,6 +684,20 @@ void RoadScreen::drawWorld(Renderer& r) {
                 }
             }
         }
+        if (zone == 0 && i % 3 == 1 && hashf(i * 17) > 0.55f) {     // calilar / kayalar (yol kenari, yakin)
+            for (int side = -1; side <= 1; side += 2) {
+                if (camBlend_ < 0.5 && side < 0) continue;
+                const Proj b = edge(i, side * (P[i].hw + 3.2 + 4.0 * hashf(i * 23 + side)));
+                if (!b.ok || b.w > 140.0f) continue;
+                r.setDepthW(b.w);
+                const float sc = pxPerM / b.w, s0 = (0.5f + 0.5f * hashf(i * 29 + side)) * sc;
+                if (mtn) { r.tri(b.x - s0, b.y, b.x + s0, b.y, b.x + s0 * 0.2f, b.y - s0 * 0.9f, fog(L({0.45f, 0.42f, 0.38f}), b.w)); }
+                else {
+                    r.circle(b.x - s0 * 0.4f, b.y - s0 * 0.35f, s0 * 0.55f, 10, fog(L({0.14f, 0.36f, 0.15f}), b.w));
+                    r.circle(b.x + s0 * 0.3f, b.y - s0 * 0.45f, s0 * 0.6f, 10, fog(L({0.2f, 0.46f, 0.2f}), b.w));
+                }
+            }
+        }
         if (zone == 0 && i % 8 == 0) {                             // kenar agaclari / direkleri (her 16 m)
             for (int side = -1; side <= 1; side += 2) {
                 if (camBlend_ < 0.5 && side < 0) continue;            // drag gorunumu: kamera tarafindaki agaclar gorusu kapatir
@@ -622,14 +712,23 @@ void RoadScreen::drawWorld(Renderer& r) {
                     const Color pc = fog(L({0.35f, 0.28f, 0.2f}), b.w);
                     r.rect(b.x - 0.12f * sc, b.y - 7.5f * sc, b.x + 0.12f * sc, b.y, pc);
                     r.rect(b.x - 0.9f * sc, b.y - 7.2f * sc, b.x + 0.9f * sc, b.y - 7.0f * sc, pc);
-                } else {                                             // cam agaci: golge + govde + iki kat yaprak (isikli / golgeli yari)
+                } else if (!mtn && hashf(i * 5 + side * 3) > 0.5f) {  // yuvarlak yaprakli agac: govde + 3 kat tac (golge / isik)
+                    const Color c0 = fog(L({0.10f, 0.30f + 0.08f * h, 0.12f}), b.w), c1 = fog(L({0.16f, 0.42f + 0.1f * h, 0.17f}), b.w),
+                                c2 = fog(L({0.26f, 0.55f + 0.1f * h, 0.24f}), b.w);
+                    r.circle(b.x + 0.4f * sc, b.y, tw * 1.0f, 12, {0.0f, 0.0f, 0.0f, 0.18f});
+                    r.rect(b.x - tw * 0.11f, b.y - th * 0.45f, b.x + tw * 0.11f, b.y, fog(L({0.38f, 0.26f, 0.15f}), b.w));
+                    r.circle(b.x, b.y - th * 0.62f, tw * 0.95f, 14, c0);
+                    r.circle(b.x - tw * 0.18f, b.y - th * 0.70f, tw * 0.72f, 14, c1);
+                    r.circle(b.x - tw * 0.32f, b.y - th * 0.80f, tw * 0.38f, 12, c2);
+                } else {                                             // cam agaci: golge + govde + uc kat yaprak (isikli / golgeli yari)
                     const Color leaf = fog(L({0.12f, 0.38f + 0.1f * h, 0.16f}), b.w), leafD = fog(L({0.08f, 0.28f + 0.08f * h, 0.12f}), b.w);
                     r.circle(b.x + 0.4f * sc, b.y, tw * 0.9f, 10, {0.0f, 0.0f, 0.0f, 0.18f});
                     r.rect(b.x - tw * 0.12f, b.y - th * 0.35f, b.x + tw * 0.12f, b.y, fog(L({0.35f, 0.24f, 0.14f}), b.w));
-                    r.tri(b.x - tw, b.y - th * 0.28f, b.x, b.y - th * 0.28f, b.x, b.y - th * 0.78f, leafD);
-                    r.tri(b.x, b.y - th * 0.28f, b.x + tw, b.y - th * 0.28f, b.x, b.y - th * 0.78f, leaf);
-                    r.tri(b.x - tw * 0.75f, b.y - th * 0.55f, b.x, b.y - th * 0.55f, b.x, b.y - th, leafD);
-                    r.tri(b.x, b.y - th * 0.55f, b.x + tw * 0.75f, b.y - th * 0.55f, b.x, b.y - th, leaf);
+                    for (int tier = 0; tier < 3; ++tier) {
+                        const float yb = th * (0.22f + 0.24f * tier), yt = th * (0.62f + 0.19f * tier), ww = tw * (1.05f - 0.25f * tier);
+                        r.tri(b.x - ww, b.y - yb, b.x, b.y - yb, b.x, b.y - yt, leafD);
+                        r.tri(b.x, b.y - yb, b.x + ww, b.y - yb, b.x, b.y - yt, leaf);
+                    }
                 }
             }
         }
