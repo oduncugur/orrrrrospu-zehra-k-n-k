@@ -32,6 +32,7 @@ struct Platform {
     const ASensor* accel = nullptr;
     ASensorEventQueue* sensorQ = nullptr;
     float tiltLp = 0.0f;
+    int upX = 0, upY = 1;                // egim: ekranin yukari ekseni (cihaz ekseninde, yercekiminden)
     int rotation = 0;                // ekran donusu (Surface.ROTATION_0..270): egim ekseni buna gore
     bool rotationDirty = true;
     int surfW = 0, surfH = 0;                // son bilinen yuzey boyutu
@@ -428,10 +429,15 @@ void android_main(android_app* app) {
                 // Dikey tutus: telefon sola yatinca x ivmesi +; ~30 derece = tam direksiyon; alcak geciren suzgec
                 ASensorEvent ev;
                 while (ASensorEventQueue_getEvents(p.sensorQ, &ev, 1) > 0) {
-                    // Ekranin saga dogru ekseni (cihaz ekseninde; Android remapCoordinateSystem): dikeyde +x, 90da +y,
-                    // 180de -x, 270te -y. Sola egim +. Ayarlarda TERS secilirse isaret doner.
+                    // Ekran donusu (Display.getRotation) bazi cihazlarda yanlis / gec geliyor: yatayda yanlis eksen okunuyordu.
+                    // Artik donus yercekiminden: ekranin "yukari" ekseni = yercekimi tepkisinin baskin oldugu cihaz ekseni
+                    // (yatay yuzeyde: x, dikeyde: y; isaret yercekiminden, histerezisli). Ekranin sagi = yukarinin saat
+                    // yonunde 90 derece donugu; egim = ivmenin "sag" eksenindeki payi. Sola egim +. Ayarda TERS isaret dondurur.
                     const float ax = ev.acceleration.x, ay = ev.acceleration.y;
-                    const float side = p.rotation == 1 ? ay : p.rotation == 2 ? -ax : p.rotation == 3 ? -ay : ax;
+                    const bool land = p.surfW > p.surfH;
+                    if (land) { if (ax > 3.0f) p.upX = 1; else if (ax < -3.0f) p.upX = -1; if (!p.upX) p.upX = 1; p.upY = 0; }
+                    else { if (ay > 3.0f) p.upY = 1; else if (ay < -3.0f) p.upY = -1; if (!p.upY) p.upY = 1; p.upX = 0; }
+                    const float side = ax * p.upY - ay * p.upX;                // g . (yukari saat yonunde 90 derece: (upY, -upX))
                     const float t = std::clamp(side / (9.81f * 0.5f), -1.0f, 1.0f);
                     p.tiltLp += (t - p.tiltLp) * 0.25f;
                     p.game->setTilt(p.tiltLp);
