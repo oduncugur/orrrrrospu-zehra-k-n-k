@@ -56,10 +56,13 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : eff + (top - eff) * std::pow(k, 1.3);
     if (sinceShift_ < 0.8 - 0.2 * tcu && !(thr > 0.85 && sinceShift_ > 0.35)) return;
     // Yukari: cikis devri (konvertor kaymasiz) vites noktasini gecti ya da motor kesiciye dayandi (kayma ile)
-    if ((rpm > up || pt.rpm() > red - 120.0) && gear < pt.gearCount()) { shift(gear + 1); return; }
+    if ((rpm > up || pt.rpm() > red - (pt.converter() ? 350.0 : 120.0)) && gear < pt.gearCount()) { shift(gear + 1); return; }   // konvertor kaymasi: motor tekerlekten once kesiciye varir
     if (gear <= 1) return;
     const double rLow = rpm * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3);
-    if (thr > 0.85 && rLow < red - 700.0 && rpm < top - 400.0) { shift(gear - 1); return; }   // kickdown
+    // Kickdown: alt viteste motor devri (patinaj / konvertor kaymasi dahil gercek devir) kesiciye 1500 kala sigmali;
+    // arac hizindan hesaplanan devir patinajda dusuk kalir ve 1-2 arasinda gidip gelmeye yol aciyordu.
+    const double rLowEng = std::max(rLow, pt.rpm() * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3));
+    if (thr > 0.85 && rLowEng < red - 1500.0 && pt.rpm() < top - 400.0 && sim_->speed() > 3.0) { shift(gear - 1); return; }   // kickdown
     if (sinceShift_ > 1.0 && rLow < up * 0.80 && rpm < (sport ? 0.55 * red : std::max(idle + 700.0, eff * 0.72))) shift(gear - 1);
 }
 

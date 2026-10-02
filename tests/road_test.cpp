@@ -294,6 +294,14 @@ int main() {
         CHECK(light > 0 && light < 0.62 * red, "hafif gazda verimli devirde vites atar");
         CHECK(full > red - 800 && full <= red + 50, "tam gazda kesiciye ~500 kala vites atar");
         CHECK(sport > light + 1000, "S modunda ayni gazda daha yuksek devirde vites");
+        {   // tam gazda vites yalniz buyur (patinaj / konvertor kaymasi 1-2 arasinda gidip gelmeye yol aciyordu)
+            RoadCar a(sup, nullptr, road3, 0.0, -1.8);
+            RoadControls k; k.throttle = 1.0;
+            int prev = 1, downs = 0;
+            for (double t = 0; t < 8.0; t += 1.0 / 60.0) { a.update(1.0 / 60.0, k); const int g = a.sim().powertrain().gear(); downs += g > 0 && g < prev; if (g > 0) prev = g; }
+            std::printf("    tam gaz 8 s: son vites %d, vites dusurme %d\n", prev, downs);
+            CHECK(downs == 0 && prev >= 3, "tam gazda vites gidip gelmez");
+        }
         {   // kickdown: hafif gazla 4. vitese kadar, sonra tam gaz -> en az bir vites asagi
             RoadCar a(sup, nullptr, road3, 0.0, -1.8);
             RoadControls k; k.throttle = 0.30;
