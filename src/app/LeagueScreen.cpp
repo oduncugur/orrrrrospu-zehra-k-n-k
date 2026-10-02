@@ -15,7 +15,8 @@ const Rect kBackL{8, 596, 352, 634};
 const Rect kStartL{8, 548, 352, 590};
 const Rect kYesL{8, 548, 176, 590}, kNoL{184, 548, 352, 590};
 const Rect kAchL{262, 30, 352, 54};
-constexpr float kRowY0 = 114, kRowH = 44;
+constexpr float kRowY0 = 114;
+float rowH(size_t n) { return std::min(44.0f, (464.0f - kRowY0) / std::max<size_t>(1, n)); }   // lig 9 etkinlige kadar sigar
 }
 
 LeagueScreen::LeagueScreen(App& app) : app_(app) {
@@ -68,6 +69,7 @@ void LeagueScreen::render(Renderer& r) {
     for (size_t k = 0; k < list.size(); ++k) {
         const int i = list[k];
         const EventDef& e = ev[i];
+        const float kRowH = rowH(list.size());
         const float y = kRowY0 + k * kRowH;
         const bool won = c.eventWon(i);
         const bool boss = e.rival >= 0 && rivals()[e.rival].boss;
@@ -80,13 +82,14 @@ void LeagueScreen::render(Renderer& r) {
         std::string sub = eventModeName(e.mode);
         if (e.rival >= 0) sub += std::string("  ") + rivals()[e.rival].name;
         else if (e.mode == EventMode::Flow) { std::snprintf(b, sizeof b, "  HEDEF %ld", e.flowTarget); sub += b; }
+        else if (e.mode == EventMode::Chase) sub += "  400 M ACIL";
         else sub += "  DENGI RAKIP";
-        r.text(18, y + 18, sub.substr(0, 40), 1, kUiDim);
+        r.text(18, y + kRowH - 22, sub.substr(0, 40), 1, kUiDim);
         std::string right = won ? "KAZANILDI" : e.pink ? "ARABA" : money(e.prize);
         if (!avail && !won) right = "KILITLI";
         r.text(344 - r.textWidth(right, 1), y + 5, right, 1, won ? Color{0.4f, 1.0f, 0.5f} : !avail ? kUiDim : kUiGold);
         std::snprintf(b, sizeof b, "+%d UN", e.rep);
-        r.text(344 - r.textWidth(b, 1), y + 18, b, 1, {0.55f, 0.75f, 1.0f});
+        r.text(344 - r.textWidth(b, 1), y + kRowH - 22, b, 1, {0.55f, 0.75f, 1.0f});
     }
     // Alt panel: secili etkinlik ayrintisi ya da gunluk gorevler
     const float py = 470;
@@ -102,7 +105,8 @@ void LeagueScreen::render(Renderer& r) {
             static const char* pre[3] = {"STOK", "SOKAK PAKETI", "DRAG PAKETI"};
             std::snprintf(b, sizeof b, "PARCA: %s   TAHMINI 1/4: %.2f S", pre[std::clamp(rv.preset, 0, 2)], tableEt(rv.carId, rv.preset));
             r.text(16, py + 34, b, 1, kUiDim);
-        } else r.text(16, py + 6, e.mode == EventMode::Flow ? "SKOR HEDEFINI GEC" : "SENIN SEVIYENDE BIR RAKIP", 1, {1, 1, 1});
+        } else r.text(16, py + 6, e.mode == EventMode::Flow ? "SKOR HEDEFINI GEC" : e.mode == EventMode::Chase ? "POLISTEN KAC: 400 M ACIL VE 4 S TUT"
+                                                                                                              : "SENIN SEVIYENDE BIR RAKIP", 1, {1, 1, 1});
         if (e.pink) r.text(16, py + 50, "PINK SLIP: KAYBEDERSEN ARABAN GIDER!", 1, {1.0f, 0.4f, 0.5f});
         else if (!avail) r.text(16, py + 50, why, 1, {1.0f, 0.4f, 0.3f});
         else {
@@ -145,7 +149,7 @@ void LeagueScreen::pointerDown(int, float x, float y) {
     }
     const auto list = rows();
     for (size_t k = 0; k < list.size(); ++k)
-        if (Rect{8, kRowY0 + k * kRowH, 352, kRowY0 + k * kRowH + kRowH - 4}.hit(x, y)) { sel_ = list[k]; confirm_ = false; return; }
+        if (Rect{8, kRowY0 + k * rowH(list.size()), 352, kRowY0 + (k + 1) * rowH(list.size()) - 4}.hit(x, y)) { sel_ = list[k]; confirm_ = false; return; }
 }
 
 void LeagueScreen::key(Key k, bool down) {

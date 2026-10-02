@@ -58,6 +58,16 @@ const char* partCatName(PartCat c) {
     return n[(int)c];
 }
 
+// Motor swap = motorun kendi bedeli + sabit iscilik. Motor bedeli: o motorla gelen en ucuz aracin fiyatinin yarisi
+// (katalogda yoksa 30 $/HP). Iscilik her motorda ayni.
+constexpr int kSwapLabor = 2500;
+static int swapPrice(int engine) {
+    int best = 0;
+    for (const VehicleDef& v : vehicleCatalog()) if (v.engine == engine) { const int p = carPrice(v); if (best == 0 || p < best) best = p; }
+    const int value = best > 0 ? (int)(0.5 * best) : (int)(30.0 * engineTable()[engine].powerHp);
+    return (value + kSwapLabor) / 10 * 10;
+}
+
 const std::vector<PartOption>& partOptions(PartCat c) {
     static std::vector<PartOption> t[(int)PartCat::Count];
     static bool init = false;
@@ -89,7 +99,7 @@ const std::vector<PartOption>& partOptions(PartCat c) {
                 names.push_back(b);
             }
             for (size_t i = 0; i < names.size(); ++i)
-                t[(int)PartCat::EngineSwap].push_back({names[i].c_str(), i == 0 ? 0 : (int)(1500 + engineTable()[swapEngines()[i - 1]].powerHp * 22)});
+                t[(int)PartCat::EngineSwap].push_back({names[i].c_str(), i == 0 ? 0 : swapPrice(swapEngines()[i - 1])});
         }
         t[(int)PartCat::Intake] = opts(intakeTable());      t[(int)PartCat::Exhaust] = opts(exhaustTable());
         t[(int)PartCat::Turbo] = opts(turboTable());        t[(int)PartCat::Turbine] = opts(turbineTable());

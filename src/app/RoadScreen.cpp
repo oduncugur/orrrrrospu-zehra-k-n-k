@@ -68,6 +68,9 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
         case EventMode::Touge: start(RoadSession::Mode::Race, RoadSession::Kind::Touge); break;
         case EventMode::Karma: start(RoadSession::Mode::Karma); break;
         case EventMode::Flow: start(RoadSession::Mode::Flow); break;
+        case EventMode::Chase:
+            start(RoadSession::Mode::Chase, leagueEvents()[app_.activeEvent].league == 3 ? RoadSession::Kind::Touge : RoadSession::Kind::Highway);
+            break;
         default: break;
         }
     }
@@ -93,7 +96,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
         app_.rainSound(rain_);
         lastGear_ = -2;
     }
-    if (RoadCar* rv = ses_->rival(); rv && app_.activeEvent >= 0) {     // isimli rakip: patron daha keskin
+    if (RoadCar* rv = ses_->rival(); rv && app_.activeEvent >= 0 && m != RoadSession::Mode::Chase) {   // isimli rakip: patron daha keskin
         rv->slowClutch = app_.eventHandicap > 1.25;
         ses_->setRivalPace(0.55 + (1.6 - std::clamp(app_.eventHandicap, 1.0, 1.6)) * 0.15);
     }

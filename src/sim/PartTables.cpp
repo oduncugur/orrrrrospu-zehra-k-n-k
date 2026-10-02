@@ -171,8 +171,8 @@ const std::vector<FlyOpt>& flywheelTable() {
 const std::vector<TurboOpt>& turboTable() {
     static const std::vector<TurboOpt> t = {
         {"YOK / FABRIKA", 0, 0, 0, 0},
-        {"KUCUK KIT", 4500, 0.6 * 1, 0.32 + 0.08 * 1, 0.55 + 0.07 * 1},
-        {"BUYUK KIT", 9000, 0.6 * 2, 0.32 + 0.08 * 2, 0.55 + 0.07 * 2},
+        {"KUCUK KIT", 7000, 0.6 * 1, 0.32 + 0.08 * 1, 0.55 + 0.07 * 1},
+        {"BUYUK KIT", 15000, 0.6 * 2, 0.32 + 0.08 * 2, 0.55 + 0.07 * 2},
         {"T25 KUCUK", 3200, 0.5, 0.28, 0.48},
         {"T28", 4000, 0.7, 0.32, 0.53},
         {"GT2560 BILYALI", 4600, 0.8, 0.31, 0.51},

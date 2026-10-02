@@ -21,6 +21,7 @@ const char* eventModeName(EventMode m) {
     case EventMode::Touge: return "DAG YOLU";
     case EventMode::Karma: return "KARMA";
     case EventMode::Flow: return "OTOBAN AKISI";
+    case EventMode::Chase: return "POLIS KACIS";
     }
     return "";
 }
@@ -78,6 +79,10 @@ const std::vector<EventDef>& leagueEvents() {
         {"V10 SENFONI", 4, M::Karma, 29, 16000, 66, false, 0}, {"KARBON CAG", 4, M::Road, 30, 15000, 64, false, 0},
         {"YENI NESIL", 4, M::Drag, 31, 18000, 70, false, 0}, {"GECE AKISI REKORU", 4, M::Flow, -1, 12000, 50, false, 90000},
         {"PATRON: EFSANE", 4, M::Karma, 32, 60000, 300, false, 0},
+        // Polis kacislari (sona eklenir: kayittaki etkinlik bitleri sira numarasiyla tutulur)
+        {"MAHALLE KACISI", 0, M::Chase, -1, 450, 10, false, 0}, {"POLIS CEVIRMESI", 1, M::Chase, -1, 1300, 18, false, 0},
+        {"OTOBAN KACISI", 2, M::Chase, -1, 3200, 30, false, 0}, {"DAG KACISI", 3, M::Chase, -1, 6000, 42, false, 0},
+        {"SON KACIS", 4, M::Chase, -1, 12000, 58, false, 0},
     };
     return e;
 }

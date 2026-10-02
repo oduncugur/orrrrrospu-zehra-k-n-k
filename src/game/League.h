@@ -10,7 +10,7 @@
 namespace zk {
 
 constexpr int kLeagues = 5;
-enum class EventMode { Drag, Road, Touge, Karma, Flow };
+enum class EventMode { Drag, Road, Touge, Karma, Flow, Chase };   // Chase: polis kacisi (kacmak = galibiyet)
 
 struct RivalDef {
     const char* name;      // lakap (kurgusal)
