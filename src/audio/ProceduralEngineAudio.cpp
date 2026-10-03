@@ -82,6 +82,12 @@ ProceduralEngineAudio::ProceduralEngineAudio(const VehicleDef& v, int sampleRate
     // Susturucu hacim rezonansi (Helmholtz, ~120-320 Hz), dusuk Q: tonal degil govdeli
     for (int b = 0; b < 2; ++b)
         cavity_[b].setBandpass((v.exhaust == Exhaust::StraightPipe ? 320.0 : 160.0) * (b ? 1.12 : 1.0), 1.2, fs_);
+    // Ton dengesi filtreleri: blok govdesi (hacimle iner), V8 egzoz rezonanslari 80 / 160 Hz (Q 4) + alt bas 70 Hz,
+    // VTEC emme bandi ~1.35 kHz (0.8-2.2), gaz acilisi emme nefesi ~520 Hz (300-800)
+    body_.setBandpass(std::clamp(210.0 - 18.0 * e_.displacementL, 110.0, 190.0), 1.8, fs_);
+    v8a_.setBandpass(80.0, 4.0, fs_); v8b_.setBandpass(160.0, 4.0, fs_); v8sub_.setBandpass(70.0, 0.9, fs_);
+    vtecBp_.setBandpass(1350.0, 0.9, fs_);
+    intakeBp_.setBandpass(520.0, 1.2, fs_);
 }
 
 void ProceduralEngineAudio::Biquad::setBandpass(double f, double q, double fs) {
@@ -110,7 +116,7 @@ void ProceduralEngineAudio::render(float* out, int n) {
     const bool turbo = turboKit_ || e_.induction == Induction::Turbo || e_.induction == Induction::TwinTurbo;
     const bool sc = e_.induction == Induction::Supercharger;
     const bool dogbox = gearboxTable()[v_.gearbox].type == Gearbox::Dogbox;
-    const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.12 : v_.exhaust == Exhaust::Sport ? 0.05 : 0.015;
+    const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.12 : v_.exhaust == Exhaust::Sport ? 0.06 : 0.03;   // stokta da hafif patirti
     // Yanma ayrisma (combustion crack) payi: yuksek sikistirma / yaris motoru daha sert
     const double crack = raceCam ? 0.45 : 0.3;
 
@@ -251,6 +257,42 @@ void ProceduralEngineAudio::render(float* out, int n) {
         }
         prevThr_ = thr;
 
+        // ---- v6 ton dengesi ----
+        {
+            const bool v8 = e_.layout == Layout::V8Cross;
+            // Blok govdesi +4 dB (bant ekleme), V8: alt bas + 80 / 160 Hz egzoz rezonansi
+            sig += 0.6 * body_.run(sig);
+            if (v8) {
+                sig += 0.9 * v8sub_.run(sig) + 0.35 * v8a_.run(sig) + 0.25 * v8b_.run(sig);
+                // Cross-plane gurleme: rolantide 6-9 Hz genlik dalgasi (%25), devir arttikca kaybolur
+                tremPh_ += dt * (6.0 + 3.0 * std::min(1.0, rpm / 3000.0));
+                const double depth = 0.25 * std::clamp(1.0 - (rpm - 900.0) / 2500.0, 0.0, 1.0);
+                sig *= 1.0 - depth * (0.5 + 0.5 * std::sin(2 * kPi * tremPh_));
+            }
+            // VTEC: emme bandi +5 dB ve biraz daha sert surus (3. 5. harmonik)
+            if (vtecMix_ > 0.01) { sig += 0.8 * vtecMix_ * vtecBp_.run(sig); sig = sig * (1.0 - 0.3 * vtecMix_) + 0.3 * vtecMix_ * std::tanh(sig * 2.2) / 2.2 * 1.6; }
+            // Gaz acilisi: emme nefesi ("vuuh", 300-800 Hz, ~60 ms)
+            if (thr > 0.5 && tipPrev_ < 0.2) tipT_ = 0.0;
+            tipPrev_ = thr;
+            if (tipT_ >= 0.0) {
+                tipT_ += dt;
+                const double env = std::min(1.0, tipT_ / 0.015) * std::exp(-tipT_ / 0.06);
+                sig += 0.55 * env * intakeBp_.run(nLp_ * 2.0);
+                if (tipT_ > 0.4) tipT_ = -1.0;
+            }
+            // Kesici: her kesmenin basinda 40-70 Hz kisa bas vurusu (15 ms)
+            if (in_.fuelCut && !prevCut_) thumpT_ = 0.0;
+            prevCut_ = in_.fuelCut;
+            if (thumpT_ >= 0.0) {
+                thumpT_ += dt;
+                sig += 0.35 * std::exp(-thumpT_ / 0.015) * std::sin(2 * kPi * 55.0 * thumpT_);
+                if (thumpT_ > 0.1) thumpT_ = -1.0;
+            }
+            // Ust tiz: 2.5 kHz ustu ~-7 dB (synth parlakligi yok)
+            const double ah = 1.0 - std::exp(-2.0 * kPi * 2500.0 * dt);
+            hfLp_ += (sig - hfLp_) * ah;
+            sig = hfLp_ + (sig - hfLp_) * 0.45;
+        }
         // ---- DC engelleme + son alcak gecis (~9 kHz) + yumusak sinirlama ----
         const double hp = sig - dcIn_ + 0.995 * dc_;
         dcIn_ = sig; dc_ = hp;

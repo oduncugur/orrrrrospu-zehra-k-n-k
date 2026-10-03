@@ -65,6 +65,11 @@ private:
     double vtecMix_ = 0.0, lopePhase_ = 0.0;
     double nLp_ = 0.0, outLp_ = 0.0, tbLow_ = 0.0, tbBand_ = 0.0;
     Biquad blockA_, blockB_, valveBp_, cavity_[2];
+    // v6 ton dengesi (Gemini dinleme geri bildirimi): blok govdesi, V8 alt bas + egzoz rezonanslari, VTEC emme bandi,
+    // emme "vuuh"u (gaz acilisi), kesici bas vurusu, ust tiz kisma
+    Biquad body_, v8a_, v8b_, v8sub_, vtecBp_, intakeBp_;
+    double hfLp_ = 0.0, thumpT_ = -1.0, tipT_ = -1.0, tremPh_ = 0.0;
+    bool prevCut_ = false; double tipPrev_ = 0.0;
     uint32_t rng_;
     EngineAudioInput in_;
 };
