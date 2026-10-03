@@ -26,6 +26,7 @@ struct Settings {
     // Kontrol
     int   haptics = 100;             // titresim gucu (%); 0 = kapali
     bool  tiltSteer = true;          // telefon egimiyle direksiyon (Android, acik yol)
+    bool  esp = true;                // ESP (yaw kontrolu) acik yolda her aracta
     int   tiltSens = 100;            // egim hassasiyeti (%), 50..200
     int   dragDist = 0;              // drag mesafesi: 0 = 1/4 mil, 1 = 1/2 mil, 2 = 1 mil
     bool  tiltInvert = false;        // egim yonu ters (telefon / tutus farki)

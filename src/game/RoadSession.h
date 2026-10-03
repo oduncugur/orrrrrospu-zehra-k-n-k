@@ -39,6 +39,8 @@ public:
     // The Run alani: setRunField cagrilmazsa kurucuda 19 rastgele rakip; realKm: etabin temsil ettigi gercek mesafe
     void setRunField(const std::vector<RunEntrant>& field, double realKm);
     const RunField& runField() const { return run_; }
+    // Karma / The Run duz bolumu (yandan 2B drag gorunumu): carpisma yok, direksiyon yok (serit otomatik)
+    bool dragPart() const { return (mode_ == Mode::Karma || mode_ == Mode::Marathon) && player_ && !road_.curvyAt(player_->s()); }
     int runPosition() const { return run_.playerPosition(player_->s(), finishT_[0] > 0, finishT_[0]); }
     int runCount() const { return (int)run_.runners().size() + 1; }
     double realKm() const { return realKm_; }

@@ -418,6 +418,28 @@ int main() {
         std::printf("    %%60 pedal: kayma %.2f, %.2f g\n", sM, dM);
         CHECK(sM < 0.2 && dM > 0.5, "%60 frende kilitlenmez, guclu yavaslar");
     }
+    std::printf("[E] ESP: ani serit degistirmede (120 km/h, E46 RWD) govde kaymasi ESP ile kucuk\n");
+    {
+        const RoadPath straight(7u, 20000.0, 4000.0);
+        auto fishhook = [&](bool esp, double& maxBeta, double& lat) {
+            RoadCar a(findVehicle(122), nullptr, straight, 0.0, -1.8);
+            a.manual = false; a.assist = false; a.esp = esp;
+            RoadControls k; k.throttle = 1.0;
+            for (double t = 0; t < 40.0 && a.sim().speed() < 120 / 3.6; t += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            maxBeta = 0;
+            for (int i = 0; i < 240; ++i) {                             // 0.5 s sola, 0.5 s saga, sonra duz; gaz acik
+                k.throttle = 0.6; k.steer = i < 30 ? 0.10 : i < 60 ? -0.10 : 0.0;
+                a.update(1.0 / 60.0, k);
+                maxBeta = std::max(maxBeta, std::fabs(a.sim().bodySlipAngle()));
+            }
+            lat = a.lateral();
+        };
+        double bOff, bOn, lOff, lOn;
+        fishhook(false, bOff, lOff); fishhook(true, bOn, lOn);
+        std::printf("    en buyuk govde kaymasi: ESP kapali %.1f deg, acik %.1f deg\n", bOff * 57.3, bOn * 57.3);
+        CHECK(bOn < bOff * 0.8 || bOn < 0.05, "ESP savrulmayi azaltir");
+        CHECK(std::isfinite(lOn), "ESP ile kararli");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

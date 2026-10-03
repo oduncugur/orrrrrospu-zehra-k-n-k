@@ -187,7 +187,27 @@ void RoadCar::update(double dt, const RoadControls& c) {
     }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
     sim_->setTractionControl(assist);                                   // TC yalniz aracta varsa (fabrika / ECU kiti)
-    if (stability && v > 5.0 && std::fabs(c.steer) < 0.12 && !(assist && sim_->hasTc())) {
+    if (esp && v > 4.0) {
+        // ESP: istenen yaw hizi (direksiyon + hafif understeer egimi, tutus siniri) ile olculen karsilastirilir.
+        // Fazla donus (arka kayiyor): dis on teker frenlenir + gaz kesilir; az donus (burun gitmiyor): ic arka teker.
+        const double Lw = sim_->vehicleLoad().wheelbase, r = sim_->yawRate();
+        const double rMax = 0.9 * 9.81 / v;
+        const double rDes = std::clamp(v * std::tan(c.steer) / (Lw + 0.0025 * v * v), -rMax, rMax);
+        const double beta = sim_->bodySlipAngle();
+        const double over = (std::fabs(r) - std::fabs(rDes)) * (r * rDes >= 0 ? 1.0 : 1.0) + std::max(0.0, std::fabs(beta) - 0.06) * 4.0;
+        if (over > 0.06) {
+            const double k = std::clamp((over - 0.06) * 2.5, 0.0, 1.0);
+            in.espBrake[r > 0 ? 1 : 0] = k;                              // sola donuyor -> sag on (dis)
+            sim_->powertrain().setThrottle(sim_->powertrain().throttle() * std::max(0.2, 1.0 - 1.2 * k));
+            espActive_ = true;
+        } else if (std::fabs(rDes) > 0.05 && std::fabs(r) < 0.7 * std::fabs(rDes) && v > 8.0) {
+            const double k = std::clamp((0.7 * std::fabs(rDes) - std::fabs(r)) * 2.0, 0.0, 0.5);
+            in.espBrake[rDes > 0 ? 2 : 3] = k;                           // sola istiyor -> sol arka (ic)
+            sim_->powertrain().setThrottle(sim_->powertrain().throttle() * (1.0 - 0.5 * k));
+            espActive_ = k > 0.05;
+        } else espActive_ = false;
+    } else espActive_ = false;
+    if (!esp && stability && v > 5.0 && std::fabs(c.steer) < 0.12 && !(assist && sim_->hasTc())) {
         // Duz yol dengesi (her aracta, surucu refleksi): direksiyon duzken arka kayarsa hafif karsi direksiyon, cok
         // kayarsa gaz biraz kesilir. Virajda (direksiyon cevrili) devreye girmez: tam gaz virajda kayma serbest.
         const double beta = sim_->bodySlipAngle();
@@ -196,7 +216,7 @@ void RoadCar::update(double dt, const RoadControls& c) {
         const double over = std::fabs(beta) - 0.07;
         if (over > 0) sim_->powertrain().setThrottle(sim_->powertrain().throttle() * std::max(0.35, 1.0 - over * 4.0));
     }
-    if (assist && sim_->hasTc() && v > 3.0) {
+    if (!esp && assist && sim_->hasTc() && v > 3.0) {
         // ESP benzeri: arka kayarsa otomatik karsi direksiyon + gaz kesme
         const double beta = sim_->bodySlipAngle();
         // Normal virajdaki kucuk govde kaymasina (~3 deg) karismaz; yalnizca fazlasina karsi direksiyon

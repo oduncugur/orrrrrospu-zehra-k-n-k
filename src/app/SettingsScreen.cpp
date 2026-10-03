@@ -30,6 +30,7 @@ const char* label(It it) {
     case It::Tilt: return "EGIM DIREKSIYON";
     case It::TiltSens: return "EGIM HASSASIYET";
     case It::Assist: return "CEKIS KONT.";
+    case It::Esp: return "ESP";
     case It::Gears: return "DEBRIYAJ (H)";
     case It::Speed: return "HIZ BIRIMI";
     case It::Tree: return "DRAG AGACI";
@@ -53,6 +54,7 @@ const char* help(It it) {
     case It::Tilt: return "TELEFONU EGEREK DIREKSIYON; TERS: YON CEVRILIR";
     case It::TiltSens: return "YUKSEK: DAHA AZ EGIMLE TAM DIREKSIYON";
     case It::Assist: return "TC/ESP: YALNIZ ARACTA VARSA (YOKSA ECU + ELEKTRONIK PARCASI). YOLDA DA DEGISIR";
+    case It::Esp: return "SAVRULMA KONTROLU: ARKA KAYARSA DIS ON TEKERI FRENLER, GAZI KESER. KAPALI: DRIFT SERBEST";
     case It::Gears: return "H-DESEN MANUEL: OTOMATIKTE VIRAJDA VITES YOK, GEC KAVRAR, ODUL %75";
     case It::Speed: return "HIZ GOSTERGESI BIRIMI";
     case It::Tree: return "PRO: 3 SARI BIRDEN, 0.4 S. SPOR: SIRALI SARILAR, 0.5 S";
@@ -84,7 +86,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
 #ifdef __ANDROID__
         {2, It::Haptics}, {2, It::Tilt}, {2, It::TiltSens},
 #endif
-        {2, It::Assist}, {2, It::Gears},
+        {2, It::Assist}, {2, It::Esp}, {2, It::Gears},
         {3, It::Speed}, {3, It::Tree}};
     float y = 62;
     int last = -1;
@@ -116,6 +118,7 @@ std::string SettingsScreen::value(It it) const {
     case It::Tilt: return !s.tiltSteer ? onOff(false) : s.tiltInvert ? std::string("TERS") : onOff(true);
     case It::TiltSens: return pct(s.tiltSens);
     case It::Assist: return onOff(s.assist);
+    case It::Esp: return onOff(s.esp);
     case It::Gears: return s.autoClutch ? "OTOMATIK" : "OYUNCU";
     case It::Speed: return s.speedUnit();
     case It::Tree: return app_.treePro ? "PRO .4" : "SPOR .5";
@@ -160,6 +163,7 @@ void SettingsScreen::change(It it, int dir) {
         break;
     case It::TiltSens: s.tiltSens = list(Settings::tiltSensOptions(), s.tiltSens); break;
     case It::Assist: s.assist = !s.assist; break;
+    case It::Esp: s.esp = !s.esp; break;
     case It::Gears: s.autoClutch = !s.autoClutch; break;
     case It::Speed: s.mph = !s.mph; break;
     case It::Tree: app_.treePro = !app_.treePro; app_.saveCareer(); return;

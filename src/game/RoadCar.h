@@ -39,6 +39,8 @@ public:
 
     bool manual = false, assist = true;
     bool stability = false;                // duz yol dengesi (oyuncu araci; YZ kendi surer)
+    bool esp = false;
+    bool espActive() const { return espActive_; }                      // ESP: yaw hizi kontrolu (tek teker freni + gaz kesme), her aracta ayardan
     double gripMul = 1.0;                  // hava durumu: yagmurda ~0.72 (islak asfalt)
     double launchRpm = 0.0;                // > 0: otomatik debriyajda kalkis devri (YZ drag kalkisi); 0: gaza gore 1500-2700
     bool slowClutch = false;               // otomatik debriyaj cezasi: kalkis ve vites gecisinde gec kavrar
@@ -55,6 +57,7 @@ public:
     void nudge(double dx, double dy) { sim_->nudge(dx, dy); }   // temas: konumu it
 
 private:
+    bool espActive_ = false;
     void driverAssist(double dt, double thrIn, bool neutral);
     void playerClutch(const RoadControls& c);
     bool grind_ = false;

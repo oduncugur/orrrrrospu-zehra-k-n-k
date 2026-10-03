@@ -339,7 +339,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
         // Oyuncu - rakip temasi (kutu): oyuncu savrulur / yavaslar, rakip yavaslar
         const double cx = player_->sim().posX(), cy = player_->sim().posY();
         for (Runner& R : run_.runners()) {
-            if (std::fabs(R.s - player_->s()) > 9.0) continue;
+            if (dragPart() || std::fabs(R.s - player_->s()) > 9.0) continue;   // 2B drag bolumu: temas yok
             const RoadPoint p = road_.at(R.s);
             const double x = p.x - R.lane * std::sin(p.heading), y = p.y + R.lane * std::cos(p.heading);
             const double dx = cx - x, dy = cy - y, c = std::cos(p.heading), sn = std::sin(p.heading);
@@ -361,7 +361,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
     }
     if (player_->takeRecovered()) msgs_.push_back("ARAC YOLA ALINDI");
     if (player_->takeStalled()) msgs_.push_back("MOTOR STOP ETTI");
-    collide(*player_, true);
+    if (!dragPart()) collide(*player_, true);
     if (mode_ == Mode::Flow) {
         std::vector<FlowScorer::Car> snap;
         snap.reserve(traffic_.size());
@@ -383,8 +383,9 @@ void RoadSession::update(double dt, const RoadControls& in) {
     else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
     collide(*rival_, false);
-    // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h)
-    {
+    // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h); 2B drag bolumunde yok
+    if (dragPart()) touching_ = false;
+    else {
         const VehicleDef* pv = findVehicle(playerCar_);
         const VehicleDef* rv = findVehicle(rivalCar_);
         const ContactResult c = resolveContact({&player_->sim(), 0.5 * pv->lengthM, 0.5 * pv->widthM},

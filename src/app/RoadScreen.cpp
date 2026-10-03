@@ -116,6 +116,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     RoadCar& P = ses_->player();
     P.assist = app_.settings.assist;
     P.stability = true;                                                 // duz yol dengesi (oyuncu)
+    P.esp = app_.settings.esp;
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();
     const int gears = P.sim().powertrain().gearCount();
@@ -219,11 +220,21 @@ void RoadScreen::update(double dt) {
     const bool curvy = !karma || ses_->road().curvyAt(P.s());
     camBlend_ += std::clamp((curvy ? 1.0 : 0.0) - camBlend_, -dt / 0.9, dt / 0.9);
     if (karma && !curvy) {
-        if (run) {                                                       // The Run duzlugu: direksiyon yonu serit degistirir (0.6 s ara)
+        if (run) {   // The Run duzlugu (2B): jiroskop serit degistirmez; onde yavas arac varsa bos seride kendisi gecer (klavye de olur)
             const int nf = ses_->road().lanesFwd(P.s());
             laneCool_ -= dt;
-            const double want = target;                                  // klavye / egim hedefi
-            if (laneCool_ <= 0 && std::fabs(want) > 0.35 * maxSteer) { runLane_ += want > 0 ? 1 : -1; laneCool_ = 0.6; }
+            if (laneCool_ <= 0 && (kL_ || kR_)) { runLane_ += kL_ ? 1 : -1; laneCool_ = 0.6; }
+            else if (laneCool_ <= 0) {
+                auto blocked = [&](int ln, double ahead) {                   // seritte onde (ya da yanda) arac var mi
+                    const double lo = ses_->road().laneOffset(P.s(), false, std::clamp(ln, 0, nf - 1));
+                    for (const Runner& Rn : ses_->runField().runners())
+                        if (Rn.s > P.s() - 6.0 && Rn.s < P.s() + ahead && std::fabs(Rn.lane - lo) < 1.6 && (ahead < 10.0 || Rn.v < v - 0.5)) return true;
+                    return false;
+                };
+                if (blocked(runLane_, 20.0 + 1.2 * v))
+                    for (int cand : {runLane_ + 1, runLane_ - 1})
+                        if (cand >= 0 && cand < nf && !blocked(cand, 8.0) && !blocked(cand, 20.0 + 1.2 * v)) { runLane_ = cand; laneCool_ = 1.0; break; }
+            }
             runLane_ = std::clamp(runLane_, 0, nf - 1);
             steer_ = P.aiControls(ses_->road().laneOffset(P.s(), false, runLane_), 0.6).steer;
         } else steer_ = P.aiControls(ses_->rightLane(P.s()), 0.6).steer;
@@ -946,8 +957,9 @@ void RoadScreen::drawWorld(Renderer& r) {
         }
     if (RoadCar* rv = ses_->rival()) {
         const VehicleSim& rs = rv->sim();
-        Obj o{0, rs.posX(), rs.posY(), rs.heading(), rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId(),
-              (float)spinR_, (float)std::clamp(std::atan(rs.yawRate() * rs.vehicleLoad().wheelbase / std::max(rs.speed(), 3.0)), -0.5, 0.5)};
+        const double rh = R.at(rv->s()).heading, dpsi = std::remainder(rs.heading() - rh, 2.0 * 3.14159265358979);
+        Obj o{0, rs.posX(), rs.posY(), rh + dpsi * camBlend_, rv->elevation() + rs.suspension().heave(), rs.grade(), ses_->rivalCarId(),
+              (float)spinR_, (float)(camBlend_ * std::clamp(std::atan(rs.yawRate() * rs.vehicleLoad().wheelbase / std::max(rs.speed(), 3.0)), -0.5, 0.5))};
         o.d = (o.x - ex) * dx + (o.y - ey) * dy;
         o.police = ses_->mode() == RoadSession::Mode::Chase;
         if (o.d > 2 && o.d < 340) objs.push_back(o);
@@ -979,8 +991,11 @@ void RoadScreen::drawWorld(Renderer& r) {
         }
     }
     r.setCarLook(app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_));
-    r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), sim.heading(), sim.grade()),
-              (float)spinP_, (float)steer_);
+    {
+        const double rh = R.at(ps).heading, dpsi = std::remainder(sim.heading() - rh, 2.0 * 3.14159265358979);
+        r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), rh + dpsi * camBlend_, sim.grade()),
+                  (float)spinP_, (float)(steer_ * camBlend_));                 // 2B drag gorunumu: yola paralel, teker duz
+    }
     {   // Egzoz alevi: devir kesici ya da gaz kesme patlamasi (titrek, rastgele)
         const PowertrainCore& ptc = const_cast<VehicleSim&>(sim).powertrain();
         const bool burst = (ptc.limiterHit() && ptc.rpm() > 0.6 * sim.engineSpec().redlineRpm) || popT_ > 0;

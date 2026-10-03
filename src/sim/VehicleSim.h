@@ -35,6 +35,7 @@ struct VehicleInputs {
     double handbrake = 0.0;   // 0..1 arka hidrolik el freni
     bool   held = false;      // line-lock / stage: arac yerinde tutulur (burnout, agac)
     double steer = 0.0;       // on tekerlek direksiyon acisi (rad, sola +); yalnizca duzlemsel modda
+    double espBrake[4] = {0, 0, 0, 0};   // ESP tek teker freni 0..1 (sira: on sol, on sag, arka sol, arka sag)
 };
 
 // Suspansiyon olayi (tekerlek havalanmasi ya da takoza vurma), olustugu andaki konumla

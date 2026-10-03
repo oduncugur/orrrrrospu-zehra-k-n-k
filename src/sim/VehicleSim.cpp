@@ -552,7 +552,7 @@ void VehicleSim::stepPlanar(double dt, const VehicleInputs& in) {
         w_[i].setNormalLoad(susp_->tireLoad(i));
         const double share = i < 2 ? fs : 1.0 - fs;
         const double Ta = share * ((i % 2 == 0) ? pt.axleTorqueL() : pt.axleTorqueR());
-        w_[i].stepPlanar(dt, vlong, vlat, Ta, (i < 2 ? bF : bR) * absF_[i]);
+        w_[i].stepPlanar(dt, vlong, vlat, Ta, ((i < 2 ? bF : bR) + std::clamp(in.espBrake[i], 0.0, 1.0) * brakeTotal_ * 0.30) * absF_[i]);
         const double fx = w_[i].Fx(), fy = w_[i].Fy();
         const double bx = fx * cd - fy * sd, by = fx * sd + fy * cd;           // govde eksenine
         Fx += bx; Fy += by;

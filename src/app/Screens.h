@@ -404,7 +404,7 @@ public:
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
     enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, Master, Engine, Tire,
-                      Haptics, Tilt, TiltSens, Assist, Gears, Speed, Tree };
+                      Haptics, Tilt, TiltSens, Assist, Esp, Gears, Speed, Tree };
 private:
     struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi
     void change(Item it, int dir);                     // dir: +1 / -1; 0 = dongusel ileri
