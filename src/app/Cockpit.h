@@ -28,10 +28,15 @@ public:
     void update(double dt);                        // klavye analog rampalari
     void render(Renderer& r, int gear, bool grind) const;
 
-    double throttle() const { return std::max({thrUi_, keyThr_, padThr_}); }
+    // Dokunmatik gaz: yolun %85'inde tam gaz (kisa pedal)
+    double throttle() const { return std::max({std::min(1.0, thrUi_ / 0.85), (double)keyThr_, (double)padThr_}); }
     double brake() const { return std::max({brakeUi_, keyBrake_, padBrk_}); }
     void setPadPedals(float thr, float brk) { padThr_ = thr; padBrk_ = brk; }   // oyun kolu tetikleri (analog 0..1)
-    double clutch() const { return std::max(clutchUi_, keyClutch_); }   // 1 = basili
+    // Dokunmatik debriyaj: kavrama araligi (pedal 0.32-0.62) cubugun %76'sina yayilir, bos / tam basili bolgeler kisa
+    static double clutchCurve(double u) {
+        return u < 0.12 ? u / 0.12 * 0.32 : u < 0.88 ? 0.32 + (u - 0.12) / 0.76 * 0.30 : 0.62 + (u - 0.88) / 0.12 * 0.38;
+    }
+    double clutch() const { return std::max(clutchCurve(clutchUi_), (double)keyClutch_); }   // 1 = basili
     int  knobGear() const { return knobGear_; }    // H-desen: kolun gosterdigi vites (0 = bos)
     bool takeSeated() { const bool e = seatedEv_ != 0; seatedEv_ = 0; return e; }   // vites yuvaya oturdu (titresim)
     int  takeShift() { const int s = shift_; shift_ = 0; return s; }   // sirali / otomatik M: +1 / -1 darbe

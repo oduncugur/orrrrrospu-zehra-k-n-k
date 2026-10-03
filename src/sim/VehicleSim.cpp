@@ -160,7 +160,9 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         // Devir siniri: supap + kam + ECU + motor ici (stroker dusurur)
         const double redAdd = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + EC.redline + inRed;
         // Supap siniri: ECU disindaki parcalarin kaldirabilecegi devir + 300 pay; ECU ile ustune cikilirsa supap atar
-        valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 300.0);
+        // ECU ile guvenli ek devir: stokta ~250; supap / kam modifiyesi kendi artisinin %40'i kadar pay acar
+        const double vcAdd = std::max(0.0, row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0));
+        valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 250.0 + 0.4 * vcAdd);
         // Mekanik devir artisi (supap / kam / kafa / krank): guc tepesi de yukari kayar, motor yeni kesiciye kadar ceker.
         // Yalniz ECU ile acilan devir uzatilmis (dusen) egride kalir.
         if (const double mech = redAdd - EC.redline; mech > 0.0) {

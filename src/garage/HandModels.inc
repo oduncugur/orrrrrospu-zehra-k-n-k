@@ -16,18 +16,20 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     Builder B{m};
     const double L = v.lengthM, W = v.widthM, HW = W * 0.5;
     // Yan profil (z, m): ust yuzey (kaput / cam / tavan / bagaj), bel cizgisi, alt
-    static const double kTop[][2] = {{0.0, 0.68}, {0.012, 0.715}, {0.035, 0.74}, {0.08, 0.775}, {0.16, 0.815}, {0.26, 0.845}, {0.335, 0.865},
-                                     {0.465, 1.36}, {0.56, 1.38}, {0.655, 1.345}, {0.72, 1.17}, {0.795, 0.985}, {0.90, 0.995},
-                                     {0.96, 0.985}, {0.985, 0.94}, {1.0, 0.84}};
-    static const double kBelt[][2] = {{0.0, 0.64}, {0.04, 0.70}, {0.20, 0.80}, {0.335, 0.85}, {0.55, 0.89}, {0.72, 0.93}, {0.80, 0.95},
-                                      {0.965, 0.93}, {1.0, 0.82}};
-    static const double kBot[][2] = {{0.0, 0.30}, {0.03, 0.21}, {0.08, 0.17}, {0.92, 0.17}, {0.975, 0.22}, {1.0, 0.31}};
+    // Referans: yandan fotograf (Wikimedia Commons, "BMW M3 Coupe E46", CC BY 2.0) uzerinde olculen oranlar; olcek teker
+    // capindan (0.64 m), tavan / kaput orta hatti kamera yuksekligi icin duzeltildi. Kopya degil, oran referansi.
+    static const double kTop[][2] = {{0.0, 0.66}, {0.012, 0.70}, {0.035, 0.745}, {0.08, 0.79}, {0.16, 0.845}, {0.24, 0.885}, {0.283, 0.905},
+                                     {0.443, 1.30}, {0.54, 1.37}, {0.64, 1.345}, {0.71, 1.30}, {0.75, 1.24}, {0.893, 0.94},
+                                     {0.945, 0.965}, {0.985, 0.99}, {0.995, 0.95}, {1.0, 0.82}};
+    static const double kBelt[][2] = {{0.0, 0.62}, {0.04, 0.70}, {0.20, 0.80}, {0.283, 0.86}, {0.55, 0.91}, {0.75, 0.95}, {0.85, 0.93},
+                                      {0.965, 0.92}, {1.0, 0.80}};
+    static const double kBot[][2] = {{0.0, 0.30}, {0.03, 0.22}, {0.08, 0.16}, {0.92, 0.16}, {0.975, 0.22}, {1.0, 0.30}};
     static const double kHw[][2] = {{0.0, 0.87}, {0.015, 0.935}, {0.05, 0.97}, {0.13, 0.985}, {0.5, 1.0}, {0.86, 0.99}, {0.955, 0.955},
                                     {0.99, 0.90}, {1.0, 0.86}};
     constexpr int nT = sizeof kTop / sizeof *kTop, nB = sizeof kBelt / sizeof *kBelt, nBo = sizeof kBot / sizeof *kBot, nH = sizeof kHw / sizeof *kHw;
-    const double cowl = 0.335, roofF = 0.465, roofR = 0.655, deck = 0.795, sideGlass0 = 0.36, sideGlass1 = 0.665;
-    // Teker: E46 M3 on cikinti ~0.80 m, arka ~0.96 m; 18" (r 0.33)
-    const double r = 0.33, ovF = 0.80, xFront = L * 0.5 - ovF, xRear = xFront - v.wheelbaseM;
+    const double cowl = 0.283, roofF = 0.443, roofR = 0.71, deck = 0.893, sideGlass0 = 0.31, sideGlass1 = 0.775;   // uzun yatik arka cam, kisa bagaj
+    // Teker: fotografta on cikinti ~0.72 m, arka ~1.04 m; 18" (r 0.32)
+    const double r = 0.32, ovF = 0.72, xFront = L * 0.5 - ovF, xRear = xFront - v.wheelbaseM;
     const double sF = ovF / L, sR = (L * 0.5 - xRear) / L;
     auto X = [&](double s) { return L * (0.5 - s); };
     auto top = [&](double s) { return lerpTab(kTop, nT, s); };
@@ -61,8 +63,8 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         p[8][0] = 0; p[8][1] = cabin(s) ? zt + 0.006 : zt + ((s > 0.06 && s < 0.31) ? 0.022 * std::sin(kPi * (s - 0.06) / 0.25) : 0.0);
     };
     // Istasyonlar: uclarda ve cam gecislerinde sik, aks merkezleri dahil
-    std::vector<double> ss = {0.0, 0.006, 0.015, 0.03, 0.05, 0.08, 0.11, 0.14, 0.20, 0.25, 0.30, cowl, 0.36, 0.40, 0.435, roofF, 0.51, 0.56,
-                              0.61, roofR, 0.69, sideGlass1, 0.74, 0.77, deck, 0.83, 0.87, 0.91, 0.94, 0.965, 0.985, 0.995, 1.0,
+    std::vector<double> ss = {0.0, 0.006, 0.015, 0.03, 0.05, 0.08, 0.11, 0.14, 0.20, 0.24, cowl, 0.32, 0.36, 0.40, roofF, 0.49, 0.54, 0.59,
+                              0.64, 0.68, roofR, 0.75, sideGlass1, 0.81, 0.85, deck, 0.92, 0.945, 0.965, 0.985, 0.995, 1.0,
                               sF - 0.06, sF, sF + 0.06, sR - 0.06, sR, sR + 0.06, sideGlass0};
     std::sort(ss.begin(), ss.end());
     ss.erase(std::unique(ss.begin(), ss.end(), [](double a, double b) { return std::fabs(a - b) < 0.004; }), ss.end());
@@ -126,7 +128,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     B.panel(X(0.975), 0.62, top(0.975) + 0.006, X(0.975), -0.62, top(0.975) + 0.006, X(0.98), -0.62, top(0.98) + 0.004, X(0.98), 0.62, top(0.98) + 0.004, MatDark);   // bagaj kapagi cizgisi
     // ---- yan: kapi cizgisi, M3 yan havalandirmasi, aynalar, teker yuvalari
     for (double sg : {1.0, -1.0}) {
-        for (double sd : {0.345, 0.615}) {                                // kapi araliklari
+        for (double sd : {0.31, 0.595}) {                                // kapi araliklari
             const double y = sg * (hw(sd) + 0.003);
             B.panel(X(sd), y, 0.30, X(sd), y, belt(sd), X(sd) - 0.008, y, belt(sd), X(sd) - 0.008, y, 0.30, MatDark);
         }
@@ -136,7 +138,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
             B.panel(X(0.236), y * 1.001, 0.676, X(0.236), y * 1.001, 0.664, X(0.274), y * 1.001, 0.664, X(0.274), y * 1.001, 0.676, MatChrome);
         }
         {   // ayna (A direginin dibi)
-            const double s0 = 0.365, s1 = 0.395, y0 = hw(0.38) * 0.95, y1 = y0 + 0.13, z0 = belt(0.38) + 0.04;
+            const double s0 = 0.315, s1 = 0.345, y0 = hw(0.33) * 0.95, y1 = y0 + 0.13, z0 = belt(0.33) + 0.04;
             B.box(X(s1), X(s0), sg > 0 ? y0 : -y1, sg > 0 ? y1 : -y0, z0, z0 + 0.085, MatPaint);
             B.panel(X(s1) - 0.003, sg * (y0 + 0.02), z0 + 0.01, X(s1) - 0.003, sg * (y1 - 0.01), z0 + 0.01,
                     X(s1) - 0.003, sg * (y1 - 0.01), z0 + 0.075, X(s1) - 0.003, sg * (y0 + 0.02), z0 + 0.075, MatGlass);

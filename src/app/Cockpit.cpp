@@ -200,9 +200,11 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
         // pedal bandin icindeyken dolgu sariya doner (debriyaj tutuyor)
         const float c = (float)clutch();
         const bool biting = c > 0.32f && c < 0.62f;
-        slider(L.clutch, c, "", biting ? Color{1.0f, 0.78f, 0.1f, 0.9f} : Color{0.25f, 0.55f, 0.95f, 0.85f});
+        // cubuk konumu (clutchCurve tersi): kavrama bandi cubugun 0.12-0.88 araligi
+        const float u = c < 0.32f ? c / 0.32f * 0.12f : c < 0.62f ? 0.12f + (c - 0.32f) / 0.30f * 0.76f : 0.88f + (c - 0.62f) / 0.38f * 0.12f;
+        slider(L.clutch, u, "", biting ? Color{1.0f, 0.78f, 0.1f, 0.9f} : Color{0.25f, 0.55f, 0.95f, 0.85f});
         const float span = L.clutch.y1 - L.clutch.y0 - 12;
-        const float yTop = L.clutch.y1 - 6 - span * 0.62f, yBot = L.clutch.y1 - 6 - span * 0.32f;
+        const float yTop = L.clutch.y1 - 6 - span * 0.88f, yBot = L.clutch.y1 - 6 - span * 0.12f;
         r.rect(L.clutch.x0, yTop, L.clutch.x1, yBot, {1.0f, 0.8f, 0.1f, biting ? 0.35f : 0.22f});
         r.rect(L.clutch.x0, yTop - 1, L.clutch.x1, yTop + 1, {1.0f, 0.85f, 0.2f});     // tutmaya basladigi yer
         r.rect(L.clutch.x0, yBot - 1, L.clutch.x1, yBot + 1, {1.0f, 0.85f, 0.2f});

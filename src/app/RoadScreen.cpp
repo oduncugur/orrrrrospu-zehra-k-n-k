@@ -521,7 +521,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     r.rect(0, horizon, W, horizon + 2, {0.35f, 0.42f, 0.38f});
 
     const double hw = R.halfWidth();
-    const int i0 = std::max(0, (int)((ps - (sideCam ? 70.0 : 8.0)) / RoadPath::kStep)), n = (int)R.points().size();
+    const int i0 = std::max(0, (int)((ps - (sideCam ? 70.0 : 44.0)) / RoadPath::kStep)), n = (int)R.points().size();
     const int i1 = std::min(n - 2, i0 + (sideCam ? 200 : 160));
     const auto& P = R.points();
     auto edge = [&](int i, double off) {
@@ -706,21 +706,25 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const int key = i * 2 + (side > 0);
                 const double d = P[i].hw + 5.0 + 3.0 * hashf(key * 5), hgt = 8.0 + 30.0 * hashf(key * 11) * hashf(key * 3 + 1), dep = 14.0;
                 const int ie = std::min(i + 9, n - 1);
-                const Proj f0 = pt(i, side * d, 0), f1 = pt(ie, side * d, 0), f2 = pt(ie, side * d, hgt), f3 = pt(i, side * d, hgt);
+                // Basi kameranin arkasinda kalan bina: cephe gorunen ilk noktadan baslar (bina birden silinmez)
+                int ib = i;
+                while (ib < ie && !(pt(ib, side * d, 0).ok && pt(ib, side * d, hgt).ok)) ++ib;
+                const Proj f0 = pt(ib, side * d, 0), f1 = pt(ie, side * d, 0), f2 = pt(ie, side * d, hgt), f3 = pt(ib, side * d, hgt);
                 const Proj e0 = pt(i, side * (d + dep), 0), e3 = pt(i, side * (d + dep), hgt);
-                if (!f0.ok || !f1.ok || !f2.ok || !f3.ok || !e0.ok || !e3.ok) continue;
+                if (ib >= ie || !f0.ok || !f1.ok || !f2.ok || !f3.ok) continue;
+                const bool endFace = ib == i && e0.ok && e3.ok;
                 const float hcol = hashf(key * 17);
                 const Color base{0.55f + 0.25f * hcol, 0.52f + 0.2f * hashf(key * 19), 0.50f + 0.18f * hashf(key * 23)};
                 const Color face = fog(L({base.r * 0.85f, base.g * 0.85f, base.b * 0.85f}), f0.w), endc = fog(L({base.r * 0.62f, base.g * 0.62f, base.b * 0.62f}), f0.w);
-                triP(r, f0, e0, e3, endc); triP(r, f0, e3, f3, endc);
+                if (endFace) { triP(r, f0, e0, e3, endc); triP(r, f0, e3, f3, endc); }
                 triP(r, f0, f1, f2, face); triP(r, f0, f2, f3, face);
                 {   // zemin kat dukkan bandi (renkli) + tente, cati korkulugu (acik renk)
-                    const Proj s0 = pt(i, side * d, 3.2), s1 = pt(ie, side * d, 3.2), c0 = pt(i, side * d, hgt - 0.7), c1 = pt(ie, side * d, hgt - 0.7);
+                    const Proj s0 = pt(ib, side * d, 3.2), s1 = pt(ie, side * d, 3.2), c0 = pt(ib, side * d, hgt - 0.7), c1 = pt(ie, side * d, hgt - 0.7);
                     if (s0.ok && s1.ok && c0.ok && c1.ok) {
                         static const Color shop[5] = {{0.75f, 0.2f, 0.18f}, {0.15f, 0.42f, 0.7f}, {0.85f, 0.65f, 0.15f}, {0.2f, 0.55f, 0.3f}, {0.55f, 0.25f, 0.55f}};
                         const Color sc2 = fog(L(shop[key % 5]), f0.w), roof = fog(L({base.r * 1.05f, base.g * 1.05f, base.b * 1.05f}), f0.w);
                         triP(r, f0, f1, s1, fog(L({0.12f, 0.13f, 0.16f}), f0.w)); triP(r, f0, s1, s0, fog(L({0.12f, 0.13f, 0.16f}), f0.w));   // vitrin
-                        const Proj a0 = pt(i, side * (d - 1.2), 3.0), a1 = pt(ie, side * (d - 1.2), 3.0);
+                        const Proj a0 = pt(ib, side * (d - 1.2), 3.0), a1 = pt(ie, side * (d - 1.2), 3.0);
                         if (a0.ok && a1.ok) { triP(r, s0, s1, a1, sc2); triP(r, s0, a1, a0, sc2); }                                     // tente
                         triP(r, c0, c1, f2, roof); triP(r, c0, f2, f3, roof);                                                          // korkuluk
                         if (night_ && hashf(key * 41) > 0.5f) {                                                                       // neon tabela
