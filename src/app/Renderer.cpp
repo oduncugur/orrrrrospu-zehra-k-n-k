@@ -229,6 +229,12 @@ void main(){
   vec3 amb = mix(vec3(0.30, 0.28, 0.25), vec3(0.62, 0.70, 0.85), n.y * 0.5 + 0.5);
   vec3 c = col * (0.42 * amb * uLight.y + 0.72 * dif * uLight.x);
   float fr = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+  if (abs(g - 0.45) < 0.005) {                           // cam: koyu fume, yansima yalniz yatik acida (Fresnel)
+    c = col * (0.35 * amb * uLight.y) + sky(reflect(-v, n)) * uLight.y * (0.10 + 0.75 * fr);
+    vec3 hg = normalize(l + v);
+    c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, hg), 0.0), 120.0) * 1.2 * uLight.x;
+    o = vec4(min(c, vec3(1.0)), uAlpha); return;
+  }
   c = mix(c, sky(reflect(-v, n)) * uLight.y, clamp(g * (0.06 + 0.55 * fr), 0.0, 0.6));
   vec3 h = normalize(l + v);
   c += vec3(1.0, 0.97, 0.9) * pow(max(dot(n, h), 0.0), g > 0.5 ? 70.0 : 12.0) * g * 0.9 * uLight.x;

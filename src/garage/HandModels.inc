@@ -21,7 +21,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     static const double kTop[][2] = {{0.0, 0.66}, {0.012, 0.70}, {0.035, 0.745}, {0.08, 0.79}, {0.16, 0.845}, {0.24, 0.885}, {0.283, 0.905},
                                      {0.443, 1.30}, {0.54, 1.37}, {0.64, 1.345}, {0.71, 1.30}, {0.75, 1.24}, {0.893, 0.94},
                                      {0.945, 0.965}, {0.985, 0.99}, {0.995, 0.95}, {1.0, 0.82}};
-    static const double kBelt[][2] = {{0.0, 0.62}, {0.04, 0.70}, {0.20, 0.80}, {0.283, 0.86}, {0.55, 0.91}, {0.75, 0.95}, {0.85, 0.93},
+    static const double kBelt[][2] = {{0.0, 0.62}, {0.04, 0.70}, {0.20, 0.80}, {0.283, 0.85}, {0.55, 0.875}, {0.75, 0.905}, {0.85, 0.915},
                                       {0.965, 0.92}, {1.0, 0.80}};
     static const double kBot[][2] = {{0.0, 0.30}, {0.03, 0.22}, {0.08, 0.16}, {0.92, 0.16}, {0.975, 0.22}, {1.0, 0.30}};
     static const double kHw[][2] = {{0.0, 0.87}, {0.015, 0.935}, {0.05, 0.97}, {0.13, 0.985}, {0.5, 1.0}, {0.86, 0.99}, {0.955, 0.955},
@@ -100,13 +100,17 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     const double xF = X(0.0), xB = X(1.0);
     // ---- on yuz: bobrek izgara, angel-eye farlar, alt hava girisi, sis farlari, plaka
     for (double sg : {1.0, -1.0}) {
-        B.diskX(xF + 0.010, sg * 0.105, 0.585, 0.088, 0.070, 10, MatChrome);       // bobrek cercevesi
-        B.diskX(xF + 0.014, sg * 0.105, 0.585, 0.072, 0.056, 10, MatDark);
-        B.panel(xF + 0.006, sg * 0.21, 0.545, xF + 0.006, sg * 0.21, 0.655, xF + 0.006, sg * HW * 0.86, 0.665, xF + 0.006, sg * HW * 0.86, 0.565, MatDark);   // far muhafazasi
-        for (double yc : {0.33, 0.55}) {                                  // cift yuvarlak angel-eye
-            B.diskX(xF + 0.012, sg * yc, 0.605, 0.050, 0.046, 12, MatLight);
-            B.diskX(xF + 0.016, sg * yc, 0.605, 0.030, 0.027, 10, MatChrome);
+        B.diskX(xF + 0.010, sg * 0.095, 0.575, 0.072, 0.082, 10, MatChrome);       // bobrek: dikey, kromlu
+        B.diskX(xF + 0.014, sg * 0.095, 0.575, 0.058, 0.068, 10, MatDark);
+        // Far grubu: ice alcalan, yana ve kaputa sarilan damla bicimli lens (on yuz + kose egimi)
+        B.panel(xF + 0.006, sg * 0.20, 0.555, xF + 0.006, sg * 0.20, 0.625, xF + 0.006, sg * HW * 0.80, 0.650, xF + 0.006, sg * HW * 0.82, 0.565, MatDark);
+        B.panel(xF + 0.006, sg * HW * 0.80, 0.650, X(0.022), sg * HW * 0.93, 0.690, X(0.026), sg * HW * 0.95, 0.600, xF + 0.006, sg * HW * 0.82, 0.565, MatDark);
+        for (double yc : {0.32, 0.53}) {                                  // cift yuvarlak angel-eye (lens icinde)
+            B.diskX(xF + 0.011, sg * yc, 0.600, 0.056, 0.048, 12, MatChrome);
+            B.diskX(xF + 0.013, sg * yc, 0.600, 0.046, 0.039, 12, MatLight);
+            B.diskX(xF + 0.016, sg * yc, 0.600, 0.026, 0.022, 10, MatChrome);
         }
+        B.panel(X(0.024), sg * HW * 0.935, 0.640, X(0.024), sg * HW * 0.945, 0.615, X(0.012), sg * HW * 0.90, 0.605, X(0.012), sg * HW * 0.89, 0.630, MatIndicator);   // kose sinyal
         B.diskX(xF + 0.010, sg * 0.60, 0.385, 0.038, 0.030, 10, MatLight);   // sis fari
     }
     B.panel(xF + 0.012, 0.50, 0.46, xF + 0.012, 0.50, 0.32, xF + 0.012, -0.50, 0.32, xF + 0.012, -0.50, 0.46, MatDark);   // alt hava girisi
@@ -131,6 +135,19 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         for (double sd : {0.31, 0.595}) {                                // kapi araliklari
             const double y = sg * (hw(sd) + 0.003);
             B.panel(X(sd), y, 0.30, X(sd), y, belt(sd), X(sd) - 0.008, y, belt(sd), X(sd) - 0.008, y, 0.30, MatDark);
+        }
+        {   // yan cam alti krom bel seridi + cam ust kenari siyah conta (cercevesiz kupe)
+            const int nS = 14;
+            for (int k = 0; k < nS; ++k) {
+                const double sa = sideGlass0 + (sideGlass1 - sideGlass0) * k / nS, sb = sideGlass0 + (sideGlass1 - sideGlass0) * (k + 1) / nS;
+                const double za = belt(sa) + 0.045, zb = belt(sb) + 0.045;
+                const double ya = sg * (hw(sa) * 0.935 + 0.004), yb = sg * (hw(sb) * 0.935 + 0.004);
+                B.panel(X(sa), ya, za - 0.004, X(sb), yb, zb - 0.004, X(sb), yb, zb + 0.018, X(sa), ya, za + 0.018, MatChrome);
+                const double ta = std::max(top(sa) - 0.035, za + 0.006), tb = std::max(top(sb) - 0.035, zb + 0.006);
+                const double kA = std::clamp((top(sa) - belt(sa)) / (1.37 - 0.86), 0.0, 1.0), kB = std::clamp((top(sb) - belt(sb)) / (1.37 - 0.86), 0.0, 1.0);
+                const double ua = sg * (hw(sa) * (0.935 - 0.17 * kA) + 0.004), ub = sg * (hw(sb) * (0.935 - 0.17 * kB) + 0.004);
+                B.panel(X(sa), ua, ta - 0.022, X(sb), ub, tb - 0.022, X(sb), ub, tb, X(sa), ua, ta, MatDark);
+            }
         }
         {   // camurluk arkasinda yan havalandirma (izgara)
             const double y = sg * (hw(0.25) + flare(0.25) * 0.6 + 0.004);

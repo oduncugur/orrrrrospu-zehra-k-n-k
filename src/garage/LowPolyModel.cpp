@@ -156,7 +156,7 @@ struct Builder {
 } // namespace
 
 void materialColor(int m, unsigned paint, float c[3]) {
-    static const float t[MatCount][3] = {{0, 0, 0},          {0.10f, 0.13f, 0.18f}, {0.06f, 0.06f, 0.06f},
+    static const float t[MatCount][3] = {{0, 0, 0},          {0.04f, 0.05f, 0.07f}, {0.06f, 0.06f, 0.06f},
                                          {0.62f, 0.63f, 0.66f}, {1.00f, 0.96f, 0.82f}, {0.80f, 0.06f, 0.06f},
                                          {0.13f, 0.13f, 0.14f}, {0.03f, 0.03f, 0.035f}, {0.92f, 0.92f, 0.88f},
                                          {0.80f, 0.80f, 0.82f}, {1.00f, 0.55f, 0.08f}};
