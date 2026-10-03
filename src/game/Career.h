@@ -125,6 +125,7 @@ long restoreStepCost(const OwnedCar& c, int comp);       // bir adim (0: saglam)
 struct Career {
     static constexpr int kVersion = 1;
     long money = 0;
+    long wager = 0;            // siradaki lig yarisinin bahsi (kaydedilmez): kazanirsa + bahis, kaybederse - bahis
     std::vector<OwnedCar> cars;
     int  current = 0;
     int  races = 0, wins = 0;
@@ -149,7 +150,11 @@ struct Career {
     bool eventAvailable(int idx, std::string* why = nullptr) const;
     // Etkinlik sonucu: odul (ilk galibiyet tam, tekrar %40), un, pink slip (araci al / kaybet), gunluk gorevler.
     // Donus: odul. pinkOut: pink slip'te el degistiren arac kimligi (0: yok)
+    // Donus: net para degisimi (odul + bahis; kaybedilen bahiste negatif)
     long recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut = nullptr);
+    long eventPrize(int idx, bool first) const;     // lig carpani dahil odul (tekrar %40)
+    static constexpr int kWagerSteps = 5;           // bahis: odulun 0, 0.5, 1, 2, 3 kati
+    long wagerFor(int idx, int step) const;         // paraya gore sinirli
     // Gunluk gorevler: gun degistiyse sifirlar; ilerleme ekler, tamamlananin odulunu verir (donus: verilen odul)
     void dailyRefresh();
     long dailyAdd(TaskType t, long amount);

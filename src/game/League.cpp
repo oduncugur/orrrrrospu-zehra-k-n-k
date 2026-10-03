@@ -47,24 +47,24 @@ const char* bossLine(int rival, int kind) {
 const std::vector<RivalDef>& rivals() {
     static const std::vector<RivalDef> r = {
         // 0 MAHALLE
-        {"BAKKAL CEMAL", 0, 302, 0, 1.8, false}, {"TAKSICI RIZA", 0, 282, 0, 1.8, false},
-        {"KOMSU OGLU EMRE", 0, 216, 1, 1.7, false}, {"DOLMUSCU HAKAN", 0, 290, 1, 1.7, false},
-        {"OKUL CIKISI BURAK", 0, 27, 1, 1.6, false}, {"MAHALLENIN KRALI SEDAT", 0, 218, 2, 1.3, true},
+        {"BAKKAL CEMAL", 0, 302, 0, 1.8, false}, {"TAKSICI RIZA", 0, 282, 1, 1.8, false},
+        {"KOMSU OGLU EMRE", 0, 216, 1, 1.7, false}, {"DOLMUSCU HAKAN", 0, 290, 2, 1.7, false},
+        {"OKUL CIKISI BURAK", 0, 27, 0, 1.6, false}, {"MAHALLENIN KRALI SEDAT", 0, 218, 2, 1.45, true},
         // 6 SEHIR
-        {"TIP-R MERT", 1, 5, 1, 1.6, false}, {"GTI ALI", 1, 152, 2, 1.6, false}, {"BMWCI SELIN", 1, 118, 1, 1.55, false},
-        {"DRIFTCI TOFU", 1, 24, 2, 1.5, false}, {"KUCUK TERMINATOR", 1, 291, 2, 1.5, false}, {"INTEGRA EDA", 1, 12, 2, 1.45, false},
-        {"GECE KUSU ASLI", 1, 100, 2, 1.2, true},
+        {"TIP-R MERT", 1, 5, 0, 1.6, false}, {"GTI ALI", 1, 152, 1, 1.6, false}, {"BMWCI SELIN", 1, 118, 0, 1.55, false},
+        {"DRIFTCI TOFU", 1, 24, 1, 1.5, false}, {"KUCUK TERMINATOR", 1, 291, 1, 1.5, false}, {"INTEGRA EDA", 1, 12, 1, 1.45, false},
+        {"GECE KUSU ASLI", 1, 100, 0, 1.3, true},
         // 13 SEHIRLERARASI
         {"SUPRA HAKAN", 2, 34, 1, 1.5, false}, {"GODZILLA KAAN", 2, 50, 1, 1.5, false}, {"DONER MOTOR DENIZ", 2, 78, 1, 1.45, false},
-        {"RALLICI ONUR", 2, 88, 2, 1.45, false}, {"MUSTANG CAN", 2, 227, 1, 1.4, false}, {"SILVIA BERK", 2, 59, 2, 1.4, false},
-        {"BASKAN", 2, 52, 2, 1.15, true},
+        {"RALLICI ONUR", 2, 88, 1, 1.45, false}, {"MUSTANG CAN", 2, 227, 1, 1.4, false}, {"SILVIA BERK", 2, 59, 1, 1.4, false},
+        {"BASKAN", 2, 52, 2, 1.25, true},
         // 20 DAG
-        {"VIRAJ USTASI ECE", 3, 17, 2, 1.4, false}, {"NSX TOLGA", 3, 19, 1, 1.4, false}, {"EXIGE EFE", 3, 308, 1, 1.35, false},
-        {"ELFER ORHAN", 3, 167, 1, 1.35, false}, {"M3 KEREM", 3, 122, 2, 1.3, false}, {"MX-5 IPEK", 3, 75, 2, 1.3, false},
-        {"DAGIN HAYALETI", 3, 171, 2, 1.1, true},
+        {"VIRAJ USTASI ECE", 3, 17, 2, 1.4, false}, {"NSX TOLGA", 3, 19, 2, 1.4, false}, {"EXIGE EFE", 3, 308, 2, 1.35, false},
+        {"ELFER ORHAN", 3, 167, 2, 1.35, false}, {"M3 KEREM", 3, 122, 2, 1.3, false}, {"MX-5 IPEK", 3, 75, 2, 1.3, false},
+        {"DAGIN HAYALETI", 3, 171, 2, 1.2, true},
         // 27 PIST
-        {"F40 SAMI", 4, 184, 1, 1.3, false}, {"VIPER RECEP", 4, 272, 1, 1.3, false}, {"LFA YUSUF", 4, 46, 1, 1.25, false},
-        {"CARRERA GT BURCU", 4, 177, 1, 1.25, false}, {"720S KORAY", 4, 315, 1, 1.2, false}, {"EFSANE", 4, 313, 2, 1.05, true},
+        {"F40 SAMI", 4, 184, 1, 1.3, false}, {"VIPER RECEP", 4, 272, 1, 1.3, false}, {"LFA YUSUF", 4, 46, 2, 1.25, false},
+        {"CARRERA GT BURCU", 4, 177, 1, 1.25, false}, {"720S KORAY", 4, 315, 1, 1.2, false}, {"EFSANE", 4, 313, 1, 1.1, true},
     };
     return r;
 }

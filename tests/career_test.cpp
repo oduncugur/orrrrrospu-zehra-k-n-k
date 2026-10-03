@@ -368,6 +368,23 @@ int main() {
         std::printf("    50 arac: dengeli %d, dip gaz %d, eko %d, stok %d, canavar %d\n", st[0], st[1], st[2], st[3], st[4]);
         CHECK(f.size() == 50 && kinds == StyleCount, "etap alani: 50 arac, 5 tarzin hepsi var");
     }
+    std::printf("[W] Bahis: kazanirsa +bahis, kaybederse -bahis; paradan fazla oynanmaz; ust lig odul carpani\n");
+    {
+        Career c = Career::newGame(); c.money = 5000;
+        const long p0 = c.eventPrize(0, true);
+        CHECK(c.wagerFor(0, 0) == 0 && c.wagerFor(0, 2) == p0 && c.wagerFor(0, 4) == 3 * p0, "bahis kademeleri 0 / 1x / 3x");
+        c.wager = c.wagerFor(0, 2);
+        const long m0 = c.money, net = c.recordEvent(0, true, 15.0, 0);
+        CHECK(net == p0 + p0 && c.money >= m0 + 2 * p0 && c.wager == 0, "kazanilan bahis: odul + bahis");
+        c.wager = c.wagerFor(1, 2);
+        const long w = c.wager, m1 = c.money, net2 = c.recordEvent(1, false, 16.0, 0);
+        CHECK(net2 == -w && c.money <= m1 - w + 2000, "kaybedilen bahis paradan duser");
+        c.money = 100;
+        CHECK(c.wagerFor(0, 4) == 100, "bahis paradan fazla olamaz");
+        int l4 = -1;
+        for (int i = 0; i < (int)leagueEvents().size(); ++i) if (leagueEvents()[i].league == 4 && leagueEvents()[i].prize > 0) { l4 = i; break; }
+        CHECK(l4 >= 0 && c.eventPrize(l4, true) == leagueEvents()[l4].prize * 3 / 2, "pist ligi odulu x1.5");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

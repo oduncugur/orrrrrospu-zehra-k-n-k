@@ -709,8 +709,8 @@ void DragScreen::drawResults(Renderer& r) {
     const bool won = race_->winner() == 0;
     r.textCentered(career_ ? 250 : 320, 50, won ? "KAZANDIN!" : "KAYBETTIN", 3, won ? kGreen : kRed);
     if (career_) {
-        char pb[48]; std::snprintf(pb, sizeof pb, "+$%ld", prize_);
-        r.text(420, 52, prize_ > 0 ? pb : "$0", 2, prize_ > 0 ? kGreen : Color{0.6f, 0.6f, 0.6f});
+        char pb[48]; std::snprintf(pb, sizeof pb, prize_ < 0 ? "-$%ld" : "+$%ld", prize_ < 0 ? -prize_ : prize_);   // bahis kaybi negatif
+        r.text(420, 52, prize_ != 0 ? pb : "$0", 2, prize_ > 0 ? kGreen : prize_ < 0 ? kRed : Color{0.6f, 0.6f, 0.6f});
     }
     if (!showGraph_) {
     r.text(250, 80, "SEN", 2, {1, 1, 1});

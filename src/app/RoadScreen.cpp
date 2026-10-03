@@ -110,7 +110,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     }
     if (RoadCar* rv = ses_->rival(); rv && app_.activeEvent >= 0 && m != RoadSession::Mode::Chase) {   // isimli rakip: patron daha keskin
         rv->slowClutch = app_.eventHandicap > 1.25;
-        ses_->setRivalPace(0.55 + (1.6 - std::clamp(app_.eventHandicap, 1.0, 1.6)) * 0.15);
+        ses_->setRivalPace(0.47 + (1.6 - std::clamp(app_.eventHandicap, 1.0, 1.6)) * 0.12);   // patron ~0.53, siradan ~0.48 g
     }
     camPsi_ = ses_->player().sim().heading();
     RoadCar& P = ses_->player();
@@ -1270,7 +1270,7 @@ void RoadScreen::drawResults(Renderer& r) {
         std::snprintf(b, sizeof b, "CARPISMA %d", ses_->collisions());
         r.text(lx, 166 + oy, b, 1, {0.8f, 0.8f, 0.85f});
     }
-    if (prize_ < 0) std::snprintf(b, sizeof b, "CEZA $%ld", -prize_);
+    if (prize_ < 0) std::snprintf(b, sizeof b, "KAYIP $%ld", -prize_);
     else std::snprintf(b, sizeof b, "ODUL $%ld", prize_);
     r.textCentered(W / 2.0f, 200 + oy, b, 3, prize_ < 0 ? Color{1.0f, 0.35f, 0.3f} : kUiGold);
     if (autoClutchPenalty()) r.textCentered(W / 2.0f, 232 + oy, "OTOMATIK DEBRIYAJ: ODUL %75", 1, {0.9f, 0.6f, 0.3f});

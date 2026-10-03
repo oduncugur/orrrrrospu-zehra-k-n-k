@@ -14,6 +14,7 @@ namespace {
 const Rect kBackL{8, 596, 352, 634};
 const Rect kStartL{8, 548, 352, 590};
 const Rect kYesL{8, 548, 176, 590}, kNoL{184, 548, 352, 590};
+const Rect kWagerL{214, 514, 352, 542};                                // bahis kademesi (onay adiminda)
 const Rect kAchL{262, 30, 352, 54};
 constexpr float kRowY0 = 114;
 float rowH(size_t n) { return std::min(44.0f, (464.0f - kRowY0) / std::max<size_t>(1, n)); }   // lig 9 etkinlige kadar sigar
@@ -86,7 +87,7 @@ void LeagueScreen::render(Renderer& r) {
         else if (e.mode == EventMode::Marathon) sub += "  18 KM, BENZINLIK";
         else sub += "  DENGI RAKIP";
         r.text(18, y + kRowH - 22, sub.substr(0, 40), 1, kUiDim);
-        std::string right = won ? "KAZANILDI" : e.pink ? "ARABA" : money(e.prize);
+        std::string right = won ? "KAZANILDI" : e.pink ? "ARABA" : money(c.eventPrize(i, true));
         if (!avail && !won) right = "KILITLI";
         r.text(344 - r.textWidth(right, 1), y + 5, right, 1, won ? Color{0.4f, 1.0f, 0.5f} : !avail ? kUiDim : kUiGold);
         std::snprintf(b, sizeof b, "+%d UN", e.rep);
@@ -112,8 +113,13 @@ void LeagueScreen::render(Renderer& r) {
         if (e.pink) r.text(16, py + 50, "PINK SLIP: KAYBEDERSEN ARABAN GIDER!", 1, {1.0f, 0.4f, 0.5f});
         else if (!avail) r.text(16, py + 50, why, 1, {1.0f, 0.4f, 0.3f});
         else {
-            std::snprintf(b, sizeof b, "ODUL %s (TEKRAR %s)", money(e.prize).c_str(), money(e.prize * 4 / 10).c_str());
+            std::snprintf(b, sizeof b, "ODUL %s (TEKRAR %s)", money(c.eventPrize(sel_, true)).c_str(), money(c.eventPrize(sel_, false)).c_str());
             r.text(16, py + 50, b, 1, kUiGold);
+            if (confirm_) {                                               // bahis: kazanirsan +, kaybedersen - ayni miktar
+                const long w = c.wagerFor(sel_, wagerStep_);
+                std::snprintf(b, sizeof b, w > 0 ? "BAHIS %s" : "BAHIS YOK", money(w).c_str());
+                button(r, kWagerL, b, w > 0 ? Color{0.55f, 0.35f, 0.05f} : kUiBtn, 1);
+            }
         }
         if (confirm_) {
             button(r, kYesL, "YARIS!", {0.75f, 0.15f, 0.2f}, 2);
@@ -136,8 +142,9 @@ void LeagueScreen::render(Renderer& r) {
 
 void LeagueScreen::pointerDown(int, float x, float y) {
     if (confirm_ && sel_ >= 0) {
-        if (kYesL.hit(x, y)) { app_.startEvent(sel_); return; }
+        if (kYesL.hit(x, y)) { app_.career.wager = leagueEvents()[sel_].pink ? 0 : app_.career.wagerFor(sel_, wagerStep_); app_.startEvent(sel_); return; }
         if (kNoL.hit(x, y)) { confirm_ = false; return; }
+        if (!leagueEvents()[sel_].pink && kWagerL.hit(x, y)) { wagerStep_ = (wagerStep_ + 1) % Career::kWagerSteps; return; }
     }
     if (kBackL.hit(x, y)) { app_.goMap(); return; }
     if (kAchL.hit(x, y)) { app_.goAchievements(); return; }
@@ -162,7 +169,7 @@ void LeagueScreen::key(Key k, bool down) {
     if (k == Key::Back) { if (confirm_) confirm_ = false; else if (sel_ >= 0) sel_ = -1; else app_.goMap(); }
     if (k == Key::Left) { tab_ = std::max(0, tab_ - 1); sel_ = -1; }
     if (k == Key::Right) { tab_ = std::min(kLeagues - 1, tab_ + 1); sel_ = -1; }
-    if (k == Key::Enter && sel_ >= 0) { if (confirm_) app_.startEvent(sel_); else if (app_.career.eventAvailable(sel_)) confirm_ = true; }
+    if (k == Key::Enter && sel_ >= 0) { if (confirm_) { app_.career.wager = leagueEvents()[sel_].pink ? 0 : app_.career.wagerFor(sel_, wagerStep_); app_.startEvent(sel_); } else if (app_.career.eventAvailable(sel_)) confirm_ = true; }
 }
 
 } // namespace zk

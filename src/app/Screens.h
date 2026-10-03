@@ -211,6 +211,7 @@ private:
     std::vector<int> rows() const;
     App& app_;
     int tab_ = 0, sel_ = -1;
+    int wagerStep_ = 0;                         // bahis kademesi (Career::wagerFor)
     bool confirm_ = false;
     std::string msg_; double msgT_ = 0;
 };

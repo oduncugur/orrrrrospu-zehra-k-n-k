@@ -964,6 +964,20 @@ bool Career::eventAvailable(int idx, std::string* why) const {
     return true;
 }
 
+long Career::eventPrize(int idx, bool first) const {
+    const auto& ev = leagueEvents();
+    if (idx < 0 || idx >= (int)ev.size()) return 0;
+    static const double kLeagueMul[kLeagues] = {1.0, 1.0, 1.0, 1.25, 1.5};   // ust ligde parca / arac pahali
+    const long p = (long)std::lround(ev[idx].prize * kLeagueMul[std::clamp(ev[idx].league, 0, kLeagues - 1)] / 10.0) * 10;
+    return first ? p : p * 4 / 10;
+}
+
+long Career::wagerFor(int idx, int step) const {
+    static const double k[kWagerSteps] = {0.0, 0.5, 1.0, 2.0, 3.0};
+    const long w = (long)(eventPrize(idx, true) * k[std::clamp(step, 0, kWagerSteps - 1)]) / 10 * 10;
+    return std::min(w, money);                                         // parandan fazlasina oynanmaz
+}
+
 long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut) {
     if (pinkOut) *pinkOut = 0;
     const auto& ev = leagueEvents();
@@ -975,7 +989,7 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
     ++races; ++car().races;
     if (won) {
         ++wins; ++car().wins;
-        prize = first ? e.prize : e.prize * 4 / 10;
+        prize = eventPrize(idx, first);
         rep += first ? e.rep : std::max(1, e.rep * 3 / 10);
         eventWins |= (uint64_t)1 << idx;
         form = std::clamp(form + 1, -3, 3);
@@ -998,6 +1012,14 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
         }
     }
     money += prize; earnings += prize;
+    // Bahis: kazanirsa bahis kadar ek, kaybederse bahis kadar kayip (pink slip'te bahis yok)
+    long net = prize;
+    if (wager > 0 && !e.pink) {
+        const long w = wager;
+        if (won) { money += w; earnings += w; net += w; }
+        else { money -= std::min(w, money); net -= w; }
+    }
+    wager = 0;
     // Gunluk gorevler
     if (won) {
         dailyAdd(TaskType::WinAny, 1);
@@ -1005,8 +1027,8 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
     }
     if (et > 0) dailyAdd(TaskType::EtUnder, (long)std::round(et * 100.0));
     if (e.mode == EventMode::Flow) dailyAdd(TaskType::FlowScore, flowScore);
-    if (prize > 0) dailyAdd(TaskType::Earn, prize);
-    return prize;
+    if (net > 0) dailyAdd(TaskType::Earn, net);
+    return net;
 }
 
 void Career::dailyRefresh() {
