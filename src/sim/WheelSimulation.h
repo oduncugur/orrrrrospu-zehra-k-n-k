@@ -20,7 +20,8 @@ struct TireParams {
     double slipHeatFrac = 0.25;   // kayma gucunun tabana giden orani
     double flatSpotRate = 2.0e-7; // mm/J, kilitli kaymada eriyen kaucuk
     // Yanal (kayma acisi, rad) Magic Formula katsayilari ve yanal gevseme boyu
-    double By = 11.0, Cy = 1.35, Ey = -0.50;
+    double By = 11.0, Cy = 1.40, Ey = 0.00;   // tepe sonrasi yumusak dusus: ani kopma yok, kayma kontrol edilebilir
+    double latGrip = 1.0;         // yanal tutus carpani (arka aks dengesi)
     double relaxLat = 0.35;       // m
 };
 

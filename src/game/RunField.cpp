@@ -98,7 +98,7 @@ void RunField::update(double dt, const RoadPath& road, const std::vector<double>
         // ---- hedef hiz: viraj (tutus), tarz seyri, onde engel ----
         double vT = R.vmax * R.cruise;
         if (R.style == StyleEco) vT = std::min(vT, 36.0);                // eko: ~130 km/h
-        const double aLat = R.mu * 9.81 * 0.82, aBrk = 6.0 * std::min(1.0, R.mu);
+        const double aLat = R.mu * 9.81 * 0.68, aBrk = 5.0 * std::min(1.0, R.mu);   // insan payi: lastigin sinirinda surmez
         for (double d = 0; d < R.v * R.v / (2 * aBrk) + 40.0; d += 10.0) {
             const double kk = std::max(std::fabs(road.at(R.s + d).curvature), 1e-4);
             vT = std::min(vT, std::sqrt(aLat / kk + 2 * aBrk * d));

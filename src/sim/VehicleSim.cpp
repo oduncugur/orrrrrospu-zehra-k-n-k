@@ -264,9 +264,9 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         // Lastik tipi: sokak / yari-slick / drag slick (tahrikli aks); serbest aks sokak lastigi
         // Sicaklik penceresi: sokak lastigi soguk da tutar (genis pencere), yari-slick ~75 C ister,
         // drag slick dar pencereli (burnout sart). Soguk sokak lastigi ~%97, soguk slick ~%55 tutus.
-        TireParams street; street.muPeak = 1.05; street.B = 10.0; street.wheelMass = 16.0;
+        TireParams street; street.muPeak = 1.05; street.latGrip = 1.067; street.B = 10.0; street.wheelMass = 16.0;   // yanal ~1.12, boyuna ayni
         street.tempIdeal = 55.0; street.tempWidth = 0.00004;
-        TireParams semi;   semi.muPeak = 1.25;   semi.B = 11.0;   semi.wheelMass = 15.0;
+        TireParams semi;   semi.muPeak = 1.25; semi.latGrip = 1.12;   semi.B = 11.0;   semi.wheelMass = 15.0;
         semi.tempIdeal = 75.0;   semi.tempWidth = 0.00007;
         TireParams slick;  // 1.45, dovme jant
         // Kesin lastik (tireTable): sinifin tutus carpani + teker kutlesi; jant kutlesi
@@ -277,11 +277,14 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const TireParams* dt = tune->tires == TireType::DragSlick ? &slick : tune->tires == TireType::SemiSlick ? &semi : &street;
         const double defPsi = tune->tires == TireType::DragSlick ? 16.0 : tune->tires == TireType::SemiSlick ? 26.0 : 32.0;
         const double defTemp = tune->tires == TireType::DragSlick ? 55.0 : tune->tires == TireType::SemiSlick ? 45.0 : 35.0;
+        // Yol arabasi dengesi: arka aks yanalda %8 fazla tutar (fabrika ayari gibi hafif understeer)
+        TireParams dR = *dt; dR.latGrip *= 1.08;
+        TireParams semiR = semi, streetR = street; semiR.latGrip *= 1.08; streetR.latGrip *= 1.08;
         for (int i = 0; i < 4; ++i) {
             const bool d = i < 2 ? fDriven : rDriven;
-            if (d) w_.emplace_back(*dt, tune->psi > 0 ? tune->psi : defPsi, defTemp, ambient);
-            else if (tune->tires == TireType::SemiSlick) w_.emplace_back(semi, 30.0, defTemp, ambient);   // yari-slick 4 teker takim
-            else   w_.emplace_back(street, 32.0, 30.0, ambient);
+            if (d) w_.emplace_back(i < 2 ? *dt : dR, tune->psi > 0 ? tune->psi : defPsi, defTemp, ambient);
+            else if (tune->tires == TireType::SemiSlick) w_.emplace_back(i < 2 ? semi : semiR, 30.0, defTemp, ambient);   // yari-slick 4 teker takim
+            else   w_.emplace_back(i < 2 ? street : streetR, 32.0, 30.0, ambient);
         }
     }
     if (cfg.laneAsymmetry) w_[dL_].setSurfaceMu(0.96);

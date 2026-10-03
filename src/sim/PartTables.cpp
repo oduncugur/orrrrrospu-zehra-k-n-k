@@ -705,7 +705,7 @@ int Tune::weightKg(int level) {
 std::string Tune::signature() const {
     char b[512];
     std::snprintf(b, sizeof b, "%d|%.1f|%d|%d|%d|%.3f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d"
-                  "|%.1f|%.2f|%.0f|%.3f|%.3f|%.0f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
+                  "|%d|%.1f|%.2f|%.0f|%.3f|%.3f|%.0f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
                   (int)tires, psi, clutch, axles, (int)diff, finalDrive, weight, intake, exhaust, ecu, turbo, drySump ? 1 : 0,
                   absKit ? 1 : 0, tcKit ? 1 : 0, (int)fuel, tireSel, rims, finalSel, gearSwap, engineSwap, cam, valve,
                   flywheel, superch, intercooler, fuelSys, nitrous, oil, fuelSel, elec, susp, brakes, aero,

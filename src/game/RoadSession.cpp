@@ -29,7 +29,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         const double pl = road_.lanesFwd(startS_) >= 2 ? road_.laneOffset(startS_, false, 1) : road_.laneOffset(startS_, true, road_.lanesBack(startS_) - 1);   // oyuncunun yan seridi
         rival_ = std::make_unique<RoadCar>(findVehicle(rivalCar), rivalTune, road_, startS_ - 55.0, pl);
         rivalLane_ = pl;
-        rivalPace_ = 0.64;
+        rivalPace_ = 0.58;
         const EngineSpec& e = rival_->sim().engineSpec();
         rival_->launchRpm = std::max(e.idleRpm + 800.0, 0.30 * e.redlineRpm);   // kalkis: drag devri
         phase_ = Phase::Countdown; countdown_ = 3.0;

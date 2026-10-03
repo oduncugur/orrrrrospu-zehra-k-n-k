@@ -187,7 +187,7 @@ void RoadCar::update(double dt, const RoadControls& c) {
     }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
     sim_->setTractionControl(assist);                                   // TC yalniz aracta varsa (fabrika / ECU kiti)
-    if (stability && v > 5.0 && std::fabs(c.steer) < 0.05 && !(assist && sim_->hasTc())) {
+    if (stability && v > 5.0 && std::fabs(c.steer) < 0.12 && !(assist && sim_->hasTc())) {
         // Duz yol dengesi (her aracta, surucu refleksi): direksiyon duzken arka kayarsa hafif karsi direksiyon, cok
         // kayarsa gaz biraz kesilir. Virajda (direksiyon cevrili) devreye girmez: tam gaz virajda kayma serbest.
         const double beta = sim_->bodySlipAngle();

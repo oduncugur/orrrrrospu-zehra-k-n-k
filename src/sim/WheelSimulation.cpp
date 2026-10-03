@@ -92,7 +92,7 @@ void WheelSimulation::stepPlanar(double dt, double vlong, double vlat, double T_
     step(dt, vlong, T_axle, T_brakeCap);                           // boyuna: 1B modelle birebir ayni
     const double D = Fz_ * gripMu();
     alpha_ = std::atan2(vlat, std::max(std::fabs(vlong), 1.0));    // dusuk hizda payda sinirli
-    double fySS = -magicFormula(alpha_, Fz_, gripMu(), p_.By, p_.Cy, p_.Ey);
+    double fySS = -magicFormula(alpha_, Fz_, gripMu() * p_.latGrip, p_.By, p_.Cy, p_.Ey);
     // Cekis elipsi: (Fx/D)^2 + (Fy/D)^2 <= 1 -> boyuna kuvvetin kullandigi pay yanaldan dusulur
     if (D > 1e-6) {
         const double u = std::clamp(Fx_ / D, -1.0, 1.0);

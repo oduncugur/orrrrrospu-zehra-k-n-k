@@ -126,7 +126,7 @@ private:
     double finishT_[2] = {0, 0};
     int winner_ = -1, collisions_ = 0;
     double rivalLane_ = -kLane;
-    double rivalPace_ = 0.55;
+    double rivalPace_ = 0.50;
     bool rain_ = false;
     double reaction_ = -1.0, rivalReact_ = 0.0;      // karma tepki sureleri (rakip: 0.15-0.35 s, tohumdan)
     std::vector<std::string> msgs_;
