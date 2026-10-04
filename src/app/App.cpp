@@ -169,14 +169,14 @@ void App::goEcu() { setScreen(std::make_unique<EcuScreen>(*this)); }
 void App::goSetup() { setScreen(std::make_unique<SetupScreen>(*this)); }
 void App::goGauges() { setScreen(std::make_unique<GaugeShopScreen>(*this)); }
 void App::goStreet() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); }
-void App::startTravel(int target) {
+void App::startTravel(int target, bool solo) {
     std::string why;
     if (!career.canTravel(target, &why)) return;
     runPlan = {};
-    runPlan.active = true; runPlan.from = career.city; runPlan.target = target;
+    runPlan.active = true; runPlan.from = career.city; runPlan.target = target; runPlan.solo = solo;
     const int dir = target > career.city ? 1 : -1, leg = dir > 0 ? career.city : career.city - 1;
     runPlan.realKm = Career::legKm(leg);
-    runPlan.field = career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
+    runPlan.field = solo ? std::vector<RunEntrant>{} : career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
     activeEvent = -1; activeTour = false; activeMeet = false;
     setScreen(std::make_unique<RoadScreen>(*this, career.car().carId, &career.car().tune));   // runPlan: The Run etabi
 }
@@ -189,7 +189,7 @@ void App::nextTravelLeg(double fuelLeft) {
     if (career.city == runPlan.target) { runPlan.active = false; eventNote = std::string(Career::cityName(career.city)) + "'A VARDIN!"; return; }
     const int leg = dir > 0 ? career.city : career.city - 1;
     runPlan.realKm = Career::legKm(leg);
-    runPlan.field = career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
+    runPlan.field = runPlan.solo ? std::vector<RunEntrant>{} : career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
     runPlan.fuelL = fuelLeft;                                           // depo bir sonraki etaba tasinir
 }
 

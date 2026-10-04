@@ -637,9 +637,9 @@ const Renderer::Mesh& Renderer::kitMesh(int carId, int aero, float wingH) {
         const float H = aero == 5 ? 0.24f : aero == 6 ? 0.38f : std::clamp(wingH, 0.15f, 0.45f);
         const float chord = aero == 6 ? 0.42f : 0.32f, span = aero == 6 ? hw * 1.0f : hw * 0.9f;
         for (float sg : {-1.0f, 1.0f}) box(rx + 0.16f, rx + 0.24f, top - 0.02f, top + H, sg * span * 0.5f - 0.02f, sg * span * 0.5f + 0.02f, false);
-        box(rx - 0.04f, rx - 0.04f + chord, top + H, top + H + 0.035f, -span, span, false);
+        box(rx - 0.04f, rx - 0.04f + chord, top + H, top + H + 0.035f, -span + 0.014f, span - 0.014f, false);   // plakalarin icinde (z-fighting yok)
         for (float sg : {-1.0f, 1.0f}) box(rx - 0.08f, rx + chord, top + H - 0.10f, top + H + 0.08f, sg * span - 0.012f, sg * span + 0.012f, false);
-        if (aero == 6) box(rx - 0.02f, rx + chord * 0.5f, top + H + 0.06f, top + H + 0.085f, -span, span, false);   // ikinci kat
+        if (aero == 6) box(rx - 0.02f, rx + chord * 0.5f, top + H + 0.06f, top + H + 0.085f, -span + 0.014f, span - 0.014f, false);   // ikinci kat
         break;
     }
     default: break;
@@ -697,7 +697,13 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
         glDepthMask(GL_TRUE); glDisable(GL_BLEND);
         glUniform1f(uShadow_, 0.0f);
     }
-    const Mat4 body = look.drop != 0.0f ? matMul(model, matTranslate(0, -look.drop, 0)) : model;   // basiklik: teker yerinde
+    Mat4 body = look.drop != 0.0f ? matMul(model, matTranslate(0, -look.drop, 0)) : model;   // basiklik: teker yerinde
+    if (look.pitch != 0.0f || look.roll != 0.0f) {                       // suspansiyon: govde CoG etrafinda dalar / yatar
+        const float cp = std::cos(look.pitch), sp = std::sin(look.pitch), cr = std::cos(look.roll), sr = std::sin(look.roll);
+        Mat4 rz{}; rz.m[0] = cp; rz.m[1] = sp; rz.m[4] = -sp; rz.m[5] = cp; rz.m[10] = 1; rz.m[15] = 1;   // GL z ekseni: burun
+        Mat4 rx{}; rx.m[0] = 1; rx.m[5] = cr; rx.m[6] = sr; rx.m[9] = -sr; rx.m[10] = cr; rx.m[15] = 1;   // GL x ekseni: yatma
+        body = matMul(body, matMul(matTranslate(0, 0.5f, 0), matMul(matMul(rz, rx), matTranslate(0, -0.5f, 0))));
+    }
     const Mat4 mvp = matMul(proj, matMul(view, body));
     glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
     glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
@@ -709,7 +715,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
         if (K.count) { glBindVertexArray(K.vao); glDrawArrays(GL_TRIANGLES, 0, K.count); }
     }
     glBindVertexArray(M.vao);
-    if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f || look.drop != 0.0f)) {
+    if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f || look.drop != 0.0f || look.pitch != 0.0f || look.roll != 0.0f)) {
         glDrawArrays(GL_TRIANGLES, 0, M.bodyCount);
         for (size_t k = 0; k < 4; ++k) {
             const WheelDraw& wd = M.wheels[k];

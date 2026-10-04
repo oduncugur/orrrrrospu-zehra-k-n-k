@@ -568,11 +568,16 @@ const std::vector<GearOpt>& gearTable() {
         {"GETRAG 265 DOGLEG", 3000, "BM5E", 380}, {"PORSCHE G96 6 ILERI", 4800, "PO6G", 650}, {"TREMEC T56 6 ILERI", 4200, "GM6T", 750},
         {"TREMEC TR6060", 4800, "GM6R", 900}, {"TREMEC 7 ILERI", 5600, "GM7T", 950}, {"BORGWARNER T5", 1500, "FO5T", 400},
         {"TREMEC TR-3160", 4000, "FO6T", 650}, {"MUNCIE M22 4 ILERI", 2800, "GM4M", 850}, {"CHRYSLER A833", 2400, "CH4M", 800},
-        {"NISSAN GR6 CIFT KAVRAMA", 7500, "NS6D", 850}, {"VW DQ250 DSG", 4200, "VW6D", 400}, {"VW DQ500 DSG 7", 6200, "VW7D", 650},
-        {"PORSCHE PDK 7", 8800, "PO7P", 800}, {"GETRAG 7 DCT", 7400, "BM7D", 700}, {"PORSCHE SIRALI (CUP)", 9800, "PO6S", 900},
-        {"LAMBORGHINI ISR 7", 11000, "LB7I", 900}, {"HEWLAND SIRALI DOGBOX", 12500, "RC6S", 1300}, {"TH400 3 ILERI OTOMATIK", 1800, "GM3A", 1200},
-        {"TORQUEFLITE 727", 1600, "CH3A", 950}, {"6L80 OTOMATIK", 3200, "GM6A", 760}, {"ZF 8HP OTOMATIK", 4800, "ZF8H", 900},
-        {"FORD 10R80 10 ILERI", 5600, "TR10", 1000}, {"GRAZIANO 7 SIRALI", 9500, "MC7D", 900}, {"OZEL VITES ORANLARI (ATOLYE)", 0, nullptr, 0},
+        {"NISSAN GR6 (CIFT KAVRAMA)", 7500, "NS6D", 850, 0.8}, {"VW DQ250 DSG (CIFT KAVRAMA)", 4200, "VW6D", 400, 1.0}, {"VW DQ500 DSG 7 (CIFT KAVRAMA)", 6200, "VW7D", 650, 0.9},
+        {"PORSCHE PDK 7 (CIFT KAVRAMA)", 8800, "PO7P", 800, 0.7}, {"GETRAG 7 DCT (CIFT KAVRAMA)", 7400, "BM7D", 700, 0.85}, {"PORSCHE CUP (SIRALI)", 9800, "PO6S", 900, 0.8},
+        {"LAMBORGHINI ISR 7 (SIRALI)", 11000, "LB7I", 900, 1.4}, {"HEWLAND DOGBOX (SIRALI)", 12500, "RC6S", 1300, 0.7}, {"TH400 3 ILERI (OTOMATIK)", 1800, "GM3A", 1200, 1.3},
+        {"TORQUEFLITE 727 (OTOMATIK)", 1600, "CH3A", 950, 1.4}, {"6L80 6 ILERI (OTOMATIK)", 3200, "GM6A", 760, 1.0}, {"ZF 8HP (OTOMATIK)", 4800, "ZF8H", 900, 0.7},
+        {"FORD 10R80 10 ILERI (OTOMATIK)", 5600, "TR10", 1000, 0.8}, {"GRAZIANO 7 (SIRALI)", 9500, "MC7D", 900, 0.9}, {"OZEL VITES ORANLARI (ATOLYE)", 0, nullptr, 0},
+        // 31+: ucuz / eski kutular (yavas gecis). Kayit indeksleri korunur: yeniler sona eklenir.
+        {"ESKI 4 ILERI (OTOMATIK, YAVAS)", 700, "GM4A", 520, 1.8}, {"KAMYONET 4 ILERI (OTOMATIK, YAVAS)", 600, "TR4A", 700, 1.9},
+        {"AISIN 5 ILERI (OTOMATIK)", 1300, "TS5A", 480, 1.4}, {"SUBARU 4EAT (OTOMATIK, YAVAS)", 800, "SB4A", 420, 1.7},
+        {"MERCEDES 722.6 5 ILERI (OTOMATIK)", 1900, "MB5A", 700, 1.3}, {"ZF 6HP (OTOMATIK)", 2600, "ZF6H", 650, 1.1},
+        {"UCUZ 5 ILERI MANUEL (SERT VITES)", 650, "TS5T", 330, 1.5}, {"KULLANILMIS T5 5 ILERI", 900, "FO5T", 380, 1.3},
     };
     return t;
 }
@@ -664,9 +669,15 @@ AeroOpt customAero(const Tune& t) {
 // ---- motor / sanziman swap ----
 const std::vector<int>& swapEngines() {
     static const std::vector<int> list = [] {
+        // Kayitta swap indeksi tutulur: ilk 280 motor guce gore siralanir (eski kayit uyumu), sonra eklenenler kendi
+        // aralarinda guce gore listenin sonuna (araya girmez)
+        constexpr int kLegacy = 280;
         std::vector<int> idx(engineTable().size());
         std::iota(idx.begin(), idx.end(), 0);
-        std::stable_sort(idx.begin(), idx.end(), [](int a, int b) { return engineTable()[a].powerHp < engineTable()[b].powerHp; });
+        auto byHp = [](int a, int b) { return engineTable()[a].powerHp < engineTable()[b].powerHp; };
+        const int n0 = std::min(kLegacy, (int)idx.size());
+        std::stable_sort(idx.begin(), idx.begin() + n0, byHp);
+        std::stable_sort(idx.begin() + n0, idx.end(), byHp);
         return idx;
     }();
     return list;
@@ -674,6 +685,10 @@ const std::vector<int>& swapEngines() {
 int effectiveEngine(const VehicleDef& v, const Tune* t) {
     if (t && t->engineSwap > 0 && t->engineSwap <= (int)swapEngines().size()) return swapEngines()[t->engineSwap - 1];
     return v.engine;
+}
+double gearShiftMul(const Tune* t) {
+    if (!t || t->gearSwap <= 0 || t->gearSwap >= (int)gearTable().size()) return 1.0;
+    return gearTable()[t->gearSwap].shiftMul;
 }
 int effectiveGearbox(const VehicleDef& v, const Tune* t) {
     if (t && t->gearSwap > 0 && t->gearSwap < (int)gearTable().size() && gearTable()[t->gearSwap].code) {

@@ -82,6 +82,7 @@ public:
         float drop = 0.0f;                      // govde alcalmasi (m; teker yerinde kalir)
         float alpha = 1.0f;                     // < 1: yari saydam (drag hayaleti); golge cizilmez
         bool aeroFront = false, aeroSide = false, aeroUnder = false;   // on lip / yan etek / difuzor (arka kanattan ayri)
+        float pitch = 0.0f, roll = 0.0f;        // govde dalma (burun yukari +) / yatma (sol yukari +), rad; tekerler yerde
     };
     void setCarLook(const CarLook& l) { look_ = l; }
     void drawCar(int carId, float vx, float vy, float vwid, float vhei, const Mat4& proj, const Mat4& view, const Mat4& model,

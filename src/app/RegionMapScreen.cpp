@@ -21,7 +21,7 @@ const Node kNodes[Career::kCities] = {
 };
 constexpr float kR = 21;
 const Rect kTour{8, 528, 352, 566}, kBackM{8, 596, 176, 634}, kStreetM{184, 596, 352, 634};
-const Rect kRunT{32, 260, 328, 304}, kFastT{32, 326, 328, 370}, kCancelT{32, 384, 328, 424};   // seyahat penceresi
+const Rect kRunT{32, 254, 328, 294}, kSoloT{32, 312, 328, 346}, kFastT{32, 352, 328, 386}, kCancelT{32, 392, 328, 428};   // seyahat penceresi
 
 bool bossBeaten(const Career& c, int league) {
     const auto& ev = leagueEvents();
@@ -136,6 +136,7 @@ void RegionMapScreen::render(Renderer& r) {
         r.textFit(180, 236, rs, 1, 320, kUiDim, true);
         button(r, kRunT, "THE RUN ILE GIT >", kUiOrange, 2);
         r.textCentered(180, kRunT.y1 + 4, "ODUL + UN; YAKIT VE SIRA ONEMLI", 1, kUiDim);
+        button(r, kSoloT, "TEK BASINA SUR (YARISSIZ)", Color{0.2f, 0.4f, 0.3f}, 2);
         std::snprintf(b, sizeof b, "HIZLI GECIS %s", money(c.fastTravelPrice(travelTo_)).c_str());
         button(r, kFastT, b, c.money >= c.fastTravelPrice(travelTo_) ? Color{0.15f, 0.45f, 0.7f} : Color{0.25f, 0.25f, 0.28f}, 2);
         button(r, kCancelT, "VAZGEC", kUiBtn, 2);
@@ -147,6 +148,7 @@ void RegionMapScreen::pointerDown(int, float x, float y) {
     if (travelTo_ >= 0) {                                                // seyahat penceresi (modal)
         std::string why;
         if (kRunT.hit(x, y)) { const int t = travelTo_; travelTo_ = -1; app_.startTravel(t); }
+        else if (kSoloT.hit(x, y)) { const int t = travelTo_; travelTo_ = -1; app_.startTravel(t, true); }
         else if (kFastT.hit(x, y)) {
             if (app_.career.fastTravel(travelTo_, &why)) { app_.saveCareer(); msg_ = std::string(Career::cityName(app_.career.city)) + "'A GELDIN"; }
             else msg_ = why;

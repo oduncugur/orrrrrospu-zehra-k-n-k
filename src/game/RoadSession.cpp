@@ -10,12 +10,13 @@ namespace zk {
 
 double RoadSession::rnd() { rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_ << 5; return (rng_ & 0xFFFFFF) / double(0x1000000); }
 
-RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed, Kind kind)
+RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed, Kind kind, double runRealKm)
     : mode_(mode), kind_(kind),
-      road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04) : mode == Mode::Marathon ? RoadPath::run(seed, 18000.0 + kRunStartS, 0.07)
+      road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04) : mode == Mode::Marathon ? RoadPath::run(seed, runDrivenM(runRealKm) + kRunStartS, 0.07)
             : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
                        kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
+    runLen_ = runDrivenM(runRealKm);
     // Yol genisligi cesitliligi: otoban / sehirlerarasi 2x1 ile 2x2 genislik arasi, dag yolu dar, karma orta
     // Serit duzeni: bolum bolum degisir (1+1, 2+2, 4+4, tek yon 3 / 4 ...); dag yolu dar 1+1; karma / maraton kapali yol (tek yon)
     if (mode == Mode::Karma || mode == Mode::Marathon) road_.setLaneProgram(seed, RoadPath::LanesClosed);
@@ -58,7 +59,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
             do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
             f.push_back({id, Tune{}, (int)(rnd() * StyleCount) % StyleCount});
         }
-        setRunField(f, 300.0);
+        setRunField(f, runRealKm);
         phase_ = Phase::Countdown; countdown_ = 3.0;
     }
     if (mode == Mode::Flow) {

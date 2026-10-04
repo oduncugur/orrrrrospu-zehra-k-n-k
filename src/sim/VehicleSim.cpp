@@ -233,6 +233,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         octane_ = tune->fuelSel > 0 && tune->fuelSel < 10 ? kOct[tune->fuelSel]
                 : tune->fuel == FuelType::Pump95 ? 95.0 : tune->fuel == FuelType::E85 ? 105.0 : 100.0;
         knockReq_ = 90.0 + 2.2 * (pt_->compressionRatio() - 10.5) + 8.0 * std::max(0.0, boostTot_ - boostFac_) + ecuAgg_ - icCredit_ + fineKnock_;
+        if (car && engineIsDiesel(engineTable()[engIdx])) knockReq_ = 0.0;   // dizel: sikistirma atesleme, vuruntu yok
     }
     drive_ = car ? car->drive : Drive::FWD;
     boxType_ = car ? gearboxTable()[gbIdx].type : Gearbox::HPattern;
@@ -278,11 +279,11 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         // Lastik tipi: sokak / yari-slick / drag slick (tahrikli aks); serbest aks sokak lastigi
         // Sicaklik penceresi: sokak lastigi soguk da tutar (genis pencere), yari-slick ~75 C ister,
         // drag slick dar pencereli (burnout sart). Soguk sokak lastigi ~%97, soguk slick ~%55 tutus.
-        TireParams street; street.muPeak = 1.05; street.latGrip = 1.067; street.B = 10.0; street.wheelMass = 16.0;   // yanal ~1.12, boyuna ayni
+        TireParams street; street.muPeak = 1.05; street.latGrip = 1.067; street.B = 11.4; street.C = 1.45; street.E = 0.30; street.wheelMass = 16.0;   // yanal ~1.12; kayinca cekis ~%80 (C 1.65: %52, patinaj kendini beslerdi)
         street.tempIdeal = 55.0; street.tempWidth = 0.00004;
-        TireParams semi;   semi.muPeak = 1.25; semi.latGrip = 1.12;   semi.B = 11.0;   semi.wheelMass = 15.0;
+        TireParams semi;   semi.muPeak = 1.25; semi.latGrip = 1.12;   semi.B = 11.0;   semi.C = 1.45; semi.E = 0.10; semi.wheelMass = 15.0;
         semi.tempIdeal = 75.0;   semi.tempWidth = 0.00007;
-        TireParams slick;  // 1.45, dovme jant
+        TireParams slick; slick.C = 1.50; slick.E = 0.10;   // 1.45, dovme jant; kayinca cekis ~%80
         // Kesin lastik (tireTable): sinifin tutus carpani + teker kutlesi; jant kutlesi
         const TireOpt& TR = row(tireTable(), tune->tireSel > 0 ? tune->tireSel : (int)tune->tires);
         const double wkg = TR.wheelKg + row(rimTable(), tune->rims).wheelKg;
@@ -292,8 +293,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double defPsi = tune->tires == TireType::DragSlick ? 16.0 : tune->tires == TireType::SemiSlick ? 26.0 : 32.0;
         const double defTemp = tune->tires == TireType::DragSlick ? 55.0 : tune->tires == TireType::SemiSlick ? 45.0 : 35.0;
         // Yol arabasi dengesi: arka aks yanalda %8 fazla tutar (fabrika ayari gibi hafif understeer)
-        TireParams dR = *dt; dR.latGrip *= 1.08;
-        TireParams semiR = semi, streetR = street; semiR.latGrip *= 1.08; streetR.latGrip *= 1.08;
+        TireParams dR = *dt; dR.latGrip *= 1.06;
+        TireParams semiR = semi, streetR = street; semiR.latGrip *= 1.06; streetR.latGrip *= 1.06;
         for (int i = 0; i < 4; ++i) {
             const bool d = i < 2 ? fDriven : rDriven;
             if (d) w_.emplace_back(i < 2 ? *dt : dR, tune->psi > 0 ? tune->psi : defPsi, defTemp, ambient);

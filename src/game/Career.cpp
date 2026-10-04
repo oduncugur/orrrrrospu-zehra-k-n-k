@@ -1254,8 +1254,8 @@ namespace {
 struct IntField { const char* key; int Tune::*f; int max; int min = 0; };
 struct DblField { const char* key; double Tune::*f; double max; };
 const IntField kIntFields[] = {
-    {"tire", &Tune::tireSel, 29}, {"rim", &Tune::rims, 9}, {"fin", &Tune::finalSel, 11}, {"gbx", &Tune::gearSwap, 30},
-    {"eng", &Tune::engineSwap, 400}, {"cam", &Tune::cam, 11}, {"val", &Tune::valve, 9}, {"fly", &Tune::flywheel, 9},
+    {"tire", &Tune::tireSel, 29}, {"rim", &Tune::rims, 9}, {"fin", &Tune::finalSel, 11}, {"gbx", &Tune::gearSwap, 40},
+    {"eng", &Tune::engineSwap, 600}, {"cam", &Tune::cam, 11}, {"val", &Tune::valve, 9}, {"fly", &Tune::flywheel, 9},
     {"sc", &Tune::superch, 9}, {"ic", &Tune::intercooler, 9}, {"fsy", &Tune::fuelSys, 9}, {"nos", &Tune::nitrous, 9},
     {"head", &Tune::head, 9}, {"pis", &Tune::piston, 9}, {"rod", &Tune::rod, 9}, {"crk", &Tune::crank, 9},
     {"brg", &Tune::bearing, 9}, {"gsk", &Tune::gasket, 9}, {"trb", &Tune::turbine, 9}, {"wg", &Tune::wastegate, 9},

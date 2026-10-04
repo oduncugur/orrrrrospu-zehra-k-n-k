@@ -78,7 +78,9 @@ int main() {
         CHECK(sc.engineSpec().redlineRpm > sa.engineSpec().redlineRpm + 1400 && sc.engineSpec().redlineRpm < sc.valveSafeRpm(),
               "ECU devri acar; kam + supap varken guvenli sinirin altinda");
         CHECK(peakHpRpm(sc) > peakHpRpm(sa) + 500, "kam + ECU devri: guc tepesi yukari tasinir");
-        Tune swap; swap.engineSwap = (int)swapEngines().size();                  // en guclu motor
+        Tune swap;                                                               // en guclu motor (liste sonu yeni eklenenler)
+        for (int k = 0; k < (int)swapEngines().size(); ++k)
+            if (swap.engineSwap == 0 || engineTable()[swapEngines()[k]].powerHp > engineTable()[swapEngines()[swap.engineSwap - 1]].powerHp) swap.engineSwap = k + 1;
         const double hs = peakHp(sahin, swap);
         std::printf("    Sahin + en guclu motor swap: %.0f HP, kutle farki %+.0f kg\n", hs, swapMassDelta(sahin, swap));
         CHECK(hs > 600 && swapMassDelta(sahin, swap) > 50, "motor swap: takili motorun gucu ve agirligi");

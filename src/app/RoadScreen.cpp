@@ -90,7 +90,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     }
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
-    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind);
+    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind, app_.runPlan.active ? app_.runPlan.realKm : 300.0);
     if (m == RoadSession::Mode::Marathon) {                              // alan: seyahat plani ya da kariyer seviyesinde 20 arac
         if (app_.runPlan.active) {
             ses_->setRunField(app_.runPlan.field, app_.runPlan.realKm);
@@ -172,7 +172,7 @@ void RoadScreen::finishRace() {
     else if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
     else if (ses_->mode() == RoadSession::Mode::Chase) prize_ = app_.career.recordChase(ses_->playerWon(), ses_->collisions());
     else if (ses_->mode() == RoadSession::Mode::Marathon) {
-        prize_ = app_.career.recordRun(ses_->runPosition(), ses_->runCount(), ses_->realKm());
+        prize_ = app_.runPlan.active && app_.runPlan.solo ? 0 : app_.career.recordRun(ses_->runPosition(), ses_->runCount(), ses_->realKm());   // tek basina: odul yok
         if (app_.runPlan.active) app_.nextTravelLeg(ses_->player().sim().fuelLiters());   // sehir ilerler; sonraki etap / varis
     }
     else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
@@ -255,7 +255,8 @@ void RoadScreen::update(double dt) {
             cockpit_.setKnobGear(pt.gear());
             flash("VIRAJDA VITES YOK (OTOMATIK DEBRIYAJ)", 1.2);
         }
-        c.gear = cockpit_.knobGear();
+        c.gear = std::max(0, cockpit_.knobGear());
+        c.reverse = cockpit_.knobGear() < 0;                              // R: vites bos + geri itis
         if (cockpit_.clutchPedal()) c.clutch = cockpit_.clutch();
         break;
     }
@@ -1075,7 +1076,12 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
         }
     }
-    r.setCarLook(app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_));
+    {
+        Renderer::CarLook lk = app_.career.car().carId == carId_ ? lookOf(app_.career.car()) : lookOf(&tune_);
+        lk.pitch = (float)(sim.suspension().pitchDeg() / 57.2958 * 1.4);   // gorunur (hafif abartili) dalma / yatma
+        lk.roll = (float)(sim.suspension().rollDeg() / 57.2958 * 1.4);
+        r.setCarLook(lk);
+    }
     {
         const double rh = R.at(ps).heading, dpsi = std::remainder(sim.heading() - rh, 2.0 * 3.14159265358979);
         r.drawCar(carId_, 0, 0, W, H, proj, view, carModel(X, Y, zCar + sim.suspension().heave(), rh + dpsi * camBlend_, sim.grade()),

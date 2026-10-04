@@ -12,16 +12,17 @@ namespace {
 struct PadLayout {
     Rect brake, clutch, thr, lever;
     float colX[3], rowTop, rowMid, rowBot;
+    float colR;                                    // H-desen: R yuvasi (en sol sutun, ust sira)
     Rect seqUp, seqDn;
     float autoY[5];   // P R N D S (S en ustte: D'den ileri itince)
     Rect gateUp, gateDn;   // otomatik M kapisi: + / -
 };
 // Kaydiricilar ekranin alt ~%57'sinde (basparmak az yol alir), 64 px genis; vites alani buyuk (kullanici geri bildirimi)
 const PadLayout kLand{{72, 150, 136, 356}, {4, 150, 68, 356}, {572, 150, 636, 356}, {404, 214, 566, 356},
-                   {432, 484, 536}, 236, 286, 336, {404, 214, 566, 282}, {404, 288, 566, 356}, {340, 312, 284, 256, 228},
+                   {460, 500, 540}, 236, 286, 336, 420, {404, 214, 566, 282}, {404, 288, 566, 356}, {340, 312, 284, 256, 228},
                    {496, 214, 566, 282}, {496, 288, 566, 356}};
 const PadLayout kPort{{72, 440, 136, 636}, {4, 440, 68, 636}, {292, 440, 356, 636}, {142, 470, 286, 636},
-                   {166, 214, 262}, 492, 553, 614, {142, 470, 286, 550}, {142, 556, 286, 636}, {618, 586, 554, 522, 490},
+                   {194, 230, 266}, 492, 553, 614, 158, {142, 470, 286, 550}, {142, 556, 286, 636}, {618, 586, 554, 522, 490},
                    {220, 470, 286, 550}, {220, 556, 286, 636}};
 const char* const kAutoName[5] = {"P", "R", "N", "D", "S"};
 
@@ -44,9 +45,10 @@ void Cockpit::configure(Lever lever, int gears, bool clutchPedal) {
 
 void Cockpit::setKnobGear(int g) {
     const PadLayout& L = lay(portrait_);
-    g = std::clamp(g, 0, gears_);
+    g = std::clamp(g, -1, gears_);
     knobGear_ = g;
-    if (g == 0) { knobY_ = L.rowMid; knobX_ = std::clamp(knobX_, L.colX[0], L.colX[2]); return; }
+    if (g == -1) { knobX_ = L.colR; knobY_ = L.rowTop; return; }       // R
+    if (g == 0) { knobY_ = L.rowMid; knobX_ = std::clamp(knobX_, L.colR, L.colX[2]); return; }
     knobX_ = L.colX[(g - 1) / 2]; knobY_ = (g % 2) ? L.rowTop : L.rowBot;
 }
 
@@ -75,21 +77,22 @@ void Cockpit::shifterFromPoint(float x, float y, bool release) {
     const float half = (L.rowBot - L.rowTop) * 0.5f, midBand = half * 0.30f;
     int col = 0;
     for (int c = 1; c < 3; ++c) if (std::fabs(x - L.colX[c]) < std::fabs(x - L.colX[col])) col = c;
-    int target = col * 2 + (y < L.rowMid ? 1 : 2);
+    const bool rCol = std::fabs(x - L.colR) < std::fabs(x - L.colX[0]) && y < L.rowMid;   // R yalniz ust sira
+    int target = rCol ? -1 : col * 2 + (y < L.rowMid ? 1 : 2);
     while (target > gears_ && target > 2) target -= 2;                 // olmayan sutun: en yakin var olan vitese
     if (target > gears_) target = gears_;
     const float depth = std::fabs(y - L.rowMid);
     if (release) {
         knobDrag_ = false;
-        if (depth < midBand) { knobGear_ = 0; knobX_ = std::clamp(x, L.colX[0], L.colX[2]); knobY_ = L.rowMid; return; }
+        if (depth < midBand) { knobGear_ = 0; knobX_ = std::clamp(x, L.colR, L.colX[2]); knobY_ = L.rowMid; return; }
         if (target != knobGear_) ++seatedEv_;
         setKnobGear(target);
         return;
     }
     // Gorsel kol: orta bantta yatay serbest, kanalda sutuna kilitli
     knobDrag_ = true;
-    if (depth < midBand) { dragX_ = std::clamp(x, L.colX[0], L.colX[2]); dragY_ = std::clamp(y, L.rowTop, L.rowBot); }
-    else { dragX_ = L.colX[(target - 1) / 2]; dragY_ = std::clamp(y, L.rowTop, L.rowBot); }
+    if (depth < midBand) { dragX_ = std::clamp(x, L.colR, L.colX[2]); dragY_ = std::clamp(y, L.rowTop, L.rowBot); }
+    else { dragX_ = target < 0 ? L.colR : L.colX[(target - 1) / 2]; dragY_ = std::clamp(y, target < 0 ? L.rowTop : L.rowTop, target < 0 ? L.rowMid : L.rowBot); }
     if (depth > half * 0.60f && target != knobGear_) { setKnobGear(target); ++seatedEv_; }   // yuvaya oturdu
 }
 
@@ -160,7 +163,7 @@ void Cockpit::key(Key k, bool down) {
     if (lever_ == Lever::HPattern) {
         if (k >= Key::Gear0 && k <= Key::Gear6) setKnobGear((int)k - (int)Key::Gear0);
         if (k == Key::ShiftUp) setKnobGear(knobGear_ + 1);
-        if (k == Key::ShiftDown) setKnobGear(knobGear_ - 1);
+        if (k == Key::ShiftDown) setKnobGear(knobGear_ - 1);                // bostan asagi: R
     } else if (lever_ == Lever::Sequential) {
         if (k == Key::ShiftUp) shift_ = +1;
         if (k == Key::ShiftDown) shift_ = -1;
@@ -217,7 +220,9 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
 
     r.rect(L.lever.x0, L.lever.y0, L.lever.x1, L.lever.y1, {0.10f, 0.10f, 0.13f, 0.45f});   // yari saydam: yolu kapatmasin
     if (lever_ == Lever::HPattern) {
-        r.rect(L.colX[0] - 2, L.rowMid - 2, L.colX[2] + 2, L.rowMid + 2, {0.35f, 0.35f, 0.4f});
+        r.rect(L.colR - 2, L.rowMid - 2, L.colX[2] + 2, L.rowMid + 2, {0.35f, 0.35f, 0.4f});
+        r.rect(L.colR - 2, L.rowTop, L.colR + 2, L.rowMid, {0.45f, 0.25f, 0.25f});                 // R kanali
+        r.text(L.colR - 2, L.rowTop - 9, "R", 1, {1.0f, 0.55f, 0.5f});
         for (int c = 0; c < 3; ++c) {
             const bool has = c * 2 + 1 <= gears_;
             r.rect(L.colX[c] - 2, L.rowTop, L.colX[c] + 2, L.rowBot, has ? Color{0.35f, 0.35f, 0.4f} : Color{0.2f, 0.2f, 0.22f});
@@ -226,6 +231,7 @@ void Cockpit::render(Renderer& r, int gear, bool grind) const {
         }
         // Takili vites yuvasi vurgusu + kol (surukleme sirasinda parmagi izler)
         if (knobGear_ > 0) r.circle(L.colX[(knobGear_ - 1) / 2], (knobGear_ % 2) ? L.rowTop : L.rowBot, 11, 14, {0.3f, 0.8f, 0.4f, 0.35f});
+        else if (knobGear_ < 0) r.circle(L.colR, L.rowTop, 11, 14, {0.9f, 0.3f, 0.3f, 0.35f});
         const float kx = knobDrag_ ? dragX_ : knobX_, ky = knobDrag_ ? dragY_ : knobY_;
         r.circle(kx, ky, 10, 14, {0.05f, 0.05f, 0.06f, 0.6f});
         r.circle(kx, ky, 8, 14, grind ? Color{1.0f, 0.15f, 0.1f} : Color{0.92f, 0.92f, 0.95f});

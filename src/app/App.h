@@ -107,9 +107,9 @@ public:
     void goGauges();                             // kadran dukkani                             // sokak: bulusma / dyno yarismasi / musteri isleri
     void startMeet();                            // gece bulusmasi: bahisli drag
     // Sehirler arasi THE RUN seyahati: hedefe kadar her ara bir etap (yakit tasinir). Etap bitince sonraki etap ya da varis.
-    struct RunPlan { bool active = false; int from = 0, target = 0; double fuelL = -1; std::vector<RunEntrant> field; double realKm = 300; };
+    struct RunPlan { bool active = false; int from = 0, target = 0; double fuelL = -1; std::vector<RunEntrant> field; double realKm = 300; bool solo = false; };   // solo: yarissiz, tek basina
     RunPlan runPlan;
-    void startTravel(int target);                // ilk etap
+    void startTravel(int target, bool solo = false);   // ilk etap (solo: The Run yok, tek basina surus)
     void continueTravel();                       // sonraki etap ekrani
     void nextTravelLeg(double fuelLeft);         // etap bitti (bitirdiyse): sehir ilerler, sonraki etap / varis
     bool activeMeet = false;

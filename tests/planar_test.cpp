@@ -170,12 +170,14 @@ int main() {
             VehicleInputs in; in.steer = 0.5;
             d.apply(*s, 0.12, in);
             if (i * kDt > 1.2) { s->powertrain().setGear(1); d.shiftT = -1; }
+            if (s->powertrain().rpm() < 1100.0) s->powertrain().setClutchPedal(0.55);   // insan: devir dusunce yarim debriyaj (stop etmez)
             s->step(kDt, in);
             finite &= std::isfinite(s->posX()) && std::isfinite(s->yawRate());
             if (i * kDt > 8 && s->speed() > 0.5) { const double R = s->speed() / std::max(std::fabs(s->yawRate()), 1e-6); maxR = std::max(maxR, R); minR = std::min(minR, R); ++samples; }
         }
         const double Rkin = findVehicle(5)->wheelbaseM / std::tan(0.5);
-        std::printf("    hiz %.2f m/s, donus yaricapi %.2f-%.2f m (kinematik %.2f m)\n", s->speed(), minR, maxR, Rkin);
+        std::printf("    hiz %.2f m/s, donus yaricapi %.2f-%.2f m (kinematik %.2f m), devir %.0f, stop %d\n", s->speed(), minR, maxR, Rkin,
+                    s->powertrain().rpm(), (int)s->powertrain().stalled());
         CHECK(finite, "NaN/sonsuz yok");
         CHECK(samples > 1000, "arac hareket etti (olcum var)");
         CHECK(minR > 0.7 * Rkin && maxR < 1.4 * Rkin, "yaricap kinematik degere yakin");

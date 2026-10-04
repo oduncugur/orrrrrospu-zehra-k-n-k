@@ -446,7 +446,7 @@ int main() {
         const RoadPath straight(7u, 20000.0, 4000.0);
         Tune t;
         for (int i = 0; i < (int)partOptions(PartCat::Gearbox).size(); ++i)
-            if (std::string(partOptions(PartCat::Gearbox)[i].name) == "VW DQ500 DSG 7") t.gearSwap = i;
+            if (std::string(partOptions(PartCat::Gearbox)[i].name) == "VW DQ500 DSG 7 (CIFT KAVRAMA)") t.gearSwap = i;
         RoadCar a(findVehicle(122), &t, straight, 0.0, -1.8);
         CHECK(t.gearSwap > 0 && a.sim().gearboxType() == Gearbox::DCT, "E46 + DQ500 = cift kavrama");
         a.manual = false;

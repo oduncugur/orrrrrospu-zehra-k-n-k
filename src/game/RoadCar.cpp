@@ -125,13 +125,14 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
     const Gearbox box = sim_->gearboxType();
     const bool seq = box == Gearbox::Dogbox || box == Gearbox::DCT;
     // otomatik debriyaj cezasi: gec kavrar; TCU yazilimi tork konvertorlu otomatikte gecisi kisaltir (seviye basina %22)
-    const double k = (slowClutch ? 1.6 : 1.0) * (pt.converter() && hasTune_ ? 1.0 - 0.22 * std::clamp(tune_.swTcu, 0, 2) : 1.0);
+    const double gm = hasTune_ ? gearShiftMul(&tune_) : 1.0;            // sanziman modeli: ucuz / eski kutu yavas gecer
+    const double k = (slowClutch ? 1.6 : 1.0) * gm * (pt.converter() && hasTune_ ? 1.0 - 0.22 * std::clamp(tune_.swTcu, 0, 2) : 1.0);
     double clutch = 0.0, thr = thrIn;
     if (pt.stalled()) { pt.restart(); pt.setGear(manual ? std::max(pt.gear(), 1) : 1); launching_ = true; launchPedal_ = 1.0; stalledEv_ = true; }
     const bool launchGear = manual ? pt.gear() >= 1 : pt.gear() == 1;
     if (shiftT_ >= 0.0 && seq) {
         shiftT_ += dt;
-        const double dur = box == Gearbox::Dogbox ? 0.035 : 0.060;
+        const double dur = (box == Gearbox::Dogbox ? 0.035 : 0.060) * gm;
         if (pt.gear() != target_) pt.setGear(target_);
         if (box == Gearbox::Dogbox) thr = 0.0;
         if (shiftT_ > dur) shiftT_ = -1.0;
@@ -173,7 +174,7 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
 
 void RoadCar::update(double dt, const RoadControls& c) {
     const double v = sim_->speed();
-    if (c.clutch >= 0.0) playerClutch(c);
+    if (c.clutch >= 0.0) { playerClutch(c); sim_->setReverse(c.reverse, c.reverse ? c.throttle * (1.0 - std::clamp(c.clutch, 0.0, 1.0)) : 0.0); }
     else {
         if (c.gear >= 0) requestGear(c.gear);
         if (c.autoMode >= 0) { autoMode = c.autoMode; manual = false; if (c.shift != 0 && autoMode == 2) requestShift(c.shift); }
@@ -199,9 +200,10 @@ void RoadCar::update(double dt, const RoadControls& c) {
         const double rMax = 0.9 * 9.81 / v;
         const double rDes = std::clamp(v * std::tan(c.steer) / (Lw + 0.0025 * v * v), -rMax, rMax);
         const double beta = sim_->bodySlipAngle();
-        const double over = (std::fabs(r) - std::fabs(rDes)) * (r * rDes >= 0 ? 1.0 : 1.0) + std::max(0.0, std::fabs(beta) - 0.06) * 4.0;
-        if (over > 0.06) {
-            const double k = std::clamp((over - 0.06) * 2.5, 0.0, 1.0);
+        // Esik: kontrollu rotasyon (gec fren / trail-braking ile kic dondurme) serbest; yalniz gercek savrulmada girer
+        const double over = (std::fabs(r) - std::fabs(rDes)) + std::max(0.0, std::fabs(beta) - 0.10) * 4.0;
+        if (over > 0.12) {
+            const double k = std::clamp((over - 0.12) * 2.5, 0.0, 1.0);
             in.espBrake[r > 0 ? 1 : 0] = k;                              // sola donuyor -> sag on (dis)
             sim_->powertrain().setThrottle(sim_->powertrain().throttle() * std::max(0.2, 1.0 - 1.2 * k));
             espActive_ = true;

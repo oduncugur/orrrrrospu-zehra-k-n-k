@@ -40,7 +40,8 @@ struct ClutchOpt  { const char* name; int price; double mul; };
 struct AxleOpt    { const char* name; int price; int spec; double dia; };                  // spec 0 stok, 1 krom-moly, 2 yaris
 struct DiffOpt    { const char* name; int price; double preload, plate, rampA, rampD; };
 struct FinalOpt   { const char* name; int price; double mul; };
-struct GearOpt    { const char* name; int price; const char* code; double strengthNm; };   // nullptr: stok / ozel; giris tork dayanimi
+struct GearOpt    { const char* name; int price; const char* code; double strengthNm; double shiftMul = 1.0; };   // shiftMul: vites gecis suresi carpani (ucuz / eski kutu yavas)
+double gearShiftMul(const struct Tune* t);   // takili sanzimanin gecis suresi carpani   // nullptr: stok / ozel; giris tork dayanimi
 struct WeightOpt  { const char* name; int price; double kg; };
 struct TireOpt    { const char* name; int price; int type; double grip, wheelKg; };        // type: TireType
 struct RimOpt     { const char* name; int price; double wheelKg; };

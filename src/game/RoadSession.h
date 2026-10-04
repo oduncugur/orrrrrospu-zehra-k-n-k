@@ -29,10 +29,12 @@ public:
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
+    // The Run: surulen uzunluk etabin gercek mesafesiyle orantili (130 km ~9 km, 480 km ~34 km)
+    static double runDrivenM(double realKm) { return std::clamp(realKm * 70.0, 8000.0, 34000.0); }
     double raceLength() const {                       // m
         if (mode_ == Mode::Karma) return road_.length() - kStartS - 300.0;
         if (mode_ == Mode::Chase) return 5000.0;
-        if (mode_ == Mode::Marathon) return 18000.0;
+        if (mode_ == Mode::Marathon) return runLen_;
         return kind_ == Kind::Touge ? 3000.0 : 4000.0;
     }
     bool hasRival() const { return mode_ == Mode::Race || mode_ == Mode::Karma; }
@@ -61,7 +63,7 @@ public:
     double rightLane(double s) const { return road_.laneOffset(s, false, 0); }   // en sag gidis seridi (yanal)
 
     RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed,
-                Kind kind = Kind::Highway);
+                Kind kind = Kind::Highway, double runRealKm = 300.0);   // runRealKm: The Run etabinin gercek km
     Kind kind() const { return kind_; }
 
     void update(double dt, const RoadControls& player);
@@ -115,6 +117,7 @@ public:
 private:
     void wallContact(RoadCar& car);              // arac duvara girdiyse geri itilir, yanal hiz soner (sekme)
     bool wallHit_ = false;
+    double runLen_ = 18000.0;
     // Kinematik arac (trafik / The Run rakibi) ile carpisma: kutle + hiz + temas noktasi -> impuls (sekme e, surtunme mu).
     // Donus: kinematik aracin yeni ileri hizi (m/s); rel: carpisma hizi (m/s)
     double impactKinematic(RoadCar& car, double ox, double oy, double opsi, double ov, double omass, double halfL, double halfW, double& rel);
