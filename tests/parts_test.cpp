@@ -132,7 +132,7 @@ int main() {
     }
     std::printf("[3c] Lastik asinmasi: patinaj lastigi yer, kariyere yazilir\n");
     {
-        Tune spin; spin.turbo = 2; spin.fuelSel = 7; spin.clutch = 9; spin.axles = 9;   // sokak lastigi + cok guc: patinaj
+        Tune spin; spin.turbo = 9; spin.fuelSel = 7; spin.fuelPump = 9; spin.injector = 9; spin.fuelLine = 9; spin.clutch = 9; spin.axles = 9;   // sokak lastigi + cok guc: patinaj
         Tune grip = spin; grip.tires = TireType::DragSlick; grip.tireSel = 25;
         RoadCar* a = runWot(sahin, spin, 6.0); RoadCar* b = runWot(sahin, grip, 6.0);
         std::printf("    6 s tam gaz: sokak lastigi asinma %.4f, slick %.4f\n", a->sim().tireWearGained(), b->sim().tireWearGained());
