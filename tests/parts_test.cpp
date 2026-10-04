@@ -136,7 +136,7 @@ int main() {
         Tune grip = spin; grip.tires = TireType::DragSlick; grip.tireSel = 25;
         RoadCar* a = runWot(sahin, spin, 6.0); RoadCar* b = runWot(sahin, grip, 6.0);
         std::printf("    6 s tam gaz: sokak lastigi asinma %.4f, slick %.4f\n", a->sim().tireWearGained(), b->sim().tireWearGained());
-        CHECK(a->sim().tireWearGained() > 0.004 && a->sim().tireWearGained() > b->sim().tireWearGained() * 1.5, "patinaj lastigi asindirir");
+        CHECK(a->sim().tireWearGained() > 0.0025 && a->sim().tireWearGained() > b->sim().tireWearGained() * 1.5, "patinaj lastigi asindirir");   // yeni egri: patinaj daha az (esik 0.004 -> 0.0025)
         Career c = Career::newGame();
         c.recordDamage(false, 0.0, false, false, 0.0, 0.05);
         c.recordDamage(false, 0.0, false, false, 0.0, 0.05);
