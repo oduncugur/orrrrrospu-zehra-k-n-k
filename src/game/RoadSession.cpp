@@ -158,6 +158,40 @@ void RoadSession::wallContact(RoadCar& car) {
     if (&car == player_.get()) wallHit_ = vn > 4.0;
 }
 
+double RoadSession::impactKinematic(RoadCar& car, double ox, double oy, double opsi, double ov, double omass,
+                                    double halfL, double halfW, double& rel) {
+    rel = 0;
+    VehicleSim& sm = car.sim();
+    const double cx = sm.posX(), cy = sm.posY(), c = std::cos(opsi), s = std::sin(opsi);
+    const double dx = cx - ox, dy = cy - oy;
+    const double lon = dx * c + dy * s, lat = -dx * s + dy * c;
+    const double carHalfL = 2.2, carHalfW = 0.9;
+    const double penLon = halfL + carHalfL - std::fabs(lon), penLat = halfW + carHalfW - std::fabs(lat);
+    if (penLon <= 0 || penLat <= 0) return ov;
+    // Temas normali: en az girilen eksen (kinematik aracin yerel ekseni), arac tarafina dogru
+    double nx, ny, pen;
+    if (penLon < penLat) { const double sg = lon > 0 ? 1.0 : -1.0; nx = c * sg; ny = s * sg; pen = penLon; }
+    else { const double sg = lat > 0 ? 1.0 : -1.0; nx = -s * sg; ny = c * sg; pen = penLat; }
+    sm.nudge(nx * pen, ny * pen);                                      // ayir
+    double vx, vy; sm.worldVelocity(vx, vy);
+    const double ovx = c * ov, ovy = s * ov;
+    const double vn = (vx - ovx) * nx + (vy - ovy) * ny;              // < 0: yaklasiyor
+    if (vn >= 0) return ov;
+    rel = -vn;
+    // Temas noktasi: aracin merkezinden normal yonunde yari genislik kadar (yandan vuruslar yaw uretir)
+    const double m = sm.mass(), e = 0.25, mu = 0.45;
+    const double rx = -nx * carHalfW, ry = -ny * carHalfW;
+    const double j = -(1.0 + e) * vn / (1.0 / m + 1.0 / omass);
+    sm.applyImpulse(nx * j, ny * j, rx, ry);
+    // Surtunme (teget): goreli kayma hizini azaltir, |jt| <= mu j
+    const double tx = -ny, ty = nx, vt = (vx - ovx) * tx + (vy - ovy) * ty;
+    const double jt = std::clamp(-vt / (1.0 / m + 1.0 / omass), -mu * j, mu * j);
+    sm.applyImpulse(tx * jt, ty * jt, rx, ry);
+    // Kinematik arac: ileri ekseni boyunca momentum degisimi (ters isaretli impuls)
+    const double dvo = (-(nx * j + tx * jt) * c - (ny * j + ty * jt) * s) / omass;
+    return ov + dvo;
+}
+
 void RoadSession::collide(RoadCar& car, bool isPlayer) {
     const double cx = car.sim().posX(), cy = car.sim().posY();
     for (TrafficCar& t : traffic_) {
@@ -166,10 +200,13 @@ void RoadSession::collide(RoadCar& car, bool isPlayer) {
         const double dx = cx - x, dy = cy - y, c = std::cos(psi), s = std::sin(psi);
         const double lon = dx * c + dy * s, lat = -dx * s + dy * c;
         if (std::fabs(lon) < 4.3 && std::fabs(lat) < 1.75) {
-            const double rel = t.oncoming ? car.sim().speed() + t.v : std::max(0.0, car.sim().speed() - t.v);
-            car.bump(std::clamp(1.0 - rel / 45.0, 0.15, 0.85));
-            spawnTraffic(t, car.s() + 400.0);
-            if (isPlayer) {
+            double rel = 0;
+            const double mt = 1150.0 + 350.0 * ((t.uid * 2654435761u >> 20) % 3);   // 1150-1850 kg
+            const double nv = impactKinematic(car, x, y, psi, t.v, mt, 2.2, 0.9, rel);
+            if (rel < 0.5) continue;                                     // ayriliyorlar: temas yok
+            t.v = std::max(0.0, std::fabs(nv));                            // trafik araci yavaslar / itilir
+            if (rel > 6.0) spawnTraffic(t, car.s() + 400.0);              // sert carpisma: trafik araci yoldan cekilir
+            if (isPlayer && rel > 1.5) {
                 ++collisions_; crashEv_ = true;
                 if (flow_) flow_->crash();                          // skor cezasi + kombo sifir (mesaji skor verir)
                 else msgs_.push_back(rel > 20 ? "AGIR CARPISMA!" : "CARPISMA");
@@ -390,9 +427,10 @@ void RoadSession::update(double dt, const RoadControls& in) {
             const double dx = cx - x, dy = cy - y, c = std::cos(p.heading), sn = std::sin(p.heading);
             const double lon = dx * c + dy * sn, lat = -dx * sn + dy * c;
             if (std::fabs(lon) < 4.3 && std::fabs(lat) < 1.75) {
-                const double rel = std::fabs(player_->sim().speed() - R.v);
-                player_->bump(std::clamp(1.0 - rel / 45.0, 0.35, 0.92));
-                R.v *= 0.75; R.lane += lat > 0 ? -0.6 : 0.6;
+                double rel = 0;
+                const double nv = impactKinematic(*player_, x, y, p.heading, R.v, std::max(900.0, R.massKg), 2.2, 0.9, rel);
+                if (rel < 0.5) continue;
+                R.v = std::max(0.0, nv); R.lane += lat > 0 ? -0.4 : 0.4;
                 if (!touching_) { msgs_.push_back(rel > 6.0 ? "SERT TEMAS!" : "TEMAS!"); crashEv_ = true; ++collisions_; }
                 touching_ = true;
             }

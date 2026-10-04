@@ -525,7 +525,7 @@ void RoadScreen::drawWorld(Renderer& r) {
 
     const double hw = R.halfWidth();
     const int i0 = std::max(0, (int)((ps - (sideCam ? 70.0 : 44.0)) / RoadPath::kStep)), n = (int)R.points().size();
-    const int i1 = std::min(n - 2, i0 + (sideCam ? 200 : 160));
+    const int i1 = std::min(n - 2, i0 + (sideCam ? 240 : 280));   // gorus: ~520 m ileri
     const auto& P = R.points();
     auto edge = [&](int i, double off) {
         const RoadPoint& p = P[i];
@@ -561,6 +561,19 @@ void RoadScreen::drawWorld(Renderer& r) {
             const Color gc = fog(night_ && zone == 1 ? L({0.42f, 0.42f, 0.44f}) : g0, aL.w);
             if (gL0.ok && gL1.ok) { triP(r, gL0, aL, bL, gc); triP(r, gL0, bL, gL1, gc); }
             if (gR0.ok && gR1.ok) { triP(r, aR, gR0, gR1, gc); triP(r, aR, gR1, bR, gc); }
+            if (zone == 0 && aL.w < 140.0f) {                           // cim yamalari: koyu / acik lekeler (3 blok derinlik)
+                for (int sd = -1; sd <= 1; sd += 2)
+                    for (int bl = 0; bl < 3; ++bl) {
+                        const float hv = hashf((i / 3) * 31 + bl * 7 + (sd > 0) * 101);
+                        if (hv < 0.45f) continue;
+                        const double o0 = sd * (P[i].hw + 4.0 + bl * 12.0 + 6.0 * hashf(i / 3 + bl)), o1 = o0 + sd * (4.0 + 6.0 * hv);
+                        const Proj p0 = pt(i, o0, 0.01), p1 = pt(j, o0, 0.01), p2 = pt(j, o1, 0.01), p3 = pt(i, o1, 0.01);
+                        if (!p0.ok || !p1.ok || !p2.ok || !p3.ok) continue;
+                        const float k = hv > 0.75f ? 1.12f : 0.84f;
+                        const Color pc = fog(L({grass0.r * k * amb, grass0.g * k * amb, grass0.b * k * amb}), p0.w);
+                        triP(r, p0, p1, p2, pc); triP(r, p0, p2, p3, pc);
+                    }
+            }
         }
         if (zone == 0) {                                                // banket: toprak / cakil (cim ile bordur arasi)
             const Proj sL0 = edgeW(i, 1, -2.6), sL1 = edgeW(j, 1, -2.6), sR0 = edgeW(i, -1, -2.6), sR1 = edgeW(j, -1, -2.6);
@@ -579,6 +592,26 @@ void RoadScreen::drawWorld(Renderer& r) {
         const Color asp = fog(L(band ? Color{(0.30f + patch) * wet, (0.30f + patch) * wet, (0.32f + patch) * wet}
                                      : Color{(0.27f + patch) * wet, (0.27f + patch) * wet, (0.29f + patch) * wet}), cL.w);
         triP(r, cL, cR, dR, asp); triP(r, cL, dR, dL, asp);
+        if (cL.w < 45.0f) {                                            // agrega benekleri (acik / koyu tas)
+            for (int k = 0; k < 6; ++k) {
+                const float hx = hashf(i * 17 + k * 5), hy = hashf(i * 23 + k * 11);
+                const Proj q = pt(i, -P[i].hw + 2.0 * P[i].hw * hx, 0.01);
+                if (!q.ok) continue;
+                const float sz = std::max(0.6f, 0.06f * pxPerM / q.w);
+                const float v = hy > 0.5f ? 0.40f : 0.18f;
+                r.setDepthW(q.w - 0.02f);
+                r.rect(q.x - sz, q.y - sz * 0.5f, q.x + sz, q.y + sz * 0.5f, fog(L({v * wet, v * wet, (v + 0.02f) * wet, 0.7f}), q.w));
+            }
+        }
+        if (i % 6 == 0 && cL.w < 120.0f && hashf(i * 41) > 0.55f) {   // yama dikisi (koyu katran cizgisi, enine)
+            const Proj u0 = pt(i, -P[i].hw, 0.012), u1 = pt(i, P[i].hw, 0.012);
+            if (u0.ok && u1.ok) {
+                const Color tc = fog(L({0.12f * wet, 0.12f * wet, 0.13f * wet, 0.6f}), cL.w);
+                const float th = std::max(0.6f, 0.10f * pxPerM / cL.w);
+                r.tri(u0.x, u0.y - th, u1.x, u1.y - th, u1.x, u1.y + th, tc);
+                r.tri(u0.x, u0.y - th, u1.x, u1.y + th, u0.x, u0.y + th, tc);
+            }
+        }
         if (cL.w < 120.0f)                                         // tekerlek izleri (serit merkezinin iki yani)
             for (int tk = 0; tk < 2 * (int)std::lround(P[i].lf + P[i].lb); ++tk) {
                 const double w2 = 2.0 * P[i].hw / std::max(1.0, P[i].lf + P[i].lb);
@@ -804,12 +837,78 @@ void RoadScreen::drawWorld(Renderer& r) {
                 }
             }
         }
-        if (zone == 0 && i % 8 == 0) {                             // kenar agaclari / direkleri (her 16 m)
+        if (zone == 0 && aL.w < 60.0f) {                               // cim obekleri / cicek / tas (yakin)
+            for (int sd = -1; sd <= 1; sd += 2) {
+                if (camBlend_ < 0.5 && sd < 0) continue;
+                for (int k = 0; k < 3; ++k) {
+                    const float h = hashf(i * 13 + k * 7 + (sd > 0) * 57);
+                    const Proj b = pt(i, sd * (P[i].hw + 2.8 + 9.0 * hashf(i * 29 + k)), 0.0);
+                    if (!b.ok) continue;
+                    r.setDepthW(b.w);
+                    const float sc = pxPerM / b.w;
+                    if (h < 0.55f) {                                     // cim obegi (3 yaprak)
+                        const Color gb = fog(L({grass0.r * 0.75f * amb, grass0.g * 0.85f * amb, grass0.b * 0.7f * amb}), b.w);
+                        for (int bl = -1; bl <= 1; ++bl) r.tri(b.x + bl * 0.08f * sc, b.y, b.x + bl * 0.08f * sc + 0.05f * sc, b.y, b.x + bl * 0.16f * sc, b.y - (0.28f + 0.1f * h) * sc, gb);
+                    } else if (h < 0.75f) {                              // cicek
+                        const Color fc = h < 0.65f ? Color{0.95f, 0.85f, 0.2f} : Color{0.95f, 0.95f, 0.95f};
+                        r.rect(b.x - 0.01f * sc, b.y - 0.22f * sc, b.x + 0.01f * sc, b.y, fog(L({0.2f, 0.45f, 0.18f}), b.w));
+                        r.circle(b.x, b.y - 0.24f * sc, std::max(0.8f, 0.05f * sc), 6, fog(L(fc), b.w));
+                    } else if (h > 0.9f) {                               // tas
+                        r.circle(b.x, b.y - 0.08f * sc, std::max(1.0f, 0.18f * sc), 8, fog(L({0.48f, 0.47f, 0.45f}), b.w));
+                        r.circle(b.x - 0.05f * sc, b.y - 0.12f * sc, std::max(0.6f, 0.09f * sc), 6, fog(L({0.62f, 0.61f, 0.58f}), b.w));
+                    }
+                }
+            }
+        }
+        if (zone == 0 && i % 25 == 0 && !(P[i].hw > 4.6 && !mtn)) {    // delinator direkleri (beyaz, siyah bant, reflektor) her 50 m
+            for (int sd = -1; sd <= 1; sd += 2) {
+                if (camBlend_ < 0.5 && sd < 0) continue;
+                const Proj b = pt(i, sd * (P[i].hw + 1.5), 0.0), t = pt(i, sd * (P[i].hw + 1.5), 1.0);
+                if (!b.ok || !t.ok) continue;
+                r.setDepthW(b.w);
+                const float sc = pxPerM / b.w, w2 = std::max(0.6f, 0.06f * sc);
+                r.rect(b.x - w2, t.y, b.x + w2, b.y, fog(L({0.92f, 0.92f, 0.9f}), b.w));
+                r.rect(b.x - w2, t.y + 0.12f * sc, b.x + w2, t.y + 0.28f * sc, fog(L({0.08f, 0.08f, 0.08f}), b.w));
+                r.rect(b.x - w2 * 0.6f, t.y + 0.15f * sc, b.x + w2 * 0.6f, t.y + 0.24f * sc, night_ ? Color{1.0f, 0.8f, 0.3f} : fog(L({0.95f, 0.6f, 0.15f}), b.w));
+            }
+        }
+        if (zone == 0 && !mtn && P[i].hw <= 4.6 && i % 2 == 0 && aL.w < 110.0f) {   // kirsal ahsap cit (direk + iki ray)
+            for (int sd = -1; sd <= 1; sd += 2) {
+                if (camBlend_ < 0.5 && sd < 0) continue;
+                if (hashf((i / 40) * 3 + (sd > 0)) < 0.5f) continue;      // citli / citsiz kesimler
+                const double off = sd * (P[i].hw + 6.0);
+                const Proj b0 = pt(i, off, 0.0), t0 = pt(i, off, 1.1), r0 = pt(i, off, 0.9), r1 = pt(i + 2, off, 0.9), q0 = pt(i, off, 0.5), q1 = pt(i + 2, off, 0.5);
+                if (!b0.ok || !t0.ok) continue;
+                r.setDepthW(b0.w);
+                const float sc = pxPerM / b0.w;
+                const Color wc = fog(L({0.42f, 0.30f, 0.18f}), b0.w);
+                r.rect(b0.x - std::max(0.5f, 0.05f * sc), t0.y, b0.x + std::max(0.5f, 0.05f * sc), b0.y, wc);
+                const float rt = std::max(0.5f, 0.03f * sc);
+                if (r0.ok && r1.ok) { r.tri(r0.x, r0.y - rt, r1.x, r1.y - rt, r1.x, r1.y + rt, wc); r.tri(r0.x, r0.y - rt, r1.x, r1.y + rt, r0.x, r0.y + rt, wc); }
+                if (q0.ok && q1.ok) { r.tri(q0.x, q0.y - rt, q1.x, q1.y - rt, q1.x, q1.y + rt, wc); r.tri(q0.x, q0.y - rt, q1.x, q1.y + rt, q0.x, q0.y + rt, wc); }
+            }
+        }
+        if (zone == 0 && i % 8 == 4 && !mtn) {                        // calilar (agaclarin arasinda)
+            for (int sd = -1; sd <= 1; sd += 2) {
+                if (camBlend_ < 0.5 && sd < 0) continue;
+                const float h = hashf(i * 3 + (sd > 0) * 7 + 1);
+                if (h < 0.4f) continue;
+                const Proj b = edge(i, sd * (P[i].hw + 4.0 + 10.0 * hashf(i * 11 + sd)));
+                if (!b.ok) continue;
+                r.setDepthW(b.w);
+                const float sc = pxPerM / b.w, bw = (0.8f + 0.6f * h) * sc;
+                r.circle(b.x, b.y - bw * 0.4f, bw * 0.75f, 10, fog(L({0.10f, 0.30f, 0.12f}), b.w));
+                r.circle(b.x - bw * 0.35f, b.y - bw * 0.55f, bw * 0.5f, 10, fog(L({0.16f, 0.40f, 0.17f}), b.w));
+                r.circle(b.x + bw * 0.3f, b.y - bw * 0.5f, bw * 0.45f, 10, fog(L({0.13f, 0.36f, 0.15f}), b.w));
+            }
+        }
+        if (zone == 0 && i % 4 == 0) {                             // kenar agaclari / direkleri (her 8 m)
             for (int side = -1; side <= 1; side += 2) {
                 if (camBlend_ < 0.5 && side < 0) continue;            // drag gorunumu: kamera tarafindaki agaclar gorusu kapatir
                 const float h = hashf(i * 2 + (side > 0));
                 if (h < (mtn ? 0.08f : 0.35f)) continue;
-                const Proj b = edge(i, side * (P[i].hw + 5.0 + 20.0 * hashf(i * 7 + side)));
+                const bool far = (i / 4) % 2 == 1;                         // her ikinci sira uzak (orman derinligi)
+                const Proj b = edge(i, side * (P[i].hw + (far ? 28.0 + 26.0 * hashf(i * 5 + side) : 5.0 + 20.0 * hashf(i * 7 + side))));
                 if (!b.ok) continue;
                 r.setDepthW(b.w);
                 const float sc = pxPerM / b.w;

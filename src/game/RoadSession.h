@@ -115,6 +115,9 @@ public:
 private:
     void wallContact(RoadCar& car);              // arac duvara girdiyse geri itilir, yanal hiz soner (sekme)
     bool wallHit_ = false;
+    // Kinematik arac (trafik / The Run rakibi) ile carpisma: kutle + hiz + temas noktasi -> impuls (sekme e, surtunme mu).
+    // Donus: kinematik aracin yeni ileri hizi (m/s); rel: carpisma hizi (m/s)
+    double impactKinematic(RoadCar& car, double ox, double oy, double opsi, double ov, double omass, double halfL, double halfW, double& rel);
     void spawnTraffic(TrafficCar& t, double fromS);
     void collide(RoadCar& car, bool isPlayer);
     RoadControls rivalControls();
