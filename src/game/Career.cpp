@@ -1044,6 +1044,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     setPartLevel(oc.tune, c, level, v);
     clampSetup(oc.tune);                                               // parca degisti: gecersiz kurulum ayari sifirlanir
     if (c == PartCat::Nitrous) oc.nosFill = 1.0;                       // yeni kit dolu gelir
+    if (c == PartCat::EngineSwap && level > 0) { oc.engineWear = 0.0; oc.tune.wearEngine = 0.0; }   // yeni motor: eski motorun hasari gider
     if (used) applyUsedWear(oc.tune, c);
     dailyAdd(TaskType::BuyParts, 1);
     return true;
@@ -1642,6 +1643,9 @@ bool Career::parse(const std::string& text, Career& out) {
     }
     if (c.cars.empty()) return false;
     for (OwnedCar& oc : c.cars) migrateTune(oc.tune);              // eski yakit sistemi / ECU paketi -> yeni parcalar
+    // Eski surum hatasi: hurda aracta motor swap'tan sonra eski motorun hasari kaliyordu (yeni motor hasarsiz)
+    for (OwnedCar& oc : c.cars)
+        if (oc.fromJunk && oc.tune.engineSwap > 0 && oc.engineWear >= 1.0) { oc.engineWear = 0.0; oc.tune.wearEngine = 0.0; }
     c.garageSlots = std::max(c.garageSlots, std::min((int)c.cars.size(), (int)kMaxSlots));   // eski kayit: arac sayisi kadar yuva
     c.current = std::clamp(c.current, 0, (int)c.cars.size() - 1);
     out = c;

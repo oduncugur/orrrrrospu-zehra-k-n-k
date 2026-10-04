@@ -437,6 +437,14 @@ int main() {
         f.recordMeet(true, nullptr);
         CHECK(f.cars.size() == n0 + 1 && f.meetPinkWon > 0, "pink slip kazanilir: rakibin arabasi");
     }
+    std::printf("[M] Motor swap: eski motorun hasari gider\n");
+    {
+        Career c = Career::newGame(); c.money = 200000;
+        c.car().engineWear = 1.0; c.car().tune.wearEngine = 0.6;
+        CHECK(c.car().damaged(), "patlak motor: hasarli");
+        CHECK(c.buyPart(PartCat::EngineSwap, 1), "motor swap");
+        CHECK(!c.car().damaged() && c.car().tune.wearEngine == 0.0, "yeni motor: hasar / asinma yok");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();
