@@ -107,7 +107,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "esp") s.esp = v != 0;
         else if (k == "tilt_sensitivity") s.tiltSens = snap(tiltSensOptions(), v);
         else if (k == "tilt_invert") s.tiltInvert = v != 0;
-        else if (k == "drag_distance") s.dragDist = std::clamp(v, 0, 2);
+        else if (k == "drag_distance") s.dragDist = std::clamp(v, 0, 3);
         else if (k == "assist") s.assist = v != 0;
         else if (k == "manual_gears") s.manualGears = v != 0;
         else if (k == "auto_clutch") s.autoClutch = v != 0;

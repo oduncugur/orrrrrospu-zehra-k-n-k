@@ -67,6 +67,11 @@ public:
     void update(double dt, const RoadControls& player);
 
     Mode  mode() const { return mode_; }
+    // Yol bolgesi (s'ye gore, 350 m bloklar): 0 kir, 1 sehir, 2 tunel. Cizim ve carpisma ayni bolgeyi kullanir.
+    int zoneAt(double s) const;
+    // Yol kenarindaki sert engelin yol merkezinden uzakligi (m): tunel duvari, dag / otoban bariyeri, sehir binalari;
+    // -1: engel yok (acik arazi)
+    double wallAt(double s) const;
     Phase phase() const { return phase_; }
     double countdown() const { return countdown_; }
     // Karma: drag agaci (geri sayimin son 1.5 s'si 3 amber, sonra yesil); tepki = yesilden kalkisa (-1: henuz yok)
@@ -108,6 +113,8 @@ public:
     bool rain() const { return rain_; }
 
 private:
+    void wallContact(RoadCar& car);              // arac duvara girdiyse geri itilir, yanal hiz soner (sekme)
+    bool wallHit_ = false;
     void spawnTraffic(TrafficCar& t, double fromS);
     void collide(RoadCar& car, bool isPlayer);
     RoadControls rivalControls();

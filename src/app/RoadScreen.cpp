@@ -344,15 +344,7 @@ void RoadScreen::update(double dt) {
 double RoadScreen::Pc0z() const { return ses_ ? ses_->player().elevation() : 0.0; }
 
 // Yol bolgesi (s'ye gore, 700 m'lik bloklar): 0 kir, 1 sehir, 2 tunel. Tohum: yolun kendisi (ayni yarista sabit)
-int RoadScreen::zoneAt(double s) const {
-    const bool mtn = ses_->kind() == RoadSession::Kind::Touge;
-    const int block = (int)(s / 350.0);
-    if (block < 1) return 0;                                           // baslangic acik alanda
-    const float h = hashf(block * 13 + (int)ses_->raceLength());
-    if (mtn) return h < 0.18f ? 2 : 0;
-    if ((ses_->mode() == RoadSession::Mode::Karma || ses_->mode() == RoadSession::Mode::Marathon) && ses_->road().curvyAt(s)) return 0;
-    return h < 0.32f ? 1 : h < 0.40f ? 2 : 0;
-}
+int RoadScreen::zoneAt(double s) const { return ses_->zoneAt(s); }   // cizim = carpisma (RoadSession)
 
 // Lastik dumani: tahrikli / kayan tekerlerin kayma hizi 5 m/s ustunde; yogunluk kaymayla artar
 void RoadScreen::spawnSmoke(const RoadCar& car, double dt) {
@@ -637,13 +629,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
             if (nb > 0) {
                 const double da = bnd(pa, false, pa.lf), db = bnd(pb, false, pb.lf);
-                if (nf >= 3 && nb >= 3) {                                  // beton refuj (0.8 m)
-                    const Proj b0 = pt(i, da + 0.35, 0.8), b1 = pt(j, db + 0.35, 0.8), b2 = pt(j, db - 0.35, 0.8), b3 = pt(i, da - 0.35, 0.8);
-                    const Proj g0 = edge(i, da - 0.35), g1 = edge(j, db - 0.35);
-                    const Color top = fog(L({0.78f, 0.78f, 0.76f}), cL.w), side = fog(L({0.62f, 0.62f, 0.60f}), cL.w);
-                    if (b0.ok && b1.ok && b2.ok && b3.ok) { triP(r, b0, b1, b2, top); triP(r, b0, b2, b3, top); }
-                    if (g0.ok && g1.ok && b2.ok && b3.ok) { triP(r, g0, g1, b2, side); triP(r, g0, b2, b3, side); }
-                } else {
+                {   // gidis / gelis ayrimi: cift sari surekli (eski beton refuj carpismasizdi, kaldirildi)
                     const Color yc = fog(L({0.95f, 0.8f, 0.2f}), cL.w);
                     strip(da + 0.13, db + 0.13, 0.05, yc); strip(da - 0.13, db - 0.13, 0.05, yc);
                 }

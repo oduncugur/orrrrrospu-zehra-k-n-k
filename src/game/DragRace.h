@@ -10,6 +10,7 @@
 #pragma once
 #include "sim/VehicleSim.h"
 
+#include <cmath>
 #include <cstdint>
 #include <future>
 #include <memory>
@@ -95,7 +96,7 @@ public:
     // Yaris mesafesi (m): 1/4 mil (varsayilan), 1/2 mil, 1 mil. Yesilden once ayarlanir; slip.quarter = bu mesafenin ET'si.
     void setLength(double m) { length_ = m; }
     double length() const { return length_; }
-    bool isQuarter() const { return length_ < kQuarterMile + 1.0; }
+    bool isQuarter() const { return std::fabs(length_ - kQuarterMile) < 1.0; }   // 1/8 de 1/4 degil (ET kaydi yok)
     static QuarterEstimate estimateQuarter(const VehicleDef* car, const Tune* tune);   // pahali: arka planda
 
 private:

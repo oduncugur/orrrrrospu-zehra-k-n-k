@@ -26,8 +26,8 @@ constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 35
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
 constexpr float kLcDn[4] = {352, 62, 382, 88}, kLcUp[4] = {484, 62, 514, 88};   // 2-step kalkis devri (yesilden once)
 constexpr float kDist[4] = {140, 62, 244, 88};                                      // yaris mesafesi (yesilden once)
-const double kDistM[3] = {DragRace::kQuarterMile, DragRace::kHalfMile, DragRace::kMile};
-const char* const kDistName[3] = {"1/4 MIL", "1/2 MIL", "1 MIL"};
+const double kDistM[4] = {DragRace::kQuarterMile, DragRace::kHalfMile, DragRace::kMile, DragRace::kQuarterMile * 0.5};
+const char* const kDistName[4] = {"1/4 MIL", "1/2 MIL", "1 MIL", "1/8 MIL"};   // 3: 1/8 (eski kayit sirasi korunur)
 constexpr float kAgain[4] = {120, 262, 250, 296}, kGarage[4] = {260, 262, 390, 296}, kGraph[4] = {400, 262, 520, 296};
 constexpr float kCamLead = 8.0f;                     // oyuncu arac merkezi, ekranin solundan 8 m sagda
 
@@ -57,7 +57,7 @@ void DragScreen::restart() {
     race_ = std::make_unique<DragRace>(carIds_[0], carIds_[1], app_.treePro ? TreeType::Pro : TreeType::Sportsman, seed_, true,
                                        hasTune_[0] ? &tunes_[0] : nullptr, hasTune_[1] ? &tunes_[1] : nullptr);
     race_->setOpponentHandicap(app_.activeEvent >= 0 || app_.activeTour || app_.activeMeet ? app_.eventHandicap : 1.6);
-    race_->setLength(kDistM[std::clamp(app_.settings.dragDist, 0, 2)]);   // rakip insan gibi hata yapar
+    race_->setLength(kDistM[std::clamp(app_.settings.dragDist, 0, 3)]);   // rakip insan gibi hata yapar
     if (career_ && app_.career.car().carId == carIds_[0]) race_->lane(0).sim->setNosFill(app_.career.car().nosFill);   // tupte kalan
     rewarded_ = false; prize_ = 0;
     tel_.clear(); telT_ = telAcc_ = 0; showGraph_ = std::getenv("ZK_GRAPH") != nullptr;
@@ -134,7 +134,7 @@ void DragScreen::pointerDown(int id, float x, float y) {
     }
     if (ph == RacePhase::Burnout && in(kStageBtn, x, y)) { race_->skipBurnout(); return; }
     if ((ph == RacePhase::Burnout || ph == RacePhase::Staging) && in(kDist, x, y)) {   // mesafe: 1/4 -> 1/2 -> 1 mil (yaris yeniden kurulur)
-        app_.settings.dragDist = (app_.settings.dragDist + 1) % 3; app_.saveSettings();
+        app_.settings.dragDist = (app_.settings.dragDist + 1) % 4; app_.saveSettings();
         restart();
         return;
     }
@@ -536,7 +536,7 @@ void DragScreen::drawHud(Renderer& r) {
     r.rect(0, 0, 640, kWorldTop, {0.07f, 0.07f, 0.09f, 0.95f});
     if (ph == RacePhase::Burnout || ph == RacePhase::Staging) {          // mesafe secimi (dokun: 1/4 -> 1/2 -> 1 mil)
         r.rect(kDist[0], kDist[1], kDist[2], kDist[3], {0.30f, 0.20f, 0.08f, 0.9f});
-        r.textCentered((kDist[0] + kDist[2]) / 2, kDist[1] + 9, kDistName[std::clamp(app_.settings.dragDist, 0, 2)], 1, {1.0f, 0.85f, 0.3f});
+        r.textCentered((kDist[0] + kDist[2]) / 2, kDist[1] + 9, kDistName[std::clamp(app_.settings.dragDist, 0, 3)], 1, {1.0f, 0.85f, 0.3f});
     }
     if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
         && box != Gearbox::TorqueConverter) {
@@ -729,7 +729,7 @@ void DragScreen::drawResults(Renderer& r) {
     row(3, "1/8", sec(P.slip.eighth), sec(O.slip.eighth));
     row(4, app_.settings.mph ? "1/8 MPH" : "1/8 KMH", kmh(P.slip.eighthKmh), kmh(O.slip.eighthKmh));
     row(5, "1000 FT", sec(P.slip.t1000), sec(O.slip.t1000));
-    row(6, (std::string(kDistName[std::clamp(app_.settings.dragDist, 0, 2)]).substr(0, 3) + " ET").c_str(), sec(P.slip.quarter), sec(O.slip.quarter));
+    row(6, (std::string(kDistName[std::clamp(app_.settings.dragDist, 0, 3)]).substr(0, 3) + " ET").c_str(), sec(P.slip.quarter), sec(O.slip.quarter));
     row(7, "TRAP", kmh(P.slip.trapKmh), kmh(O.slip.trapKmh));
     if (P.slip.broke || O.slip.broke || P.slip.stalled || O.slip.stalled) {
         std::string n = std::string(P.slip.broke ? "SEN: AKS KIRIK " : "") + (O.slip.broke ? "RAKIP: AKS KIRIK " : "") +

@@ -114,6 +114,50 @@ void RoadSession::trafficPose(const TrafficCar& t, double& x, double& y, double&
 }
 
 // Arac-trafik carpismasi: trafik aracinin kutusu (4.4 x 1.8 m) icinde mi? Hiz kaybi + trafik araci savrulur (yeniden dogar)
+int RoadSession::zoneAt(double s) const {
+    auto hashf = [](int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; };
+    const bool mtn = kind_ == Kind::Touge;
+    const int block = (int)(s / 350.0);
+    if (block < 1) return 0;                                           // baslangic acik alanda
+    const float h = hashf(block * 13 + (int)raceLength());
+    if (mtn) return h < 0.18f ? 2 : 0;
+    if ((mode_ == Mode::Karma || mode_ == Mode::Marathon) && road_.curvyAt(s)) return 0;
+    return h < 0.32f ? 1 : h < 0.40f ? 2 : 0;
+}
+
+double RoadSession::wallAt(double s) const {
+    const double hw = road_.halfWidthAt(s);
+    const int z = zoneAt(s);
+    if (z == 2) return hw + 1.2;                                       // tunel duvari
+    if (kind_ == Kind::Touge) return hw + 1.2;                        // dag: celik bariyer / kaya
+    if (z == 1) return hw + 4.8;                                       // sehir: bina cephesi
+    if (hw > 4.6) return hw + 2.0;                                     // otoban bariyeri
+    return -1.0;
+}
+
+void RoadSession::wallContact(RoadCar& car) {
+    const double wall = wallAt(car.s());
+    if (wall < 0) return;
+    const double half = 0.95, lat = car.lateral();
+    const double pen = std::fabs(lat) + half - wall;
+    if (pen <= 0) return;
+    VehicleSim& sm = car.sim();
+    const RoadPoint p = road_.at(car.s());
+    const double sg = lat > 0 ? 1.0 : -1.0;
+    const double nx = -std::sin(p.heading) * sg, ny = std::cos(p.heading) * sg;   // yol disina dogru
+    sm.nudge(-nx * pen, -ny * pen);                                    // duvarin icine geri
+    double vx, vy; sm.worldVelocity(vx, vy);
+    const double vn = vx * nx + vy * ny;
+    if (vn > 0) {                                                      // duvara dogru hiz: soner (az sekme) + surtunme
+        const double m = sm.mass(), j = m * vn * 1.3;
+        sm.applyImpulse(-nx * j, -ny * j, 0, 0);
+        const double tx = -ny, ty = nx, vt = vx * tx + vy * ty;
+        sm.applyImpulse(-tx * m * vt * 0.12, -ty * m * vt * 0.12, 0, 0);   // surtunme: hiz kaybi
+        if (&car == player_.get() && vn > 4.0 && !wallHit_) { msgs_.push_back(vn > 9.0 ? "DUVARA CARPTIN!" : "DUVAR!"); crashEv_ = true; }
+    }
+    if (&car == player_.get()) wallHit_ = vn > 4.0;
+}
+
 void RoadSession::collide(RoadCar& car, bool isPlayer) {
     const double cx = car.sim().posX(), cy = car.sim().posY();
     for (TrafficCar& t : traffic_) {
@@ -324,6 +368,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
         return;
     }
     player_->update(dt, in);
+    wallContact(*player_);
     if (mode_ == Mode::Marathon) {
         fuelStep(dt);
         static const double kWarn = 1.0;
@@ -382,6 +427,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
     } else if (mode_ == Mode::Chase) rival_->update(dt, phase_ == Phase::Run ? chaseControls() : RoadControls{0, 0, 0.6});
     else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
+    wallContact(*rival_);
     collide(*rival_, false);
     // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h); 2B drag bolumunde yok
     if (dragPart()) touching_ = false;

@@ -456,6 +456,19 @@ int main() {
         std::printf("    15 s tam gaz D: %.0f km/h, en yuksek vites %d\n", a.sim().speed() * 3.6, maxGear);
         CHECK(maxGear >= 4 && a.sim().speed() > 150 / 3.6, "D konumunda otomatik vites");
     }
+    std::printf("[W] Dag yolu bariyeri: tam gaz tam kilit, arac bariyerden cikmaz (dag icine girmez)\n");
+    {
+        RoadSession ses(RoadSession::Mode::Free, 217, nullptr, 0, nullptr, 3u, RoadSession::Kind::Touge);
+        RoadControls k; k.throttle = 1.0; k.steer = -0.5;               // saga tam kilit
+        double worst = -1e9;
+        for (int i = 0; i < 60 * 12; ++i) {
+            ses.update(1.0 / 60.0, k);
+            const RoadCar& P = ses.player();
+            worst = std::max(worst, std::fabs(P.lateral()) + 0.95 - ses.wallAt(P.s()));
+        }
+        std::printf("    en buyuk tasma: %.2f m (bariyer yol kenarindan 1.2 m)\n", worst);
+        CHECK(worst < 0.25, "bariyer arac gecirmez");
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }
