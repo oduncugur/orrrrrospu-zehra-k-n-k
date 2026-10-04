@@ -126,18 +126,25 @@ int RoadSession::zoneAt(double s) const {
     return h < 0.32f ? 1 : h < 0.40f ? 2 : 0;
 }
 
-double RoadSession::wallAt(double s) const {
+double RoadSession::wallAt(double s, int side) const {
     const double hw = road_.halfWidthAt(s);
     const int z = zoneAt(s);
     if (z == 2) return hw + 1.2;                                       // tunel duvari
+    for (double k = 2.0; k <= 160.0; k += 4.0)                         // tunel yaklasma yamaci (dag yanlarda yukselir)
+        if (zoneAt(s + k) == 2 || zoneAt(s - k) == 2) return hw + 2.5;
     if (kind_ == Kind::Touge) return hw + 1.2;                        // dag: celik bariyer / kaya
     if (z == 1) return hw + 4.8;                                       // sehir: bina cephesi
     if (hw > 4.6) return hw + 2.0;                                     // otoban bariyeri
-    return -1.0;
+    if (side != 0) {                                                   // kirsal ahsap cit (cizimle ayni kesimler: 80 m bloklar)
+        auto hashf = [](int k) { unsigned x = (unsigned)k * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; };
+        const int i = (int)(s / RoadPath::kStep);
+        if (hashf((i / 40) * 3 + (side > 0)) >= 0.5f) return hw + 6.0;
+    }
+    return hw + 14.0;                                                  // acik arazi: yoldan fazla uzaklasilmaz (geri isinlanma yok)
 }
 
 void RoadSession::wallContact(RoadCar& car) {
-    const double wall = wallAt(car.s());
+    const double wall = wallAt(car.s(), car.lateral() > 0 ? 1 : -1);
     if (wall < 0) return;
     const double half = 0.95, lat = car.lateral();
     const double pen = std::fabs(lat) + half - wall;

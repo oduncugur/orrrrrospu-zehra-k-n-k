@@ -102,6 +102,7 @@ void App::setScreen(std::unique_ptr<Screen> s) {
     if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(screen_->landscape()); return; }
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
     windSpeed_ = 0.0f; nos_ = false; rain_ = false; siren_ = 0.0f;
+    for (Voice& v : voices_) { v.slip = 0.0f; v.lock = 0.0f; }      // yaris bitince lastik sesi menuye tasinmasin
 }
 void App::goGarage() {
     setVoice(1, nullptr);
@@ -174,23 +175,22 @@ void App::startTravel(int target, bool solo) {
     if (!career.canTravel(target, &why)) return;
     runPlan = {};
     runPlan.active = true; runPlan.from = career.city; runPlan.target = target; runPlan.solo = solo;
+    // Tek etap: kac sehir otesine gidiliyorsa tum ayaklarin toplami (ornek 110 + 130 = 240 km); alan en kalabalik ayaktan
     const int dir = target > career.city ? 1 : -1, leg = dir > 0 ? career.city : career.city - 1;
-    runPlan.realKm = Career::legKm(leg);
-    runPlan.field = solo ? std::vector<RunEntrant>{} : career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
+    runPlan.realKm = career.travelKm(target);
+    int fieldN = 0;
+    for (int c = std::min(career.city, target); c < std::max(career.city, target); ++c) fieldN = std::max(fieldN, Career::legField(c));
+    runPlan.field = solo ? std::vector<RunEntrant>{} : career.runField(fieldN, (uint32_t)(career.races * 131 + leg * 7 + 3));
     activeEvent = -1; activeTour = false; activeMeet = false;
     setScreen(std::make_unique<RoadScreen>(*this, career.car().carId, &career.car().tune));   // runPlan: The Run etabi
 }
 void App::continueTravel() { setScreen(std::make_unique<RoadScreen>(*this, career.car().carId, &career.car().tune)); }
 void App::nextTravelLeg(double fuelLeft) {
     if (!runPlan.active) return;
-    const int dir = runPlan.target > career.city ? 1 : -1;
-    career.arriveCity(career.city + dir);
+    career.arriveCity(runPlan.target);                                  // tek etap: dogrudan hedef sehir
     saveCareer();
-    if (career.city == runPlan.target) { runPlan.active = false; eventNote = std::string(Career::cityName(career.city)) + "'A VARDIN!"; return; }
-    const int leg = dir > 0 ? career.city : career.city - 1;
-    runPlan.realKm = Career::legKm(leg);
-    runPlan.field = runPlan.solo ? std::vector<RunEntrant>{} : career.runField(Career::legField(leg), (uint32_t)(career.races * 131 + leg * 7 + 3));
-    runPlan.fuelL = fuelLeft;                                           // depo bir sonraki etaba tasinir
+    runPlan.active = false; runPlan.fuelL = fuelLeft;
+    eventNote = std::string(Career::cityName(career.city)) + "'A VARDIN!";
 }
 
 void App::startMeet() {

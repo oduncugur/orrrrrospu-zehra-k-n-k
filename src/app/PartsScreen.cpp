@@ -160,7 +160,13 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
         const double d = ok ? et_->nxt.quarter - et_->cur.quarter : 0.0;
         r.text(72, py + 81, str(et_->cur) + " > " + str(et_->nxt) + " S", 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
     }
-    if (prev_.engineLoad > 1.0) r.text(180, py + 81, "MOTOR DAYANMAZ!", 1, down);
+    const PartCat pc = (PartCat)cat_;
+    const bool breathing = pc == PartCat::Intake || pc == PartCat::Throttle || pc == PartCat::IntakeMani || pc == PartCat::Header ||
+                           pc == PartCat::Catalyst || pc == PartCat::Exhaust;
+    const Tune& ct = app_.career.car().tune;
+    const int stage = ecuNewSystem(ct) ? ct.swMap : (ct.ecu > 0 ? 1 : 0);
+    if (breathing && stage == 0) r.text(180, py + 81, "ECU HARITASI YOK: KAZANC 0", 1, down);   // emme / egzoz harita ister
+    else if (prev_.engineLoad > 1.0) r.text(180, py + 81, "MOTOR DAYANMAZ!", 1, down);
     else if (prev_.gearboxLoad > 1.0) r.text(180, py + 81, "SANZIMAN DAYANMAZ!", 1, down);
     else if (prev_.octaneReq > prev_.octane) r.text(180, py + 81, "VURUNTU! OKTAN", 1, down);
     else if (prev_.heatLoad > 1.15) r.text(180, py + 81, "SOGUTMA YETMEZ", 1, kUiGold);
@@ -451,6 +457,13 @@ void FabricateScreen::refresh() {
     const VehicleDef& v = *findVehicle(oc.carId);
     now_ = tuneStats(v, oc.tune);
     next_ = tuneStats(v, built());
+    if ((PartCat)cat_ == PartCat::Gearbox) {                             // her vitesin son hizi icin: kesici x teker / son disli
+        const Tune bt = built();
+        VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &bt;
+        const VehicleSim sim(cfg);
+        const double rEff = sim.wheel(sim.drivenLeft()).rEff();
+        gearKmhPerRatio_ = sim.engineSpec().redlineRpm / 9.5493 * rEff * 3.6 / std::max(0.5, sim.gearboxSpec().finalDrive);
+    }
     confirm_ = false;
 }
 
@@ -478,6 +491,10 @@ void FabricateScreen::render(Renderer& r) {
     for (size_t i = 0; i < s.size(); ++i) {
         const float y = 92.0f + i * 50.0f;
         r.text(8, y, s[i].name, 1, kUiText);
+        if ((PartCat)cat_ == PartCat::Gearbox && gearKmhPerRatio_ > 0 && vals_[i] > 0.05) {   // bu vitesin son hizi (kesicide)
+            std::snprintf(b, sizeof b, "SON HIZ %.0f KM/H", gearKmhPerRatio_ / vals_[i]);
+            r.text(130, y, b, 1, {0.55f, 0.85f, 1.0f});
+        }
         std::snprintf(b, sizeof b, s[i].fmt, vals_[i]);
         r.text(352 - r.textWidth(b, 2), y - 3, b, 2, {1, 1, 1});
         const Rect minus{8, y + 14, 48, y + 44}, plus{312, y + 14, 352, y + 44};

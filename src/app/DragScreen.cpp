@@ -139,7 +139,7 @@ void DragScreen::pointerDown(int id, float x, float y) {
         return;
     }
     if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
-        && race_->lane(0).sim->gearboxType() != Gearbox::TorqueConverter && (in(kLcDn, x, y) || in(kLcUp, x, y))) {
+        && (in(kLcDn, x, y) || in(kLcUp, x, y))) {
         adjustLaunch(in(kLcUp, x, y) ? +250 : -250);
         return;
     }
@@ -538,8 +538,7 @@ void DragScreen::drawHud(Renderer& r) {
         r.rect(kDist[0], kDist[1], kDist[2], kDist[3], {0.30f, 0.20f, 0.08f, 0.9f});
         r.textCentered((kDist[0] + kDist[2]) / 2, kDist[1] + 9, kDistName[std::clamp(app_.settings.dragDist, 0, 3)], 1, {1.0f, 0.85f, 0.3f});
     }
-    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])
-        && box != Gearbox::TorqueConverter) {
+    if ((ph == RacePhase::Burnout || ph == RacePhase::Staging || ph == RacePhase::Tree) && hasTune_[0] && launchControlAvailable(tunes_[0])) {   // otomatikte de (fren + devir tutma)
         r.rect(kLcDn[0], kLcDn[1], kLcUp[2], kLcUp[3], {0.05f, 0.05f, 0.08f, 0.8f});
         r.rect(kLcDn[0], kLcDn[1], kLcDn[2], kLcDn[3], {0.25f, 0.27f, 0.35f});
         r.rect(kLcUp[0], kLcUp[1], kLcUp[2], kLcUp[3], {0.25f, 0.27f, 0.35f});

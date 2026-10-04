@@ -82,11 +82,16 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         bool knockSensor = true;
         const EcuOpt EC = effectiveEcu(*tune, &knockSensor);
         const double ecuMul = (forced || tune->turbo || tune->superch) ? EC.forced : EC.na;
+        // Emme / egzoz kazanci ancak yakit haritasiyla (ECU stage) alinir: harita yok 0, stage 1 tam, stage 2 x1.2, stage 3 x1.4
+        const int stage = ecuNewSystem(*tune) ? std::clamp(tune->swMap, 0, 3) : (tune->ecu > 0 ? 1 : 0);
+        static const double kStageK[4] = {0.0, 1.0, 1.2, 1.4};
+        const double sk = kStageK[stage];
+        auto gk = [&](double g) { return 1.0 + (g - 1.0) * sk; };
         if (IT.low == IT.high && EX.low == EX.high) {
-            double mul = IT.low * EX.low * ecuMul;
+            double mul = gk(IT.low) * gk(EX.low) * ecuMul;
             scaleCurves(eng_, constMul, &mul);
         } else {
-            ShapeCtx a{red0, IT.low, IT.high}, b{red0, EX.low, EX.high};
+            ShapeCtx a{red0, gk(IT.low), gk(IT.high)}, b{red0, gk(EX.low), gk(EX.high)};
             scaleCurves(eng_, shapeMul, &a); scaleCurves(eng_, shapeMul, &b);
             double m = ecuMul; scaleCurves(eng_, constMul, &m);
         }
@@ -95,7 +100,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             const IntakeOpt& MA = row(intakeManiTable(), tune->intakeMani);
             const ShapeOpt& HE = row(headerTable(), tune->header);
             const ShapeOpt& CT = row(catalystTable(), tune->catalyst);
-            auto apply = [&](double lo, double hi) { ShapeCtx c{red0, lo, hi}; scaleCurves(eng_, shapeMul, &c); };
+            auto apply = [&](double lo, double hi) { ShapeCtx c{red0, gk(lo), gk(hi)}; scaleCurves(eng_, shapeMul, &c); };   // haritaya bagli
             if (tune->throttleBody > 0) apply(TH.low, TH.high);
             if (tune->intakeMani > 0) apply(MA.low, MA.high);
             if (tune->header > 0) apply(HE.low, HE.high);

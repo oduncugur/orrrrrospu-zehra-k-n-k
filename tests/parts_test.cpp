@@ -182,6 +182,7 @@ int main() {
     {
         auto mass = [&](const Tune& t) { VehicleSimConfig c; c.car = &sahin; c.tune = &t; return VehicleSim(c).baseMassKg(); };
         Tune st, in1, in2, all;
+        st.ecu = in1.ecu = in2.ecu = all.ecu = 1;                       // emme / egzoz kazanci ECU haritasi (stage 1) ister
         in1.intake = 2; in2.throttleBody = 4; all.intake = 2; all.throttleBody = 4; all.intakeMani = 1; all.header = 1; all.catalyst = 4;
         const double h0 = peakHp(sahin, st), h1 = peakHp(sahin, in1), h2 = peakHp(sahin, in2), hA = peakHp(sahin, all);
         std::printf("    emme: stok %.0f, filtre %.0f, kelebek %.0f, filtre+kelebek+manifold+header+katalizor %.0f HP\n", h0, h1, h2, hA);

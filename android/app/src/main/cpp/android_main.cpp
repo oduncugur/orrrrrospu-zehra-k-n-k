@@ -438,7 +438,11 @@ void android_main(android_app* app) {
                     if (land) { if (ax > 3.0f) p.upX = 1; else if (ax < -3.0f) p.upX = -1; if (!p.upX) p.upX = 1; p.upY = 0; }
                     else { if (ay > 3.0f) p.upY = 1; else if (ay < -3.0f) p.upY = -1; if (!p.upY) p.upY = 1; p.upX = 0; }
                     const float side = ax * p.upY - ay * p.upX;                // g . (yukari saat yonunde 90 derece: (upY, -upX))
-                    const float t = std::clamp(side / (9.81f * 0.5f), -1.0f, 1.0f);
+                    // Gercek yatma acisi (telefonun one / arkaya egiminden bagimsiz): sifir = cihaz tam yatay (yercekimi),
+                    // acilis durusuna gore kalibrasyon yok. ~30 derece = tam direksiyon.
+                    const float upG = ax * p.upX + ay * p.upY, flat = std::sqrt(upG * upG + ev.acceleration.z * ev.acceleration.z);
+                    const float rollRad = std::atan2(side, std::max(flat, 0.5f));
+                    const float t = std::clamp(rollRad / 0.5236f, -1.0f, 1.0f);
                     p.tiltLp += (t - p.tiltLp) * 0.25f;
                     p.game->setTilt(p.tiltLp);
                 }

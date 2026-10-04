@@ -126,14 +126,12 @@ void RegionMapScreen::render(Renderer& r) {
         const int legs = std::abs(travelTo_ - c.city);
         std::snprintf(b, sizeof b, "%s -> %s", Career::cityName(c.city), Career::cityName(travelTo_));
         r.textFit(180, 194, b, 2, 320, kUiGold, true);
-        std::snprintf(b, sizeof b, "%.0f KM, %d ETAP", c.travelKm(travelTo_), legs);
+        std::snprintf(b, sizeof b, "%.0f KM, TEK ETAP (%d SEHIR)", c.travelKm(travelTo_), legs);
         r.textCentered(180, 220, b, 1, kUiText);
-        std::string rs = "THE RUN: ";
-        for (int k = 0; k < legs; ++k) {
-            const int from = travelTo_ > c.city ? c.city + k : c.city - k - 1;
-            char e[32]; std::snprintf(e, sizeof e, "%s%d ARAC", k ? " + " : "", Career::legField(from)); rs += e;
-        }
-        r.textFit(180, 236, rs, 1, 320, kUiDim, true);
+        int fieldN = 0;
+        for (int k = 0; k < legs; ++k) fieldN = std::max(fieldN, Career::legField(travelTo_ > c.city ? c.city + k : c.city - k - 1));
+        std::snprintf(b, sizeof b, "THE RUN: %d ARAC", fieldN);
+        r.textFit(180, 236, b, 1, 320, kUiDim, true);
         button(r, kRunT, "THE RUN ILE GIT >", kUiOrange, 2);
         r.textCentered(180, kRunT.y1 + 4, "ODUL + UN; YAKIT VE SIRA ONEMLI", 1, kUiDim);
         button(r, kSoloT, "TEK BASINA SUR (YARISSIZ)", Color{0.2f, 0.4f, 0.3f}, 2);

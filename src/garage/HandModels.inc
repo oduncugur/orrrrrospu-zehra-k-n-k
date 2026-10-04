@@ -207,8 +207,8 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
                     X(s1) - 0.003, sg * (y1 - 0.01), z0 + 0.075, X(s1) - 0.003, sg * (y0 + 0.02), z0 + 0.075, MatGlass);
         }
         for (double xa : {xFront, xRear}) {                               // teker yuvasi (koyu yarim disk, camurluk dudagi)
-            const double sa = (L * 0.5 - xa) / L, y = sg * (hw(sa) + flare(sa) + 0.003);
-            B.archY(xa, y, r - 0.01, 0.0, r * 1.13, 10, MatDark);
+            const double sa = (L * 0.5 - xa) / L;
+            B.archY(xa, sg * (hw(sa) + flare(sa) - 0.30), r - 0.01, 0.0, r * 1.13, 10, MatDark);   // yuva tekerin arkasinda
         }
     }
     // ---- tekerler (sira: on sol, on sag, arka sol, arka sag); dis yuz camurlukla hizali

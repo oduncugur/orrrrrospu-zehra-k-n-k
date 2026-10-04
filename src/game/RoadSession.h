@@ -29,8 +29,8 @@ public:
     static constexpr double kFlowTime = 120.0;       // akis modu suresi (s)
     enum class Phase { Countdown, Run, Finished };
     enum class Kind { Highway, Touge };               // sehirlerarasi (genis viraj) / dag yolu (dar, keskin)
-    // The Run: surulen uzunluk etabin gercek mesafesiyle orantili (130 km ~9 km, 480 km ~34 km)
-    static double runDrivenM(double realKm) { return std::clamp(realKm * 70.0, 8000.0, 34000.0); }
+    // The Run: surulen uzunluk etabin gercek mesafesiyle orantili (km basina 140 m: 110 km ~15 km, 130 km ~18 km, 480 km 60 km)
+    static double runDrivenM(double realKm) { return std::clamp(realKm * 140.0, 10000.0, 60000.0); }
     double raceLength() const {                       // m
         if (mode_ == Mode::Karma) return road_.length() - kStartS - 300.0;
         if (mode_ == Mode::Chase) return 5000.0;
@@ -73,7 +73,7 @@ public:
     int zoneAt(double s) const;
     // Yol kenarindaki sert engelin yol merkezinden uzakligi (m): tunel duvari, dag / otoban bariyeri, sehir binalari;
     // -1: engel yok (acik arazi)
-    double wallAt(double s) const;
+    double wallAt(double s, int side = 0) const;   // side: +1 sol / -1 sag (kirsal cit yalniz bazi kesimlerde, tek tarafta)
     Phase phase() const { return phase_; }
     double countdown() const { return countdown_; }
     // Karma: drag agaci (geri sayimin son 1.5 s'si 3 amber, sonra yesil); tepki = yesilden kalkisa (-1: henuz yok)

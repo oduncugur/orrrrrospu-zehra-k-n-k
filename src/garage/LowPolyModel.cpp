@@ -372,7 +372,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     for (double x : {xFront, xRear})
         for (double sg : {-1.0, 1.0}) {
             const double y = sg * (W * 0.5 + 0.004);
-            B.archY(x, y, r, 0.0, r * 1.12, 12, MatDark);
+            B.archY(x, sg * (W * 0.5 - tw - 0.03), r, 0.0, r * 1.12, 12, MatDark);   // koyu yuva tekerin ARKASINDA (onde tekeri ortuyordu)
             B.archY(x, y + sg * 0.004, r, r * 1.12, r * 1.20, 12, v.widebody || sh.arch == SUV_SMALL ? MatTrim : MatPaint);
         }
 

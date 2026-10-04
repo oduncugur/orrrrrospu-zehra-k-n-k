@@ -46,8 +46,8 @@ void TireAudio::render(float* out, int n, double slip, float gain, double lockSp
                              : std::clamp((slip - 1.0) / 3.5, 0.0, 1.0) * (1.0 - 0.8 * std::clamp((slip - 8.0) / 8.0, 0.0, 1.0));
     const double burnT = locked ? 0.0 : std::clamp((slip - 7.0) / 10.0, 0.0, 1.0);
     // Ton perdesi: hafif kaymada ~650 Hz, artan kaymada ~1150 Hz'e cikar
-    const double f0 = locked ? 400.0 + 800.0 * std::clamp(lockSpeed / 30.0, 0.0, 1.0)      // kilit: hizla 1.2 kHz -> 400 Hz
-                             : (650.0 + 45.0 * std::min(slip, 11.0)) * (1.0 - 0.15 * burnT);   // burnoutta perde iner (Gemini)
+    const double f0 = locked ? 300.0 + 500.0 * std::clamp(lockSpeed / 30.0, 0.0, 1.0)      // kilit: hizla 800 -> 300 Hz
+                             : (450.0 + 30.0 * std::min(slip, 11.0)) * (1.0 - 0.15 * burnT);   // daha kalin ciglik (tizlik azaltildi)
     if (std::fabs(f0 - lastF_) > 3.0) { lastF_ = f0; toneBand_.bandpass(f0, 4.0, fs_); }
     const double kEnv = 1.0 - std::exp(-1.0 / (0.025 * fs_)), kBurn = 1.0 - std::exp(-1.0 / (0.10 * fs_));
     const double kW = 1.0 - std::exp(-1.0 / (0.25 * fs_));     // yavas perde gezinmesi (~0.6 Hz)

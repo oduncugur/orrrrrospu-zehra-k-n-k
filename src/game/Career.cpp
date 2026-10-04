@@ -343,6 +343,7 @@ Tune opponentPreset(int i) {
     if (i == 1) {                                                   // SOKAK: emme / egzoz, kelebek, katalizor, fren, hafif ic
         t.intake = 1; t.exhaust = 1; t.tires = TireType::SemiSlick; t.diff = DiffType::OneAndHalfWay;
         t.throttleBody = 2; t.catalyst = 1; t.brakes = 1; t.brakeDisc = 1; t.weight = 1;
+        t.ecu = 1;                                                  // emme / egzoz kazanci icin stage 1 harita
     }
     if (i == 2) {                                                   // DRAG: ECU + yazilim, header, yakit, hafifletme, dusuk surtunme
         t.intake = 2; t.exhaust = 2; t.tires = TireType::DragSlick;

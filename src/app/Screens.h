@@ -192,6 +192,7 @@ private:
     Tune t_;
     std::vector<double> vals_;
     TuneStats now_, next_;
+    double gearKmhPerRatio_ = 0;                 // vites ekrani: son hiz = bu / (vites orani) (kesici, son disli, teker)
     bool confirm_ = false;
     int ptr_ = -1, held_ = -1, heldDir_ = 0, dragSlider_ = -1;
     double holdT_ = 0;
