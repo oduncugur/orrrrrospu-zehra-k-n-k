@@ -164,7 +164,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const double potential = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + HD.redline;
         valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 250.0 + potential);
         // Kam / kafa nefesi guc tepesini yukari tasir (egri tepe ustu gerilir); ECU devri acinca bu bolge kullanilir
-        const double breathe = 1.2 * ((tune->cam > 0 ? C.redline : 0.0) + HD.redline);
+        // ECU devri de tepeyi tasir (harita / avans ust devire gore): acilan devrin %60'i; kam / kafa ustune ekler
+        const double breathe = 1.2 * ((tune->cam > 0 ? C.redline : 0.0) + HD.redline) + 0.6 * std::max(0.0, EC.redline);
         if (breathe > 0.0) {
             const double piv = 0.45 * red0, k = (red0 + breathe - piv) / (red0 - piv);
             for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) if (pr.first > piv) pr.first = piv + (pr.first - piv) * k;

@@ -56,6 +56,11 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : eff + (top - eff) * std::pow(k, 1.3);
     if (sinceShift_ < 0.8 - 0.2 * tcu && !(thr > 0.85 && sinceShift_ > 0.35)) return;
     // Yukari: cikis devri (konvertor kaymasiz) vites noktasini gecti ya da motor kesiciye dayandi (kayma ile)
+    // Tam gazda (ve S'de) en iyi vites noktasi: ust viteste tekere giden cekis (tork x oran) bu vitesi gectigi an
+    if ((k > 0.8 || sport) && gear < pt.gearCount() && rpm > 0.55 * red) {
+        const double g0 = pt.gearRatio(gear), g1 = pt.gearRatio(gear + 1);
+        if (g0 > 0 && g1 > 0 && pt.wotTorqueAt(rpm) * g0 <= pt.wotTorqueAt(rpm * g1 / g0) * g1) { shift(gear + 1); return; }
+    }
     if ((rpm > up || pt.rpm() > red - (pt.converter() ? 350.0 : 120.0)) && gear < pt.gearCount()) { shift(gear + 1); return; }   // konvertor kaymasi: motor tekerlekten once kesiciye varir
     if (gear <= 1) return;
     const double rLow = rpm * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3);

@@ -96,6 +96,7 @@ public:
     double gearRatio(int g) const { return g >= 1 && g <= gearCount() ? gb_.ratios[g - 1] : 0.0; }
     double totalRatio()  const;
     const EngineSpec& engine() const { return e_; }
+    double wotTorqueAt(double rpm) const { return wotTorque(rpm); }   // tam gaz tork (vites noktasi hesabi)
     // olay mesajlari (VTEC gecisi, stop etme vb.)
     std::vector<std::string> drainEvents() { auto v = std::move(events_); events_.clear(); return v; }
 
