@@ -123,7 +123,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     if (box == Gearbox::HPattern) {
         cockpit_.configure(Cockpit::Lever::HPattern, gears, !app_.settings.autoClutch);
         P.manual = true; P.slowClutch = app_.settings.autoClutch;
-    } else if (box == Gearbox::TorqueConverter) {
+    } else if (box == Gearbox::TorqueConverter || box == Gearbox::DCT) {   // DSG / PDK da P-R-N-D-S + M (+/-) kapisi
         cockpit_.configure(Cockpit::Lever::Automatic, gears, false);
         P.manual = false;
     } else {

@@ -1,4 +1,5 @@
 // Acik yol testleri: yapay zeka surucusu prosedurel yolu yoldan cikmadan tamamlamali.
+#include "game/Career.h"
 #include "game/RoadCar.h"
 #include "game/RoadSession.h"
 #include "garage/VehicleCatalog.h"
@@ -439,6 +440,21 @@ int main() {
         std::printf("    en buyuk govde kaymasi: ESP kapali %.1f deg, acik %.1f deg\n", bOff * 57.3, bOn * 57.3);
         CHECK(bOn < bOff * 0.8 || bOn < 0.05, "ESP savrulmayi azaltir");
         CHECK(std::isfinite(lOn), "ESP ile kararli");
+    }
+    std::printf("[G] DSG takili arac D konumunda kendisi vites atar (otomatik kol)\n");
+    {
+        const RoadPath straight(7u, 20000.0, 4000.0);
+        Tune t;
+        for (int i = 0; i < (int)partOptions(PartCat::Gearbox).size(); ++i)
+            if (std::string(partOptions(PartCat::Gearbox)[i].name) == "VW DQ500 DSG 7") t.gearSwap = i;
+        RoadCar a(findVehicle(122), &t, straight, 0.0, -1.8);
+        CHECK(t.gearSwap > 0 && a.sim().gearboxType() == Gearbox::DCT, "E46 + DQ500 = cift kavrama");
+        a.manual = false;
+        RoadControls k; k.throttle = 1.0; k.autoMode = 0;              // D
+        int maxGear = 0;
+        for (int i = 0; i < 60 * 15; ++i) { a.update(1.0 / 60.0, k); maxGear = std::max(maxGear, a.sim().powertrain().gear()); }
+        std::printf("    15 s tam gaz D: %.0f km/h, en yuksek vites %d\n", a.sim().speed() * 3.6, maxGear);
+        CHECK(maxGear >= 4 && a.sim().speed() > 150 / 3.6, "D konumunda otomatik vites");
     }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
