@@ -41,7 +41,8 @@ jobs:
           cmake --build build-linux -j4
           cmake -B build-win -DCMAKE_TOOLCHAIN_FILE=/tmp/SDL/build-scripts/cmake-toolchain-mingw64-x86_64.cmake -DCMAKE_PREFIX_PATH=/tmp/sdl3-win
           cmake --build build-win -j4
-          ctest --test-dir build-linux --output-on-failure
+          # Kalan testlerin KALDI satirlari acik "annotation" olarak yazilir (log indirmeden okunur)
+          ctest --test-dir build-linux --output-on-failure > ctest.log 2>&1 || { grep -E "KALDI|Failed|\*\*\*" ctest.log | head -20 | sed 's/^/::error::/'; exit 1; }
           mkdir -p out/linux out/win
           cp build-linux/zehra_game build-linux/zehra_sim build-linux/zehra_garage out/linux/
           cp build-win/zehra_game.exe build-win/zehra_sim.exe build-win/zehra_garage.exe out/win/
