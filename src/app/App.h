@@ -93,6 +93,7 @@ public:
 
     // Ekranlar icin
     void goGarage();
+    void goIntro();                              // acilis sinematigi
     void goDrag(int playerCarId, int opponentCarId, bool autopilot = false);   // serbest (kariyer disi) yaris
     void goCareerRace();                        // kariyer araci + parcalari vs eslesen rakip
     void goParts(int cat = -1);                  // cat: dogrudan kategori (atolyeden donus)

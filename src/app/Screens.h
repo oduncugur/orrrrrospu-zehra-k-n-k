@@ -42,6 +42,27 @@ private:
     float spin_ = 0; double acc_ = 0; double hapT_ = 0;
 };
 
+// Acilis sinematigi: yatay 640x360 (IntroScreen.cpp)
+class IntroScreen : public Screen {
+public:
+    explicit IntroScreen(App& app);
+    bool landscape() const override { return true; }
+    void update(double dt) override;
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void key(Key k, bool down) override;
+
+private:
+    void finish();
+    float carX(double t) const;
+    App& app_;
+    bool full_ = true, done_ = false;
+    int carId_ = 122;
+    Renderer::CarLook look_;
+    double t_ = 0, dur_ = 7.2, red_ = 7000;
+    float spin_ = 0, halfL_ = 2.25f;
+};
+
 // Drag yarisi: yatay 640x360.
 class DragScreen : public Screen {
 public:

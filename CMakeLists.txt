@@ -46,7 +46,7 @@ target_link_libraries(zehra_ettable PRIVATE zk_sim)
 # Grafik masaustu istemcisi (SDL3 + OpenGL 3.3). SDL3 bulunamazsa atlanir.
 find_package(SDL3 CONFIG QUIET)
 if(SDL3_FOUND)
-  add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp
+  add_executable(zehra_game WIN32 src/desktop_main.cpp src/app/App.cpp src/app/Renderer.cpp src/app/GarageScreen.cpp src/app/IntroScreen.cpp
                  src/app/DragScreen.cpp src/app/MenuScreens.cpp src/app/PartsScreen.cpp src/app/JunkScreens.cpp src/app/Lang.cpp src/app/LeagueScreen.cpp src/app/BodyShopScreen.cpp src/app/AchievementsScreen.cpp src/app/SetupScreen.cpp src/app/StreetScreen.cpp src/app/GaugeShopScreen.cpp src/app/Gauges.cpp src/app/SaveCodeScreen.cpp src/app/RegionMapScreen.cpp src/app/RoadScreen.cpp src/app/SettingsScreen.cpp src/app/Cockpit.cpp src/app/GLApi.cpp)
   target_include_directories(zehra_game PRIVATE src third_party/khronos)
   if(TARGET SDL3::SDL3-static)

@@ -12,6 +12,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/App.cpp
     ${ZK_ROOT}/src/app/Renderer.cpp
     ${ZK_ROOT}/src/app/GarageScreen.cpp
+    ${ZK_ROOT}/src/app/IntroScreen.cpp
     ${ZK_ROOT}/src/app/DragScreen.cpp
     ${ZK_ROOT}/src/app/MenuScreens.cpp
     ${ZK_ROOT}/src/app/PartsScreen.cpp

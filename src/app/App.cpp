@@ -34,8 +34,13 @@ App::App(const std::string& saveDir) {
     selectedCar = career.car().carId;
     loadGhosts();
     applySettings();
-    setScreen(std::make_unique<GarageScreen>(*this));
+    // Acilis sinematigi (test calistirmalarinda yok; ZK_START_SCREEN=intro ile acilir)
+    const bool test = std::getenv("ZK_START_SCREEN") || std::getenv("ZK_AUTOPILOT") || std::getenv("ZK_START_DRAG");
+    if (test) setScreen(std::make_unique<GarageScreen>(*this));
+    else setScreen(std::make_unique<IntroScreen>(*this));
 }
+
+void App::goIntro() { setScreen(std::make_unique<IntroScreen>(*this)); }
 
 // Hayalet dosyasi: satir basina "arac ET n d0 d1 ..." (metin; bozuk satir atlanir)
 void App::loadGhosts() {

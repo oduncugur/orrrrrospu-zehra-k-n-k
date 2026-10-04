@@ -140,7 +140,8 @@ int main(int argc, char** argv) {
     }
     if (const char* ss = std::getenv("ZK_START_SCREEN")) {       // test: dogrudan bir ekran
         const std::string n = ss;
-        if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
+        if (n == "intro") game.goIntro();
+        else if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
         else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
