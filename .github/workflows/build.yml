@@ -71,7 +71,11 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: APK derle
+        env:
+          ZK_KEYSTORE_B64: ${{ secrets.ZK_KEYSTORE_B64 }}
+          ZK_KEYSTORE_PASS: ${{ secrets.ZK_KEYSTORE_PASS }}
         run: |
+          if [ -n "$ZK_KEYSTORE_B64" ]; then echo "$ZK_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/zk.keystore"; export ZK_KEYSTORE="$RUNNER_TEMP/zk.keystore"; echo "Sabit imza"; else echo "UYARI: imza secret'i yok (debug imzasi)"; fi
           export ZK_NDK_VERSION=$(basename "$ANDROID_NDK_LATEST_HOME")
           echo "NDK: $ZK_NDK_VERSION"
           gradle -p android assembleDebug --no-daemon --stacktrace

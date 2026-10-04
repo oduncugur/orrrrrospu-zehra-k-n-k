@@ -323,11 +323,11 @@ int main() {
         CHECK(o.targetHp > o.stockHp && o.reward > 0, "musteri teklifi: hedef fabrikadan yuksek, odeme var");
         const size_t n0 = j.cars.size();
         CHECK(j.acceptJob(0) && j.cars.size() == n0 + 1 && j.car().jobHp == o.targetHp && !j.car().raceable(), "isi al: arac garaja gelir, yarisamaz");
-        CHECK(!j.sellCurrent(&why) && why == "MUSTERI ARACI SATILAMAZ" && !j.acceptJob(0), "musteri araci satilamaz, ayni teklif tekrar alinmaz");
+        CHECK(!j.sellCurrent(&why) && why == "MUSTERI ARACI SATILAMAZ" && j.jobSeq[0] == 1, "musteri araci satilamaz, kabul edilen slota yeni teklif gelir");
         long paid = 0;
         CHECK(!j.deliverJob(&paid, &why) && why == "HEDEF GUCE ULASILMADI", "hedefe ulasmadan teslim yok");
         Career k2;
-        CHECK(Career::parse(j.serialize(), k2) && k2.car().jobHp == o.targetHp && k2.car().jobReward == o.reward && k2.jobTaken(0), "musteri isi kayitta");
+        CHECK(Career::parse(j.serialize(), k2) && k2.car().jobHp == o.targetHp && k2.car().jobReward == o.reward && k2.jobSeq[0] == 1, "musteri isi kayitta");
         j.cars[j.current].tune.engineSwap = 0;
         for (int sw = 1; sw < 300 && peakHpOf(*findVehicle(j.car().carId), j.car().tune) < o.targetHp; ++sw) j.cars[j.current].tune.engineSwap = sw;   // guclu motor
         const long jm = j.money;
@@ -352,7 +352,7 @@ int main() {
     {
         Career c = Career::newGame(); c.money = 100000;
         std::string why;
-        CHECK(c.city == 0 && !c.canTravel(1, &why) && why == "KILITLI: ONCEKI PATRONU YEN", "kilitli sehre gidilmez");
+        CHECK(c.city == 0 && c.canTravel(1) && !c.canTravel(2, &why) && why == "KILITLI: ONCEKI PATRONU YEN", "ayni ligin ikinci sehrine gidilir, kilitli lige gidilmez");
         CHECK(!c.canTravel(0, &why) && why == "ZATEN BURADASIN", "bulunulan sehir");
         for (int i = 0; i < (int)leagueEvents().size(); ++i)            // tum ligleri ac (patronlari kazanmis say)
             if (leagueEvents()[i].rival >= 0 && rivals()[leagueEvents()[i].rival].boss) c.recordEvent(i, true, 12.0, 0, nullptr);

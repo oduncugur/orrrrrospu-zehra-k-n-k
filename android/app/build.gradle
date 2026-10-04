@@ -12,8 +12,9 @@ android {
         applicationId 'com.zehrakinik.game'
         minSdk 26            // AAudio
         targetSdk 34
-        versionCode 2
-        versionName '0.2-garaj'
+        // Surum: CI calisma numarasi (her build bir oncekinin uzerine guncelleme olarak kurulur)
+        versionCode (System.getenv('GITHUB_RUN_NUMBER') ? 100 + System.getenv('GITHUB_RUN_NUMBER').toInteger() : 2)
+        versionName (System.getenv('GITHUB_RUN_NUMBER') ? "0.${System.getenv('GITHUB_RUN_NUMBER')}" : '0.2-garaj')
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
         externalNativeBuild {
             cmake {
@@ -25,7 +26,20 @@ android {
     externalNativeBuild {
         cmake { path 'src/main/cpp/CMakeLists.txt' }
     }
+    // Sabit imza: CI'da ZK_KEYSTORE (dosya yolu) + ZK_KEYSTORE_PASS varsa her build ayni anahtarla imzalanir
+    // (GitHub secret'lari; repo acik oldugu icin anahtar repoda tutulmaz). Yoksa varsayilan debug imzasi.
+    signingConfigs {
+        if (System.getenv('ZK_KEYSTORE')) {
+            zk {
+                storeFile file(System.getenv('ZK_KEYSTORE'))
+                storePassword System.getenv('ZK_KEYSTORE_PASS')
+                keyAlias 'zehrakinik'
+                keyPassword System.getenv('ZK_KEYSTORE_PASS')
+            }
+        }
+    }
     buildTypes {
         release { minifyEnabled false }
+        debug { if (System.getenv('ZK_KEYSTORE')) signingConfig signingConfigs.zk }
     }
 }

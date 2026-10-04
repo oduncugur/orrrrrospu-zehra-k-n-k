@@ -223,7 +223,8 @@ struct Career {
     long recordRun(int position, int count, double realKm);
     // ---- Sehirler (hikaye): her lig bir sehirde; sehirler arasi seyahat THE RUN etabiyla (her ara bir etap) ya da
     //      parali hizli gecisle. Lig etkinlikleri bulunulan sehirde oynanir.
-    static constexpr int kCities = 5;
+    static constexpr int kCities = 10;          // her ligde iki sehir (lig = sehir / 2)
+    static int cityLeague(int c) { return std::clamp(c, 0, kCities - 1) / 2; }
     static const char* cityName(int c);
     static double legKm(int from);              // c -> c+1 gercek mesafe (km)
     static int legField(int from);              // o etabin rakip sayisi (20 / 50 / 100 / 200)
@@ -270,7 +271,8 @@ struct Career {
     // Katil: giris ucreti alinir, siralama hesaplanir; place 1..10, prize odul (ilk uce)
     bool dynoEnter(int* place, long* prize, std::vector<DynoEntry>* board = nullptr, std::string* why = nullptr);
     struct JobOffer { int carId; int targetHp; long reward; int stockHp; };
-    int  jobDay = -1, jobMask = 0;         // bugun kabul edilen teklifler (bit)
+    int  jobDay = -1, jobMask = 0;         // (eski kayit uyumu)
+    int  jobSeq[3] = {0, 0, 0};            // teklif sirasi: kabul edilince o slota yeni teklif gelir
     JobOffer jobOffer(int k) const;        // bugunun 3 teklifi
     bool jobTaken(int k) const;
     bool acceptJob(int k, std::string* why = nullptr);

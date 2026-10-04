@@ -14,7 +14,7 @@ const char* leagueName(int l) {
     return n[std::clamp(l, 0, kLeagues - 1)];
 }
 double leagueIndexCap(int l) {
-    static const double c[kLeagues] = {95, 170, 270, 380, 0};
+    static const double c[kLeagues] = {125, 220, 340, 480, 0};
     return c[std::clamp(l, 0, kLeagues - 1)];
 }
 const char* eventModeName(EventMode m) {
