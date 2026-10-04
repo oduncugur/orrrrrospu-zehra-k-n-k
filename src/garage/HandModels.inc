@@ -41,53 +41,62 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         return 0.022 * std::exp(-a * a) + 0.030 * std::exp(-b * b);
     };
     auto cabin = [&](double s) { return s > cowl && s < deck; };
-    // Sol yarim kesit: 9 nokta (alt orta .. ust orta)
+    // Sol yarim kesit: 12 nokta (alt orta .. ust orta). E46: belirgin esik (marspiyel) kivrimi, kapi kolu hizasinda
+    // karakter cizgisi, M3 camurluk sisligi, omuz, cam alti, cam ustu, yuvarlak tavan kenari.
+    constexpr int NP = 12, NR = 2 * NP - 2;
     auto ring = [&](double s, double (*p)[2]) {
         const double h = hw(s), zb = bot(s), zl = belt(s), zt = top(s), fl = flare(s);
-        p[0][0] = 0;            p[0][1] = zb;
-        p[1][0] = h * 0.90;     p[1][1] = zb;
-        p[2][0] = h * 0.985;    p[2][1] = zb + 0.09;
-        p[3][0] = h + fl;       p[3][1] = std::min(zb + 0.30, zl - 0.10);
-        p[4][0] = h + fl * 0.6; p[4][1] = zl - 0.045;
-        p[5][0] = h * 0.985;    p[5][1] = zl;
-        if (cabin(s)) {                                                   // cerceve: cam alti, tavan kenari (tumblehome)
-            const double z6 = zl + 0.045, z7 = std::max(zt - 0.035, z6 + 0.006);
-            const double k = std::clamp((zt - zl) / (1.37 - 0.86), 0.0, 1.0);   // camin dikligi: tavanda tam iceri
-            p[6][0] = h * 0.935;               p[6][1] = z6;
-            p[7][0] = h * (0.935 - 0.17 * k);  p[7][1] = z7;
-        } else {                                                          // kaput / bagaj: omuz + power-dome
-            const double dome = (s > 0.06 && s < 0.31) ? 0.022 * std::sin(kPi * (s - 0.06) / 0.25) : 0.0;
-            p[6][0] = h * 0.955; p[6][1] = std::max(zl + 0.012, zt - 0.025);
-            p[7][0] = h * 0.40;  p[7][1] = zt + dome;
+        const double dome = (s > 0.06 && s < 0.31) ? 0.022 * std::sin(kPi * (s - 0.06) / 0.25) : 0.0;   // M3 kaput kubbesi
+        p[0][0] = 0;                  p[0][1] = zb;
+        p[1][0] = h * 0.86;           p[1][1] = zb;
+        p[2][0] = h * 0.965;          p[2][1] = zb + 0.05;                  // esik alti
+        p[3][0] = h * 0.985 + fl * 0.3; p[3][1] = zb + 0.15;                // esik kivrimi (marspiyel)
+        p[4][0] = h * 0.975 + fl * 0.4; p[4][1] = zb + 0.20;                // kivrimin ici (golge cizgisi)
+        p[5][0] = h + fl;             p[5][1] = std::min(zb + 0.38, zl - 0.20);   // en genis: camurluk / kapi gobegi
+        p[6][0] = h * 0.998 + fl * 0.8; p[6][1] = zl - 0.13;                // karakter cizgisi (kapi kolu hizasi)
+        p[7][0] = h * 0.990 + fl * 0.4; p[7][1] = zl - 0.04;                // omuz
+        if (cabin(s)) {                                                     // cam alti, cam ustu (tumblehome), tavan kenari
+            const double z8 = zl + 0.045, z9 = std::max(zt - 0.06, z8 + 0.006);
+            const double k = std::clamp((zt - zl) / (1.37 - 0.86), 0.0, 1.0);
+            p[8][0] = h * 0.965;               p[8][1] = zl;
+            p[9][0] = h * 0.935;               p[9][1] = z8;
+            p[10][0] = h * (0.935 - 0.17 * k); p[10][1] = z9;
+            p[11][0] = 0;                      p[11][1] = zt + 0.006;
+            // tavan kenari yuvarlatma: ust ortaya giden son noktayi biraz iceri ve yukari (yuvarlak tavan)
+            p[10][0] = std::max(p[10][0] - 0.0, 0.0);
+        } else {                                                            // kaput / bagaj: omuz, kenar, kubbe
+            p[8][0] = h * 0.975;  p[8][1] = std::max(zl, zt - 0.06);
+            p[9][0] = h * 0.950;  p[9][1] = std::max(zl + 0.012, zt - 0.025);
+            p[10][0] = h * 0.55;  p[10][1] = zt + dome * 0.6;
+            p[11][0] = 0;         p[11][1] = zt + dome;
         }
-        p[8][0] = 0; p[8][1] = cabin(s) ? zt + 0.006 : zt + ((s > 0.06 && s < 0.31) ? 0.022 * std::sin(kPi * (s - 0.06) / 0.25) : 0.0);
     };
     // Istasyonlar: uclarda ve cam gecislerinde sik, aks merkezleri dahil
-    std::vector<double> ss = {0.0, 0.006, 0.015, 0.03, 0.05, 0.08, 0.11, 0.14, 0.20, 0.24, cowl, 0.32, 0.36, 0.40, roofF, 0.49, 0.54, 0.59,
+    std::vector<double> ss = {0.0, 0.006, 0.015, 0.03, 0.05, 0.08, 0.11, 0.14, 0.17, 0.20, 0.24, cowl, 0.32, 0.36, 0.40, roofF, 0.49, 0.54, 0.59,
                               0.64, 0.68, roofR, 0.75, sideGlass1, 0.81, 0.85, deck, 0.92, 0.945, 0.965, 0.985, 0.995, 1.0,
-                              sF - 0.06, sF, sF + 0.06, sR - 0.06, sR, sR + 0.06, sideGlass0};
+                              sF - 0.08, sF - 0.04, sF, sF + 0.04, sF + 0.08, sR - 0.08, sR - 0.04, sR, sR + 0.04, sR + 0.08, sideGlass0};
     std::sort(ss.begin(), ss.end());
     ss.erase(std::unique(ss.begin(), ss.end(), [](double a, double b) { return std::fabs(a - b) < 0.004; }), ss.end());
-    // Halkalar: dongu sirasi L0..L8, R7..R1 (16 nokta)
-    std::vector<std::array<int, 16>> rings;
+    // Halkalar: dongu sirasi L0..L11, R10..R1 (22 nokta)
+    std::vector<std::array<int, NR>> rings;
     for (double s : ss) {
-        double p[9][2]; ring(s, p);
-        std::array<int, 16> R{};
-        for (int k = 0; k <= 8; ++k) R[k] = B.v(X(s), p[k][0], p[k][1]);
-        for (int k = 7; k >= 1; --k) R[16 - k] = B.v(X(s), -p[k][0], p[k][1]);
+        double p[NP][2]; ring(s, p);
+        std::array<int, NR> R{};
+        for (int k = 0; k < NP; ++k) R[k] = B.v(X(s), p[k][0], p[k][1]);
+        for (int k = NP - 2; k >= 1; --k) R[NR - k] = B.v(X(s), -p[k][0], p[k][1]);
         rings.push_back(R);
     }
-    auto segMat = [&](int j, double s) {                                  // j: sol yari segment (0 alt .. 7 ust)
+    auto segMat = [&](int j, double s) {                                  // j: sol yari segment (0 alt .. 10 ust)
         if (j == 0) return (int)MatDark;
-        if (j == 6 && s > sideGlass0 && s < sideGlass1) return (int)MatGlass;         // yan camlar (cercevesiz kupe)
-        if (j == 7 && ((s > cowl && s < roofF) || (s > roofR && s < deck))) return (int)MatGlass;   // on / arka cam
-        if (j == 6 && cabin(s)) return (int)MatPaint;                    // A / C direkleri govde renginde (kalin C diregi)
+        if (j == 3 && s > sF + 0.07 && s < sR - 0.07) return (int)MatDark;   // esik kivriminin golgesi (tekerler arasi)
+        if (j == 9 && s > sideGlass0 && s < sideGlass1) return (int)MatGlass;          // yan camlar (cercevesiz kupe)
+        if ((j == 10) && ((s > cowl && s < roofF) || (s > roofR && s < deck))) return (int)MatGlass;   // on / arka cam
         return (int)MatPaint;
     };
     for (size_t i = 0; i + 1 < rings.size(); ++i) {
         const double sm = 0.5 * (ss[i] + ss[i + 1]);
-        for (int k = 0; k < 16; ++k) {
-            const int k2 = (k + 1) % 16, j = k < 8 ? k : 15 - k;
+        for (int k = 0; k < NR; ++k) {
+            const int k2 = (k + 1) % NR, j = k < NP - 1 ? k : NR - 1 - k;
             B.quad(rings[i][k], rings[i + 1][k], rings[i + 1][k2], rings[i][k2], segMat(j, sm));
         }
     }
@@ -95,26 +104,37 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         const auto& R = end ? rings.back() : rings.front();
         const double s = end ? 1.0 : 0.0;
         const int c = B.v(X(s) + (end ? -0.004 : 0.004), 0, 0.5 * (bot(s) + top(s)));
-        for (int k = 0; k < 16; ++k) B.tri(c, R[k], R[(k + 1) % 16], MatPaint);
+        for (int k = 0; k < NR; ++k) B.tri(c, R[k], R[(k + 1) % NR], MatPaint);
     }
     const double xF = X(0.0), xB = X(1.0);
     // ---- on yuz: bobrek izgara, angel-eye farlar, alt hava girisi, sis farlari, plaka
     for (double sg : {1.0, -1.0}) {
-        B.diskX(xF + 0.010, sg * 0.095, 0.575, 0.072, 0.082, 10, MatChrome);       // bobrek: dikey, kromlu
-        B.diskX(xF + 0.014, sg * 0.095, 0.575, 0.058, 0.068, 10, MatDark);
-        // Far grubu: ice alcalan, yana ve kaputa sarilan damla bicimli lens (on yuz + kose egimi)
-        B.panel(xF + 0.006, sg * 0.20, 0.555, xF + 0.006, sg * 0.20, 0.625, xF + 0.006, sg * HW * 0.80, 0.650, xF + 0.006, sg * HW * 0.82, 0.565, MatDark);
-        B.panel(xF + 0.006, sg * HW * 0.80, 0.650, X(0.022), sg * HW * 0.93, 0.690, X(0.026), sg * HW * 0.95, 0.600, xF + 0.006, sg * HW * 0.82, 0.565, MatDark);
-        for (double yc : {0.32, 0.53}) {                                  // cift yuvarlak angel-eye (lens icinde)
-            B.diskX(xF + 0.011, sg * yc, 0.600, 0.056, 0.048, 12, MatChrome);
-            B.diskX(xF + 0.013, sg * yc, 0.600, 0.046, 0.039, 12, MatLight);
-            B.diskX(xF + 0.016, sg * yc, 0.600, 0.026, 0.022, 10, MatChrome);
+        // Bobrek izgara: kaputun on kenarinda, kromlu cerceve + dikey citalar
+        B.diskX(xF + 0.010, sg * 0.098, 0.590, 0.080, 0.070, 14, MatChrome);
+        B.diskX(xF + 0.014, sg * 0.098, 0.590, 0.066, 0.057, 14, MatDark);
+        for (int k = -2; k <= 2; ++k) B.panel(xF + 0.016, sg * (0.098 + k * 0.022) - 0.003, 0.545, xF + 0.016, sg * (0.098 + k * 0.022) + 0.003, 0.545,
+                                              xF + 0.016, sg * (0.098 + k * 0.022) + 0.003, 0.635, xF + 0.016, sg * (0.098 + k * 0.022) - 0.003, 0.635, MatTrim);
+        // Far grubu: genis, disa dogru yukselen ve kaputa / camurluga egimle sarilan seffaf lens (krom yansitici ici)
+        const double yIn = 0.19, yOut = HW * 0.93, sTop = 0.05;
+        const double zInB = 0.560, zOutB = 0.585, zInT = top(sTop) - 0.012, zOutT = std::min(top(sTop) - 0.05, belt(sTop) + 0.02);
+        B.panel(xF + 0.006, sg * yIn, zInB, xF + 0.006, sg * yOut, zOutB, X(sTop), sg * hw(sTop) * 0.93, zOutT, X(sTop), sg * yIn, zInT, MatChrome);
+        B.panel(xF + 0.009, sg * (yIn + 0.01), zInB + 0.008, xF + 0.009, sg * (yOut - 0.01), zOutB + 0.006,
+                X(sTop - 0.006), sg * (hw(sTop) * 0.93 - 0.01), zOutT - 0.006, X(sTop - 0.006), sg * (yIn + 0.01), zInT - 0.006, MatDark);   // lens ici koyu
+        for (double yc : {0.30, 0.52}) {                                  // cift yuvarlak angel-eye (lensin onunde)
+            B.diskX(xF + 0.012, sg * yc, 0.605, 0.064, 0.054, 14, MatChrome);
+            B.diskX(xF + 0.014, sg * yc, 0.605, 0.054, 0.045, 14, MatLight);
+            B.diskX(xF + 0.017, sg * yc, 0.605, 0.030, 0.025, 10, MatChrome);
         }
-        B.panel(X(0.024), sg * HW * 0.935, 0.640, X(0.024), sg * HW * 0.945, 0.615, X(0.012), sg * HW * 0.90, 0.605, X(0.012), sg * HW * 0.89, 0.630, MatIndicator);   // kose sinyal
-        B.diskX(xF + 0.010, sg * 0.60, 0.385, 0.038, 0.030, 10, MatLight);   // sis fari
+        B.panel(X(0.03), sg * HW * 0.945, 0.600, X(0.03), sg * HW * 0.955, 0.575, X(0.012), sg * HW * 0.90, 0.570, X(0.012), sg * HW * 0.89, 0.595, MatIndicator);   // kose sinyal
+        // M3 tampon: yan hava girisleri (sis farli)
+        B.panel(xF + 0.010, sg * 0.50, 0.405, xF + 0.010, sg * 0.50, 0.275, xF + 0.010, sg * 0.74, 0.290, xF + 0.010, sg * 0.74, 0.395, MatDark);
+        B.diskX(xF + 0.013, sg * 0.62, 0.340, 0.040, 0.034, 12, MatLight);   // sis fari
     }
-    B.panel(xF + 0.012, 0.50, 0.46, xF + 0.012, 0.50, 0.32, xF + 0.012, -0.50, 0.32, xF + 0.012, -0.50, 0.46, MatDark);   // alt hava girisi
-    B.panel(xF + 0.016, 0.24, 0.47, xF + 0.016, 0.24, 0.39, xF + 0.016, -0.24, 0.39, xF + 0.016, -0.24, 0.47, MatPlate);
+    // M3 tampon: buyuk orta hava girisi (trapez), plaka uzerinde; alt splitter
+    B.panel(xF + 0.012, 0.40, 0.410, xF + 0.012, 0.36, 0.245, xF + 0.012, -0.36, 0.245, xF + 0.012, -0.40, 0.410, MatDark);
+    for (int k = -3; k <= 3; ++k) B.panel(xF + 0.015, k * 0.10 - 0.004, 0.25, xF + 0.015, k * 0.10 + 0.004, 0.25, xF + 0.015, k * 0.10 + 0.004, 0.40, xF + 0.015, k * 0.10 - 0.004, 0.40, MatTrim);
+    B.panel(xF + 0.016, 0.24, 0.500, xF + 0.016, 0.24, 0.425, xF + 0.016, -0.24, 0.425, xF + 0.016, -0.24, 0.500, MatPlate);
+    B.panel(xF + 0.02, 0.78, 0.205, xF - 0.06, 0.78, 0.205, xF - 0.06, -0.78, 0.205, xF + 0.02, -0.78, 0.205, MatDark);   // splitter
     // ---- arka: L stoplar (yana sarar), bagaj cizgisi, plaka, difuzor, dortlu egzoz
     for (double sg : {1.0, -1.0}) {
         B.panel(xB - 0.008, sg * 0.40, 0.905, xB - 0.008, sg * 0.40, 0.835, xB - 0.008, sg * HW * 0.85, 0.835, xB - 0.008, sg * HW * 0.85, 0.905, MatTail);
