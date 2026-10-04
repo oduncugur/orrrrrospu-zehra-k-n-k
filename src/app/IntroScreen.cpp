@@ -137,9 +137,9 @@ void IntroScreen::render(Renderer& r) {
     for (float sz : {-0.55f, 0.55f}) {
         const P2 f = proj(VP, cx + halfL_ - 0.05f, 0.62f, sz);
         if (front && f.ok && f.w > 0.5f) {
-            const float k = std::clamp(9.0f / f.w, 0.4f, 6.0f);
-            r.circle(f.x, f.y, 26 * k, 18, {1.0f, 0.95f, 0.8f, 0.10f});
-            r.circle(f.x, f.y, 9 * k, 14, {1.0f, 0.97f, 0.9f, 0.35f});
+            const float k = std::clamp(9.0f / f.w, 0.4f, 1.6f);           // yakinda buyumez (leke olmasin)
+            if (f.w > 8.0f) r.circle(f.x, f.y, 22 * k, 18, {1.0f, 0.95f, 0.8f, 0.08f});   // hale yalniz uzaktan
+            r.circle(f.x, f.y, 7 * k, 14, {1.0f, 0.97f, 0.9f, 0.25f});
             r.circle(f.x, f.y, 3 * k, 10, {1.0f, 1.0f, 1.0f, 0.95f});
             r.rect(f.x - 1.5f * k, f.y + 4 * k, f.x + 1.5f * k, f.y + 60 * k, {1.0f, 0.95f, 0.8f, 0.08f});   // asfaltta far yansimasi
         }
