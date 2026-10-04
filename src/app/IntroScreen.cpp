@@ -87,15 +87,29 @@ void IntroScreen::render(Renderer& r) {
     }
     // ---- islak asfalt: koyu, ufukta isik yansimasi (dikey cizgiler) ----
     r.gradientV(0, horizon, kW, kH, {0.06f, 0.05f, 0.09f}, {0.015f, 0.015f, 0.025f});
-    for (int k = 0; k < 30; ++k) {
-        const float x = std::fmod(k * 23.7f - t * 4.0f + 1000.0f, (float)kW);
-        const Color c = hashI(k) > 0.5f ? Color{1.0f, 0.6f, 0.3f, 0.10f} : Color{0.4f, 0.5f, 1.0f, 0.08f};
-        r.rect(x, horizon, x + 2 + 3 * hashI(k * 9), horizon + 40 + 120 * hashI(k * 13), c);
+    r.gradientV(0, horizon - 26, kW, horizon + 18, {0.30f, 0.16f, 0.32f, 0.0f}, {0.30f, 0.16f, 0.32f, 0.35f});   // ufuk sisi
+    for (int k = 0; k < 14; ++k) {                                         // sehir isiklarinin islak asfaltta uzayan yansimasi
+        const float x = std::fmod(k * 47.3f - t * 4.0f + 1000.0f, (float)kW);
+        const Color c = hashI(k) > 0.5f ? Color{1.0f, 0.62f, 0.3f, 0.0f} : Color{0.45f, 0.55f, 1.0f, 0.0f};
+        const float len = 50 + 90 * hashI(k * 13), wv = 1.5f + 1.2f * std::sin(t * 3.0f + k);
+        for (int s = 0; s < 6; ++s) {                                      // dalgali, asagi dogru sonen
+            const float y0 = horizon + s * len / 6, y1 = y0 + len / 6;
+            const float o = std::sin(t * 4.0f + k * 1.7f + s) * wv;
+            r.rect(x + o, y0, x + o + 3 + 4 * hashI(k * 9), y1, {c.r, c.g, c.b, 0.12f * (1.0f - s / 6.0f)});
+        }
+    }
+    // Sokak lambalari (ufukta): turuncu isik + koni
+    for (int k = 0; k < 6; ++k) {
+        const float x = std::fmod(k * 131.0f - t * 9.0f + 2000.0f, (float)kW + 80) - 40, top = horizon - 70;
+        r.rect(x - 1, top, x + 1, horizon, {0.08f, 0.07f, 0.1f});
+        r.circle(x, top, 14, 14, {1.0f, 0.65f, 0.3f, 0.10f});
+        r.circle(x, top, 3, 8, {1.0f, 0.85f, 0.6f, 0.9f});
+        r.tri(x, top, x - 34, horizon + 6, x + 34, horizon + 6, {1.0f, 0.6f, 0.3f, 0.05f});
     }
     // ---- kamera (cekime gore) ----
     const float cx = carX(t_);
     float ex, ey, ez, tx, ty, tz, fov = 0.75f;
-    if (t < 1.8f) { ex = 7.0f; ey = 0.45f; ez = 2.6f; tx = cx; ty = 0.6f; tz = 0.0f; fov = 0.55f; }                         // yaklasma
+    if (t < 1.8f) { ex = 4.5f; ey = 0.40f; ez = 1.9f; tx = cx; ty = 0.62f; tz = 0.0f; fov = 0.42f; }                         // yaklasma
     else if (t < 3.2f) { const float u = (t - 1.8f) / 1.4f, wx = cx + halfL_ - 0.8f - 1.4f * u; ex = wx + 0.6f; ey = 0.30f; ez = 3.4f; tx = wx; ty = 0.40f; tz = 0.6f; fov = 0.42f; }   // teker yani
     else if (t < 4.4f) { ex = cx - 4.6f; ey = 0.38f; ez = 1.5f; tx = cx; ty = 0.62f; tz = 0.0f; fov = 0.7f; }                // arka
     else { const float a = 0.6f + 0.55f * (t - 4.4f); ex = cx + 6.2f * std::cos(a); ey = 1.35f; ez = 6.2f * std::sin(a); tx = cx; ty = 1.05f; tz = 0.0f; fov = 0.6f; }   // kahraman
@@ -119,9 +133,10 @@ void IntroScreen::render(Renderer& r) {
     r.setCarLook(look_);
     r.drawCar(carId_, 0, 0, kW, kH, P, V, M, spin_);
     // ---- farlar (parlama) / stop / egzoz alevi ----
+    const bool front = ex > cx + halfL_ * 0.3f, rear = ex < cx - halfL_ * 0.3f;   // kamera onde mi / arkada mi
     for (float sz : {-0.55f, 0.55f}) {
         const P2 f = proj(VP, cx + halfL_ - 0.05f, 0.62f, sz);
-        if (f.ok && f.w > 0.5f) {
+        if (front && f.ok && f.w > 0.5f) {
             const float k = std::clamp(9.0f / f.w, 0.4f, 6.0f);
             r.circle(f.x, f.y, 26 * k, 18, {1.0f, 0.95f, 0.8f, 0.10f});
             r.circle(f.x, f.y, 9 * k, 14, {1.0f, 0.97f, 0.9f, 0.35f});
@@ -129,7 +144,7 @@ void IntroScreen::render(Renderer& r) {
             r.rect(f.x - 1.5f * k, f.y + 4 * k, f.x + 1.5f * k, f.y + 60 * k, {1.0f, 0.95f, 0.8f, 0.08f});   // asfaltta far yansimasi
         }
         const P2 s = proj(VP, cx - halfL_ + 0.05f, 0.82f, sz * 1.1f);
-        if (s.ok && s.w > 0.5f) { const float k = std::clamp(9.0f / s.w, 0.4f, 6.0f); r.circle(s.x, s.y, 7 * k, 12, {1.0f, 0.1f, 0.08f, 0.35f}); }
+        if (rear && s.ok && s.w > 0.5f) { const float k = std::clamp(9.0f / s.w, 0.4f, 4.0f); r.circle(s.x, s.y, 5 * k, 12, {1.0f, 0.1f, 0.08f, 0.25f}); r.circle(s.x, s.y, 2 * k, 8, {1.0f, 0.3f, 0.25f, 0.8f}); }
     }
     if (t > 3.2f && t < 4.4f && std::fmod(t - 3.2f, 0.4f) < 0.12f) {   // kesicide egzoz alevi
         const P2 e = proj(VP, cx - halfL_ - 0.1f, 0.3f, 0.45f);
@@ -142,6 +157,10 @@ void IntroScreen::render(Renderer& r) {
         const float y = std::fmod(hashI(k * 3) * kH + t * sp, (float)kH + 40) - 20;
         r.tri(x, y, x + 1.2f, y, x - 3.0f, y + 14.0f, {0.75f, 0.8f, 0.95f, 0.22f});
     }
+    // ---- vinyet ----
+    r.gradientV(0, 34, kW, 110, {0, 0, 0, 0.55f}, {0, 0, 0, 0.0f});
+    r.gradientV(0, kH - 110, kW, kH - 34, {0, 0, 0, 0.0f}, {0, 0, 0, 0.6f});
+    for (int i = 0; i < 10; ++i) { const float w = 6.0f * (10 - i); r.rect(0, 34, w, kH - 34, {0, 0, 0, 0.06f}); r.rect(kW - w, 34, kW, kH - 34, {0, 0, 0, 0.06f}); }
     // ---- sinematik bantlar + logo ----
     r.rect(0, 0, kW, 34, {0, 0, 0, 1}); r.rect(0, kH - 34, kW, kH, {0, 0, 0, 1});
     const float lt = t - 5.0f;
