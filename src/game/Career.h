@@ -246,7 +246,23 @@ struct Career {
     bool meetStart(std::string* why = nullptr);   // bahis masaya konur
     long recordMeet(bool won, long* fine); // net kazanc (+2 x bahis ya da 0) ; fine: polis cezasi (baskin yoksa 0)
     static constexpr double kRaidChance = 0.18;
+    bool meetPink = false;                 // bu bulusma pink slip (para yok: kazanan karsinin arabasini alir; 2+ arac)
+    bool meetPinkAvailable(std::string* why = nullptr) const;
+    int  meetPinkWon = 0;                  // son pink slip bulusmasinda kazanilan arac (0: yok, -id: kaybedilen)
+    // ---- Tefeci (kredi): acik lige gore limit; her yarista %5 faiz; 12 yarista kapanmazsa once para, sonra araba alinir
+    long loan = 0; int loanRaces = 0;
+    long loanLimit() const;
+    bool borrow(long amount, std::string* why = nullptr);
+    long repay(long amount);               // odenen
+    void loanRace();                       // her yaris sonunda (lig / serbest / bulusma / turnuva)
+    std::string loanNote;                  // son tefeci olayi (ekranda gosterilir, kaydedilmez)
     struct DynoEntry { const char* name; int carId; double hp; bool player; };
+    // ---- Haftalik arac gosterisi: boya / cila / serit / jant / govde kiti / basiklik / guc puani
+    int  showWeek = -1;
+    double showScore(const OwnedCar& c) const;
+    std::vector<DynoEntry> showField() const;   // bu haftanin 9 rakibi (hp alani: puan)
+    bool showAvailable(std::string* why = nullptr) const;
+    bool showEnter(int* place, long* prize, std::vector<DynoEntry>* board = nullptr, std::string* why = nullptr);
     int  dynoWeek = -1;                    // son katilinan hafta
     long dynoEntryFee() const;
     std::vector<DynoEntry> dynoField() const;    // bu haftanin 9 rakibi (oyuncunun seviyesinde)

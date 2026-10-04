@@ -399,7 +399,20 @@ bool Career::meetAvailable(std::string* why) const {
     if (money < meetStake()) return no("BAHSE PARA YETMIYOR");
     return true;
 }
+bool Career::meetPinkAvailable(std::string* why) const {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (cars.size() < 2) return no("PINK SLIP: EN AZ 2 ARAC");
+    if (garageFull()) return no("PINK SLIP: GARAJ DOLU");
+    return true;
+}
 bool Career::meetStart(std::string* why) {
+    if (meetPink) {
+        if (meetDone == meetSlot()) { if (why) *why = "BU GECE YARISTIN"; return false; }
+        if (!car().raceable()) { if (why) *why = "ARAC HASARLI"; return false; }
+        if (!meetPinkAvailable(why)) return false;
+        meetDone = meetSlot();
+        return true;
+    }
     if (!meetAvailable(why)) return false;
     money -= meetStake(); meetDone = meetSlot();
     return true;
@@ -408,12 +421,121 @@ long Career::recordMeet(bool won, long* fine) {
     const long stake = meetStake();
     ++races;
     long net = 0;
+    meetPinkWon = 0;
+    if (meetPink) {                                                    // pink slip: para yok, araba el degistirir
+        meetPink = false;
+        if (won) {
+            ++wins; rep += 6;
+            const Opponent o = meetOpponent();
+            OwnedCar oc; oc.carId = o.carId; oc.tune = o.tune;
+            cars.push_back(oc); meetPinkWon = o.carId;
+            dailyAdd(TaskType::WinDrag, 1); dailyAdd(TaskType::WinAny, 1);
+        } else if (cars.size() > 1) {
+            meetPinkWon = -car().carId;
+            cars.erase(cars.begin() + current);
+            current = std::min(current, (int)cars.size() - 1);
+        }
+        loanRace();
+        return 0;
+    }
     if (won) { ++wins; net = 2 * stake; money += net; earnings += stake; rep += 2; dailyAdd(TaskType::WinDrag, 1); dailyAdd(TaskType::WinAny, 1); }
     const bool raid = (mix32((uint32_t)meetSlot() * 977u + 5u) % 1000u) < (uint32_t)(kRaidChance * 1000.0);
     const long f = raid ? std::min(money, stake / 2) : 0;
     money -= f;
     if (fine) *fine = f;
+    loanRace();
     return net;
+}
+
+// ------------------------------------------------------------------ tefeci
+long Career::loanLimit() const { return 4000L + 6000L * leagueUnlocked() * (1 + leagueUnlocked()) / 2; }
+bool Career::borrow(long amount, std::string* why) {
+    amount = std::max(0L, amount) / 10 * 10;
+    if (amount <= 0) return false;
+    if (loan + amount > loanLimit()) { if (why) *why = "TEFECI: LIMIT DOLU"; return false; }
+    if (loan == 0) loanRaces = 0;
+    loan += amount; money += amount;
+    return true;
+}
+long Career::repay(long amount) {
+    const long p = std::min({std::max(0L, amount), loan, money});
+    loan -= p; money -= p;
+    if (loan == 0) loanRaces = 0;
+    return p;
+}
+void Career::loanRace() {
+    if (loan <= 0) return;
+    loan = (long)std::ceil(loan * 1.05 / 10.0) * 10;                   // yaris basina %5
+    if (++loanRaces < 12) return;
+    // Vade doldu: once para, yetmezse secili araba (en az bir arac kalir); kalan borc silinir (tefeci araciyla gider)
+    const long cash = std::min(money, loan);
+    money -= cash; loan -= cash;
+    char b[96];
+    if (loan > 0 && cars.size() > 1) {
+        std::snprintf(b, sizeof b, "TEFECI ARACINI ALDI: %s", findVehicle(car().carId)->fullName().c_str());
+        cars.erase(cars.begin() + current);
+        current = std::min(current, (int)cars.size() - 1);
+        loan = 0;
+    } else if (loan > 0) {
+        std::snprintf(b, sizeof b, "TEFECI PARANI ALDI, BORC SURUYOR: $%ld", loan);
+        loanRaces = 6;                                                     // yeni vade (6 yaris)
+    } else std::snprintf(b, sizeof b, "TEFECI BORCU PARANDAN KESTI: -$%ld", cash);
+    if (loan == 0) loanRaces = 0;
+    loanNote = b;
+}
+
+// ------------------------------------------------------------------ arac gosterisi
+double Career::showScore(const OwnedCar& c) const {
+    const Tune& t = c.tune;
+    double s = 0;
+    if (c.paint >= 0) s += 18;                                             // ozel boya
+    s += 6.0 * std::clamp(c.finish, 0, 3);                                 // metalik / mat / sedef
+    if (c.stripe > 0) s += 8;
+    if (c.rimCol >= 0) s += 5;
+    s += 3.0 * t.rims + 2.0 * t.susp;                                      // jant, basiklik
+    s += t.aero > 0 ? 10 + t.aero : 0;
+    s += 4.0 * ((t.aeroFront > 0) + (t.aeroSide > 0) + (t.aeroUnder > 0));
+    s += 0.08 * peakHpOf(*findVehicle(c.carId), t);
+    s -= 40.0 * std::clamp(t.wearBody, 0.0, 1.0);                         // pas / gocuk
+    return std::max(0.0, s);
+}
+std::vector<Career::DynoEntry> Career::showField() const {
+    static const char* const kNames[9] = {"KROM KAAN", "BASIK BARIS", "NEON NAZ", "JANTCI OZAN", "BOYACI SELO",
+                                          "STANCE SERAP", "CILALI CEM", "VITRIN VEDAT", "KANAT KORAY"};
+    std::vector<DynoEntry> f;
+    const uint32_t w = (uint32_t)(todayIndex() / 7);
+    const double me = showScore(car());
+    for (int k = 0; k < 9; ++k) {
+        const Opponent o = pickOpponentFor(w * 7727u + (uint32_t)k * 104729u + 11u, 0.0);
+        const double j = (mix32(w * 31u + (uint32_t)k * 977u) % 1000u) / 1000.0;
+        f.push_back({kNames[k], o.carId, std::max(5.0, (20.0 + me) * (0.55 + 0.09 * k) + 8.0 * (j - 0.5)), false});
+    }
+    return f;
+}
+bool Career::showAvailable(std::string* why) const {
+    auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (showWeek == todayIndex() / 7) return no("BU HAFTA KATILDIN");
+    if (car().jobHp) return no("MUSTERI ARACIYLA OLMAZ");
+    if (money < dynoEntryFee()) return no("GIRIS UCRETI YETMIYOR");
+    return true;
+}
+bool Career::showEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) {
+    if (!showAvailable(why)) return false;
+    const long fee = dynoEntryFee();
+    money -= fee; showWeek = todayIndex() / 7;
+    std::vector<DynoEntry> f = showField();
+    f.push_back({"SEN", car().carId, showScore(car()), true});
+    std::stable_sort(f.begin(), f.end(), [](const DynoEntry& a, const DynoEntry& b) { return a.hp > b.hp; });
+    int p = 1;
+    while (!f[p - 1].player) ++p;
+    static const double kMul[3] = {5.0, 2.5, 1.2};
+    const long pr = p <= 3 ? r50(fee * kMul[p - 1]) : 0;
+    money += pr; earnings += pr;
+    rep += p == 1 ? 6 : p <= 3 ? 2 : 0;
+    if (place) *place = p;
+    if (prize) *prize = pr;
+    if (board) *board = f;
+    return true;
 }
 
 long Career::dynoEntryFee() const {
@@ -596,10 +718,15 @@ bool Career::tourStart(std::string* why) {
 }
 long Career::recordTour(bool won) {
     ++races;
-    if (!won) { tourOut = true; form = std::max(-3, form - 1); return 0; }
+    if (!won) { tourOut = true; form = std::max(-3, form - 1); loanRace(); return 0; }
     ++wins; form = std::min(3, form + 1);
     dailyAdd(TaskType::WinDrag, 1); dailyAdd(TaskType::WinAny, 1);
-    if (++tourRound < kTourRounds) return 0;
+    loanRace();
+    if (++tourRound < kTourRounds) {                                   // ara tur: odul her turda buyur (%10, %20 ...)
+        const long r = tourPrize() * tourRound / 10 / 10 * 10;
+        money += r; earnings += r;
+        return r;
+    }
     const long p = tourPrize();
     money += p; earnings += p; rep += 40;
     dailyAdd(TaskType::Earn, p);
@@ -1068,6 +1195,7 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
     }
     wager = 0;
     if (!e.pink) sponsorRace(won);
+    loanRace();
     // Gunluk gorevler
     if (won) {
         dailyAdd(TaskType::WinAny, 1);
@@ -1116,6 +1244,7 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
     if (prizeOut) *prizeOut = prize;
     if (won) { dailyAdd(TaskType::WinAny, 1); dailyAdd(et > 0 ? TaskType::WinDrag : TaskType::WinRoad, 1); rep += 2; }
     sponsorRace(won);
+    loanRace();
     if (et > 0) dailyAdd(TaskType::EtUnder, (long)std::round(et * 100.0));
     if (prize > 0) dailyAdd(TaskType::Earn, prize);
 }
@@ -1376,7 +1505,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity=" << city << "\nsponsor=" << sponsor << ";" << spWins << ";" << spRaces << ";" << sponsorsDone << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity=" << city << "\nsponsor=" << sponsor << ";" << spWins << ";" << spRaces << ";" << sponsorsDone << "\nloan=" << loan << ";" << loanRaces << ";" << showWeek << "\n";
     {
         char lb[160];
         std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
@@ -1433,6 +1562,10 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
         else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
         else if (k == "chase") c.chaseEscapes = std::max(0, std::atoi(v.c_str()));
+        else if (k == "loan") {
+            long l = 0; int r = 0, w = -1;
+            if (std::sscanf(v.c_str(), "%ld;%d;%d", &l, &r, &w) >= 2) { c.loan = std::max(0L, l); c.loanRaces = std::max(0, r); c.showWeek = w; }
+        }
         else if (k == "sponsor") {
             int a = -1, w = 0, r = 0; unsigned long d = 0;
             if (std::sscanf(v.c_str(), "%d;%d;%d;%lu", &a, &w, &r, &d) == 4) {

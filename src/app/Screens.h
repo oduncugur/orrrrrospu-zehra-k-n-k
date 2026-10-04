@@ -313,7 +313,8 @@ public:
 private:
     App& app_;
     int tab_ = 0;
-    std::vector<Career::DynoEntry> board_;
+    std::vector<Career::DynoEntry> board_, showBoard_;
+    bool pink_ = false;                          // bulusma pink slip
     std::string msg_; double msgT_ = 0;
 };
 

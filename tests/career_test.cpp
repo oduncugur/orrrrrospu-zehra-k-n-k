@@ -267,7 +267,8 @@ int main() {
         c.money = 100000; c.dailyDay = todayIndex(); c.dailyDone = 7;
         const long m0 = c.money;
         CHECK(c.tourStart() && c.money == m0 - c.tourEntry(), "ilk turda giris ucreti");
-        CHECK(c.recordTour(true) == 0 && c.tourStart() && c.money == m0 - c.tourEntry(), "2. tur ucretsiz");
+        { const long r1 = c.tourPrize() / 10 / 10 * 10;
+          CHECK(c.recordTour(true) == r1 && r1 > 0 && c.tourStart() && c.money == m0 - c.tourEntry() + r1, "2. tur ucretsiz, 1. tur ara odulu"); }
         c.recordTour(true);
         const long m1 = c.money, prize = c.tourPrize();
         CHECK(c.tourStart() && c.recordTour(true) == prize && c.money == m1 + prize && c.tourRound == Career::kTourRounds, "3 tur = odul");
@@ -405,6 +406,36 @@ int main() {
         const double w0 = c.car().tune.wearEngine;
         c.recordDamage(false, 0, false, false, 0, 0);
         CHECK(c.car().tune.wearEngine > w0 && c.car().tune.wearBrakes > 0, "her yarista olagan asinma");
+    }
+    std::printf("[K] Tefeci, arac sovu, pink slip bulusma\n");
+    {
+        Career c = Career::newGame(); c.money = 1000;
+        const long lim = c.loanLimit();
+        CHECK(c.borrow(lim) && c.money == 1000 + lim && c.loan == lim && !c.borrow(10), "limit kadar borc, fazlasi yok");
+        c.loanRace();
+        CHECK(c.loan > lim && c.loan <= lim * 106 / 100 + 10, "yaris basina %5 faiz");
+        const long paid = c.repay(500);
+        CHECK(paid == 500 && c.money == 1000 + lim - 500, "kismi odeme");
+        Career r;
+        CHECK(Career::parse(c.serialize(), r) && r.loan == c.loan && r.loanRaces == c.loanRaces, "borc kayitta");
+        Career d = Career::newGame(); d.money = 0; d.cars.push_back(d.cars[0]);
+        d.borrow(1000); d.money = 0;
+        for (int i = 0; i < 12; ++i) d.loanRace();
+        CHECK(d.cars.size() == 1 && d.loan == 0 && !d.loanNote.empty(), "vade dolunca tefeci arabayi alir");
+        Career e = Career::newGame(); e.money = 50000;
+        int place = 0; long prize = 0;
+        e.car().paint = 3; e.car().finish = 3; e.car().stripe = 1;
+        CHECK(e.showScore(e.car()) > Career::newGame().showScore(Career::newGame().car()), "boya / serit puani artirir");
+        CHECK(e.showEnter(&place, &prize) && place >= 1 && place <= 10 && !e.showAvailable(), "sova katilim, haftada bir");
+        Career f = Career::newGame(); f.money = 50000; f.clockSlot = 7;
+        f.meetPink = true;
+        CHECK(!f.meetStart(), "pink slip: tek aracla olmaz");
+        f.cars.push_back(f.cars[0]);
+        f.meetPink = true;
+        const size_t n0 = f.cars.size(); const long m0 = f.money;
+        CHECK(f.meetStart() && f.money == m0, "pink slip: para konmaz");
+        f.recordMeet(true, nullptr);
+        CHECK(f.cars.size() == n0 + 1 && f.meetPinkWon > 0, "pink slip kazanilir: rakibin arabasi");
     }
     std::printf("[11] Satis\n");
     {
