@@ -63,6 +63,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
     s.mass = sim.baseMassKg();
     s.octane = sim.octane(); s.octaneReq = sim.octaneRequired();
     s.fuelCapped = sim.fuelCapped();
+    s.valveSafe = sim.valveSafeRpm();
     const double peakT = s.nm + (n.hp > 0 ? n.hp * 7120.9 / 4000.0 : 0.0);   // nitro tepe tork (~4000 rpm)
     s.engineLoad = peakT / std::max(1.0, sim.engineRatingNm());
     s.gearboxLoad = peakT / std::max(1.0, sim.gearboxRatingNm());
@@ -123,7 +124,8 @@ void PartsScreen::drawStatsBar(Renderer& r) {
 void PartsScreen::drawPreview(Renderer& r, float py) {
     const auto& opts = partOptions((PartCat)cat_);
     r.rect(8, py, 352, py + 94, {0.08f, 0.09f, 0.13f});
-    r.text(16, py + 5, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, 34), 1, kUiGold);
+    r.text(16, py + 5, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, prev_.fuelCapped ? 24 : 34), 1, kUiGold);
+    if (prev_.fuelCapped) r.text(344 - r.textWidth("YAKIT SINIRI!", 1), py + 5, "YAKIT SINIRI!", 1, {1.0f, 0.35f, 0.3f});   // pompa / enjektor al
     const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
     auto line = [&](float y, float x, const char* name, double a, double bnew, const char* fmt, bool higherBetter) {
         char t[64]; std::snprintf(t, sizeof t, fmt, a, bnew);
@@ -133,7 +135,6 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
         r.text(x + 56, y, t, 1, same ? kUiDim : (d > 0) == higherBetter ? up : down);
     };
     line(py + 19, 16, "GUC", now_.hp, prev_.hp, "%.0f > %.0f", true);
-    if (prev_.fuelCapped) r.text(120, py + 19, "YAKIT SINIRI!", 1, {1.0f, 0.35f, 0.3f});   // pompa / enjektor al
     line(py + 31, 16, "TORK", now_.nm, prev_.nm, "%.0f > %.0f", true);
     line(py + 43, 16, "ENDEKS", now_.idx, prev_.idx, "%.0f > %.0f", true);
     line(py + 55, 16, "AGIRLIK", now_.mass, prev_.mass, "%.0f > %.0f", false);
@@ -142,11 +143,10 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
     line(py + 43, 180, "ISI", now_.heatLoad * 100, prev_.heatLoad * 100, "%%%.0f > %%%.0f", false);
     line(py + 55, 180, "AKS", now_.axleRisk * 100, prev_.axleRisk * 100, "%%%.0f > %%%.0f", false);
     line(py + 67, 16, "DEVIR", now_.redline, prev_.redline, "%.0f > %.0f", true);         // devir siniri (kesici)
-    {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
-        char t[48]; std::snprintf(t, sizeof t, "%.0f / %.0f", prev_.octane, prev_.octaneReq);
-        const Color oc = prev_.octaneReq > prev_.octane ? down : prev_.octaneReq > prev_.octane - 3 ? kUiGold : kUiDim;
-        r.text(180, py + 67, "OKTAN", 1, kUiText);
-        r.text(236, py + 67, t, 1, oc);
+    {   // guvenli (max) devir: supap / kam / kafa ile artar; ECU kesiciyi bunun ustune acarsa supap zorlanir
+        char t[32]; std::snprintf(t, sizeof t, "%.0f > %.0f", now_.valveSafe, prev_.valveSafe);
+        r.text(180, py + 67, "MAX DEV", 1, kUiText);
+        r.text(236, py + 67, t, 1, prev_.redline > prev_.valveSafe ? down : prev_.valveSafe > now_.valveSafe + 1 ? up : kUiDim);
     }
     r.text(16, py + 81, "1/4 MIL", 1, kUiText);
     if (!et_ || !et_->done) r.text(72, py + 81, "HESAPLANIYOR...", 1, kUiDim);
@@ -164,6 +164,10 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
     else if (prev_.gearboxLoad > 1.0) r.text(180, py + 81, "SANZIMAN DAYANMAZ!", 1, down);
     else if (prev_.octaneReq > prev_.octane) r.text(180, py + 81, "VURUNTU! OKTAN", 1, down);
     else if (prev_.heatLoad > 1.15) r.text(180, py + 81, "SOGUTMA YETMEZ", 1, kUiGold);
+    else {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
+        char t[48]; std::snprintf(t, sizeof t, "OKTAN %.0f / %.0f", prev_.octane, prev_.octaneReq);
+        r.text(180, py + 81, t, 1, prev_.octaneReq > prev_.octane - 3 ? kUiGold : kUiDim);
+    }
 
 }
 

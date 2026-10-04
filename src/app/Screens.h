@@ -111,6 +111,7 @@ struct TuneStats {
     double engineLoad = 0, gearboxLoad = 0, heatLoad = 0;
     double octane = 100, octaneReq = 0;          // yakit oktani / motorun istedigi (vuruntu)
     bool fuelCapped = false;                     // guc yakit sistemiyle kirpiliyor
+    double valveSafe = 0;                        // motorun guvenli devri (supap / kam / kafa; ECU bu kadar acabilir)
     std::vector<std::pair<double, double>> hpCurve;
 };
 TuneStats tuneStats(const VehicleDef& v, const Tune& t);
