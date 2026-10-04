@@ -21,7 +21,8 @@ double constMul(double, const void* c) { return *static_cast<const double*>(c); 
 struct ShapeCtx { double red, low, high; };
 double shapeMul(double rpm, const void* c) {
     const ShapeCtx& s = *static_cast<const ShapeCtx*>(c);
-    const double x = std::clamp((rpm / s.red - 0.40) / 0.35, 0.0, 1.0);
+    // 0.40 red'de alt etki, 0.85 red'de tam ust etki; ustunde (ECU ile acilan bolge) %40'a kadar artmaya devam eder
+    const double x = std::clamp((rpm / s.red - 0.40) / 0.45, 0.0, 1.4);
     return s.low + (s.high - s.low) * x;
 }
 // Kompresor: roots / twin-screw dusuk devirden tam boost (parazitik kayip artar), santrifuj devirle karesel
@@ -39,8 +40,8 @@ void extendCurve(TorqueCurve& c, double newMax) {
     if (c.size() < 2) return;
     while (c.back().first < newMax) {
         const auto a = c[c.size() - 2], b = c.back();
-        const double slope = std::min((b.second - a.second) / (b.first - a.first), -b.second * 0.00006);
-        c.push_back({b.first + 250.0, std::max(0.0, b.second + slope * 250.0 * 1.15)});
+        const double slope = std::min((b.second - a.second) / (b.first - a.first), -b.second * 0.00004);
+        c.push_back({b.first + 250.0, std::max(0.0, b.second + slope * 250.0 * 0.85)});
     }
 }
 double peakHp(const EngineSpec& e) {
@@ -157,22 +158,29 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         if (GK.mm > 0.0) { eng_.gasketMm = GK.mm; cfg_.gasketMm = GK.mm; }
         const FuelOpt& FU = row(fuelTable(), tune->fuelSel);
         if (FU.mul != 1.0) { double f = FU.mul; scaleCurves(eng_, constMul, &f); }
-        // Devir siniri: supap + kam + ECU + motor ici (stroker dusurur)
-        const double redAdd = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + EC.redline + inRed;
-        // Supap siniri: ECU disindaki parcalarin kaldirabilecegi devir + 300 pay; ECU ile ustune cikilirsa supap atar
-        // ECU ile guvenli ek devir: stokta ~250; supap / kam modifiyesi kendi artisinin %40'i kadar pay acar
-        const double vcAdd = std::max(0.0, row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0));
-        valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 250.0 + 0.4 * vcAdd);
-        // Mekanik devir artisi (supap / kam / kafa / krank): guc tepesi de yukari kayar, motor yeni kesiciye kadar ceker.
-        // Yalniz ECU ile acilan devir uzatilmis (dusen) egride kalir.
-        if (const double mech = redAdd - EC.redline; mech > 0.0) {
-            const double piv = 0.45 * red0, k = (red0 + mech - piv) / (red0 - piv);
+        // Devir siniri (kesici): YALNIZ ECU acar (stroker krank dusurur). Supap / kam / kafa kesiciyi degistirmez:
+        // motorun guvenle donebilecegi devri (potansiyel) yukseltir; ECU ile bunun ustune cikilirsa supap zorlanir.
+        const double redAdd = EC.redline + (tune->crank == kCustomCrank ? -1500.0 * std::clamp(tune->custDisp, 0.0, 0.40) : CR.redline);
+        const double potential = row(valveTable(), tune->valve).redline + (tune->cam > 0 ? C.redline : 0.0) + HD.redline;
+        valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 250.0 + potential);
+        // Kam / kafa nefesi guc tepesini yukari tasir (egri tepe ustu gerilir); ECU devri acinca bu bolge kullanilir
+        const double breathe = 1.2 * ((tune->cam > 0 ? C.redline : 0.0) + HD.redline);
+        if (breathe > 0.0) {
+            const double piv = 0.45 * red0, k = (red0 + breathe - piv) / (red0 - piv);
             for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) if (pr.first > piv) pr.first = piv + (pr.first - piv) * k;
+        }
+        if (redAdd > 0.0 || breathe > 0.0) {
+            // Katalog egrisi stok kesicinin hemen ustunde ucurumdan duser: (gerilmis) stok kesici ustu atilir, yerine
+            // yavas dusen kuyruk (ECU ile acilan devir ise yarar; kam / kafa yoksa guc tepeden sonra yavasca azalir)
+            const double keep = red0 + breathe + 1.0;
+            for (auto* c : {&eng_.lowCam, &eng_.highCam})
+                while (c->size() > 2 && c->back().first > keep) c->pop_back();
         }
         if (redAdd != 0.0) {
             eng_.redlineRpm = std::max(eng_.idleRpm + 2500.0, red0 + redAdd);
             extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);
         }
+        extendCurve(eng_.lowCam, eng_.redlineRpm + 500.0); extendCurve(eng_.highCam, eng_.redlineRpm + 500.0);   // kesici ustu (sekme)
         eng_.inertia *= row(flywheelTable(), tune->flywheel).inertia;
         // Yipranma: dusuk kompresyon / elektrik arizasi guc kaybi
         if (tune->wearEngine > 0 || tune->wearElec > 0) {
@@ -184,6 +192,9 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         double cap = fuelCap(*tune);
         if (tune->turbo == 1 || tune->turbo == 2) cap = std::max(cap, 3.5);
         const double capHp = hp0 * cap;
+        for (auto* c : {&eng_.lowCam, &eng_.highCam})
+            for (auto& pr : *c)
+                if (pr.first > 800.0 && pr.first <= eng_.redlineRpm && pr.second > capHp * 7120.9 / pr.first * 1.02) fuelCapped_ = true;
         for (auto* c : {&eng_.lowCam, &eng_.highCam})
             for (auto& pr : *c) if (pr.first > 800.0) pr.second = std::min(pr.second, capHp * 7120.9 / pr.first);
         // Sanziman: ozel vites oranlari (fabrika oranina carpan)

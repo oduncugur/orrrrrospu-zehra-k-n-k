@@ -414,15 +414,15 @@ double fuelCap(const Tune& t) {
 const std::vector<EcuHwOpt>& ecuHwTable() {
     static const std::vector<EcuHwOpt> t = {
         {"STOK ECU", 0, 1, {1, 0, 0, 0, 0, 0, 0, 0}, true},
-        {"CHIP (EPROM)", 350, 1, {2, 1, 0, 0, 0, 0, 0, 1}, true},
-        {"PIGGYBACK", 600, 2, {1, 2, 0, 0, 0, 1, 0, 1}, true},
-        {"PIGGYBACK PRO", 900, 3, {2, 2, 1, 0, 0, 1, 0, 1}, true},
-        {"PLUG-IN ECU", 1400, 3, {2, 4, 1, 1, 0, 1, 0, 2}, true},
-        {"PLUG-IN PRO", 1900, 4, {3, 4, 1, 1, 0, 1, 0, 2}, true},
-        {"STANDALONE", 2800, 5, {3, 6, 1, 1, 1, 1, 1, 2}, false},
-        {"STANDALONE PRO", 3600, 6, {3, 7, 1, 1, 1, 1, 1, 2}, false},
-        {"YARIS ECU", 5200, 7, {3, 8, 1, 1, 1, 1, 0, 2}, true},
-        {"TAKIM YARIS ECU", 7500, 8, {3, 10, 1, 1, 1, 1, 0, 2}, true},
+        {"CHIP (EPROM)", 350, 1, {2, 2, 0, 0, 0, 0, 0, 1}, true},
+        {"PIGGYBACK", 600, 2, {1, 3, 0, 0, 0, 1, 0, 1}, true},
+        {"PIGGYBACK PRO", 900, 3, {2, 4, 1, 0, 0, 1, 0, 1}, true},
+        {"PLUG-IN ECU", 1400, 3, {2, 6, 1, 1, 0, 1, 0, 2}, true},
+        {"PLUG-IN PRO", 1900, 4, {3, 7, 1, 1, 0, 1, 0, 2}, true},
+        {"STANDALONE", 2800, 5, {3, 10, 1, 1, 1, 1, 1, 2}, false},
+        {"STANDALONE PRO", 3600, 6, {3, 12, 1, 1, 1, 1, 1, 2}, false},
+        {"YARIS ECU", 5200, 7, {3, 14, 1, 1, 1, 1, 0, 2}, true},
+        {"TAKIM YARIS ECU", 7500, 8, {3, 16, 1, 1, 1, 1, 0, 2}, true},
     };
     return t;
 }

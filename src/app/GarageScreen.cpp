@@ -127,8 +127,7 @@ void GarageScreen::render(Renderer& r) {
     r.text(352 - r.textWidth(b, 1), 30, b, 1, kUiDim);
     if (app_.settings.showFps) { std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps()); r.text(352 - r.textWidth(b, 1), 42, b, 1, {0.45f, 0.5f, 0.45f}); }
     // ---- bilgi kartlari ----
-    std::snprintf(b, sizeof b, "%s %s %.1fL %s  %.0f KG  KESICI %.0f", e.code, layoutName(e.layout), e.displacementL, inductionName(e.induction),
-                  v.massKg - oc.tune.totalWeightKg(), pt_->engine().redlineRpm);
+    std::snprintf(b, sizeof b, "%s  %.0f KG  KESICI %.0f", engineDisplayName(e).c_str(), v.massKg - oc.tune.totalWeightKg(), pt_->engine().redlineRpm);
     r.textFit(8, 302, upper(b), 1, 344, kUiText);
     struct Chip { const char* label; std::string val; Color col; };
     char hp[24], tq[24], ix[24], et[24];

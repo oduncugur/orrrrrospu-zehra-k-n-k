@@ -77,6 +77,9 @@ int findGearbox(const char* code);
 
 const char* layoutName(Layout l);
 const char* inductionName(Induction i);
+// Oyuncuya gorunen motor adi: hacim + duzen + supap + degisken kam + besleme + yakit (ornek "1.6 SIRALI 4 16V VTEC BENZIN")
+bool engineIsDiesel(const EngineDef& e);
+std::string engineDisplayName(const EngineDef& e);
 const char* driveName(Drive d);
 const char* bodyName(Body b);
 const char* gearboxName(Gearbox g);

@@ -148,6 +148,7 @@ public:
     double octaneRequired() const { return knockReq_; }
     bool knocking() const { return knockNow_; }
     double tireWearGained() const { return tireWear_; }
+    bool fuelCapped() const { return fuelCapped_; }        // guc yakit sistemi siniriyla kirpiliyor (pompa / enjektor)
     double valveSafeRpm() const { return valveSafeRpm_; }   // supaplarin guvenli devri (ustu: supap atmasi -> motor hasari)   // bu surusteki lastik asinmasi (patinaj / kayma; kariyere yazilir)
     double engineStress() const { return std::min(1.0, stress_); }
     double gearboxStress() const { return std::min(1.0, gbStress_); }
@@ -166,6 +167,7 @@ private:
     double octane_ = 100, knockReq_ = 0, knockLim_ = 1.0, tmax_ = 1.0, boostTot_ = 0, boostFac_ = 0, icCredit_ = 0, ecuAgg_ = 0;
     bool knockSensor_ = true, knockNow_ = false, knockWarned_ = false;
     double tireWear_ = 0, valveSafeRpm_ = 0, fineKnock_ = 0, heatMul_ = 1.0;
+    bool fuelCapped_ = false;
     bool reverse_ = false; double revThr_ = 0.0;
     double spoolLo_ = 0, spoolHi_ = 0; bool superOnly_ = false;
     double fuelAdded_ = 0, burnMul_ = 1.0, tankL_ = 0;

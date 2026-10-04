@@ -96,7 +96,7 @@ const std::vector<PartOption>& partOptions(PartCat c) {
             names.push_back("FABRIKA MOTORU");
             for (int e : swapEngines()) {
                 const EngineDef& d = engineTable()[e];
-                char b[64]; std::snprintf(b, sizeof b, "%s %s %.1fL %.0fHP", d.code, layoutName(d.layout), d.displacementL, d.powerHp);
+                char b[96]; std::snprintf(b, sizeof b, "%s %.0fHP", engineDisplayName(d).c_str(), d.powerHp);
                 names.push_back(b);
             }
             for (size_t i = 0; i < names.size(); ++i)
@@ -1085,7 +1085,7 @@ const IntField kIntFields[] = {
     {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
     {"lrpm", &Tune::launchRpm, 12000}, {"rtir", &Tune::roadTire, 29},
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
-    {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 10}, {"slc", &Tune::swLaunch, 1},
+    {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 16}, {"slc", &Tune::swLaunch, 1},
     {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1}, {"stcu", &Tune::swTcu, 1},
     {"pv", &Tune::partsVer, 9}, {"thr", &Tune::throttleBody, 9}, {"imf", &Tune::intakeMani, 9}, {"hdr", &Tune::header, 9},
     {"cat", &Tune::catalyst, 5}, {"meth", &Tune::meth, 5}, {"stud", &Tune::headStud, 4}, {"msup", &Tune::mainSupport, 5},

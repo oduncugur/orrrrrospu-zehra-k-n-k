@@ -20,6 +20,12 @@ static double peakHp(const VehicleDef& v, const Tune& t) {
         for (auto& p : *cv) if (p.first <= s.engineSpec().redlineRpm) hp = std::max(hp, p.second * p.first / 7120.9);
     return hp;
 }
+static double peakHpRpm(const VehicleSim& s) {                       // guc tepesinin devri (kesiciye kadar)
+    double hp = 0, at = 0;
+    for (auto* cv : {&s.engineSpec().lowCam, &s.engineSpec().highCam})
+        for (auto& p : *cv) if (p.first <= s.engineSpec().redlineRpm && p.second * p.first > hp) { hp = p.second * p.first; at = p.first; }
+    return at;
+}
 
 // Tam gaz surus: acik yolda (uzun otoban) oyunun surus yardimi (otomatik debriyaj + vites), direksiyon YZ, gaz tam
 static RoadCar* runWot(const VehicleDef& v, const Tune& t, double seconds) {
@@ -65,7 +71,13 @@ int main() {
         Tune cam; cam.cam = 8; cam.valve = 6;
         VehicleSimConfig a; a.car = &sahin; a.tune = &stock; const VehicleSim sa(a);
         VehicleSimConfig b; b.car = &sahin; b.tune = &cam; const VehicleSim sb(b);
-        CHECK(sb.engineSpec().redlineRpm > sa.engineSpec().redlineRpm + 1000, "yaris kami + titanyum supap devir sinirini yukseltir");
+        CHECK(std::fabs(sb.engineSpec().redlineRpm - sa.engineSpec().redlineRpm) < 1.0 && sb.valveSafeRpm() > sa.valveSafeRpm() + 1000,
+              "kam + supap kesiciyi degistirmez, guvenli devri (ECU payi) yukseltir");
+        Tune camEcu = cam; camEcu.ecuHw = 9; camEcu.swRev = 6;
+        VehicleSimConfig c2; c2.car = &sahin; c2.tune = &camEcu; const VehicleSim sc(c2);
+        CHECK(sc.engineSpec().redlineRpm > sa.engineSpec().redlineRpm + 1400 && sc.engineSpec().redlineRpm < sc.valveSafeRpm(),
+              "ECU devri acar; kam + supap varken guvenli sinirin altinda");
+        CHECK(peakHpRpm(sc) > peakHpRpm(sa) + 500, "kam + ECU devri: guc tepesi yukari tasinir");
         Tune swap; swap.engineSwap = (int)swapEngines().size();                  // en guclu motor
         const double hs = peakHp(sahin, swap);
         std::printf("    Sahin + en guclu motor swap: %.0f HP, kutle farki %+.0f kg\n", hs, swapMassDelta(sahin, swap));

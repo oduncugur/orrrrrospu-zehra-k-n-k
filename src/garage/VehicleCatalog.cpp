@@ -119,6 +119,31 @@ const char* inductionName(Induction i) {
     case Induction::TwinTurbo: return "TwinTurbo"; case Induction::Supercharger: return "Kompresor"; }
     return "?";
 }
+bool engineIsDiesel(const EngineDef& e) {
+    const std::string r = e.ref;
+    for (const char* k : {"TDI", "TDCi", "dCi", "CDI", "CRDi", "D-4D", "HDi", "JTD", "Multijet", "SDI", "Diesel", "dizel"})
+        if (r.find(k) != std::string::npos) return true;
+    return false;
+}
+std::string engineDisplayName(const EngineDef& e) {
+    static const char* lay[] = {"SIRALI 3", "SIRALI 4", "SIRALI 5", "SIRALI 6", "V6", "V6", "V8", "V8 DUZ KRANK", "V10", "V12",
+                                "BOXER 4", "BOXER 6", "2 ROTORLU WANKEL", "3 ROTORLU WANKEL", "4 ROTORLU WANKEL"};
+    const bool rotary = e.layout == Layout::Rotary2 || e.layout == Layout::Rotary3 || e.layout == Layout::Rotary4;
+    char b[96];
+    std::snprintf(b, sizeof b, "%.1f %s", e.displacementL, lay[(int)e.layout]);
+    std::string s = b;
+    if (!rotary && e.valvesPerCyl > 0) { std::snprintf(b, sizeof b, " %dV", e.cylinders * e.valvesPerCyl); s += b; }
+    if (e.variableCam) s += " DEGISKEN KAM";
+    switch (e.induction) {
+    case Induction::NA: break;
+    case Induction::ITB: s += " TEK GAZ KELEBEKLI"; break;
+    case Induction::Turbo: s += " TURBO"; break;
+    case Induction::TwinTurbo: s += " CIFT TURBO"; break;
+    case Induction::Supercharger: s += " KOMPRESORLU"; break;
+    }
+    s += engineIsDiesel(e) ? " DIZEL" : " BENZIN";
+    return s;
+}
 const char* driveName(Drive d) { return d == Drive::FWD ? "FWD" : d == Drive::RWD ? "RWD" : "AWD"; }
 const char* bodyName(Body b) {
     static const char* n[] = {"Kei", "Hatch", "Sedan", "Coupe", "Wagon", "Roadster", "Muscle", "Super", "SUV",
@@ -174,7 +199,7 @@ EngineSpec buildEngineSpec(const VehicleDef& v) { return buildEngineSpecFor(v.en
 EngineSpec buildEngineSpecFor(int engineIdx) {
     const EngineDef& e = engineTable()[engineIdx];
     EngineSpec s;
-    s.name = std::string(e.code) + " " + layoutName(e.layout) + " " + inductionName(e.induction);
+    s.name = engineDisplayName(e);
     s.cylinders = e.cylinders;
     const double perCylCc = e.displacementL * 1000.0 / std::max(1, e.cylinders);
     s.boreMm = s.strokeMm = std::cbrt(perCylCc * 4.0 / kPi) * 10.0;

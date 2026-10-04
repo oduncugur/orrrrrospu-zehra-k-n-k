@@ -62,6 +62,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t) {
     s.idx = performanceIndex(v, t);
     s.mass = sim.baseMassKg();
     s.octane = sim.octane(); s.octaneReq = sim.octaneRequired();
+    s.fuelCapped = sim.fuelCapped();
     const double peakT = s.nm + (n.hp > 0 ? n.hp * 7120.9 / 4000.0 : 0.0);   // nitro tepe tork (~4000 rpm)
     s.engineLoad = peakT / std::max(1.0, sim.engineRatingNm());
     s.gearboxLoad = peakT / std::max(1.0, sim.gearboxRatingNm());
@@ -132,6 +133,7 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
         r.text(x + 56, y, t, 1, same ? kUiDim : (d > 0) == higherBetter ? up : down);
     };
     line(py + 19, 16, "GUC", now_.hp, prev_.hp, "%.0f > %.0f", true);
+    if (prev_.fuelCapped) r.text(120, py + 19, "YAKIT SINIRI!", 1, {1.0f, 0.35f, 0.3f});   // pompa / enjektor al
     line(py + 31, 16, "TORK", now_.nm, prev_.nm, "%.0f > %.0f", true);
     line(py + 43, 16, "ENDEKS", now_.idx, prev_.idx, "%.0f > %.0f", true);
     line(py + 55, 16, "AGIRLIK", now_.mass, prev_.mass, "%.0f > %.0f", false);
