@@ -327,7 +327,7 @@ void RoadScreen::update(double dt) {
     app_.voice(0, pt.rpm(), pt.throttleEffective(), pt.limiterHit(), pt.gear() > 0, 1.0f);
     if (pt.gear() != lastGear_) { if (lastGear_ > -2) app_.sfxShift(); lastGear_ = pt.gear(); }
     app_.nitrousSound(P.sim().nitrousActive());
-    app_.tire(0, P.tireSlipSpeed());
+    app_.tire(0, P.tireSlipSpeed(), P.tireLockSpeed());
     app_.wind(v);
     if (RoadCar* rv = ses_->rival()) {
         // Rakip sesi mesafeye gore kisilir

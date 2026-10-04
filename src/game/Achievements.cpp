@@ -31,6 +31,13 @@ const std::vector<AchDef>& achievements() {
         {"BOYACI", "ARACINI BOYAT", 300},
         {"GUNUN ADAMI", "UC GUNLUK GOREVI BITIR", 800},
         {"KACAK", "POLISTEN KAC", 1500},
+        // Koleksiyonlar: setin uc araci ayni anda garajda
+        {"YERLI GURURU", "KOLEKSIYON: SAHIN + DOGAN + MURAT 124", 3000},
+        {"HOT HATCH", "KOLEKSIYON: GOLF GTI + 205 GTI + CIVIC TYPE R", 6000},
+        {"ALMAN OKULU", "KOLEKSIYON: M3 E30 + M3 E46 + 964 RS", 12000},
+        {"JDM UCLUSU", "KOLEKSIYON: SUPRA + SKYLINE R34 + RX-7", 15000},
+        {"KAS VE CELIK", "KOLEKSIYON: MUSTANG + VIPER + F40", 30000},
+        {"SUPER YILDIZLAR", "KOLEKSIYON: CARRERA GT + 720S + F1", 60000},
     };
     return a;
 }
@@ -63,6 +70,12 @@ bool achievementMet(const Career& c, int i) {
     case 19: return any([](const OwnedCar& o) { return o.paint >= 0 || o.stripe > 0; });
     case 20: return c.dailyDone == 7;
     case 21: return c.chaseEscapes >= 1;
+    case 22: case 23: case 24: case 25: case 26: case 27: {
+        static const int sets[6][3] = {{217, 218, 216}, {152, 291, 5}, {118, 122, 167}, {34, 52, 78}, {227, 272, 184}, {177, 315, 313}};
+        for (int id : sets[i - 22])
+            if (!any([&](const OwnedCar& o) { return o.carId == id; })) return false;
+        return true;
+    }
     default: return false;
     }
 }

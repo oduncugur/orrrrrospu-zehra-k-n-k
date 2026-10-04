@@ -39,12 +39,15 @@ double TireAudio::rnd() {
     return (rng_ & 0xFFFF) / 32768.0 - 1.0;
 }
 
-void TireAudio::render(float* out, int n, double slip, float gain) {
+void TireAudio::render(float* out, int n, double slip, float gain, double lockSpeed) {
     // Ciglik: kucuk-orta kaymada; buyuk kaymada (burnout) yerini kavurmaya birakir
-    const double sq = std::clamp((slip - 1.0) / 3.5, 0.0, 1.0) * (1.0 - 0.8 * std::clamp((slip - 8.0) / 8.0, 0.0, 1.0));
-    const double burnT = std::clamp((slip - 7.0) / 10.0, 0.0, 1.0);
+    const bool locked = lockSpeed > 1.0;
+    const double sq = locked ? std::clamp(lockSpeed / 4.0, 0.0, 1.0)
+                             : std::clamp((slip - 1.0) / 3.5, 0.0, 1.0) * (1.0 - 0.8 * std::clamp((slip - 8.0) / 8.0, 0.0, 1.0));
+    const double burnT = locked ? 0.0 : std::clamp((slip - 7.0) / 10.0, 0.0, 1.0);
     // Ton perdesi: hafif kaymada ~650 Hz, artan kaymada ~1150 Hz'e cikar
-    const double f0 = (650.0 + 45.0 * std::min(slip, 11.0)) * (1.0 - 0.15 * burnT);   // burnoutta perde iner (Gemini)
+    const double f0 = locked ? 400.0 + 800.0 * std::clamp(lockSpeed / 30.0, 0.0, 1.0)      // kilit: hizla 1.2 kHz -> 400 Hz
+                             : (650.0 + 45.0 * std::min(slip, 11.0)) * (1.0 - 0.15 * burnT);   // burnoutta perde iner (Gemini)
     if (std::fabs(f0 - lastF_) > 3.0) { lastF_ = f0; toneBand_.bandpass(f0, 4.0, fs_); }
     const double kEnv = 1.0 - std::exp(-1.0 / (0.025 * fs_)), kBurn = 1.0 - std::exp(-1.0 / (0.10 * fs_));
     const double kW = 1.0 - std::exp(-1.0 / (0.25 * fs_));     // yavas perde gezinmesi (~0.6 Hz)

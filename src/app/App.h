@@ -147,7 +147,8 @@ public:
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
     // Parcali arac sesi: motor swap varsa takili motorun sesi, turbo / kompresor kiti sesi
     void setVoiceTuned(int i, int carId, const Tune* tune);
-    void tire(int i, double slipSpeed) { voices_[i].slip = (float)slipSpeed; }   // m/s, lastik cigligi
+    // m/s, lastik cigligi; lockSpeed > 0: kilitli teker (fren) - arac hizi, perde hizla duser (burnout degil)
+    void tire(int i, double slipSpeed, double lockSpeed = 0.0) { voices_[i].slip = (float)slipSpeed; voices_[i].lock = (float)lockSpeed; }
     Opponent lastOpp;                              // son kariyer rakibi (tahmini ET'ler: odul zorlugu, ekranda gosterim)
     void wind(double speed) { windSpeed_ = (float)speed; }   // m/s, ruzgar ugultusu (ekran degisince 0)
     void sfxShift() { clunk_.fetch_add(1); }                     // vites gecisi: mekanik "tok"
@@ -167,7 +168,7 @@ private:
         std::unique_ptr<ProceduralEngineAudio> synth;
         std::atomic<float> rpm{900}, thr{0}, gain{1};
         std::atomic<bool> cut{false}, inGear{false};
-        std::atomic<float> slip{0};
+        std::atomic<float> slip{0}, lock{0};
         // Lastik cigligi sentez durumu (yalnizca ses thread'i)
         TireAudio tireAudio{kSampleRate};
     };

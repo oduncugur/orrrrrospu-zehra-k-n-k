@@ -322,7 +322,7 @@ void App::renderAudio(float* out, int frames) {
     for (Voice& v : voices_) {
         const double slip = v.slip.load();
         if (v.tireAudio.silent(slip) || tireVol <= 0.0f) continue;
-        v.tireAudio.render(out, frames, slip, v.gain.load() * tireVol);
+        v.tireAudio.render(out, frames, slip, v.gain.load() * tireVol, v.lock.load());
     }
     // Ruzgar: beyaz gurultu, iki kutuplu alcak geciren (kesim hizla 450 -> ~2000 Hz), genlik ~ hiz^2, yavas dalga
     if (const float ws = windSpeed_.load(); ws > 8.0f && tireVol > 0.0f) {

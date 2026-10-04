@@ -964,6 +964,53 @@ bool Career::eventAvailable(int idx, std::string* why) const {
     return true;
 }
 
+const std::vector<SponsorDef>& sponsors() {
+    static const std::vector<SponsorDef> s = {
+        // ad, en dusuk acik lig, galibiyet, yaris hakki, galibiyet primi, bonus, ceza
+        {"SANAYI YAG", 0, 3, 5, 150, 1200, 600},
+        {"KOSE MARKET", 0, 5, 8, 200, 2000, 1000},
+        {"TURBO LASTIK", 1, 4, 6, 450, 5000, 2500},
+        {"GECE RADYO", 1, 6, 9, 500, 7500, 3500},
+        {"OTOBAN PETROL", 2, 5, 8, 1000, 14000, 7000},
+        {"KARBON PARCA", 3, 5, 7, 1800, 26000, 13000},
+        {"PIST ENERJI", 4, 6, 8, 3500, 60000, 30000},
+    };
+    return s;
+}
+
+int Career::sponsorOffer() const {
+    if (sponsor >= 0) return -1;
+    const auto& s = sponsors();
+    int best = -1;                                                    // acik ligdeki en iyi, bitirilmemis sozlesme
+    for (int i = 0; i < (int)s.size(); ++i)
+        if (!(sponsorsDone >> i & 1) && s[i].league <= leagueUnlocked()) best = i;
+    return best;
+}
+
+bool Career::signSponsor(int s) {
+    if (s < 0 || s != sponsorOffer()) return false;
+    sponsor = s; spWins = spRaces = 0;
+    sponsorNote = std::string("SPONSOR: ") + sponsors()[s].name;
+    return true;
+}
+
+void Career::sponsorRace(bool won) {
+    if (sponsor < 0) return;
+    const SponsorDef& d = sponsors()[sponsor];
+    ++spRaces;
+    if (won) { ++spWins; money += d.perWin; earnings += d.perWin; }
+    char b[96];
+    if (spWins >= d.wins) {
+        money += d.bonus; earnings += d.bonus; sponsorsDone |= 1u << sponsor;
+        std::snprintf(b, sizeof b, "%s SOZLESMESI TAMAM! +$%ld", d.name, d.bonus);
+        sponsor = -1; sponsorNote = b;
+    } else if (spRaces >= d.races) {
+        money = std::max(0L, money - d.penalty);
+        std::snprintf(b, sizeof b, "%s SOZLESMESI BOZULDU: -$%ld", d.name, d.penalty);
+        sponsor = -1; sponsorNote = b;
+    }
+}
+
 long Career::eventPrize(int idx, bool first) const {
     const auto& ev = leagueEvents();
     if (idx < 0 || idx >= (int)ev.size()) return 0;
@@ -1020,6 +1067,7 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
         else { money -= std::min(w, money); net -= w; }
     }
     wager = 0;
+    if (!e.pink) sponsorRace(won);
     // Gunluk gorevler
     if (won) {
         dailyAdd(TaskType::WinAny, 1);
@@ -1067,6 +1115,7 @@ void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* p
     if (et > 0 && (oc.bestEt <= 0 || et < oc.bestEt)) oc.bestEt = et;
     if (prizeOut) *prizeOut = prize;
     if (won) { dailyAdd(TaskType::WinAny, 1); dailyAdd(et > 0 ? TaskType::WinDrag : TaskType::WinRoad, 1); rep += 2; }
+    sponsorRace(won);
     if (et > 0) dailyAdd(TaskType::EtUnder, (long)std::round(et * 100.0));
     if (prize > 0) dailyAdd(TaskType::Earn, prize);
 }
@@ -1148,6 +1197,16 @@ uint32_t fnv1a(const std::string& s) {
 void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun, bool gearboxBroke, double engineStress, double tireWear) {
     OwnedCar& c = car();
     c.tune.wearTires = std::clamp(c.tune.wearTires + std::max(0.0, tireWear), 0.0, 1.0);   // patinaj / drift lastigi yer
+    {   // Olagan asinma (her yaris): motor (asiri besleme / yuksek devir yazilimi hizlandirir), fren, suspansiyon, elektrik.
+        // ~120 yarista motor %50 yipranir (guc -%20); restorasyon / bakim ekraninda yenilenir.
+        const double boost = (c.tune.turbo > 0 || c.tune.superch > 0 || c.tune.nitrous > 0) ? 1.6 : 1.0;
+        const double rev = 1.0 + 0.05 * c.tune.swRev;
+        auto add = [](double& w, double d) { w = std::clamp(w + d, 0.0, 1.0); };
+        add(c.tune.wearEngine, 0.004 * boost * rev);
+        add(c.tune.wearBrakes, 0.010);
+        add(c.tune.wearSusp, 0.004);
+        add(c.tune.wearElec, 0.002);
+    }
     c.axleBroken = c.axleBroken || axleBroke;
     c.gearboxBroken = c.gearboxBroken || gearboxBroke;
     c.engineWear = bearingSpun || engineStress >= 1.0 ? 1.0
@@ -1317,7 +1376,7 @@ std::string Career::serialize() const {
     std::ostringstream o;
     o << "ZEHRAKINIK_KAYIT " << kVersion << "\n";
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
-      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity=" << city << "\n";
+      << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity=" << city << "\nsponsor=" << sponsor << ";" << spWins << ";" << spRaces << ";" << sponsorsDone << "\n";
     {
         char lb[160];
         std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
@@ -1374,6 +1433,13 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "treePro") c.treePro = std::atoi(v.c_str()) != 0;
         else if (k == "flow") c.bestFlow = std::max(0L, std::atol(v.c_str()));
         else if (k == "chase") c.chaseEscapes = std::max(0, std::atoi(v.c_str()));
+        else if (k == "sponsor") {
+            int a = -1, w = 0, r = 0; unsigned long d = 0;
+            if (std::sscanf(v.c_str(), "%d;%d;%d;%lu", &a, &w, &r, &d) == 4) {
+                c.sponsor = a >= 0 && a < (int)sponsors().size() ? a : -1; c.spWins = std::max(0, w); c.spRaces = std::max(0, r);
+                c.sponsorsDone = (uint32_t)d;
+            }
+        }
         else if (k == "tour") {
             int w = -1, r = 0, o = 0;
             if (std::sscanf(v.c_str(), "%d;%d;%d", &w, &r, &o) == 3) { c.tourWeek = w; c.tourRound = std::clamp(r, 0, (int)kTourRounds); c.tourOut = o != 0; }

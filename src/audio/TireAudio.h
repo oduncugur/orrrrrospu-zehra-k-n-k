@@ -15,7 +15,8 @@ public:
     explicit TireAudio(int sampleRate = 44100);
     bool silent(double slip) const { return slip <= 1.0 && env_ < 1e-4 && burn_ < 1e-4; }
     // slip: tekerlek cevre hizi - arac hizi (m/s). out'a EKLER.
-    void render(float* out, int n, double slip, float gain);
+    // lockSpeed > 0: kilitli tekerle kayma (fren): ton hizla 1.2 kHz -> 400 Hz iner, burnout kavurmasi yok
+    void render(float* out, int n, double slip, float gain, double lockSpeed = 0.0);
 
 private:
     struct Bq { double b0 = 0, b1 = 0, b2 = 0, a1 = 0, a2 = 0, x1 = 0, x2 = 0, y1 = 0, y2 = 0;

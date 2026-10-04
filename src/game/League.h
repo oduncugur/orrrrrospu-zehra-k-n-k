@@ -45,6 +45,8 @@ constexpr int kBossUnlockWins = 3;
 // Gunluk gorevler: gunun numarasindan (UTC gun) belirlenimci 3 gorev
 enum class TaskType { WinDrag, WinRoad, WinAny, EtUnder, FlowScore, Earn, Restore, BuyParts };
 struct DailyTask { TaskType type; long target; int reward; int rep; };
+struct SponsorDef { const char* name; int league; int wins; int races; long perWin; long bonus; long penalty; };
+const std::vector<SponsorDef>& sponsors();
 std::vector<DailyTask> dailyTasks(int day, double playerEt);
 std::string taskText(const DailyTask& t);
 int todayIndex();                               // 1970'ten beri gun (yerel saat)

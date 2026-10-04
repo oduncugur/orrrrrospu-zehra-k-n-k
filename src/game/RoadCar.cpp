@@ -257,6 +257,16 @@ RoadControls RoadCar::aiControls(double laneOffset, double pace, double speedCap
     return c;
 }
 
+double RoadCar::tireLockSpeed() const {
+    const double v = sim_->speed();
+    if (v < 2.0 || offRoad()) return 0.0;
+    for (int i = 0; i < 4; ++i) {
+        const WheelSimulation& w = sim_->wheel(i);
+        if (w.Fz() > 100 && w.omega() * w.rEff() < 0.25 * v) return v;
+    }
+    return 0.0;
+}
+
 double RoadCar::tireSlipSpeed() const {
     const double v = sim_->speed(), f = offRoad() ? 0.2 : 1.0;
     double slip = 0;

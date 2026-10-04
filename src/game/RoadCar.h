@@ -35,7 +35,8 @@ public:
     double lateral() const { return lat_; }
     double elevation() const { return road_.at(s_).z; }      // yol yuksekligi (cizim)
     bool offRoad() const { return std::fabs(lat_) > road_.halfWidthAt(s_) + 1.5; }   // banket (1.5 m) asfalt sayilir
-    double tireSlipSpeed() const;          // ses icin
+    double tireSlipSpeed() const;
+    double tireLockSpeed() const;          // kilitli (frenle duran) teker varsa arac hizi, yoksa 0          // ses icin
 
     bool manual = false, assist = true;
     bool stability = false;                // duz yol dengesi (oyuncu araci; YZ kendi surer)

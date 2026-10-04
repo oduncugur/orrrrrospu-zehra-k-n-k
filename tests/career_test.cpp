@@ -385,6 +385,27 @@ int main() {
         for (int i = 0; i < (int)leagueEvents().size(); ++i) if (leagueEvents()[i].league == 4 && leagueEvents()[i].prize > 0) { l4 = i; break; }
         CHECK(l4 >= 0 && c.eventPrize(l4, true) == leagueEvents()[l4].prize * 3 / 2, "pist ligi odulu x1.5");
     }
+    std::printf("[S] Sponsor: teklif, prim, bonus, ceza, kayit; olagan asinma\n");
+    {
+        Career c = Career::newGame(); c.money = 5000;
+        const int o = c.sponsorOffer();
+        CHECK(o >= 0 && c.signSponsor(o) && c.sponsor == o && c.sponsorOffer() == -1, "sponsor teklifi kabul edilir");
+        const SponsorDef& d = sponsors()[o];
+        const long m0 = c.money;
+        for (int i = 0; i < d.wins; ++i) c.sponsorRace(true);
+        CHECK(c.sponsor == -1 && (c.sponsorsDone >> o & 1) && c.money == m0 + d.wins * d.perWin + d.bonus, "sozlesme tamam: prim + bonus");
+        const int o2 = c.sponsorOffer();
+        CHECK(o2 >= 0 && o2 != o && c.signSponsor(o2), "yeni teklif");
+        const long m1 = c.money;
+        for (int i = 0; i < sponsors()[o2].races; ++i) c.sponsorRace(false);
+        CHECK(c.sponsor == -1 && c.money == std::max(0L, m1 - sponsors()[o2].penalty), "tutturamazsa ceza");
+        c.signSponsor(c.sponsorOffer()); c.sponsorRace(true);
+        Career r;
+        CHECK(Career::parse(c.serialize(), r) && r.sponsor == c.sponsor && r.spWins == 1 && r.sponsorsDone == c.sponsorsDone, "sponsor kayitta");
+        const double w0 = c.car().tune.wearEngine;
+        c.recordDamage(false, 0, false, false, 0, 0);
+        CHECK(c.car().tune.wearEngine > w0 && c.car().tune.wearBrakes > 0, "her yarista olagan asinma");
+    }
     std::printf("[11] Satis\n");
     {
         Career h = Career::newGame();

@@ -14,7 +14,8 @@ namespace {
 const Rect kBackL{8, 596, 352, 634};
 const Rect kStartL{8, 548, 352, 590};
 const Rect kYesL{8, 548, 176, 590}, kNoL{184, 548, 352, 590};
-const Rect kWagerL{214, 514, 352, 542};                                // bahis kademesi (onay adiminda)
+const Rect kWagerL{214, 514, 352, 542};
+const Rect kSponsorL{8, 530, 352, 546};                                // sponsor satiri (etkinlik secili degilken)                                // bahis kademesi (onay adiminda)
 const Rect kAchL{262, 30, 352, 54};
 constexpr float kRowY0 = 114;
 float rowH(size_t n) { return std::min(44.0f, (464.0f - kRowY0) / std::max<size_t>(1, n)); }   // lig 9 etkinlige kadar sigar
@@ -35,6 +36,7 @@ std::vector<int> LeagueScreen::rows() const {
 }
 
 void LeagueScreen::render(Renderer& r) {
+    if (!app_.career.sponsorNote.empty()) { msg_ = app_.career.sponsorNote; msgT_ = 3.0; app_.career.sponsorNote.clear(); }   // sponsor olayi
     const Career& c = app_.career;
     r.begin(360, 640, kUiBg);
     r.rect(0, 0, 360, 58, kUiPanel);
@@ -134,6 +136,17 @@ void LeagueScreen::render(Renderer& r) {
             std::snprintf(b, sizeof b, done ? "TAMAM" : "%s", money(tasks[i].reward).c_str());
             r.text(344 - r.textWidth(b, 1), py + 20 + i * 16, b, 1, done ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
         }
+        {   // sponsor: suren sozlesme ya da teklif (dokun: kabul)
+            if (c.sponsor >= 0) {
+                const SponsorDef& d = sponsors()[c.sponsor];
+                std::snprintf(b, sizeof b, "%s: %d/%d GALIBIYET  %d/%d YARIS", d.name, c.spWins, d.wins, c.spRaces, d.races);
+                r.textFit(16, 534, b, 1, 336, {0.55f, 0.85f, 1.0f});
+            } else if (const int o = c.sponsorOffer(); o >= 0) {
+                const SponsorDef& d = sponsors()[o];
+                std::snprintf(b, sizeof b, "SPONSOR TEKLIFI %s: %d YARISTA %d GAL, BONUS %s  [KABUL]", d.name, d.races, d.wins, money(d.bonus).c_str());
+                r.textFit(16, 534, b, 1, 336, kUiGold);
+            }
+        }
         r.textCentered(180, 562, "BIR ETKINLIK SEC", 1, kUiDim);
     }
     button(r, kBackL, "< HARITA", kUiBtn, 2);
@@ -145,6 +158,15 @@ void LeagueScreen::pointerDown(int, float x, float y) {
         if (kYesL.hit(x, y)) { app_.career.wager = leagueEvents()[sel_].pink ? 0 : app_.career.wagerFor(sel_, wagerStep_); app_.startEvent(sel_); return; }
         if (kNoL.hit(x, y)) { confirm_ = false; return; }
         if (!leagueEvents()[sel_].pink && kWagerL.hit(x, y)) { wagerStep_ = (wagerStep_ + 1) % Career::kWagerSteps; return; }
+    }
+    if (sel_ < 0 && kSponsorL.hit(x, y)) {
+        Career& c = app_.career;
+        if (c.signSponsor(c.sponsorOffer())) {
+            const SponsorDef& d = sponsors()[c.sponsor];
+            char b[96]; std::snprintf(b, sizeof b, "SOZLESME: GALIBIYET BASI %s, BOZULURSA -%s", money(d.perWin).c_str(), money(d.penalty).c_str());
+            msg_ = b; msgT_ = 2.6;
+        }
+        return;
     }
     if (kBackL.hit(x, y)) { app_.goMap(); return; }
     if (kAchL.hit(x, y)) { app_.goAchievements(); return; }

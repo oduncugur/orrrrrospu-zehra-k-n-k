@@ -196,6 +196,13 @@ struct Career {
     // Polis kovalamacasi: kacis odulu (temassiz +%50), yakalanma cezasi (donus negatif)
     long recordChase(bool escaped, int collisions);
     int  chaseEscapes = 0;
+    // Sponsor sozlesmesi: N yarista W galibiyet; galibiyet basina prim, tamamlaninca bonus, tutturamazsa ceza
+    int  sponsor = -1, spWins = 0, spRaces = 0;
+    uint32_t sponsorsDone = 0;
+    int  sponsorOffer() const;                       // su an teklif eden sponsor (-1: yok / sozlesme surerken)
+    bool signSponsor(int s);
+    std::string sponsorNote;                         // son sponsor olayi (ekranda gosterilir, kaydedilmez)
+    void sponsorRace(bool won);                      // her yaris sonunda (lig / serbest yaris)
     // Garaj yuvalari: baslangic 4, en fazla 12; dolu garaja galeri / hurdalik / pink slip araci giremez
     static constexpr int kStartSlots = 4, kMaxSlots = 12;
     int  garageSlots = kStartSlots;
