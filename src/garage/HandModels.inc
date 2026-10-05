@@ -223,8 +223,57 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     return m;
 }
 
+// ---------------------------------------------------------------- trafik: tir (cekici + dorse) / kamyon (kasali)
+static LowPolyMesh buildTruck(const VehicleDef& v) {
+    LowPolyMesh m; m.paintRGB = v.paintRGB;
+    Builder B{m};
+    const bool semi = v.ref == "TRUCK SEMI";
+    const double L = v.lengthM, HW = v.widthM * 0.5, xF = L * 0.5, r = 0.50, tw = 0.32;
+    const double cabL = 2.35, cabZ0 = 0.75, cabZ1 = 3.25;
+    // kabin: govde + on cam + izgara + farlar + tampon + gunes siperligi + yan aynalar
+    B.box(xF - cabL, xF, -HW + 0.05, HW - 0.05, cabZ0, cabZ1, MatPaint);
+    B.box(xF - cabL + 0.25, xF - 0.15, -HW + 0.12, HW - 0.12, cabZ1, cabZ1 + 0.35, MatPaint);   // yuksek tavan
+    B.panel(xF + 0.01, -HW + 0.18, 1.85, xF + 0.01, HW - 0.18, 1.85, xF + 0.01, HW - 0.18, 2.95, xF + 0.01, -HW + 0.18, 2.95, MatGlass);
+    B.panel(xF + 0.01, -HW + 0.35, 0.95, xF + 0.01, HW - 0.35, 0.95, xF + 0.01, HW - 0.35, 1.70, xF + 0.01, -HW + 0.35, 1.70, MatDark);
+    for (double sg : {1.0, -1.0}) {
+        B.box(xF - 0.02, xF + 0.03, sg > 0 ? HW - 0.40 : -HW + 0.08, sg > 0 ? HW - 0.08 : -HW + 0.40, 0.80, 1.00, MatLight);
+        B.box(xF - cabL + 0.6, xF - 0.4, sg > 0 ? HW - 0.04 : -HW - 0.01, sg > 0 ? HW + 0.01 : -HW + 0.04, 1.95, 2.95, MatGlass);   // yan cam
+        B.box(xF - 0.25, xF - 0.15, sg * (HW + 0.05) - 0.05, sg * (HW + 0.05) + 0.05, 1.9, 2.6, MatDark);   // ayna
+    }
+    B.box(xF - 0.15, xF + 0.08, -HW, HW, 0.45, 0.78, MatDark);                     // tampon
+    B.box(xF - cabL - 0.1, xF - 0.3, -HW + 0.25, HW - 0.25, 0.55, 0.80, MatDark);  // sasi
+    std::vector<double> axles;
+    const double xA0 = xF - 1.3;                                                 // on dingil
+    if (semi) {
+        const double tx0 = xF - cabL - 0.35, tx1 = -L * 0.5;                    // dorse (beyaz tente kasa)
+        B.box(tx1, tx0, -HW, HW, 1.25, 4.0, MatPaint);
+        B.box(tx1, tx0 + 0.4, -HW + 0.3, HW - 0.3, 0.95, 1.25, MatDark);         // dorse sasisi
+        B.box(tx1 - 0.02, tx1, -HW + 0.1, -HW + 0.4, 1.0, 1.25, MatTail);
+        B.box(tx1 - 0.02, tx1, HW - 0.4, HW - 0.1, 1.0, 1.25, MatTail);
+        B.box(tx0, xF - cabL, -HW + 0.4, HW - 0.4, 0.8, 1.0, MatDark);           // besinci teker
+        axles = {xA0, xA0 - v.wheelbaseM, tx1 + 1.3, tx1 + 2.65, tx1 + 4.0};
+    } else {
+        const double bx0 = xF - cabL - 0.15, bx1 = -L * 0.5;                    // kasa
+        B.box(bx1, bx0, -HW, HW, 1.10, 3.6, MatPlate);
+        B.box(bx1 - 0.02, bx1, -HW + 0.1, -HW + 0.4, 0.95, 1.15, MatTail);
+        B.box(bx1 - 0.02, bx1, HW - 0.4, HW - 0.1, 0.95, 1.15, MatTail);
+        B.box(bx1 + 0.3, bx0, -HW + 0.3, HW - 0.3, 0.75, 1.10, MatDark);
+        axles = {xA0, xA0 - v.wheelbaseM, xA0 - v.wheelbaseM - 1.35};
+    }
+    // tekerler: ilk iki dingil donen tekerler (sira: on sol, on sag, arka sol, arka sag); digerleri sabit
+    for (size_t i = 0; i < axles.size(); ++i)
+        for (double sg : {1.0, -1.0}) {
+            const double cy = sg * (HW - tw * 0.5 - 0.02);
+            const size_t t0 = m.tris.size();
+            B.wheel(axles[i], cy, r, r, tw, W_M);
+            if (i < 2) m.wheels.push_back({(float)axles[i], (float)cy, (float)r, (float)r, t0, m.tris.size()});
+        }
+    return m;
+}
+
 // Elle modellenmis arac varsa onu dondurur
 static bool buildHandModel(const VehicleDef& v, LowPolyMesh& out) {
     if (v.ref == "BMW M3 E46") { out = buildE46(v); return true; }
+    if (v.ref == "TRUCK SEMI" || v.ref == "TRUCK RIGID") { out = buildTruck(v); return true; }
     return false;
 }

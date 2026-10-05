@@ -98,7 +98,26 @@ const std::vector<VehicleDef>& vehicleCatalog() {
     return c;
 }
 
+// Trafik agir vasitalari (katalog disi, satilmaz): 9001 tir (cekici + 13.6 m dorse), 9002 kamyon (kasali, 3 dingil)
+static const std::vector<VehicleDef>& truckDefs() {
+    static const std::vector<VehicleDef> t = [] {
+        std::vector<VehicleDef> v(2);
+        for (int k = 0; k < 2; ++k) {
+            VehicleDef& d = v[k];
+            d.id = kTruckId0 + k; d.brand = k == 0 ? "TIR" : "KAMYON"; d.model = k == 0 ? "CEKICI" : "KASALI";
+            d.ref = k == 0 ? "TRUCK SEMI" : "TRUCK RIGID"; d.year = 2012; d.body = Body::Van; d.drive = Drive::RWD;
+            d.massKg = k == 0 ? 18000 : 9000; d.lengthM = k == 0 ? 16.5 : 9.6; d.widthM = 2.55; d.heightM = k == 0 ? 4.0 : 3.6;
+            d.wheelbaseM = k == 0 ? 3.8 : 5.0; d.frontWeight = 0.5; d.engine = d.head = 0; d.gearbox = 0;
+            d.exhaust = Exhaust::Stock; d.streetLegal = false; d.wing = d.hoodScoop = d.widebody = false;
+            d.rideHeightM = 0.35; d.paintRGB = k == 0 ? 0xD8D8D0 : 0x2E5C9A;
+        }
+        return v;
+    }();
+    return t;
+}
+
 const VehicleDef* findVehicle(int id) {
+    if (id >= kTruckId0 && id < kTruckId0 + 2) return &truckDefs()[id - kTruckId0];
     const auto& c = vehicleCatalog();
     return (id >= 1 && id <= (int)c.size()) ? &c[id - 1] : nullptr;
 }

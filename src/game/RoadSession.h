@@ -15,6 +15,8 @@
 namespace zk {
 
 // v0: istenen hiz; uid: her yeniden doguste yeni (skor takibi icin kimlik)
+// Trafik aracinin yari boyu (m): tir 8.25, kamyon 4.8, otomobil 2.2
+inline double trafficHalfLen(int carId) { return carId == 9001 ? 8.25 : carId == 9002 ? 4.8 : 2.2; }
 struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; int li = 0; };   // li: serit no (lane: yanal konum)
 
 class RoadSession {

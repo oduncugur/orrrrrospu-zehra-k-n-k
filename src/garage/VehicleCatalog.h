@@ -71,7 +71,9 @@ struct VehicleDef {
 const std::vector<EngineDef>&  engineTable();
 const std::vector<GearboxDef>& gearboxTable();
 const std::vector<VehicleDef>& vehicleCatalog();   // >= 250 arac, id sirali (1..N)
-const VehicleDef* findVehicle(int id);
+const VehicleDef* findVehicle(int id);       // kTruckId0.. : trafik tir / kamyon (katalogda yok)
+constexpr int kTruckId0 = 9001;
+inline bool isTruckId(int id) { return id >= kTruckId0 && id < kTruckId0 + 2; }
 int findEngine(const char* code);
 int findGearbox(const char* code);
 

@@ -71,12 +71,16 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
     }
     // Trafik: yol boyunca araclar (sag seritte yavas, karsi seritte gelen). Akis modunda yogun.
     const auto& cat = vehicleCatalog();
-    const int nTraffic = mode == Mode::Karma ? 0 : kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : mode == Mode::Chase ? 18 : 14;   // karma: kapali yol
-    const double spacing = mode == Mode::Flow ? 70.0 : 170.0;
+    // Sehirlerarasi (The Run / uzun yol): seyrek trafik, yaklasik yarisi tir / kamyon. Serbest otoban: dortte bir agir vasita.
+    const bool intercity = mode == Mode::Marathon;
+    const int nTraffic = mode == Mode::Karma ? 0 : kind == Kind::Touge ? 5 : mode == Mode::Flow ? 24 : mode == Mode::Chase ? 18 : intercity ? 9 : 14;   // karma: kapali yol
+    const double spacing = mode == Mode::Flow ? 70.0 : intercity ? 320.0 : 170.0;
+    const double truckShare = kind == Kind::Touge || mode == Mode::Flow ? 0.0 : intercity ? 0.5 : mode == Mode::Free ? 0.25 : 0.12;
     for (int i = 0; i < nTraffic; ++i) {
         TrafficCar t{};
         int id;
-        do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
+        if (rnd() < truckShare) id = rnd() < 0.6 ? kTruckId0 : kTruckId0 + 1;
+        else do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
         t.carId = id;
         spawnTraffic(t, startS_ + 150.0 + i * spacing);
         traffic_.push_back(t);
@@ -94,6 +98,10 @@ void RoadSession::spawnTraffic(TrafficCar& t, double fromS) {
     t.v0 = t.oncoming ? 18.0 + 8.0 * rnd() : 14.0 + 8.0 * rnd();  // 50-95 km/h
     if (kind_ == Kind::Touge) t.v0 *= 0.6;                          // dag yolunda yavas
     t.v0 *= 1.0 + 0.08 * t.li;                                         // sol seritler hizli
+    if (isTruckId(t.carId)) {                                          // agir vasita: sag serit, 70-85 km/h (yokusta yavas)
+        if (!t.oncoming) { t.li = 0; t.lane = road_.laneOffset(t.s, false, 0); }
+        t.v0 = (19.5 + 4.0 * rnd()) * (kind_ == Kind::Touge ? 0.6 : 1.0);
+    }
     t.v = t.v0;
 }
 
@@ -225,14 +233,16 @@ void RoadSession::pumpContact(RoadCar& car, bool isPlayer) {
 void RoadSession::collide(RoadCar& car, bool isPlayer) {
     const double cx = car.sim().posX(), cy = car.sim().posY();
     for (TrafficCar& t : traffic_) {
-        if (std::fabs(t.s - car.s()) > 10.0) continue;
+        const double hl = trafficHalfLen(t.carId), hwid = isTruckId(t.carId) ? 1.28 : 0.9;
+        if (std::fabs(t.s - car.s()) > hl + 8.0) continue;
         double x, y, psi; trafficPose(t, x, y, psi);
         const double dx = cx - x, dy = cy - y, c = std::cos(psi), s = std::sin(psi);
         const double lon = dx * c + dy * s, lat = -dx * s + dy * c;
-        if (std::fabs(lon) < 4.3 && std::fabs(lat) < 1.75) {
+        if (std::fabs(lon) < hl + 2.1 && std::fabs(lat) < hwid + 0.85) {
             double rel = 0;
-            const double mt = 1150.0 + 350.0 * ((t.uid * 2654435761u >> 20) % 3);   // 1150-1850 kg
-            const double nv = impactKinematic(car, x, y, psi, t.v, mt, 2.2, 0.9, rel);
+            const double mt = isTruckId(t.carId) ? findVehicle(t.carId)->massKg
+                                                 : 1150.0 + 350.0 * ((t.uid * 2654435761u >> 20) % 3);   // 1150-1850 kg
+            const double nv = impactKinematic(car, x, y, psi, t.v, mt, hl, hwid, rel);
             if (rel < 0.5) continue;                                     // ayriliyorlar: temas yok
             t.v = std::max(0.0, std::fabs(nv));                            // trafik araci yavaslar / itilir
             if (rel > 6.0) spawnTraffic(t, car.s() + 400.0);              // sert carpisma: trafik araci yoldan cekilir
@@ -402,12 +412,14 @@ void RoadSession::update(double dt, const RoadControls& in) {
     for (TrafficCar& t : traffic_) {
         const double dir = t.oncoming ? -1.0 : 1.0;
         double gap = 1e9, vLead = t.v0;
+        double otherHl = 2.2;
         auto consider = [&](double s, double lat, double v, bool sameDirMover) {
             if (std::fabs(lat - t.lane) > 2.2) return;
-            const double g = (s - t.s) * dir - 4.5;
+            const double g = (s - t.s) * dir - 2.3 - trafficHalfLen(t.carId) - (otherHl - 2.2);
             if (g > -2.0 && g < gap) { gap = std::max(g, 0.1); vLead = sameDirMover ? v : 0.0; }
         };
-        for (const TrafficCar& o : traffic_) if (&o != &t && o.oncoming == t.oncoming) consider(o.s, o.lane, o.v, true);
+        for (const TrafficCar& o : traffic_) if (&o != &t && o.oncoming == t.oncoming) { otherHl = trafficHalfLen(o.carId); consider(o.s, o.lane, o.v, true); }
+        otherHl = 2.2;
         consider(player_->s(), player_->lateral(), player_->sim().speed(), !t.oncoming);
         if (rival_) consider(rival_->s(), rival_->lateral(), rival_->sim().speed(), !t.oncoming);
         const double a = 1.5, bComf = 3.0, dv = t.v - vLead;
