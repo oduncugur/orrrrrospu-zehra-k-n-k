@@ -241,14 +241,16 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const double cw = cab ? hw * (A.roofW + (1.0 - A.roofW) * (1.0 - tumble) * 0.6) : bw;
         const double zSh = zU - (classic ? 0.03 : 0.05) * H;
         double pts[RH][2];
-        pts[0][0] = hw * 0.80; pts[0][1] = zs;
-        pts[1][0] = hw * 0.93; pts[1][1] = zs + 0.025 * H;
-        for (int k = 0; k < 3; ++k) {
-            const double t = (k - 1) * 0.6;                                        // -0.6, 0, 0.6
-            pts[2 + k][0] = hw * (1.0 - bulge * std::pow(std::fabs(t), bulgeP));
-            pts[2 + k][1] = zs + 0.06 * H + (k + 1) / 4.0 * (zSh - zs - 0.06 * H);
-        }
-        pts[5][0] = hw * 0.985; pts[5][1] = zSh;
+        // E46 kesiti: esik alti, esik kivrimi (marspiyel), kivrim ici golge, en genis gobek, karakter cizgisi, omuz
+        const double sill = classic ? 0.5 : 1.0;
+        pts[0][0] = hw * 0.86;  pts[0][1] = zs;
+        pts[1][0] = hw * 0.965; pts[1][1] = zs + 0.045;
+        pts[2][0] = hw * (0.965 + 0.02 * sill); pts[2][1] = zs + 0.12;
+        pts[3][0] = hw * (0.985 - 0.013 * sill); pts[3][1] = zs + 0.165;
+        pts[4][0] = hw * (1.0 - bulge * 0.2); pts[4][1] = zs + 0.165 + 0.45 * (zSh - zs - 0.165);
+        pts[5][0] = hw * (0.998 - bulge * 0.3); pts[5][1] = zSh - (classic ? 0.0 : 0.06);
+        for (int k = 1; k <= 5; ++k) pts[k][1] = std::max(pts[k][1], pts[k - 1][1] + 0.004);   // kisa uclarda sira bozulmasin
+        if (pts[5][1] > zSh) { pts[5][1] = zSh; for (int k = 4; k >= 1; --k) pts[k][1] = std::min(pts[k][1], pts[k + 1][1] - 0.004); }
         pts[6][0] = hw * 0.95;  pts[6][1] = zU - 0.008 * H;
         pts[7][0] = bw;         pts[7][1] = zU;
         if (cab && zR > zU + 0.02 * H) {
@@ -294,7 +296,9 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             else if ((i == RH - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
             else if (side == 9 && (windshield || rearGlass)) mat = modern ? MatDark : MatPaint;   // A / C direk
             else if (sideGlass && side >= 7 && side <= 9) mat = MatGlass;        // yan camlar
+            else if (side == 2 && sm > sFront + 0.07 && sm < sRear - 0.07) mat = MatDark;   // esik kivriminin golgesi (tekerler arasi)
             if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
+            if (A.open && side >= 7 && sm > A.roofFX + 0.01 && sm < A.backX - 0.02) continue;   // ustu acik: kokpit deligi (ic mekan gorunur)
             B.quad(a[i], b[i], b[j], a[j], mat);
         }
     }
@@ -327,9 +331,32 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const double cx0 = L * (0.5 - cs0), cx1 = L * (0.5 - cs1);
         const double zc = H * P.belt(0.5 * (cs0 + cs1)) + 0.004;
         const double cwid = halfW(0.5 * (cs0 + cs1)) * A.beltW * 0.82;
-        B.panel(cx0, cwid, zc, cx1, cwid, zc, cx1, -cwid, zc, cx0, -cwid, zc, MatDark);           // kokpit acikligi
+        // Ic mekan: taban (govdenin icinde, bel altinda), torpido, direksiyon, koltuklar (minder + sirtlik), orta konsol,
+        // vites kolu, kapi icleri; koltuk arkasi kapak. Konumlar kokpit acikligindan (aracin olculerinden) otomatik.
+        const double zf = ride + 0.30; const double dw = halfW(0.5 * (cs0 + cs1)) * A.beltW - 0.012;   // delik kenari                                                             // ic taban
+        B.panel(cx0, dw, zf, cx1, dw, zf, cx1, -dw, zf, cx0, -dw, zf, MatDark);
+        B.panel(cx0, -dw, zf, cx1, -dw, zf, cx1, dw, zf, cx0, dw, zf, MatDark);
+        for (double sg : {-1.0, 1.0}) {
+            B.panel(cx0, sg * dw, zf, cx1, sg * dw, zf, cx1, sg * dw, zc, cx0, sg * dw, zc, MatTrim);
+            B.panel(cx0, sg * dw, zc, cx1, sg * dw, zc, cx1, sg * dw, zf, cx0, sg * dw, zf, MatTrim);
+        }
+        B.panel(cx0, dw, zf, cx0, -dw, zf, cx0, -dw, zc, cx0, dw, zc, MatDark);                      // on duvar
+        B.panel(cx1, -dw, zf, cx1, dw, zf, cx1, dw, zc, cx1, -dw, zc, MatDark);                      // arka duvar
+        B.box(cx0 - 0.30, cx0 + 0.02, -dw, dw, zc - 0.20, zc + 0.04, MatDark);                     // torpido
+        const double drvY = cwid * 0.50;                                                           // surucu solda (y +)
+        B.diskX(cx0 - 0.42, drvY, zc + 0.02, 0.17, 0.17, 14, MatDark);                             // direksiyon simidi
+        B.diskX(cx0 - 0.425, drvY, zc + 0.02, 0.13, 0.13, 14, MatTrim);
+        B.diskX(cx0 - 0.43, drvY, zc + 0.02, 0.045, 0.045, 8, MatChrome);
         const double seatX = L * (0.5 - (cs0 + (cs1 - cs0) * 0.62));
-        for (double sg : {-1.0, 1.0}) B.box(seatX - 0.08, seatX, sg * cwid * 0.52 - 0.22, sg * cwid * 0.52 + 0.22, zc, zc + 0.30, MatDark);
+        for (double sg : {-1.0, 1.0}) {
+            const double yc = sg * drvY;
+            B.box(seatX, seatX + 0.42, yc - 0.21, yc + 0.21, zf, zf + 0.12, MatTrim);                // minder
+            B.box(seatX - 0.10, seatX + 0.02, yc - 0.21, yc + 0.21, zf + 0.05, zc + 0.30, MatTrim);  // sirtlik
+            B.box(seatX - 0.09, seatX + 0.01, yc - 0.11, yc + 0.11, zc + 0.30, zc + 0.40, MatTrim);  // baslik
+        }
+        B.box(seatX, cx0 - 0.30, -0.08, 0.08, zf, zf + 0.20, MatDark);                             // orta konsol
+        B.box(seatX + 0.55, seatX + 0.58, -0.015, 0.015, zf + 0.20, zf + 0.32, MatChrome);         // vites kolu
+        B.panel(seatX - 0.10, dw, zc + 0.004, cx1, dw, zc + 0.004, cx1, -dw, zc + 0.004, seatX - 0.10, -dw, zc + 0.004, MatPaint);   // arka kapak
         if (sh.arch == ROADSTER_MID || v.year >= 1998)                                              // roll hoop
             for (double sg : {-1.0, 1.0}) B.box(seatX - 0.14, seatX - 0.09, sg * cwid * 0.52 - 0.2, sg * cwid * 0.52 + 0.2, zc + 0.30, zc + 0.36, MatTrim);
     }
@@ -366,6 +393,21 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         }
     }
 
+    // ---- yan cam alti bel seridi (klasik krom, modern siyah) ----
+    if (!A.open) {
+        const double rearLen = A.backX - A.roofRX;
+        const double sEnd = cp && cp->sideEnd > 0 ? cp->sideEnd : rearLen > 0.15 ? A.roofRX + 0.30 * rearLen : A.backX;
+        const double sA = A.cowlX + 0.01, sZ = std::max(sA + 0.02, sEnd - 0.005);
+        const int nS = 10;
+        for (int k = 0; k < nS; ++k) {
+            const double a = sA + (sZ - sA) * k / nS, b = sA + (sZ - sA) * (k + 1) / nS;
+            const double za = topZ(a), zb = topZ(b), ya = halfW(a) * A.beltW + 0.006, yb = halfW(b) * A.beltW + 0.006;
+            for (double sg : {-1.0, 1.0})
+                B.panel(L * (0.5 - a), sg * ya, za - 0.008, L * (0.5 - b), sg * yb, zb - 0.008, L * (0.5 - b), sg * yb, zb + 0.016,
+                        L * (0.5 - a), sg * ya, za + 0.016, classic ? MatChrome : MatDark);
+        }
+    }
+
     // ---- davlumbazlar (koyu bosluk) + camurluk dudagi ----
     const double tw = (v.body == Body::Super || v.widebody) ? 0.28 : sh.arch == PICKUP || sh.arch == SUV_BOX ? 0.26 : 0.21;
     const double track = W * 0.5 - tw * 0.5 + 0.02;
@@ -382,7 +424,11 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double hwF = halfW(0.02);
     const double bumperZ0 = ride + 0.07, bumperZ1 = std::min(ride + 0.22, zNose - 0.12);
     const int bumperMat = classic ? MatChrome : modern ? MatPaint : MatTrim;
-    B.box(xf - 0.06, xf + 0.03, -hwF * 0.97, hwF * 0.97, bumperZ0, bumperZ1, bumperMat);
+    if (modern) {                                                                  // gomulu tampon: ince cikinti + alt dudak
+        B.box(xf - 0.06, xf + 0.008, -hwF * 0.95, hwF * 0.95, bumperZ0, bumperZ1, bumperMat);
+        B.panel(xf + 0.012, hwF * 0.9, bumperZ0 - 0.005, xf - 0.06, hwF * 0.9, bumperZ0 - 0.005, xf - 0.06, -hwF * 0.9, bumperZ0 - 0.005,
+                xf + 0.012, -hwF * 0.9, bumperZ0 - 0.005, MatDark);
+    } else B.box(xf - 0.06, xf + 0.03, -hwF * 0.97, hwF * 0.97, bumperZ0, bumperZ1, bumperMat);
     if (modern) B.box(xf - 0.02, xf + 0.035, -hwF * 0.55, hwF * 0.55, bumperZ0 + 0.01, bumperZ0 + 0.09, MatDark);   // alt hava girisi
     B.box(xf + 0.03, xf + 0.04, -0.26, 0.26, bumperZ0 + 0.015, bumperZ0 + 0.125, MatPlate);
     const double lampZ = std::max(bumperZ1 + 0.06, zNose - 0.075);
@@ -434,7 +480,8 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double xr = -L * 0.5;
     const double zTail = H * A.tailZ;
     const double hwR = halfW(0.98);
-    B.box(xr - 0.03, xr + 0.06, -hwR * 0.97, hwR * 0.97, bumperZ0, bumperZ1, bumperMat);
+    if (modern) B.box(xr - 0.008, xr + 0.06, -hwR * 0.95, hwR * 0.95, bumperZ0, bumperZ1, bumperMat);
+    else B.box(xr - 0.03, xr + 0.06, -hwR * 0.97, hwR * 0.97, bumperZ0, bumperZ1, bumperMat);
     if (modern) B.box(xr - 0.035, xr + 0.02, -hwR * 0.6, hwR * 0.6, bumperZ0 - 0.01, bumperZ0 + 0.05, MatDark);   // difuzor
     B.box(xr - 0.04, xr - 0.03, -0.26, 0.26, bumperZ1 + 0.02, bumperZ1 + 0.13, MatPlate);
     {
