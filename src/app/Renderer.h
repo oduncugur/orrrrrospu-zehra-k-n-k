@@ -92,7 +92,7 @@ private:
     float scaleFor(int screenW, int screenH) const;
     void scaleXY(int screenW, int screenH, float& sx, float& sy) const;   // doldurmada eksenler ayri
     struct WheelDraw { float cx, cy, cz; int first, count; };
-    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels;
+    struct Mesh { unsigned vao = 0, vbo = 0; int count = 0, bodyCount = 0, glassFirst = 0, glassCount = 0; float halfL = 2, halfW = 0.9f; std::vector<WheelDraw> wheels;
                   float rearX = -2, frontX = 2, rearTop = 1.0f; unsigned paint = 0xC0C0C0; };
     const Mesh& mesh(int carId);
     const Mesh& kitMesh(int carId, int aero, float wingH);   // govde kiti / kanat (arac olcusune gore)

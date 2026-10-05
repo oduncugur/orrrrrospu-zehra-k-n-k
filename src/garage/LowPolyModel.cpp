@@ -172,6 +172,37 @@ void materialColor(int m, unsigned paint, float c[3]) {
     } else { c[0] = t[m][0]; c[1] = t[m][1]; c[2] = t[m][2]; }
 }
 
+// Ortak ic mekan (tum araclar; cam yari saydam cizilir): taban, torpido + gosterge kabi, direksiyon, on koltuklar
+// (minder + sirtlik + baslik), arka koltuk (yer varsa), orta konsol + vites kolu. xDash: torpido on yuzu (on cam dibi),
+// xBack: kabin arka siniri, hw: ic yari genislik, zF taban, zB bel (kapi ust kenari), zR tavan. Surucu solda (y +).
+static void addInterior(Builder& B, double xDash, double xBack, double hw, double zF, double zB, double zR) {
+    const double len = xDash - xBack;
+    if (len < 0.9 || hw < 0.3 || zR - zF < 0.45) return;
+    B.panel(xDash, hw, zF, xBack, hw, zF, xBack, -hw, zF, xDash, -hw, zF, MatDark);                     // taban
+    B.box(xDash - 0.30, xDash, -hw, hw, zB - 0.24, zB + 0.02, MatDark);                                 // torpido
+    B.box(xDash - 0.34, xDash - 0.20, hw * 0.5 - 0.20, hw * 0.5 + 0.20, zB + 0.02, zB + 0.08, MatDark);  // gosterge kabi
+    const double xw = xDash - 0.48, yw = hw * 0.5, zw = zB - 0.02;                                       // direksiyon simidi
+    B.diskX(xw, yw, zw, 0.185, 0.185, 16, MatDark);
+    B.diskX(xw - 0.004, yw, zw, 0.150, 0.150, 16, MatTrim);
+    B.diskX(xw - 0.008, yw, zw, 0.055, 0.055, 10, MatDark);
+    B.box(xw, xDash - 0.30, yw - 0.03, yw + 0.03, zw - 0.03, zw + 0.03, MatDark);                       // kolon
+    const double xs = std::max(xBack + 0.25, xDash - 1.05);                                             // on koltuk sirtligi
+    const double zTop = std::min(zR - 0.10, zB + 0.40);
+    for (double sg : {1.0, -1.0}) {
+        const double yc = sg * hw * 0.5;
+        B.box(xs + 0.02, xs + 0.52, yc - 0.23, yc + 0.23, zF, zF + 0.26, MatTrim);                     // minder
+        B.box(xs - 0.10, xs + 0.04, yc - 0.24, yc + 0.24, zF + 0.20, zTop - 0.14, MatTrim);             // sirtlik
+        B.box(xs - 0.09, xs + 0.02, yc - 0.13, yc + 0.13, zTop - 0.12, zTop, MatTrim);                  // baslik
+    }
+    B.box(xs + 0.10, xDash - 0.30, -0.09, 0.09, zF, zF + 0.24, MatDark);                                // orta konsol
+    B.box(xs + 0.60, xs + 0.63, -0.015, 0.015, zF + 0.24, zF + 0.40, MatChrome);                        // vites kolu
+    if (xs - xBack > 0.75) {                                                                            // arka koltuk
+        const double xr = xs - 0.55;
+        B.box(xr, xr + 0.45, -hw * 0.9, hw * 0.9, zF, zF + 0.24, MatTrim);
+        B.box(std::max(xBack + 0.02, xr - 0.14), xr, -hw * 0.9, hw * 0.9, zF + 0.18, std::min(zR - 0.16, zB + 0.25), MatTrim);
+    }
+}
+
 #include "HandModels.inc"
 
 LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
@@ -337,6 +368,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             else if (sideGlass && side >= 7 && side <= 9)                        // yan camlar; direk ve ust cerceve govdeden
                 mat = pillarHere || si == 19 ? (modern ? MatDark : MatPaint) : MatGlass;
             if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
+            if (A.open && side >= 8 && sm > A.roofFX + 0.01 && sm < A.backX - 0.02) continue;   // ustu acik: kokpit deligi (ic mekan gorunur)
             B.quad(a[i], b[i], b[j], a[j], mat);
         }
     }
@@ -366,14 +398,30 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         B.box(x1 - 0.03, x1 + 0.02, -w1, w1, z1 - 0.02, z1 + 0.015, MatTrim);
         for (double sg : {-1.0, 1.0}) B.panel(x0, sg * w0, z0, x1, sg * w1, z1, x1 - 0.03, sg * w1, z1, x0 - 0.03, sg * w0, z0 - 0.01, MatTrim);
         const double cs0 = s1 + 0.01, cs1 = A.backX - 0.02;
-        const double cx0 = L * (0.5 - cs0), cx1 = L * (0.5 - cs1);
-        const double zc = H * P.belt(0.5 * (cs0 + cs1)) + 0.004;
-        const double cwid = halfW(0.5 * (cs0 + cs1)) * A.beltW * 0.82;
-        B.panel(cx0, cwid, zc, cx1, cwid, zc, cx1, -cwid, zc, cx0, -cwid, zc, MatDark);           // kokpit acikligi
-        const double seatX = L * (0.5 - (cs0 + (cs1 - cs0) * 0.62));
-        for (double sg : {-1.0, 1.0}) B.box(seatX - 0.08, seatX, sg * cwid * 0.52 - 0.22, sg * cwid * 0.52 + 0.22, zc, zc + 0.30, MatDark);
+        const double cx1 = L * (0.5 - cs1);
+        const double zc = H * P.belt(0.5 * (cs0 + cs1));
+        const double cwid = halfW(0.5 * (cs0 + cs1)) * A.beltW - 0.04;
+        addInterior(B, x0 - 0.05, cx1, cwid, ride + 0.28, zc, H * 1.05);
+        const double seatX = std::max(cx1 + 0.25, x0 - 0.05 - 1.05);
         if (sh.arch == ROADSTER_MID || v.year >= 1998)                                              // roll hoop
-            for (double sg : {-1.0, 1.0}) B.box(seatX - 0.14, seatX - 0.09, sg * cwid * 0.52 - 0.2, sg * cwid * 0.52 + 0.2, zc + 0.30, zc + 0.36, MatTrim);
+            for (double sg : {-1.0, 1.0}) B.box(seatX - 0.20, seatX - 0.14, sg * cwid * 0.5 - 0.2, sg * cwid * 0.5 + 0.2, zc + 0.30, zc + 0.36, MatTrim);
+    } else {                                                                                       // kapali: camdan gorunen ic mekan
+        const double sm = 0.5 * (A.roofFX + A.roofRX);
+        addInterior(B, L * (0.5 - A.cowlX) - 0.20, L * (0.5 - A.backX) + 0.15, halfW(sm) * A.beltW - 0.08,
+                    ride + 0.26, H * P.belt(sm), H * P.roof(sm));
+    }
+
+    // ---- on cam dibi: siyah conta bandi + iki silecek (cam / govde birlesimi) ----
+    if (!A.open && A.roofFX > A.cowlX + 0.02) {
+        const double s0 = A.cowlX, s1 = A.cowlX + 0.018;
+        const double x0 = L * (0.5 - s0), x1 = L * (0.5 - s1), z0 = H * P.belt(s0) + 0.004, z1 = H * P.roof(s1) + 0.004;
+        const double w0 = halfW(s0) * A.beltW * 0.96, w1 = halfW(s1) * A.beltW * 0.94;
+        B.panel(x0, w0, z0, x1, w1, z1, x1, -w1, z1, x0, -w0, z0, MatDark);
+        B.panel(x0, -w0, z0, x1, -w1, z1, x1, w1, z1, x0, w0, z0, MatDark);
+        for (double yw : {0.30, -0.15}) {
+            const double xa = x1 - 0.01, za = z1 + 0.006;
+            B.panel(xa, yw + 0.25, za, xa, yw - 0.25, za, xa - 0.01, yw - 0.25, za + 0.012, xa - 0.01, yw + 0.25, za + 0.012, MatDark);
+        }
     }
 
     // ---- direkler (B ve 4 kapida C) + kapi cizgileri + kollar ----
@@ -440,7 +488,15 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         for (double sg : {-1.0, 1.0}) {
             const double y = sg * lampY;
             switch (sh.lamp) {
-            case L_R: B.box(xf - 0.03, xf + 0.012, y - 0.15, y + 0.15, lampZ - 0.05, lampZ + 0.04, MatLight); break;
+            case L_R: {                                                                   // dikdortgen far: cerceve + krom yansitici + iki projektor
+                B.box(xf - 0.03, xf + 0.010, y - 0.16, y + 0.16, lampZ - 0.058, lampZ + 0.048, MatDark);
+                B.box(xf - 0.03, xf + 0.014, y - 0.148, y + 0.148, lampZ - 0.046, lampZ + 0.036, MatChrome);
+                for (double o : {-0.07, 0.07}) {
+                    B.diskX(xf + 0.017, y + o, lampZ - 0.005, 0.036, 0.036, 12, MatDark);
+                    B.diskX(xf + 0.019, y + o, lampZ - 0.005, 0.027, 0.027, 12, MatLight);
+                }
+                if (v.year >= 2005) B.box(xf - 0.01, xf + 0.018, y - 0.14, y + 0.14, lampZ + 0.026, lampZ + 0.034, MatLight);   // gunduz fari seridi
+            } break;
             case L_O: B.diskX(xf + 0.014, y, lampZ, 0.085, 0.085, 12, MatLight);
                       B.diskX(xf + 0.010, y, lampZ, 0.10, 0.10, 12, MatChrome); break;
             case L_Q: for (double o : {-0.075, 0.075}) { B.diskX(xf + 0.014, y + sg * o, lampZ, 0.065, 0.065, 10, MatLight);
@@ -449,10 +505,21 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
                         const double x0 = xf - 0.05 * L, x1 = xf - 0.10 * L;
                         B.panel(x0, y + 0.16, zt, x1, y + 0.16, zt + 0.01, x1, y - 0.16, zt + 0.01, x0, y - 0.16, zt, MatTrim);
                         B.box(xf - 0.02, xf + 0.01, y - 0.12, y + 0.12, bumperZ1 + 0.01, bumperZ1 + 0.04, MatLight); } break;
-            case L_S: B.panel(xf + 0.012, y - sg * 0.02, lampZ + 0.025, xf + 0.012, y + sg * 0.20, lampZ + 0.04,
-                              xf - 0.02, y + sg * 0.22, lampZ - 0.01, xf + 0.012, y - sg * 0.04, lampZ - 0.03, MatLight);
-                      B.panel(xf + 0.012, y - sg * 0.04, lampZ - 0.03, xf - 0.02, y + sg * 0.22, lampZ - 0.01,
-                              xf + 0.012, y + sg * 0.20, lampZ + 0.04, xf + 0.012, y - sg * 0.02, lampZ + 0.025, MatLight); break;
+            case L_S: {                                                                   // yatik damla far: koyu cerceve + krom ic + projektor + DRL
+                auto lens = [&](double dx, double grow, int mat) {
+                    B.panel(xf + dx, y - sg * (0.02 + grow), lampZ + 0.025 + grow, xf + dx, y + sg * (0.20 + grow), lampZ + 0.04 + grow,
+                            xf - 0.02 + dx, y + sg * (0.22 + grow), lampZ - 0.01 - grow, xf + dx, y - sg * (0.04 + grow), lampZ - 0.03 - grow, mat);
+                    B.panel(xf + dx, y - sg * (0.04 + grow), lampZ - 0.03 - grow, xf - 0.02 + dx, y + sg * (0.22 + grow), lampZ - 0.01 - grow,
+                            xf + dx, y + sg * (0.20 + grow), lampZ + 0.04 + grow, xf + dx, y - sg * (0.02 + grow), lampZ + 0.025 + grow, mat);
+                };
+                lens(0.010, 0.012, MatDark); lens(0.012, 0.0, MatChrome);
+                B.diskX(xf + 0.016, y + sg * 0.04, lampZ + 0.002, 0.030, 0.030, 12, MatDark);
+                B.diskX(xf + 0.018, y + sg * 0.04, lampZ + 0.002, 0.022, 0.022, 12, MatLight);
+                B.panel(xf + 0.015, y + sg * 0.08, lampZ - 0.016, xf + 0.015, y + sg * 0.20, lampZ - 0.006,
+                        xf + 0.015, y + sg * 0.20, lampZ + 0.002, xf + 0.015, y + sg * 0.08, lampZ - 0.008, MatLight);   // LED seridi
+                B.panel(xf + 0.015, y + sg * 0.08, lampZ - 0.008, xf + 0.015, y + sg * 0.20, lampZ + 0.002,
+                        xf + 0.015, y + sg * 0.20, lampZ - 0.006, xf + 0.015, y + sg * 0.08, lampZ - 0.016, MatLight);
+            } break;
             case L_V: B.diskX(xf + 0.012, y, lampZ, 0.13, 0.075, 14, MatGlass);
                       B.diskX(xf + 0.014, y, lampZ, 0.08, 0.06, 12, MatLight); break;
             case L_F: { const double sF = 0.07, xF = L * (0.5 - sF) + 0.03, zF = H * P.belt(sF) - 0.02;   // camurluk ustunde dik far
@@ -475,7 +542,9 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         for (double sg : {-1.0, 1.0}) {
             const double y = sg * ty;
             switch (sh.tail) {
-            case T_R: B.box(xr - 0.012, xr + 0.01, y - 0.15, y + 0.15, zt - 0.05, zt + 0.05, MatTail); break;
+            case T_R: B.box(xr - 0.010, xr + 0.01, y - 0.16, y + 0.16, zt - 0.06, zt + 0.06, MatDark);          // cerceve + iki tonlu stop
+                      B.box(xr - 0.014, xr + 0.01, y - 0.148, y + 0.148, zt - 0.048, zt + 0.048, MatTail);
+                      B.box(xr - 0.017, xr + 0.01, y - sg * 0.13, y - sg * 0.07, zt - 0.03, zt + 0.03, MatIndicator); break;
             case T_O: for (double o : {-0.07, 0.10}) B.diskX(xr - 0.012, y - sg * o, zt, 0.065, 0.065, 12, MatTail); break;
             case T_B: B.box(xr - 0.012, xr + 0.01, y - sg * ty, y + sg * 0.05, zt - 0.04, zt + 0.04, MatTail); break;
             case T_V: for (int k = 0; k < 3; ++k) B.box(xr - 0.012, xr + 0.01, y + sg * (k * 0.07 - 0.07) - 0.025, y + sg * (k * 0.07 - 0.07) + 0.025,

@@ -185,6 +185,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
             B.archY(xa, sg * (hw(sa) + flare(sa) - 0.30), r - 0.01, 0.0, r * 1.13, 10, MatDark);   // yuva tekerin arkasinda
         }
     }
+    addInterior(B, X(cowl) - 0.15, X(0.74), hw(0.5) * 0.86, 0.30, belt(0.5), top(0.54));   // ortak ic mekan
     // ---- tekerler (sira: on sol, on sag, arka sol, arka sag); dis yuz camurlukla hizali
     const double tw = 0.255;
     for (double xa : {xFront, xRear})

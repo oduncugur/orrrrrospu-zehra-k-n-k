@@ -555,13 +555,18 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     // Govde ucgenleri once, sonra her teker ayri aralikta (kendi donusumuyle cizilir)
     std::vector<size_t> order;
     order.reserve(nt);
+    // Sira: govde (cam haric), tekerler, kalan (cam haric), en sonda cam (yari saydam, ic mekan gorunur)
     const size_t bodyEnd = m.wheels.empty() ? nt : m.wheels.front().triBegin;
-    for (size_t i = 0; i < bodyEnd; ++i) order.push_back(i);
+    std::vector<size_t> glass;
+    for (size_t i = 0; i < bodyEnd; ++i) (m.tris[i].material == MatGlass ? glass : order).push_back(i);
+    const size_t bodyN = order.size();
     for (const WheelPart& w : m.wheels) for (size_t i = w.triBegin; i < w.triEnd; ++i) order.push_back(i);
-    for (size_t i = m.wheels.empty() ? nt : m.wheels.back().triEnd; i < nt; ++i) order.push_back(i);
-    M.bodyCount = (int)bodyEnd * 3;
+    for (size_t i = m.wheels.empty() ? nt : m.wheels.back().triEnd; i < nt; ++i) (m.tris[i].material == MatGlass ? glass : order).push_back(i);
+    M.glassFirst = (int)order.size() * 3; M.glassCount = (int)glass.size() * 3;
+    order.insert(order.end(), glass.begin(), glass.end());
+    M.bodyCount = (int)bodyN * 3;
     {
-        int first = (int)bodyEnd * 3;
+        int first = (int)bodyN * 3;
         for (const WheelPart& w : m.wheels) {
             const int cnt = (int)(w.triEnd - w.triBegin) * 3;
             M.wheels.push_back({w.cx, w.cz, -w.cy, first, cnt});               // GL (x, z, -y)
@@ -728,13 +733,22 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
             glUniformMatrix4fv(uModel_, 1, GL_FALSE, wm.m);
             glDrawArrays(GL_TRIANGLES, wd.first, wd.count);
         }
-        const int rest = M.count - (M.wheels.back().first + M.wheels.back().count);
+        const int rest = M.glassFirst - (M.wheels.back().first + M.wheels.back().count);
         if (rest > 0) {
             glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
             glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
             glDrawArrays(GL_TRIANGLES, M.wheels.back().first + M.wheels.back().count, rest);
         }
-    } else glDrawArrays(GL_TRIANGLES, 0, M.count);
+    } else glDrawArrays(GL_TRIANGLES, 0, M.glassFirst);
+    if (M.glassCount > 0) {                                              // cam: yari saydam (ic mekan gorunur), derinlik yazmaz
+        glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
+        glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
+        glUniform1f(uAlpha_, look.alpha * 0.62f);
+        glDrawArrays(GL_TRIANGLES, M.glassFirst, M.glassCount);
+        glDepthMask(GL_TRUE); glUniform1f(uAlpha_, look.alpha);
+        if (look.alpha >= 1.0f) glDisable(GL_BLEND);
+    }
     if (look.alpha < 1.0f) { glDisable(GL_BLEND); glUniform1f(uAlpha_, 1.0f); }
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, vw_ * S, vh_ * S);
