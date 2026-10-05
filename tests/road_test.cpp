@@ -365,6 +365,8 @@ int main() {
     std::printf("[F] The Run: 40 rakip, tarzlar, yakit, benzinlik, siralama\n");
     {
         RoadSession rs(RoadSession::Mode::Marathon, 5, nullptr, 0, nullptr, 3u);
+        rs.clearTraffic();                                             // bu test yakit / mola stratejisi: trafik yok (carpisma acik)
+        rs.contact2D = false;                                          // test surucusu 2B duzlukte serit degistirmez (oyunda otomatik)
         std::vector<RunEntrant> f;
         const int ids[8] = {5, 227, 217, 36, 255, 269, 78, 100};
         for (int i = 0; i < 40; ++i) f.push_back({ids[i % 8], Tune{}, i % StyleCount});

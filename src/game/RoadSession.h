@@ -97,6 +97,8 @@ public:
     const RoadCar& player() const { return *player_; }
     RoadCar* rival() { return rival_.get(); }
     const std::vector<TrafficCar>& traffic() const { return traffic_; }
+    void clearTraffic() { traffic_.clear(); }   // testler: trafiksiz etap
+    bool contact2D = true;                      // The Run 2B duzlukte rakip temasi (serit degistirmeyen test surucusu icin kapatilir)
     int  playerCarId() const { return playerCar_; }
     int  rivalCarId() const { return rivalCar_; }
     // Trafik aracinin dunya konumu/yonu

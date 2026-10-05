@@ -235,6 +235,9 @@ void RoadScreen::update(double dt) {
                     const double lo = ses_->road().laneOffset(P.s(), false, std::clamp(ln, 0, nf - 1));
                     for (const Runner& Rn : ses_->runField().runners())
                         if (Rn.s > P.s() - 6.0 && Rn.s < P.s() + ahead && std::fabs(Rn.lane - lo) < 1.6 && (ahead < 10.0 || Rn.v < v - 0.5)) return true;
+                    for (const TrafficCar& t : ses_->traffic())                // trafik de (carpisma acik)
+                        if (!t.oncoming && t.s + trafficHalfLen(t.carId) > P.s() - 6.0 && t.s - trafficHalfLen(t.carId) < P.s() + ahead &&
+                            std::fabs(t.lane - lo) < 1.6 && (ahead < 10.0 || t.v < v - 0.5)) return true;
                     return false;
                 };
                 if (blocked(runLane_, 20.0 + 1.2 * v))

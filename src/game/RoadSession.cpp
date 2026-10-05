@@ -429,6 +429,13 @@ void RoadSession::update(double dt, const RoadControls& in) {
         t.braking = acc < -1.0;
         t.v = std::max(0.0, t.v + acc * dt);
     }
+    // Yan yana duvar olmasin: ayni yondeki iki trafik araci 12 m icinde yan yanaysa soldaki hizlanir, sagdaki yavaslar
+    for (TrafficCar& t : traffic_)
+        for (const TrafficCar& o : traffic_) {
+            if (&t == &o || t.oncoming != o.oncoming || t.li == o.li || std::fabs(t.s - o.s) > 12.0) continue;
+            if (t.li > o.li) t.v = std::min(t.v + 1.5 * dt, t.v0 * 1.25);
+            else t.v = std::max(0.0, t.v - 1.0 * dt);
+        }
     // Geri donusum: akis modunda araclar oyuncunun daha yakininda yeniden dogar (surekli aksiyon)
     const double near = mode_ == Mode::Flow ? 350.0 : 900.0, spread = mode_ == Mode::Flow ? 700.0 : 1200.0;
     const double far = mode_ == Mode::Flow ? 1400.0 : 2600.0;
@@ -472,7 +479,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
         // Oyuncu - rakip temasi (kutu): oyuncu savrulur / yavaslar, rakip yavaslar
         const double cx = player_->sim().posX(), cy = player_->sim().posY();
         for (Runner& R : run_.runners()) {
-            if (dragPart() || std::fabs(R.s - player_->s()) > 9.0) continue;   // 2B drag bolumu: temas yok
+            if ((dragPart() && !contact2D) || std::fabs(R.s - player_->s()) > 9.0) continue;   // her rakibe carpilir (2B bolumde de)
             const RoadPoint p = road_.at(R.s);
             const double x = p.x - R.lane * std::sin(p.heading), y = p.y + R.lane * std::cos(p.heading);
             const double dx = cx - x, dy = cy - y, c = std::cos(p.heading), sn = std::sin(p.heading);
@@ -486,6 +493,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
                 touching_ = true;
             }
         }
+        collide(*player_, true);                                         // The Run'da da trafik araclarina carpilir
         if (finishT_[0] <= 0 && player_->s() >= goal) {
             finishT_[0] = raceT_; phase_ = Phase::Finished;
             winner_ = runPosition() == 1 ? 0 : 1;
@@ -495,7 +503,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
     }
     if (player_->takeRecovered()) msgs_.push_back("ARAC YOLA ALINDI");
     if (player_->takeStalled()) msgs_.push_back("MOTOR STOP ETTI");
-    if (!dragPart()) collide(*player_, true);
+    collide(*player_, true);
     if (mode_ == Mode::Flow) {
         std::vector<FlowScorer::Car> snap;
         snap.reserve(traffic_.size());
