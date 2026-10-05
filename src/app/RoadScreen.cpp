@@ -1429,8 +1429,10 @@ void RoadScreen::drawHud(Renderer& r) {
         r.text(x0, infoY, b, 1, gap >= 0 ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.6f, 0.3f});
         }
     } else {
-        std::snprintf(b, sizeof b, "%.2f KM  %.2f G  KAYMA %2.0f  EGIM %+.0f%%", Pc.s() / 1000.0, std::fabs(sim.lateralAccel()) / 9.81,
-                      std::fabs(sim.bodySlipAngle()) * 57.3, std::fabs(sim.grade()) < 0.005 ? 0.0 : sim.grade() * 100.0);
+        // km sayaci: kayitli + bu surusun mesafesi (The Run: etabin temsil ettigi gercek km)
+        const double odo = app_.career.car().odo() + std::max(0.0, Pc.s() - ses_->startS()) / 1000.0 * (ses_->mode() == RoadSession::Mode::Marathon ? ses_->compression() : 1.0);
+        std::snprintf(b, sizeof b, "%.2f KM  %.2f G  KAYMA %2.0f  EGIM %+.0f%%  SAYAC %06.0f", Pc.s() / 1000.0, std::fabs(sim.lateralAccel()) / 9.81,
+                      std::fabs(sim.bodySlipAngle()) * 57.3, std::fabs(sim.grade()) < 0.005 ? 0.0 : sim.grade() * 100.0, odo);
         r.text(x0, infoY, b, 1, {0.75f, 0.8f, 0.9f});
     }
     if (app_.settings.showFps) {

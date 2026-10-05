@@ -746,7 +746,9 @@ bool Career::fastTravel(int to, std::string* why) {
     if (!canTravel(to, why)) return false;
     const long p = fastTravelPrice(to);
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
-    money -= p; city = to;
+    money -= p;
+    addKm(travelKm(to));                                               // hizli gecis: arac yolu surerek gider (km sayaci)
+    city = to;
     return true;
 }
 std::vector<RunEntrant> Career::runField(int n, uint32_t seed) const {

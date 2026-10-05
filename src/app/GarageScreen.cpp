@@ -119,7 +119,7 @@ void GarageScreen::render(Renderer& r) {
     r.rect(0, 0, 360, 58, kUiPanel);
     r.text(8, 7, upper(v.brand), 1, kUiGold);
     r.textFit(8, 22, upper(v.model), 2, 200, {1, 1, 1});
-    std::snprintf(b, sizeof b, "%d %s %s", v.year, bodyName(v.body), driveName(v.drive));
+    std::snprintf(b, sizeof b, "%d %s %s  %.0f KM", v.year, bodyName(v.body), driveName(v.drive), app_.career.car().odo());
     r.text(8, 42, upper(b), 1, kUiDim);
     const std::string m = money(c.money);
     r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
