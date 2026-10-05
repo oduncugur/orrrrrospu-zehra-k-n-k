@@ -28,6 +28,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/app/SaveCodeScreen.cpp
     ${ZK_ROOT}/src/app/RegionMapScreen.cpp
     ${ZK_ROOT}/src/app/RoadScreen.cpp
+    ${ZK_ROOT}/src/app/WorldScreen.cpp
     ${ZK_ROOT}/src/app/SettingsScreen.cpp
     ${ZK_ROOT}/src/app/Cockpit.cpp
     ${ZK_ROOT}/src/app/GLApi.cpp
@@ -42,6 +43,7 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/RoadCar.cpp
     ${ZK_ROOT}/src/game/RunField.cpp
     ${ZK_ROOT}/src/game/RoadSession.cpp
+    ${ZK_ROOT}/src/game/World.cpp
     ${ZK_ROOT}/src/game/Settings.cpp
     ${ZK_ROOT}/src/game/FlowScore.cpp
     ${ZK_ROOT}/src/game/Contact.cpp
@@ -54,5 +56,9 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/audio/TireAudio.cpp)
 target_include_directories(zehra PRIVATE ${ZK_ROOT}/src)
 target_compile_features(zehra PRIVATE cxx_std_17)
+# Acik dunya surumu (gradle "world" cesidi): SERBEST YOL acik dunyaya gider
+if(ZK_OPENWORLD)
+  target_compile_definitions(zehra PRIVATE ZK_OPENWORLD=1)
+endif()
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 target_link_libraries(zehra native_app_glue android log EGL GLESv3 aaudio)

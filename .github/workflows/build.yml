@@ -50,6 +50,7 @@ jobs:
           (cd out/win && zip -q ../ZehraKinik_Windows_x64.zip *)
           (cd out/linux && zip -q ../ZehraKinik_Linux_x64.zip *)
           cp build-win/zehra_game.exe out/ZehraKinik.exe
+          cp build-win/zehra_world.exe out/ZehraKinikAcikDunya.exe
           cp build-linux/zehra_game out/ZehraKinik_Linux
       - uses: actions/upload-artifact@v4
         with:
@@ -57,6 +58,7 @@ jobs:
           path: |
             out/*.zip
             out/ZehraKinik.exe
+            out/ZehraKinikAcikDunya.exe
             out/ZehraKinik_Linux
 
   android:
@@ -80,11 +82,14 @@ jobs:
           export ZK_NDK_VERSION=$(basename "$ANDROID_NDK_LATEST_HOME")
           echo "NDK: $ZK_NDK_VERSION"
           gradle -p android assembleDebug --no-daemon --stacktrace
-          mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk out/ZehraKinik.apk
+          mkdir -p out && cp android/app/build/outputs/apk/classic/debug/app-classic-debug.apk out/ZehraKinik.apk
+          cp android/app/build/outputs/apk/world/debug/app-world-debug.apk out/ZehraKinikAcikDunya.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: out/ZehraKinik.apk
+          path: |
+            out/ZehraKinik.apk
+            out/ZehraKinikAcikDunya.apk
 
   release:
     name: Indirme linki (latest-build)
@@ -103,4 +108,4 @@ jobs:
           gh release delete latest-build --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
           gh release create latest-build dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
             --title "Zehra Kinik - son derleme" \
-            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (bilinmeyen kaynaklara izin verin). Windows: ZehraKinik.exe (tek dosya, zip gerekmez; SmartScreen uyarisinda 'Yine de calistir'). Linux: ZehraKinik_Linux (chmod +x). Zip'lerde oyun + zehra_game, zehra_sim ve zehra_garage (konsol araclari)."
+            --notes "Otomatik derleme (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}). Android: ZehraKinik.apk (klasik) + ZehraKinikAcikDunya.apk (acik dunya) (bilinmeyen kaynaklara izin verin). Windows: ZehraKinik.exe (tek dosya, zip gerekmez; SmartScreen uyarisinda 'Yine de calistir'). Linux: ZehraKinik_Linux (chmod +x). Zip'lerde oyun + zehra_game, zehra_sim ve zehra_garage (konsol araclari)."

@@ -26,6 +26,20 @@ android {
     externalNativeBuild {
         cmake { path 'src/main/cpp/CMakeLists.txt' }
     }
+    // Iki surum: klasik oyun ve acik dunya (ayri paket: telefona yan yana kurulur)
+    flavorDimensions 'edition'
+    productFlavors {
+        classic {
+            dimension 'edition'
+            resValue 'string', 'app_name', 'Zehra Kinik'
+        }
+        world {
+            dimension 'edition'
+            applicationIdSuffix '.world'
+            resValue 'string', 'app_name', 'Zehra Kinik Acik Dunya'
+            externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_static', '-DZK_OPENWORLD=ON' } }
+        }
+    }
     // Sabit imza: CI'da ZK_KEYSTORE (dosya yolu) + ZK_KEYSTORE_PASS varsa her build ayni anahtarla imzalanir
     // (GitHub secret'lari; repo acik oldugu icin anahtar repoda tutulmaz). Yoksa varsayilan debug imzasi.
     signingConfigs {
