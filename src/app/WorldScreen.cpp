@@ -125,7 +125,8 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     M.mPlus = {(float)M.W - 60, 40, (float)M.W - 8, 80}; M.mMinus = {(float)M.W - 60, 86, (float)M.W - 8, 126};
     M.mClose = {(float)M.W - 120, (float)M.H - 44, (float)M.W - 8, (float)M.H - 8}; M.mClear = {8, (float)M.H - 44, 140, (float)M.H - 8};
     M.rng ^= (uint32_t)(app.career.races * 7919 + 13);
-    if (std::getenv("ZK_WORLD_MAP")) { M.mapOpen = true; M.mapCx = M.car->sim().posX(); M.mapCy = M.car->sim().posY(); }
+    if (const char* mp = std::getenv("ZK_WORLD_MAP")) { M.mapOpen = true; M.mapCx = M.car->sim().posX(); M.mapCy = M.car->sim().posY(); if (std::atof(mp) > 1.5) M.mapScale = std::atof(mp);
+        if (const char* mc = std::getenv("ZK_WORLD_MAPCITY")) { const WorldCity& wc = M.w.cities[std::clamp(std::atoi(mc), 0, 9)]; M.mapCx = wc.x; M.mapCy = wc.y; } }
     if (const char* rp = std::getenv("ZK_WORLD_ROUTE")) {                  // test: n. noktaya rota + otonom
         const int k = std::clamp(std::atoi(rp), 0, (int)M.w.pois.size() - 1);
         WorldLeg l; double s, lat; M.hasWp = true;
@@ -370,7 +371,7 @@ void WorldScreen::render(Renderer& r) {
     // Sehir zeminleri (kaldirim / beton): 20 m karolar (yakindaki buyuk karo kameranin arkasina tasip atlaniyordu)
     for (const WorldCity& c : w.cities) {
         if (std::hypot(c.x - ex, c.y - ey) > 2400.0) continue;              // merkez arkada kalsa da sehrin bir kismi onde olabilir
-        const double R = World::kBlock * (World::kGrid - 1) * 0.5 + 40.0, px = -c.dirY, py = c.dirX;
+        const double R = std::max(c.hu, c.hv) + 40.0, px = -c.dirY, py = c.dirX;
         const int N = (int)(2 * R / 20.0);
         const double cu = (ex - c.x) * c.dirX + (ey - c.y) * c.dirY, cv = (ex - c.x) * px + (ey - c.y) * py;   // kamera yerel
         const int i0 = std::max(0, (int)((cu - 650.0 + R) / 20.0)), i1 = std::min(N, (int)((cu + 650.0 + R) / 20.0) + 1);
@@ -387,8 +388,11 @@ void WorldScreen::render(Renderer& r) {
                     for (int b2 = 0; b2 < sub; ++b2) {
                         const double ua = u0 + (u1 - u0) * a2 / sub, ub = u0 + (u1 - u0) * (a2 + 1) / sub;
                         const double va = v0 + (v1 - v0) * b2 / sub, vb = v0 + (v1 - v0) * (b2 + 1) / sub;
+                        const int surf = World::surfaceLocal(c.style, 0.5 * (ua + ub), 0.5 * (va + vb));
+                        if (surf == 2) continue;                              // yesil: cim zemini kalir
                         const Proj a = Q(ua, va);
-                        quadP(r, a, Q(ub, va), Q(ub, vb), Q(ua, vb), fog({0.62f, 0.62f, 0.60f}, a.w));
+                        const float wv = 0.04f * std::sin((float)(M.envT * 1.3 + ua * 0.05 + va * 0.03));   // su parlamasi
+                        quadP(r, a, Q(ub, va), Q(ub, vb), Q(ua, vb), fog(surf == 1 ? Color{0.16f + wv, 0.38f + wv, 0.62f + wv} : Color{0.62f, 0.62f, 0.60f}, a.w));
                     }
             }
     }
@@ -404,6 +408,11 @@ void WorldScreen::render(Renderer& r) {
             const Proj aL = edge(a, a.hw, 0.01), aR = edge(a, -a.hw, 0.01), bL = edge(b, b.hw, 0.01), bR = edge(b, -b.hw, 0.01);
             const bool band = (i / step / 4) % 2 == 0;
             quadP(r, aL, bL, bR, aR, fog(band ? Color{0.30f, 0.30f, 0.32f} : Color{0.28f, 0.28f, 0.30f}, aL.w));
+            if (E.bridge && aL.w < 400.0f)                                   // kopru korkulugu
+                for (double sg : {1.0, -1.0}) {
+                    const Proj k0 = edge(a, sg * (a.hw + 0.3), 0.0), k1 = edge(b, sg * (b.hw + 0.3), 0.0), k2 = edge(b, sg * (b.hw + 0.3), 1.1), k3 = edge(a, sg * (a.hw + 0.3), 1.1);
+                    quadP(r, k0, k1, k2, k3, fog({0.72f, 0.72f, 0.75f}, aL.w));
+                }
             if (aL.w < 260.0f && (i / step) % 3 == 0) {                     // kesik cizgiler: serit sinirlari
                 const int nl = (int)(a.lf + a.lb);
                 for (int k = 1; k < nl; ++k) {
@@ -593,7 +602,22 @@ void WorldScreen::render(Renderer& r) {
             const float dx = c2 - a, dy = d - bb, l = std::sqrt(dx * dx + dy * dy) + 1e-3f, nx = -dy / l * wd, ny = dx / l * wd;
             r.tri(a + nx, bb + ny, c2 + nx, d + ny, c2 - nx, d - ny, col); r.tri(a + nx, bb + ny, c2 - nx, d - ny, a - nx, bb - ny, col);
         };
-        for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.circle(sx, sy, (float)(c.r / M.mapScale), 20, {0.18f, 0.2f, 0.22f}); }
+        {   // sehir sekilleri ve su (kaba hucreler, gorunen bolge)
+            const double cell = std::max(40.0, M.mapScale * 5.0);
+            const double x0 = M.mapCx - W * 0.5 * M.mapScale, x1 = M.mapCx + W * 0.5 * M.mapScale, y0 = M.mapCy - H * 0.5 * M.mapScale, y1 = M.mapCy + H * 0.5 * M.mapScale;
+            for (const WorldCity& c : w.cities) {
+                const double ext = c.hu + c.hv + 400.0;
+                if (c.x + ext < x0 || c.x - ext > x1 || c.y + ext < y0 || c.y - ext > y1) continue;
+                for (double gx = std::max(x0, c.x - ext); gx < std::min(x1, c.x + ext); gx += cell)
+                    for (double gy = std::max(y0, c.y - ext); gy < std::min(y1, c.y + ext); gy += cell) {
+                        const int sf = w.surfaceAt(gx + cell * 0.5, gy + cell * 0.5);
+                        if (sf == 2) continue;
+                        float sx, sy; S(gx, gy + cell, sx, sy);
+                        const float cs = (float)(cell / M.mapScale) + 0.5f;
+                        r.rect(sx, sy, sx + cs, sy + cs, sf == 1 ? Color{0.12f, 0.28f, 0.48f} : Color{0.20f, 0.21f, 0.23f});
+                    }
+            }
+        }
         for (const WorldEdge& E : w.edges) {
             const auto& pts = E.fwd().points();
             const int st = std::max(1, (int)(M.mapScale * 2.0 / RoadPath::kStep));
@@ -606,7 +630,7 @@ void WorldScreen::render(Renderer& r) {
         }
         static const Color pc[4] = {{1.0f, 0.5f, 0.1f}, {0.9f, 0.3f, 0.7f}, {0.6f, 0.45f, 0.25f}, {0.9f, 0.2f, 0.15f}};
         for (const WorldPoi& q : w.pois) { float sx, sy; S(q.x, q.y, sx, sy); r.circle(sx, sy, 4.0f, 10, pc[q.type]); }
-        for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.textCentered(sx, sy - (float)(c.r / M.mapScale) - 12, c.name, 1, {1, 1, 1}); }
+        for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.textCentered(sx, sy - (float)(c.hv / M.mapScale) - 14, c.name, 1, {1, 1, 1}); }
         if (M.hasWp) { float sx, sy; S(M.wpX, M.wpY, sx, sy); r.circle(sx, sy, 7, 14, {0.2f, 0.8f, 1.0f}); r.circle(sx, sy, 3, 10, {1, 1, 1}); }
         {   float sx, sy; S(X, Y, sx, sy);
             const float h = (float)sim.heading(), c2 = std::cos(h), s2 = -std::sin(h);
