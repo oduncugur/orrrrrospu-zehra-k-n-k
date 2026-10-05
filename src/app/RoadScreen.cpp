@@ -119,6 +119,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     P.esp = app_.settings.esp;
     adasMode_ = 0; adasLevel_ = adasLevel(*findVehicle(carId_), tune_);
     if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::atoi(a); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
+    if (std::getenv("ZK_AT_STATION") && ses_ && !ses_->stations().empty()) ses_->player().recoverAt(ses_->stations()[0] - 70.0, ses_->rightLane(ses_->stations()[0]));   // test: ilk benzinligin onunde
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();
     const int gears = P.sim().powertrain().gearCount();
@@ -643,9 +644,10 @@ void RoadScreen::drawWorld(Renderer& r) {
             const Proj q = edge(i, 0.0);
             if (q.ok) { r.setDepthW(q.w - 0.05f); const float s2 = std::max(1.0f, 0.12f * pxPerM / q.w); r.rect(q.x - s2, q.y - s2 * 0.6f, q.x + s2, q.y, {1.0f, 0.85f, 0.4f, lit}); }
         }
+        const bool stClear = ses_->inStation(P[i].s) || ses_->inStation(P[i].s + 20.0) || ses_->inStation(P[i].s - 20.0);   // benzinlik sahasi (sag) acik
         if (zone == 0 && !mtn && P[i].hw > 4.6) {                     // otoban: celik bariyer (ray + direk)
             for (double sg : {-1.0, 1.0}) {
-                if (camBlend_ < 0.5 && sg < 0) continue;
+                if ((camBlend_ < 0.5 || stClear) && sg < 0) continue;
                 const double o0 = sg * (P[i].hw + 2.0), o1 = sg * (P[j].hw + 2.0);
                 const Proj g0 = pt(i, o0, 0.55), g1 = pt(j, o1, 0.55), g2 = pt(j, o1, 0.80), g3 = pt(i, o0, 0.80), gb = pt(i, o0, 0.0);
                 if (!g0.ok || !g1.ok || !g2.ok || !g3.ok) continue;
@@ -769,32 +771,61 @@ void RoadScreen::drawWorld(Renderer& r) {
             if (!(P[i].s <= st + 0.5 * RoadSession::kStationLen && P[j].s > st + 0.5 * RoadSession::kStationLen)) continue;
             const bool dead = ses_->stationDestroyed((int)sti);
             const int ia = std::max(0, i - (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep)), ib = std::min(n - 1, i + (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep));
-            const double o0 = -(P[i].hw + 0.6), o1 = -(P[i].hw + 13.0);
-            const Proj c0 = pt(ia, o0, 0.02), c1 = pt(ib, o0, 0.02), c2 = pt(ib, o1, 0.02), c3 = pt(ia, o1, 0.02);
-            if (c0.ok && c1.ok && c2.ok && c3.ok) { const Color cc = fog(L({0.62f, 0.62f, 0.60f}), c0.w); triP(r, c0, c1, c2, cc); triP(r, c0, c2, c3, cc); }
-            const int ka = ia + (ib - ia) / 4, kb = ib - (ib - ia) / 4;          // sacak (5 m yukseklikte) + direkler
-            const double so0 = -(P[i].hw + 3.0), so1 = -(P[i].hw + 10.0);
-            const Proj r0 = pt(ka, so0, 5.0), r1 = pt(kb, so0, 5.0), r2 = pt(kb, so1, 5.0), r3 = pt(ka, so1, 5.0);
-            const Proj r0b = pt(ka, so0, 4.4), r1b = pt(kb, so0, 4.4);
-            for (int pk = 0; pk < 4; ++pk) {                                      // direkler
+            // Kutu cizici: yol uzerinde [ka..kb] x [oa..ob] x [h0..h1]; ust yuz + yola bakan on yuz + uclar (gorunen yuzler)
+            auto quad = [&](const Proj& a, const Proj& b, const Proj& c, const Proj& d, Color col) {
+                if (a.ok && b.ok && c.ok && d.ok) { triP(r, a, b, c, col); triP(r, a, c, d, col); }
+            };
+            auto box = [&](int ka2, int kb2, double oa, double ob, double h0, double h1, Color top, Color front, Color end) {
+                quad(pt(ka2, oa, h1), pt(kb2, oa, h1), pt(kb2, ob, h1), pt(ka2, ob, h1), top);
+                quad(pt(ka2, oa, h0), pt(kb2, oa, h0), pt(kb2, oa, h1), pt(ka2, oa, h1), front);   // yola bakan yuz
+                quad(pt(ka2, oa, h0), pt(ka2, ob, h0), pt(ka2, ob, h1), pt(ka2, oa, h1), end);     // uclar
+                quad(pt(kb2, oa, h0), pt(kb2, ob, h0), pt(kb2, ob, h1), pt(kb2, oa, h1), end);
+            };
+            const double hwS = P[i].hw;
+            const float wS = pt(i, -hwS, 0).ok ? pt(i, -hwS, 0).w : 100.0f;
+            {   // platform: yukseltilmis beton saha (15 cm kaldirim), uzerinde serit cizgileri
+                const Color pad = fog(L({0.70f, 0.70f, 0.68f}), wS), lip = fog(L({0.50f, 0.50f, 0.50f}), wS);
+                box(ia, ib, -(hwS + 0.6), -(hwS + 17.0), 0.0, 0.15, pad, lip, lip);
+                const Color line = fog(L({0.92f, 0.92f, 0.9f}), wS);
+                for (double lo : {-(hwS + 4.2), -(hwS + 8.8)}) quad(pt(ia + 2, lo, 0.16), pt(ib - 2, lo, 0.16), pt(ib - 2, lo - 0.15, 0.16), pt(ia + 2, lo - 0.15, 0.16), line);
+            }
+            const int ka = ia + (ib - ia) / 4, kb = ib - (ib - ia) / 4;          // sacak / pompa bolgesi
+            const double so0 = -(hwS + 3.0), so1 = -(hwS + 10.0);
+            {   // market binasi: arkada, beyaz duvar + koyu vitrin + kirmizi bant + MARKET yazisi
+                const Color wall = fog(L({0.90f, 0.90f, 0.88f}), wS), side = fog(L({0.72f, 0.72f, 0.70f}), wS);
+                const int ma = ia + (ib - ia) / 5, mb = ib - (ib - ia) / 5;
+                const double mf = -(hwS + 12.5);
+                box(ma, mb, mf, -(hwS + 16.5), 0.15, 3.6, side, wall, side);
+                quad(pt(ma + 1, mf - 0.01, 0.4), pt(mb - 1, mf - 0.01, 0.4), pt(mb - 1, mf - 0.01, 2.5), pt(ma + 1, mf - 0.01, 2.5),
+                     night_ ? Color{0.95f, 0.9f, 0.7f} : fog(L({0.18f, 0.24f, 0.32f}), wS));   // vitrin (gece aydinlik)
+                quad(pt(ma, mf - 0.02, 2.8), pt(mb, mf - 0.02, 2.8), pt(mb, mf - 0.02, 3.5), pt(ma, mf - 0.02, 3.5), fog(L({0.85f, 0.15f, 0.12f}), wS));
+                const Proj tm = pt((ma + mb) / 2, mf - 0.03, 3.15);
+                if (tm.ok) { const float ts = std::min(3.0f, std::floor(pxPerM / tm.w * 0.05f)); if (ts >= 1.0f) { r.setDepthW(tm.w - 0.05f); r.textCentered(tm.x, tm.y - 3.5f * ts, "MARKET", ts, {1, 1, 1}); } }
+            }
+            for (int pk = 0; pk < 4; ++pk) {                                      // kare kolonlar (35 cm)
                 const int pi = pk < 2 ? ka : kb; const double po = (pk % 2) ? so1 : so0;
-                const Proj p0 = pt(pi, po, 0.0), p1 = pt(pi, po, 4.4);
-                if (p0.ok && p1.ok) { r.setDepthW(p0.w); const float pw = std::max(0.8f, 0.15f * pxPerM / p0.w); r.rect(p0.x - pw, p1.y, p0.x + pw, p0.y, fog(L({0.85f, 0.85f, 0.88f}), p0.w)); }
+                box(pi, pi + 1, po + 0.18, po - 0.18, 0.15, 4.6, fog(L({0.55f, 0.55f, 0.58f}), wS), fog(L({0.66f, 0.66f, 0.70f}), wS), fog(L({0.48f, 0.48f, 0.52f}), wS));
             }
-            for (int pk = 0; pk < 3 && !dead; ++pk) {                             // pompalar (patladiysa yok)
+            for (int pk = 0; pk < 3 && !dead; ++pk) {                             // pompa adalari + pompalar (patladiysa yok)
                 const int pi = ka + (kb - ka) * (pk + 1) / 4;
-                const Proj a0 = pt(pi, -(P[i].hw + 6.5), 0.0), a1 = pt(pi, -(P[i].hw + 6.5), 1.6);
-                if (!a0.ok || !a1.ok) continue;
-                r.setDepthW(a0.w);
-                const float pw = std::max(1.0f, 0.4f * pxPerM / a0.w);
-                r.rect(a0.x - pw, a1.y, a0.x + pw, a0.y, fog(L({0.85f, 0.15f, 0.12f}), a0.w));
-                r.rect(a0.x - pw * 0.7f, a1.y + (a0.y - a1.y) * 0.15f, a0.x + pw * 0.7f, a1.y + (a0.y - a1.y) * 0.4f, fog(L({0.15f, 0.2f, 0.25f}), a0.w));
+                const double pl = -(hwS + 6.5);
+                const Proj pc = pt(pi, pl, 0);
+                if (!pc.ok) continue;
+                const Color isl = fog(L({0.78f, 0.78f, 0.76f}), pc.w), yel = fog(L({0.95f, 0.78f, 0.1f}), pc.w);
+                box(pi - 2, pi + 2, pl + 0.7, pl - 0.7, 0.15, 0.32, isl, yel, yel);       // ada (sari kenar)
+                box(pi - 1, pi + 1, pl + 0.3, pl - 0.3, 0.32, 1.9, fog(L({0.85f, 0.15f, 0.12f}), pc.w), fog(L({0.94f, 0.94f, 0.94f}), pc.w), fog(L({0.80f, 0.80f, 0.82f}), pc.w));
+                quad(pt(pi - 1, pl + 0.31, 1.55), pt(pi + 1, pl + 0.31, 1.55), pt(pi + 1, pl + 0.31, 1.9), pt(pi - 1, pl + 0.31, 1.9), fog(L({0.85f, 0.15f, 0.12f}), pc.w));   // kirmizi baslik
+                quad(pt(pi, pl + 0.32, 1.05), pt(pi + 1, pl + 0.32, 1.05), pt(pi + 1, pl + 0.32, 1.4), pt(pi, pl + 0.32, 1.4), fog(L({0.10f, 0.14f, 0.18f}), pc.w));    // ekran
+                quad(pt(pi - 1, pl + 0.33, 0.7), pt(pi, pl + 0.33, 0.7), pt(pi, pl + 0.33, 0.95), pt(pi - 1, pl + 0.33, 0.95), fog(L({0.12f, 0.12f, 0.12f}), pc.w));   // tabanca
             }
-            if (r0.ok && r1.ok && r2.ok && r3.ok) {
-                const Color roof = dead ? Color{0.08f, 0.07f, 0.07f} : fog(night_ ? Color{0.95f, 0.95f, 0.9f} : L({0.92f, 0.92f, 0.94f}), r0.w),
-                            band = dead ? Color{0.15f, 0.08f, 0.05f} : fog(L({0.85f, 0.15f, 0.12f}), r0.w);
-                triP(r, r0, r1, r2, roof); triP(r, r0, r2, r3, roof);
-                if (r0b.ok && r1b.ok) { triP(r, r0b, r1b, r1, band); triP(r, r0b, r1, r0, band); }   // kirmizi sacak bandi
+            {   // sacak: kalin, alti aydinlik panel, kirmizi alin bandi
+                const Color under = night_ ? Color{1.0f, 1.0f, 0.95f} : fog(L({0.88f, 0.88f, 0.9f}), wS);
+                const Color roof = dead ? Color{0.08f, 0.07f, 0.07f} : fog(L({0.92f, 0.92f, 0.94f}), wS),
+                            band = dead ? Color{0.15f, 0.08f, 0.05f} : fog(L({0.85f, 0.15f, 0.12f}), wS);
+                quad(pt(ka - 1, so0 + 0.5, 4.6), pt(kb + 1, so0 + 0.5, 4.6), pt(kb + 1, so1 - 0.5, 4.6), pt(ka - 1, so1 - 0.5, 4.6), dead ? roof : under);
+                box(ka - 1, kb + 1, so0 + 0.5, so1 - 0.5, 4.6, 5.4, roof, band, band);
+                const Proj ft = pt((ka + kb) / 2, so0 + 0.49, 5.0);
+                if (ft.ok && !dead) { const float ts = std::min(3.0f, std::floor(pxPerM / ft.w * 0.05f)); if (ts >= 1.0f) { r.setDepthW(ft.w - 0.05f); r.textCentered(ft.x, ft.y - 3.5f * ts, "AKARYAKIT", ts, {1, 1, 1}); } }
             }
             if (dead) {                                                           // yanik saha: titreyen alev + duman
                 for (int f = 0; f < 3; ++f) {
@@ -981,7 +1012,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         if (zone == 0 && !mtn && P[i].hw <= 4.6 && i % 2 == 0 && aL.w < 110.0f) {   // kirsal ahsap cit (direk + iki ray)
             for (int sd = -1; sd <= 1; sd += 2) {
                 if (camBlend_ < 0.5 && sd < 0) continue;
-                if (hashf((i / 40) * 3 + (sd > 0)) < 0.5f) continue;      // citli / citsiz kesimler
+                if (hashf((i / 40) * 3 + (sd > 0)) < 0.5f || (stClear && sd < 0)) continue;   // citli / citsiz kesimler; benzinlik acik
                 const double off = sd * (P[i].hw + 6.0);
                 const Proj b0 = pt(i, off, 0.0), t0 = pt(i, off, 1.1), r0 = pt(i, off, 0.9), r1 = pt(i + 2, off, 0.9), q0 = pt(i, off, 0.5), q1 = pt(i + 2, off, 0.5);
                 if (!b0.ok || !t0.ok) continue;
@@ -998,7 +1029,7 @@ void RoadScreen::drawWorld(Renderer& r) {
             for (int sd = -1; sd <= 1; sd += 2) {
                 if (camBlend_ < 0.5 && sd < 0) continue;
                 const float h = hashf(i * 3 + (sd > 0) * 7 + 1);
-                if (h < 0.4f) continue;
+                if (h < 0.4f || (stClear && sd < 0)) continue;
                 const Proj b = edge(i, sd * (P[i].hw + 4.0 + 10.0 * hashf(i * 11 + sd)));
                 if (!b.ok) continue;
                 r.setDepthW(b.w);
@@ -1010,7 +1041,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         }
         if (zone == 0 && i % 4 == 0) {                             // kenar agaclari / direkleri (her 8 m)
             for (int side = -1; side <= 1; side += 2) {
-                if (camBlend_ < 0.5 && side < 0) continue;            // drag gorunumu: kamera tarafindaki agaclar gorusu kapatir
+                if ((camBlend_ < 0.5 || stClear) && side < 0) continue;   // drag gorunumu: kamera tarafi agaclar kapatir; benzinlik acik
                 const float h = hashf(i * 2 + (side > 0));
                 if (h < (mtn ? 0.08f : 0.35f)) continue;
                 const bool far = (i / 4) % 2 == 1;                         // her ikinci sira uzak (orman derinligi)
