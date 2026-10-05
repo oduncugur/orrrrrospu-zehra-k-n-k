@@ -83,7 +83,8 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
 void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     int rival = 0; Tune rt;
     if (m == RoadSession::Mode::Race || m == RoadSession::Mode::Karma || m == RoadSession::Mode::Chase || m == RoadSession::Mode::Marathon) {
-        const Opponent o = app_.activeEvent >= 0 ? app_.lastOpp : app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
+        Opponent o = app_.activeEvent >= 0 ? app_.lastOpp : app_.career.pickOpponentFor((uint32_t)(app_.career.races * 7919 + 17));
+        if (forceRival_ > 0) { o = Opponent{forceRival_, forceTune_, 0.0}; forceRival_ = 0; }   // sehir turu: polis / serseri
         app_.lastOpp = o;
         rival = o.carId; rt = o.tune;
         app_.setVoiceTuned(1, rival, &rt);
@@ -99,6 +100,10 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
         l100_ = 0; usedRun_ = 0; lastRunS_ = ses_->player().s(); lastFuel_ = ses_->player().sim().fuelLiters();
     }
     if (app_.career.car().carId == carId_) ses_->player().sim().setNosFill(app_.career.car().nosFill);   // tupte kalan
+    if (m == RoadSession::Mode::Free && !autopilot_) {                  // serbest surus = sehir turu (acik dunya)
+        static const int kHool[8] = {2, 12, 59, 24, 34, 100, 50, 78};
+        ses_->setupCruise(cruisePois(), 217, kHool[app_.career.city % 8]);
+    }
     {   // Ortam: gece %30, yagmur %25 (tohumdan); test icin ZK_NIGHT / ZK_RAIN
         const uint32_t w = seed * 2246822519u + 0x9E3779B9u;
         night_ = (w >> 7) % 100 < 30 || std::getenv("ZK_NIGHT");
@@ -119,6 +124,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     P.esp = app_.settings.esp;
     adasMode_ = 0; adasLevel_ = adasLevel(*findVehicle(carId_), tune_);
     if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::atoi(a); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
+    if (std::getenv("ZK_AT_POI") && ses_ && !ses_->pois().empty()) ses_->player().recoverAt(ses_->pois()[0].s - 10.0, ses_->rightLane(ses_->pois()[0].s));   // test: ilk noktanin yaninda
     if (std::getenv("ZK_AT_STATION") && ses_ && !ses_->stations().empty()) ses_->player().recoverAt(ses_->stations()[0] - 70.0, ses_->rightLane(ses_->stations()[0]));   // test: ilk benzinligin onunde
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();
@@ -139,7 +145,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     if (m == RoadSession::Mode::Chase) app_.hint(HintChase, hintTexts()[HintChase]);
     if (night_ || rain_) msgNote_ = std::string(night_ ? "GECE" : "") + (night_ && rain_ ? " + " : "") + (rain_ ? "YAGMUR: TUTUS DUSUK" : "");
     else msgNote_.clear();
-    flash(m == RoadSession::Mode::Free ? "SERBEST SURUS"
+    flash(m == RoadSession::Mode::Free ? std::string(Career::cityName(app_.career.city)) + ": SEHIRDE DOLAS"
           : m == RoadSession::Mode::Flow ? "OTOBAN AKISI: YAKIN GEC, HIZLI GIT"
           : m == RoadSession::Mode::Karma ? "KARMA: DUZDE DRAG, VIRAJDA SURUS"
           : m == RoadSession::Mode::Chase ? "POLIS! 400 M ACIL VE TUT"
@@ -149,12 +155,57 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
 
 // Sonuctan cikis: seyahatte sonraki etap (yeni ekran), varista harita, aksi halde garaj
 void RoadScreen::leaveResults() {
+    if (cruiseRet_) {                                                    // kovalamaca / kapisma bitti: sehir turuna geri
+        cruiseRet_ = false;
+        start(RoadSession::Mode::Free);
+        ses_->player().recoverAt(cruiseResume_, ses_->rightLane(cruiseResume_));
+        return;
+    }
     if (ses_->mode() == RoadSession::Mode::Marathon && app_.runPlan.active && rewarded_) {
         app_.continueTravel();
         return;
     }
+    if (ses_->mode() == RoadSession::Mode::Marathon && !app_.eventNote.empty() && app_.runPlan.solo) {   // tek basina yolculuk: menusuz yeni sehrin turu
+        const std::string note = app_.eventNote; app_.eventNote.clear();
+        start(RoadSession::Mode::Free);
+        flash(note, 2.5);
+        return;
+    }
     if (ses_->mode() == RoadSession::Mode::Marathon && !app_.eventNote.empty()) { app_.goMap(); return; }
     app_.goGarage();
+}
+
+std::vector<Poi> RoadScreen::cruisePois() const {
+    std::vector<Poi> v;
+    const int city = app_.career.city;
+    const auto& ev = leagueEvents();
+    double s = 600.0;
+    for (int i = 0; i < (int)ev.size(); ++i)
+        if (eventCity(i) == city) { v.push_back({s, PoiRace, i, ev[i].name}); s += 900.0; if (v.size() == 2) { v.push_back({s, PoiJunk, 0, "HURDALIK"}); s += 900.0; } }
+    if (!((app_.career.barnFound >> city) & 1u)) v.push_back({s + 400.0, PoiBarn, 0, "TERK EDILMIS ARAC?"});
+    const int to = city + 1 < Career::kCities ? city + 1 : city - 1;
+    v.push_back({19000.0, PoiExit, to, std::string("SEHIR CIKISI: ") + Career::cityName(to)});
+    return v;
+}
+
+void RoadScreen::activatePoi(int k) {
+    const Poi& p = ses_->pois()[k];
+    std::string why;
+    switch (p.type) {
+    case PoiRace:
+        if (!app_.career.eventAvailable(p.ref, &why)) { flash(why, 1.8); return; }
+        app_.startEvent(p.ref); return;
+    case PoiJunk: app_.goJunkyard(); return;
+    case PoiBarn:
+        if (app_.career.claimBarn(app_.career.city, &why)) {
+            app_.saveCareer();
+            flash(std::string("AHIR BULGUSU: ") + upper(findVehicle(Career::barnCar(app_.career.city))->model) + " GARAJINDA!", 3.0);
+        } else flash(why, 1.8);
+        return;
+    case PoiExit:
+        if (!app_.career.canTravel(p.ref, &why)) { flash(why, 1.8); return; }
+        app_.startTravel(p.ref, true); return;
+    }
 }
 
 bool RoadScreen::autoClutchPenalty() const {
@@ -167,6 +218,16 @@ void RoadScreen::finishRace() {
     {   // kilometre sayaci: surulen yol (The Run: etabin temsil ettigi gercek mesafe orani)
         const double m = std::max(0.0, ses_->player().s() - ses_->startS());
         app_.career.addKm(m / 1000.0 * (ses_->mode() == RoadSession::Mode::Marathon ? ses_->compression() : 1.0));
+    }
+    if (cruiseRet_ && ses_->mode() == RoadSession::Mode::Chase) {        // sehir turu polisi: kacarsan odul yok, yakalanirsan ceza
+        prize_ = 0;
+        if (!ses_->playerWon()) {
+            const long fine = std::min(app_.career.money, 500L + app_.career.money / 20);
+            app_.career.money -= fine; prize_ = -fine;
+            app_.eventNote = "POLIS CEZASI -" + money(fine);
+        } else app_.eventNote = "POLISTEN KACTIN";
+        app_.saveCareer();
+        return;
     }
     if (app_.activeEvent >= 0) {                                         // lig etkinligi
         int pink = 0;
@@ -198,6 +259,17 @@ void RoadScreen::finishRace() {
 
 void RoadScreen::update(double dt) {
     msgT_ -= dt;
+    if (ses_ && !menu_ && ses_->cruise()) {                              // sehir turu: polis / serseri sataşmasi
+        int car = 0;
+        if (const int role = ses_->takeAggro(car)) {
+            cruiseRet_ = true; cruiseResume_ = ses_->player().s();
+            forceRival_ = car; forceTune_ = role == 2 ? opponentPreset(2) : Tune{};
+            app_.activeEvent = -1;
+            start(role == 1 ? RoadSession::Mode::Chase : RoadSession::Mode::Race);
+            flash(role == 1 ? "POLIS PESINDE! 400 M ACIL VE TUT" : "SERSERI SATASTI: 4 KM KAPISMA", 2.5);
+            return;
+        }
+    }
     if (menu_ || !ses_) { app_.voice(0, 900, 0, false, false, 0.6f); app_.tire(0, 0); app_.tire(1, 0); app_.wind(0); return; }
     RoadCar& P = ses_->player();
     const double v = P.sim().speed();
@@ -1167,9 +1239,28 @@ void RoadScreen::drawWorld(Renderer& r) {
         const float sl = night_ ? 0.42f : rain_ ? 0.8f : 1.0f;            // gece duman karanlik
         r.circle(q.x, q.y, rad, 12, {0.86f * sl, 0.86f * sl, 0.88f * sl, a});
     }
+    if (ses_->cruise()) {                                                 // sehir turu: yol kenari tabelalari (sagda)
+        for (const Poi& q : ses_->pois()) {
+            if (q.s < ps - 40.0 || q.s > ps + 900.0) continue;
+            const int qi = std::clamp((int)(q.s / RoadPath::kStep), 0, n - 1);
+            const double off = -(P[qi].hw + 3.5);
+            const Proj b0 = pt(qi, off, 0.0), b1 = pt(qi, off, 5.0);
+            if (!b0.ok || !b1.ok) continue;
+            r.setDepthW(b0.w);
+            const float sc = pxPerM / b0.w;
+            static const Color kc[4] = {{0.95f, 0.45f, 0.08f}, {0.45f, 0.30f, 0.15f}, {0.15f, 0.50f, 0.25f}, {0.10f, 0.30f, 0.75f}};
+            r.rect(b0.x - 0.10f * sc, b1.y, b0.x + 0.10f * sc, b0.y, fog({0.55f, 0.55f, 0.58f}, b0.w));
+            r.rect(b1.x - 2.4f * sc, b1.y - 1.4f * sc, b1.x + 2.4f * sc, b1.y, fog(kc[q.type], b0.w));
+            if (q.type == PoiRace)                                       // dama bayrak bandi
+                for (int c = 0; c < 12; ++c) r.rect(b1.x - 2.4f * sc + c * 0.4f * sc, b1.y - 0.2f * sc, b1.x - 2.0f * sc + c * 0.4f * sc, b1.y,
+                                                    (c & 1) ? Color{0, 0, 0} : Color{1, 1, 1});
+            const float ts = std::min(3.0f, std::floor(sc * 0.045f));
+            if (ts >= 1.0f) r.textFit(b1.x, b1.y - 1.1f * sc, q.name, ts, 4.6f * sc, {1, 1, 1}, true);
+        }
+    }
     r.flush2D();
     // Diger araclar (uzaktan yakina), sonra oyuncu. z: yol yuksekligi + suspansiyon; pitch: gidis yonundeki egim
-    struct Obj { double d, x, y, psi, z, pitch; int id; float spin = 0, steer = 0; bool police = false; };
+    struct Obj { double d, x, y, psi, z, pitch; int id; float spin = 0, steer = 0; bool police = false, hool = false; };
     auto carModel = [](double x, double y, double z, double psi, double pitch) {
         return matMul(matMul(matTranslate((float)x, (float)z, (float)-y), matRotY((float)psi)), matRotZ((float)std::atan(pitch)));
     };
@@ -1177,7 +1268,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     for (const TrafficCar& t : ses_->traffic()) {
         if (t.s < ps - 60 || t.s > ps + 1400) continue;
         const RoadPoint q = R.at(t.s);
-        Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
+        Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId; o.police = t.role == 1; o.hool = t.role == 2;
         o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
         o.spin = (float)(envT_ * std::min(t.v / 0.31, 33.0) * (t.oncoming ? -1.0 : 1.0));   // en fazla ~0.55 rad / kare
         o.d = (o.x - ex) * dx + (o.y - ey) * dy; objs.push_back(o);   // kamera bakis yonunde derinlik
@@ -1202,6 +1293,11 @@ void RoadScreen::drawWorld(Renderer& r) {
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
         if (o.d < 3.0) continue;                                   // kameraya cok yakin / arkasinda
+        if (o.hool) {                                              // serseri: koyu boya + yaris seridi + kanat + alcak
+            Renderer::CarLook hl; hl.paintOn = true; hl.paint[0] = 0.08f; hl.paint[1] = 0.08f; hl.paint[2] = 0.10f;
+            hl.stripe = 2; hl.stripeCol[0] = 0.95f; hl.stripeCol[1] = 0.55f; hl.stripeCol[2] = 0.05f; hl.aero = 5; hl.drop = 0.04f;
+            r.setCarLook(hl);
+        }
         if (o.police) {
             Renderer::CarLook pl; pl.paintOn = true; pl.paint[0] = pl.paint[1] = pl.paint[2] = 0.93f;
             pl.stripe = 3; pl.stripeCol[0] = 0.08f; pl.stripeCol[1] = 0.12f; pl.stripeCol[2] = 0.45f;
@@ -1289,6 +1385,18 @@ static void policeStrobe(Renderer& r, float W, float H, double gap, double t) {
 }
 
 void RoadScreen::drawHud(Renderer& r) {
+    if (ses_->cruise()) {                                                 // sehir turu: sonraki nokta + durunca etkilesim dugmesi
+        const Poi* nx = nullptr;
+        for (const Poi& q : ses_->pois()) if (q.s > ses_->player().s() - 10.0 && (!nx || q.s < nx->s)) nx = &q;
+        char nb[80];
+        if (nx) { std::snprintf(nb, sizeof nb, "SONRAKI: %s  %.0f M", nx->name.c_str(), std::max(0.0, nx->s - ses_->player().s()));
+                  r.textCentered(W * 0.42f, H - (land_ ? 96.0f : 150.0f), nb, 1, {1.0f, 0.85f, 0.4f}); }
+        const int ph = ses_->poiHere();
+        if (ph >= 0) {
+            poiBtn_ = {W * 0.42f - 120, H - (land_ ? 86.0f : 140.0f), W * 0.42f + 120, H - (land_ ? 54.0f : 104.0f)};
+            button(r, poiBtn_, std::string("GIR: ") + ses_->pois()[ph].name, {0.85f, 0.45f, 0.08f}, 1);
+        }
+    }
     if (ses_->mode() == RoadSession::Mode::Chase && ses_->phase() == RoadSession::Phase::Run && ses_->gapMeters() > -5.0)
         policeStrobe(r, (float)W, (float)H, ses_->gapMeters(), envT_);
     RoadCar& Pc = ses_->player();
@@ -1567,6 +1675,7 @@ void RoadScreen::pointerDown(int id, float x, float y) {
         return;
     }
     if (ses_->phase() == RoadSession::Phase::Finished && finT_ > 1.0) { leaveResults(); return; }
+    if (ses_->poiHere() >= 0 && poiBtn_.hit(x, y)) { activatePoi(ses_->poiHere()); return; }
     if (cockpit_.pointerDown(id, x, y)) return;
     if (assistBtn_.hit(x, y)) toggleAssist();
     else if (tiltBtn_.hit(x, y) && app_.tiltAvailable) toggleTilt();
@@ -1713,6 +1822,7 @@ void RoadScreen::key(Key k, bool down) {
     case Key::Right: kR_ = down; break;
     case Key::Enter:
         if (down && ses_->phase() == RoadSession::Phase::Finished) leaveResults();
+        else if (down && ses_->poiHere() >= 0) activatePoi(ses_->poiHere());
         break;
     case Key::PageDown: if (down) toggleAssist(); break;
     case Key::PageUp: if (down) cycleAdas(); break;

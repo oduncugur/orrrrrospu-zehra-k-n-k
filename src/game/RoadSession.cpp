@@ -105,6 +105,43 @@ void RoadSession::spawnTraffic(TrafficCar& t, double fromS) {
     t.v = t.v0;
 }
 
+void RoadSession::setupCruise(const std::vector<Poi>& pois, int policeCar, int hoolCar) {
+    cruise_ = true; pois_ = pois;
+    for (TrafficCar& t : traffic_) {                                     // ~%3 polis, ~%1 serseri (en az birer tane)
+        const double r = rnd();
+        if (r < 0.03) { t.role = 1; t.carId = policeCar; }
+        else if (r < 0.04) { t.role = 2; t.carId = hoolCar; t.v0 *= 1.15; }
+    }
+    if (traffic_.size() > 6) {
+        bool pol = false, hool = false;
+        for (const TrafficCar& t : traffic_) { pol |= t.role == 1; hool |= t.role == 2; }
+        if (!pol) { traffic_[3].role = 1; traffic_[3].carId = policeCar; }
+        if (!hool) { traffic_[6].role = 2; traffic_[6].carId = hoolCar; }
+    }
+}
+
+int RoadSession::poiHere() const {
+    if (!cruise_ || player_->sim().speed() > 2.0) return -1;
+    for (size_t k = 0; k < pois_.size(); ++k)
+        if (std::fabs(pois_[k].s - player_->s()) < 18.0 && player_->lateral() < road_.laneOffset(player_->s(), false, 0) + 1.5) return (int)k;
+    return -1;
+}
+
+// Sehir turu: polis hiz yakalar, serseri hizli gecilince sataşir (olay RoadScreen'de yarisa / kovalamacaya doner)
+void RoadSession::cruiseStep() {
+    const double ps = player_->s(), pv = player_->sim().speed();
+    for (TrafficCar& t : traffic_) {
+        const double rel = ps - t.s;                                     // + : oyuncu onde
+        if (aggroRole_ == 0 && t.role == 1 && std::fabs(rel) < 50.0 && pv > speedLimit(ps) + 15.0 / 3.6) {
+            aggroRole_ = 1; aggroCar_ = t.carId; msgs_.push_back("POLIS HIZINI YAKALADI!");
+        }
+        if (aggroRole_ == 0 && t.role == 2 && !t.oncoming && t.prevRel < 0.0 && rel >= 0.0 && pv - t.v > 40.0 / 3.6) {
+            aggroRole_ = 2; aggroCar_ = t.carId; msgs_.push_back("SERSERI SATASTI: KAPISMA!");
+        }
+        t.prevRel = rel;
+    }
+}
+
 int RoadSession::treeLights() const {
     if (mode_ != Mode::Karma) return 0;
     if (phase_ != Phase::Countdown) return raceT_ < 1.0 ? 8 : 0;           // yesil 1 s yanik kalir
@@ -516,6 +553,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
         return;
     }
     if (mode_ == Mode::Free) {
+        if (cruise_) cruiseStep();
         if (player_->s() > road_.length() - 80.0) { player_->recover(road_.length() - 100.0); msgs_.push_back("YOL SONU - BASA DONULDU"); }
         return;
     }

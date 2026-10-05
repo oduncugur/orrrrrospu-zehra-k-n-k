@@ -17,7 +17,11 @@ namespace zk {
 // v0: istenen hiz; uid: her yeniden doguste yeni (skor takibi icin kimlik)
 // Trafik aracinin yari boyu (m): tir 8.25, kamyon 4.8, otomobil 2.2
 inline double trafficHalfLen(int carId) { return carId == 9001 ? 8.25 : carId == 9002 ? 4.8 : 2.2; }
-struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; int li = 0; };   // li: serit no (lane: yanal konum)
+struct TrafficCar { int carId; double s, lane, v, v0; bool oncoming; bool braking = false; int uid = 0; int li = 0;
+                   int role = 0; double prevRel = 0; };   // role (sehir turu): 0 normal, 1 polis, 2 serseri (modifiyeli)
+// Sehir turu (acik dunya) yol kenari noktasi: yanina durunca etkilesim
+struct Poi { double s; int type; int ref; std::string name; };
+enum PoiType { PoiRace = 0, PoiJunk = 1, PoiBarn = 2, PoiExit = 3 };   // li: serit no (lane: yanal konum)
 
 class RoadSession {
 public:
@@ -98,6 +102,14 @@ public:
     RoadCar* rival() { return rival_.get(); }
     const std::vector<TrafficCar>& traffic() const { return traffic_; }
     void clearTraffic() { traffic_.clear(); }   // testler: trafiksiz etap
+    // Sehir turu (Free modda acik dunya): yol kenari noktalari; trafigin ~%3'u polis, ~%1'i serseri.
+    // Polis: yaninda (50 m) hiz siniri + 15 km/h asilirsa; serseri: yanindan 40 km/h fark ile gecilirse sataşir.
+    void setupCruise(const std::vector<Poi>& pois, int policeCar, int hoolCar);
+    bool cruise() const { return cruise_; }
+    const std::vector<Poi>& pois() const { return pois_; }
+    int  poiHere() const;                       // oyuncu yaninda durduysa nokta indeksi (-1: yok)
+    double speedLimit(double s) const { return zoneAt(s) == 1 ? 70.0 / 3.6 : 110.0 / 3.6; }
+    int  takeAggro(int& carId) { const int r = aggroRole_; carId = aggroCar_; aggroRole_ = 0; return r; }   // 1 polis, 2 serseri
     bool contact2D = true;                      // The Run 2B duzlukte rakip temasi (serit degistirmeyen test surucusu icin kapatilir)
     int  playerCarId() const { return playerCar_; }
     int  rivalCarId() const { return rivalCar_; }
@@ -128,6 +140,8 @@ public:
 private:
     void wallContact(RoadCar& car);              // arac duvara girdiyse geri itilir, yanal hiz soner (sekme)
     bool wallHit_ = false;
+    bool cruise_ = false; std::vector<Poi> pois_; int aggroRole_ = 0, aggroCar_ = 0;
+    void cruiseStep();
     std::vector<bool> stationDead_;
     double explS_ = -1, explLat_ = 0;
     void pumpContact(RoadCar& car, bool isPlayer);

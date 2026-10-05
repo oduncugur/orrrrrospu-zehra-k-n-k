@@ -890,6 +890,26 @@ bool Career::buyCar(int carId, std::string* why) {
     return true;
 }
 
+int Career::barnCar(int city) {
+    // Eski (1995 oncesi) sokak araclarindan en degerli 10'u; sehir sirasiyla
+    std::vector<std::pair<int, int>> v;
+    for (const VehicleDef& d : vehicleCatalog()) if (d.streetLegal && d.year < 1995) v.push_back({carPrice(d), d.id});
+    std::sort(v.rbegin(), v.rend());
+    return v.empty() ? 1 : v[std::min((size_t)std::clamp(city, 0, kCities - 1), v.size() - 1)].second;
+}
+
+bool Career::claimBarn(int c, std::string* why) {
+    if ((barnFound >> c) & 1u) { if (why) *why = "BU SEHRIN BULGUSU ALINDI"; return false; }
+    if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
+    OwnedCar oc; oc.carId = barnCar(c); oc.fromJunk = true; oc.engineWear = 0.55;
+    oc.km = std::round(typicalKm(*findVehicle(oc.carId)) * 0.6 / 100.0) * 100.0;   // az km, uzun sure beklemis
+    oc.tune.wearTires = 0.9; oc.tune.wearBrakes = 0.7; oc.tune.wearSusp = 0.6; oc.tune.wearBody = 0.5; oc.tune.wearElec = 0.6;
+    cars.push_back(oc);
+    current = (int)cars.size() - 1;
+    barnFound |= 1u << c;
+    return true;
+}
+
 bool Career::buyUsed(const UsedListing& l, std::string* why) {
     if (!findVehicle(l.carId)) { if (why) *why = "ARAC YOK"; return false; }
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
@@ -1587,7 +1607,7 @@ std::string Career::serialize() const {
       << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity2=" << city << "\nsponsor=" << sponsor << ";" << spWins << ";" << spRaces << ";" << sponsorsDone << "\nloan=" << loan << ";" << loanRaces << ";" << showWeek << "\njobs=" << jobSeq[0] << ";" << jobSeq[1] << ";" << jobSeq[2] << "\n";
     {
         char lb[200];
-        std::snprintf(lb, sizeof lb, "evw=%llx\nevw2=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, (unsigned long long)eventWins2, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
+        std::snprintf(lb, sizeof lb, "evw=%llx\nevw2=%llx\nbarn=%x\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, (unsigned long long)eventWins2, (unsigned)barnFound, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
         o << lb;
     }
     char buf[256];
@@ -1665,6 +1685,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "evw2") c.eventWins2 = std::strtoull(v.c_str(), nullptr, 16);
+        else if (k == "barn") c.barnFound = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
         else if (k == "ach") c.achieved = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
         else if (k == "daily") std::sscanf(v.c_str(), "%d;%ld;%ld;%ld;%d", &c.dailyDay, &c.dailyProg[0], &c.dailyProg[1], &c.dailyProg[2], &c.dailyDone);
         else if (k == "streak") {

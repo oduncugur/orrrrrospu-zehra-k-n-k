@@ -193,6 +193,10 @@ struct Career {
     // Islemler (basarisizsa false + neden)
     bool buyCar(int carId, std::string* why = nullptr);              // sifir (0 km)
     bool buyUsed(const UsedListing& l, std::string* why = nullptr);  // ikinci el ilan
+    // Ahir bulgusu (sehir turu): her sehirde bir nadir arac; bedava ama yipranmis (hurdalik araci gibi), bir kez
+    uint32_t barnFound = 0;
+    static int barnCar(int city);                   // sehrin nadir araci
+    bool claimBarn(int city, std::string* why = nullptr);
     void addKm(double km) { OwnedCar& c = car(); c.km = c.odo() + std::max(0.0, km); }
     bool sellCurrent(std::string* why = nullptr);
     // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).

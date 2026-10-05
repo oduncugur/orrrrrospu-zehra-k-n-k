@@ -462,6 +462,11 @@ public:
 
 private:
     void leaveResults();
+    // Sehir turu (acik dunya): yol kenari noktalari, polis / serseri sataşmasi -> kovalamaca / kapisma -> geri donus
+    std::vector<Poi> cruisePois() const;
+    void activatePoi(int k);
+    bool cruiseRet_ = false; double cruiseResume_ = 0; int forceRival_ = 0; Tune forceTune_{};
+    Rect poiBtn_{0, 0, 0, 0};
     void setupLayout();                          // ayardan yon: yatay 640x360 / dikey 360x640
     float fov() const { return land_ ? 0.85f : 1.05f; }
     void start(RoadSession::Mode m, RoadSession::Kind kind = RoadSession::Kind::Highway);
