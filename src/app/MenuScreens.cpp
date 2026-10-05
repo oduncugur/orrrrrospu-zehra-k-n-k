@@ -51,11 +51,13 @@ namespace {
 const Rect kGNav[4] = {{8, 468, 88, 506}, {94, 468, 174, 506}, {186, 468, 266, 506}, {272, 468, 352, 506}};
 const int kGStep[4] = {-10, -1, +1, +10};
 const Rect kBuy{8, 512, 352, 552}, kSell{8, 558, 352, 590};
-const Rect kJunk{252, 64, 352, 92};                                    // 3B gorunumun sag ustu
+const Rect kJunk{252, 64, 352, 92};
+const Rect kLTab[4] = {{8, 440, 88, 464}, {94, 440, 174, 464}, {186, 440, 266, 464}, {272, 440, 352, 464}};   // SIFIR / ILAN 1-3                                    // 3B gorunumun sag ustu
 } // namespace
 
 GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {
     if (const char* c = std::getenv("ZK_GALLERY_CAR")) if (findVehicle(std::atoi(c))) carId_ = std::atoi(c);   // test: model goruntusu
+    pickCar(carId_);
 }
 
 void GalleryScreen::render(Renderer& r) {
@@ -124,8 +126,25 @@ void GalleryScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "ENDEKS %.0f", performanceIndex(v, Tune{}));
     r.text(8, 376, b, 1, kUiDim);
     if (!v.streetLegal) r.text(8, 390, "YARIS ARACI (SOKAKTA SURULEMEZ)", 1, {1.0f, 0.35f, 0.3f});
-    const int price = carPrice(v);
+    const long price = priceNow();
     const std::string ps = money(price);
+    {   // sifir / ikinci el ilan sekmeleri + ilan ayrintisi
+        const bool nw = soldNew(v);
+        for (int k = 0; k < 4; ++k) {
+            const bool on = (k == 0 && listing_ < 0) || (k > 0 && listing_ == k - 1);
+            const bool en = k > 0 || nw;
+            r.rect(kLTab[k].x0, kLTab[k].y0, kLTab[k].x1, kLTab[k].y1, on ? Color{0.85f, 0.55f, 0.1f} : en ? Color{0.2f, 0.22f, 0.28f} : Color{0.12f, 0.12f, 0.14f});
+            std::snprintf(b, sizeof b, k == 0 ? (nw ? "SIFIR" : "SIFIRI YOK") : "ILAN %d", k);
+            r.textCentered(kLTab[k].cx(), kLTab[k].y0 + 8, b, 1, en ? Color{1, 1, 1} : kUiDim);
+        }
+        if (listing_ < 0) std::snprintf(b, sizeof b, "0 KM  FABRIKA CIKISLI");
+        else {
+            const UsedListing L = listing();
+            std::snprintf(b, sizeof b, "%.0f KM  KONDISYON %%%d%s%s%s", L.km, L.cond, L.mods ? "  MODIFIYELI" : "",
+                          L.fault ? "  ARIZA: " : "", L.fault ? faultName(L.fault) : "");
+        }
+        r.text(8, 394, b, 1, listing_ >= 0 && listing().fault ? Color{1.0f, 0.55f, 0.35f} : Color{0.6f, 0.9f, 1.0f});
+    }
     r.text(352 - r.textWidth(ps, 4), 408, ps, 4, kUiGold);
 
     for (int i = 0; i < 4; ++i) button(r, kGNav[i], i == 0 ? "<<" : i == 1 ? "<" : i == 2 ? ">" : ">>", kUiBtn, 3);
@@ -160,6 +179,12 @@ void GalleryScreen::render(Renderer& r) {
             r.textCentered(180, 172, "SATIN ALINSIN MI?", 2, {1, 1, 1});
             r.textCentered(180, 204, upper(v.fullName()).substr(0, 40), 1, kUiText);
             r.textCentered(180, 236, money(price), 4, kUiGold);
+            if (listing_ >= 0) {
+                const UsedListing L = listing();
+                std::snprintf(b, sizeof b, "IKINCI EL  %.0f KM  KOND. %%%d", L.km, L.cond);
+                r.textCentered(180, 270, b, 1, kUiText);
+                if (L.fault) { std::snprintf(b, sizeof b, "ARIZA: %s", faultName(L.fault)); r.textCentered(180, 320, b, 1, {1.0f, 0.5f, 0.3f}); }
+            } else r.textCentered(180, 270, "SIFIR  0 KM", 1, kUiText);
             std::snprintf(b, sizeof b, "KALAN PARA: %s", money(app_.career.money - price).c_str());
             r.textCentered(180, 290, b, 2, kUiText);
             button(r, kDlgYes, "AL", kUiGreen, 2);
@@ -182,7 +207,8 @@ void drawSaleDialog(Renderer& r, const OwnedCar& cur) {
         r.text(36, y, name, 2, kUiText);
         r.text(324 - r.textWidth(val, 2), y, val, 2, c);
     };
-    row(222, "ARAC (%65)", money(q.car), kUiText);
+    std::snprintf(b, sizeof b, "ARAC %.0fK KM", cur.odo() / 1000.0);
+    row(222, b, money(q.car), kUiText);
     row(248, "PARCALAR (%40)", money(q.parts), kUiText);
     row(274, "HASAR", q.damage > 0 ? "-" + money(q.damage) : "YOK", q.damage > 0 ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
     r.rect(36, 302, 324, 304, kUiDim);
@@ -194,10 +220,12 @@ void drawSaleDialog(Renderer& r, const OwnedCar& cur) {
     button(r, kDlgNo, "VAZGEC", kUiBtn, 2);
 }
 
+long GalleryScreen::priceNow() const { return listing_ < 0 ? carPrice(*findVehicle(carId_)) : listing().price; }
+
 void GalleryScreen::confirmAction() {
     std::string why;
     if (confirm_ == Confirm::Buy) {
-        if (app_.career.buyCar(carId_, &why)) { msg_ = "HAYIRLI OLSUN!"; msgT_ = 2.0; app_.saveCareer(); }
+        if (listing_ >= 0 ? app_.career.buyUsed(listing(), &why) : app_.career.buyCar(carId_, &why)) { msg_ = "HAYIRLI OLSUN!"; msgT_ = 2.0; app_.saveCareer(); }
         else { msg_ = why; msgT_ = 1.8; }
     } else if (confirm_ == Confirm::Sell) {
         const int got = sellPrice(app_.career.car());
@@ -216,7 +244,9 @@ void GalleryScreen::pointerDown(int, float x, float y) {
     if (kJunk.hit(x, y)) { app_.goJunkyard(); return; }
     const int n = (int)vehicleCatalog().size();
     for (int i = 0; i < 4; ++i)
-        if (kGNav[i].hit(x, y)) { carId_ = ((carId_ - 1 + kGStep[i]) % n + n) % n + 1; return; }
+        if (kGNav[i].hit(x, y)) { pickCar(((carId_ - 1 + kGStep[i]) % n + n) % n + 1); return; }
+    for (int k = 0; k < 4; ++k)
+        if (kLTab[k].hit(x, y)) { if (k > 0 || soldNew(*findVehicle(carId_))) listing_ = k - 1; return; }
     if (kBuy.hit(x, y)) {
         bool owned = false;
         for (const OwnedCar& oc : app_.career.cars) owned |= oc.carId == carId_;
@@ -227,7 +257,7 @@ void GalleryScreen::pointerDown(int, float x, float y) {
             msgT_ = 1.8;
             return;
         }
-        if (app_.career.money < carPrice(*findVehicle(carId_))) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
+        if (app_.career.money < priceNow()) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
         confirm_ = Confirm::Buy;
         return;
     }
@@ -247,8 +277,8 @@ void GalleryScreen::key(Key k, bool down) {
         return;
     }
     const int n = (int)vehicleCatalog().size();
-    if (k == Key::Left) carId_ = ((carId_ - 2) % n + n) % n + 1;
-    else if (k == Key::Right) carId_ = carId_ % n + 1;
+    if (k == Key::Left) pickCar(((carId_ - 2) % n + n) % n + 1);
+    else if (k == Key::Right) pickCar(carId_ % n + 1);
     else if (k == Key::Back) app_.goGarage();
 }
 

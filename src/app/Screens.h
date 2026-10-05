@@ -219,6 +219,10 @@ private:
     App& app_;
     int carId_;
     Confirm confirm_ = Confirm::None;   // acik onay penceresi
+    int listing_ = 0;                   // -1 sifir, 0..kListings-1 ikinci el ilan
+    UsedListing listing() const { return usedListing(carId_, app_.career.marketWeek(), std::max(0, listing_)); }
+    long priceNow() const;
+    void pickCar(int id) { carId_ = id; listing_ = soldNew(*findVehicle(id)) ? -1 : 0; }
     float spin_ = 0;
     std::string msg_; double msgT_ = 0;
 };

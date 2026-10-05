@@ -235,6 +235,57 @@ int carPrice(const VehicleDef& v) {
     return (int)(std::round(p / 100.0) * 100.0);
 }
 
+double typicalKm(const VehicleDef& v) { return std::clamp(16000.0 * std::max(0, kGameYear - v.year) + 6000.0, 6000.0, 260000.0); }
+// km egrisi: f(km) = (1 + km / 150000)^-0.9 -> 30 bin 0.85, 300 bin 0.37; ortalamaya oranla
+double kmValueMul(const VehicleDef& v, double km) {
+    auto f = [](double k) { return std::pow(1.0 + std::max(0.0, k) / 150000.0, -0.9); };
+    return std::clamp(f(km) / f(typicalKm(v)), 0.4, 1.5);
+}
+double OwnedCar::odo() const { return km >= 0 ? km : typicalKm(*findVehicle(carId)); }
+
+const char* faultName(int f) {
+    switch (f) { case 1: return "MOTOR YORGUN"; case 2: return "SANZIMAN KIRIK"; case 3: return "AKS KIRIK"; default: return "YOK"; }
+}
+
+OwnedCar listingCar(const UsedListing& l) {
+    OwnedCar oc; oc.carId = l.carId; oc.km = l.km;
+    const VehicleDef& v = *findVehicle(l.carId);
+    Tune& t = oc.tune;
+    const double worn = (100 - l.cond) / 100.0;                       // kondisyon: parca yipranmasi
+    t.wearEngine = 0.25 * worn; t.wearTires = 0.8 * worn; t.wearBrakes = 0.6 * worn; t.wearSusp = 0.5 * worn; t.wearBody = 0.5 * worn;
+    if (l.mods > 0) {                                                 // modifiyeli: emme / egzoz / ECU / suspansiyon / jant
+        const PartCat cats[] = {PartCat::Intake, PartCat::Exhaust, PartCat::Ecu, PartCat::Suspension, PartCat::Header, PartCat::Rims};
+        for (int i = 0; i < 2 + 2 * l.mods && i < 6; ++i) {
+            const int lv = std::min(l.mods, (int)partOptions(cats[i]).size() - 1);
+            if (lv > 0 && partAvailable(cats[i], lv, v, nullptr, &t)) { setPartLevel(t, cats[i], lv, v); oc.paidParts += partPrice(cats[i], lv, v); }
+        }
+    }
+    if (l.fault == 1) oc.engineWear = 0.45;
+    if (l.fault == 2) oc.gearboxBroken = true;
+    if (l.fault == 3) oc.axleBroken = true;
+    return oc;
+}
+
+UsedListing usedListing(int carId, int week, int k) {
+    const VehicleDef& v = *findVehicle(carId);
+    uint32_t h = (uint32_t)carId * 2654435761u ^ (uint32_t)(week + 7) * 2246822519u ^ (uint32_t)(k + 1) * 3266489917u;
+    auto u = [&]() { h ^= h >> 15; h *= 0x2c1b3c6du; h ^= h >> 12; h *= 0x297a2d39u; h ^= h >> 15; return (h & 0xFFFFFF) / 16777216.0; };
+    UsedListing l; l.carId = carId;
+    const double ty = typicalKm(v);
+    l.km = std::round(ty * (0.3 + 1.4 * u()) / 100.0) * 100.0;          // ortalamanin %30 - %170'i
+    if (k == 0 && soldNew(v)) l.km = std::round(ty * (0.15 + 0.4 * u()) / 100.0) * 100.0;   // genc arac: ilk ilan az km
+    l.cond = (int)std::clamp(100.0 - l.km / 6000.0 - 25.0 * u(), 35.0, 100.0);
+    const double r = u();
+    l.mods = r < 0.25 ? 1 + (int)(u() * 3) : 0;                        // %25 modifiyeli
+    const double fr = u();
+    l.fault = fr < 0.12 ? 1 : fr < 0.18 ? 2 : fr < 0.22 ? 3 : 0;      // %22 arizali
+    const OwnedCar oc = listingCar(l);
+    const double base = carPrice(v) * kmValueMul(v, l.km) * (0.7 + 0.3 * l.cond / 100.0) * (soldNew(v) ? 0.82 : 1.0);
+    const double p = base + 0.5 * oc.paidParts - 0.9 * repairCostFor(oc);
+    l.price = (long)(std::round(std::max(0.25 * carPrice(v), p) / 50.0) * 50.0);
+    return l;
+}
+
 int partPrice(PartCat c, int level, const VehicleDef& v) {
     const auto& o = partOptions(c);
     if (level < 0 || level >= (int)o.size()) return 0;
@@ -275,7 +326,8 @@ bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, 
 SaleQuote saleQuote(const OwnedCar& c) {
     auto r10 = [](double x) { return (int)(std::round(x / 10.0) * 10.0); };
     SaleQuote q;
-    q.car = r10(0.65 * carPrice(*findVehicle(c.carId)));
+    const VehicleDef& qv = *findVehicle(c.carId);
+    q.car = r10(0.65 * carPrice(qv) * kmValueMul(qv, c.odo()));       // kilometreye gore
     q.parts = r10(0.4 * c.paidParts);
     q.damage = r10((double)repairCostFor(c));
     {   // Yipranmis bilesenler (hurdalik araci): restorasyon bedelinin %80'i dusulur
@@ -830,8 +882,18 @@ bool Career::buyCar(int carId, std::string* why) {
     const int p = carPrice(*v);
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
     money -= p;
-    OwnedCar oc; oc.carId = carId;
+    OwnedCar oc; oc.carId = carId; oc.km = 0.0;
     cars.push_back(oc);
+    current = (int)cars.size() - 1;
+    return true;
+}
+
+bool Career::buyUsed(const UsedListing& l, std::string* why) {
+    if (!findVehicle(l.carId)) { if (why) *why = "ARAC YOK"; return false; }
+    if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
+    if (money < l.price) { if (why) *why = "PARA YETMIYOR"; return false; }
+    money -= l.price;
+    cars.push_back(listingCar(l));
     current = (int)cars.size() - 1;
     return true;
 }
@@ -1443,6 +1505,7 @@ bool Career::buyJunk(const JunkCar& j, std::string* why) {
     if (money < j.price) { if (why) *why = "PARA YETMIYOR"; return false; }
     money -= j.price;
     OwnedCar oc; oc.carId = j.carId; oc.tune = j.tune;
+    oc.km = std::round(typicalKm(*findVehicle(j.carId)) * 1.4 / 100.0) * 100.0;   // hurdalik araci: cok km
     oc.engineWear = j.engineWear; oc.axleBroken = j.axleBroken; oc.gearboxBroken = j.gearboxBroken;
     oc.fromJunk = true;
     cars.push_back(oc);
@@ -1542,6 +1605,7 @@ std::string Career::serialize() const {
         o << "tun2=" << tuneV2String(t) << "\n";
         for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
         if (c.nosFill < 0.999) { std::snprintf(buf, sizeof buf, "nosf=%.3f\n", c.nosFill); o << buf; }
+        if (c.km >= 0) { std::snprintf(buf, sizeof buf, "km=%.1f\n", c.km); o << buf; }
         if (c.jobHp > 0) { std::snprintf(buf, sizeof buf, "job=%d;%ld\n", c.jobHp, c.jobReward); o << buf; }
         if (c.gaugeOwned) { std::snprintf(buf, sizeof buf, "gauge=%d;%d;%d\n", c.gauge, c.gaugeOwned, c.boostGauge ? 1 : 0); o << buf; }
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
@@ -1624,6 +1688,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "tun2" && !c.cars.empty()) parseTuneV2(v, c.cars.back().tune);
         else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
         else if (k == "nosf" && !c.cars.empty()) c.cars.back().nosFill = std::clamp(std::atof(v.c_str()), 0.0, 1.0);
+        else if (k == "km" && !c.cars.empty()) c.cars.back().km = std::max(0.0, std::atof(v.c_str()));
         else if (k == "job" && !c.cars.empty()) { OwnedCar& oc = c.cars.back(); if (std::sscanf(v.c_str(), "%d;%ld", &oc.jobHp, &oc.jobReward) != 2) oc.jobHp = 0; }
         else if (k == "gauge" && !c.cars.empty()) {
             OwnedCar& oc = c.cars.back(); int bg = 0;

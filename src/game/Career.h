@@ -36,6 +36,9 @@ struct OwnedCar {
     int  jobHp = 0; long jobReward = 0;
     // Kadran (gosterge): secili stil (0 fabrika, 1 analog, 2 dijital, 3 ikisi), satin alinanlar (bit: stil; 8 turbo gostergesi)
     int  gauge = 0, gaugeOwned = 0; bool boostGauge = false;
+    // Kilometre sayaci (< 0: eski kayit / bilinmiyor -> yasina gore ortalama sayilir; odo() ile okunur)
+    double km = -1.0;
+    double odo() const;
     bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }
     bool raceable() const { return !axleBroken && !gearboxBroken && engineWear < 1.0 && jobHp == 0; }
@@ -90,7 +93,22 @@ int  partPrice(PartCat c, int level, const VehicleDef& v);      // arac sinifina
 // t: takili parcalar (ELEKTRONIK icin ECU sarti); nullptr ise yalniz arac kosullari denetlenir
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr, const Tune* t = nullptr);
 
-int  carPrice(const VehicleDef& v);
+int  carPrice(const VehicleDef& v);   // ortalama kilometrede piyasa degeri
+// Araba pazari: oyun yili; son 7 model yilinin araclari sifir da satilir, eskiler yalniz ikinci el ilanla.
+// Deger kilometreye gore: ayni arac 300 bin km'de 30 bin km'dekinin yaklasik yarisi.
+constexpr int kGameYear = 2024;
+inline bool soldNew(const VehicleDef& v) { return v.streetLegal && v.year >= kGameYear - 7; }
+double typicalKm(const VehicleDef& v);                 // yasina gore ortalama km (yilda ~16 bin, en fazla 260 bin)
+double kmValueMul(const VehicleDef& v, double km);     // km'nin degere etkisi (ortalama km = 1; 0.4 .. 1.5)
+// Ikinci el ilan: km, kondisyon (yipranma), bazen modifiyeli (parca takili), bazen arizali. Haftaya gore yenilenir.
+struct UsedListing {
+    int carId = 0; double km = 0; int cond = 100; int mods = 0; int fault = 0;   // fault: 0 yok 1 motor yorgun 2 sanziman 3 aks
+    long price = 0;
+};
+constexpr int kListings = 3;
+UsedListing usedListing(int carId, int week, int k);
+OwnedCar listingCar(const UsedListing& l);             // ilanin garaja gelecek hali (parcalar / hasar / km)
+const char* faultName(int f);
 // Kayit: v2 parca alanlari "anahtar:deger,..." (eski surum bu satiri yok sayar)
 std::string tuneV2String(const Tune& t);
 void parseTuneV2(const std::string& v, Tune& t);
@@ -173,7 +191,9 @@ struct Career {
     const OwnedCar& car() const { return cars[current]; }
 
     // Islemler (basarisizsa false + neden)
-    bool buyCar(int carId, std::string* why = nullptr);
+    bool buyCar(int carId, std::string* why = nullptr);              // sifir (0 km)
+    bool buyUsed(const UsedListing& l, std::string* why = nullptr);  // ikinci el ilan
+    void addKm(double km) { OwnedCar& c = car(); c.km = c.odo() + std::max(0.0, km); }
     bool sellCurrent(std::string* why = nullptr);
     // Parca al ve tak. used: ikinci el (%55 fiyat, ilgili bilesene yipranma ekler; aktarma / atolye parcasi yok).
     // Sokulen eski (stok olmayan) parca %35'e satilir: refund (verildiyse) ciktisi.

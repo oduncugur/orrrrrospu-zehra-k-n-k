@@ -162,6 +162,10 @@ bool RoadScreen::autoClutchPenalty() const {
 void RoadScreen::finishRace() {
     rewarded_ = true;
     if (autopilot_) return;
+    {   // kilometre sayaci: surulen yol (The Run: etabin temsil ettigi gercek mesafe orani)
+        const double m = std::max(0.0, ses_->player().s() - ses_->startS());
+        app_.career.addKm(m / 1000.0 * (ses_->mode() == RoadSession::Mode::Marathon ? ses_->compression() : 1.0));
+    }
     if (app_.activeEvent >= 0) {                                         // lig etkinligi
         int pink = 0;
         const long score = ses_->flow() ? ses_->flow()->score() : 0;
