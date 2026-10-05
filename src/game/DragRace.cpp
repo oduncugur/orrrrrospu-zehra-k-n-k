@@ -95,7 +95,8 @@ void DragRace::advance(double realDt, const PlayerControls& pc) {
         else if (!P.grind) { P.grind = true; events_.push_back("DISLI CITIRTISI! Vites icin debriyaja bas"); }
     }
     if (pc.requestedGear < 0 || pc.requestedGear == pt.gear()) P.grind = false;
-    if (!autopilot_ && (box == Gearbox::Dogbox || box == Gearbox::DCT) && pc.paddle != 0 && prevPaddle_ == 0) {
+    const bool manualPaddle = box == Gearbox::Dogbox || ((box == Gearbox::DCT || box == Gearbox::TorqueConverter) && pc.autoMode == 2);
+    if (!autopilot_ && manualPaddle && pc.paddle != 0 && prevPaddle_ == 0) {
         const int g = std::clamp(pt.gear() + pc.paddle, 1, pt.gearCount());
         if (g != pt.gear()) { pt.setGear(g); P.shiftT = 0.0; }
     }
@@ -122,7 +123,8 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
             // Tork konvertoru (PowertrainCore): frende beklerken N + devir stall'da (brake-torque karsiligi,
             // defaultLaunchRpm); fren birakilinca akiskan kavrama — ani kilitlenme/darbe yok
             clutch = holding ? 1.0 : 0.0;
-            if (!holding && pt.gear() < pt.gearCount() && pt.rpm() > L.sim->shiftRpm() && L.shiftT < 0) {
+            const double up = pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // D erken, S kesiciye yakin
+            if (pc.autoMode != 2 && !holding && pt.gear() < pt.gearCount() && pt.rpm() > up && L.shiftT < 0) {
                 pt.setGear(pt.gear() + 1); L.shiftT = 0.0;
             }
         } else {
@@ -130,6 +132,10 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
             if (holding) L.autoRelease = -1.0;
             else if (L.autoRelease < 0.0) L.autoRelease = clock_;
             clutch = holding ? 1.0 : std::max(0.0, 1.0 - (clock_ - L.autoRelease) / 0.15);
+            const double up = pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // DCT D / S: kendisi atar
+            if (pc.autoMode != 2 && L.left && pt.gear() < pt.gearCount() && pt.rpm() > up && L.shiftT < 0) {
+                pt.setGear(pt.gear() + 1); L.shiftT = 0.0;
+            }
         }
         in.held = holding;
     } else {

@@ -414,15 +414,15 @@ double fuelCap(const Tune& t) {
 const std::vector<EcuHwOpt>& ecuHwTable() {
     static const std::vector<EcuHwOpt> t = {
         {"STOK ECU", 0, 1, {1, 0, 0, 0, 0, 0, 0, 0}, true},
-        {"CHIP (EPROM)", 350, 1, {2, 2, 0, 0, 0, 0, 0, 1}, true},
-        {"PIGGYBACK", 600, 2, {1, 3, 0, 0, 0, 1, 0, 1}, true},
-        {"PIGGYBACK PRO", 900, 3, {2, 4, 1, 0, 0, 1, 0, 1}, true},
-        {"PLUG-IN ECU", 1400, 3, {2, 6, 1, 1, 0, 1, 0, 2}, true},
-        {"PLUG-IN PRO", 1900, 4, {3, 7, 1, 1, 0, 1, 0, 2}, true},
-        {"STANDALONE", 2800, 5, {3, 10, 1, 1, 1, 1, 1, 2}, false},
-        {"STANDALONE PRO", 3600, 6, {3, 12, 1, 1, 1, 1, 1, 2}, false},
-        {"YARIS ECU", 5200, 7, {3, 14, 1, 1, 1, 1, 0, 2}, true},
-        {"TAKIM YARIS ECU", 7500, 8, {3, 16, 1, 1, 1, 1, 0, 2}, true},
+        {"CHIP (EPROM)", 350, 1, {2, 10, 0, 0, 0, 0, 0, 1}, true},
+        {"PIGGYBACK", 600, 2, {1, 15, 0, 0, 0, 1, 0, 1}, true},
+        {"PIGGYBACK PRO", 900, 3, {2, 20, 1, 0, 0, 1, 0, 1}, true},
+        {"PLUG-IN ECU", 1400, 3, {2, 30, 1, 1, 0, 1, 0, 2}, true},
+        {"PLUG-IN PRO", 1900, 4, {3, 35, 1, 1, 0, 1, 0, 2}, true},
+        {"STANDALONE", 2800, 5, {3, 50, 1, 1, 1, 1, 1, 2}, false},
+        {"STANDALONE PRO", 3600, 6, {3, 60, 1, 1, 1, 1, 1, 2}, false},
+        {"YARIS ECU", 5200, 7, {3, 70, 1, 1, 1, 1, 0, 2}, true},
+        {"TAKIM YARIS ECU", 7500, 8, {3, 80, 1, 1, 1, 1, 0, 2}, true},
     };
     return t;
 }
@@ -440,7 +440,7 @@ void clampSetup(Tune& t) {
 const EcuSwDef& ecuSwDef(int sw) {
     static const EcuSwDef d[SwCount] = {
         {"HARITA (STAGE)", "ATESLEME + YAKIT: STAGE 1/2/3", {500, 900, 1400}},
-        {"DEVIR SINIRI", "HER SEVIYE +250 RPM", {300, 300, 300, 300, 300, 300, 300, 300, 300, 300}},
+        {"DEVIR SINIRI", "HER SEVIYE +50 RPM (HASSAS)", {60, 60, 60, 60, 60, 60, 60, 60, 60, 60}},
         {"LAUNCH KONTROL", "AYARLANABILIR 2-STEP", {700}},
         {"FLAT SHIFT", "GAZDAN AYAK KALKMADAN VITES", {600}},
         {"ANTI-LAG", "TURBO ERKEN DOLAR (SPOOL)", {1500}},
@@ -475,7 +475,7 @@ EcuOpt effectiveEcu(const Tune& t, bool* knockSensor) {
     }
     static const double na[4] = {1.0, 1.04, 1.07, 1.10}, fo[4] = {1.0, 1.10, 1.18, 1.26};
     const int m = std::clamp(t.swMap, 0, 3);
-    EcuOpt e{"ECU", 0, na[m], fo[m], 250.0 * t.swRev, t.swAntiLag ? 0.07 : 0.0};
+    EcuOpt e{"ECU", 0, na[m], fo[m], 50.0 * t.swRev, t.swAntiLag ? 0.07 : 0.0};   // seviye basina +50 rpm
     if (t.swFlex && t.fuel == FuelType::E85) { e.na *= 1.05; e.forced *= 1.05; }
     if (knockSensor) *knockSensor = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)].knockBuiltin || t.swKnock > 0;
     return e;

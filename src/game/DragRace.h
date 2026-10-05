@@ -29,6 +29,7 @@ struct PlayerControls {
     int    requestedGear = -1;  // H-desen: hedef vites (0 = bos), -1 = degisiklik yok
     int    paddle = 0;          // +1 yukari / -1 asagi (DCT, dogbox)
     bool   twoStep = true;      // agacta devir sinirlayici (launch control)
+    int    autoMode = 1;        // otomatik / DCT: 0 D (erken vites), 1 S (kesiciye yakin), 2 M (yalniz +/-)
 };
 
 struct TimeSlip {

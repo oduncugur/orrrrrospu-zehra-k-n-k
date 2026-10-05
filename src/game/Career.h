@@ -58,10 +58,16 @@ enum class PartCat {
     Weight, WeightBody, WeightGlass, WeightChassis, AeroFront, AeroSide, Aero, AeroUnder,
     // ECU / SOGUTMA / YAG
     Ecu, Electronics, Cooling, Fan, CoolMisc, DrySump, OilCooler, OilPump,
+    Adas,                                   // surus yardimi (hiz sabitleyici / adaptif / serit / otonom)
     Count
 };
 constexpr int kPartTabs = 7;
 const char* partTabName(int tab);
+// Surus yardimi: fabrika seviyesi model yilindan (1998+ hiz sabitleyici, 2014+ adaptif, 2020+ serit takip);
+// takili seviye = max(fabrika, satin alinan)
+int adasFactory(const VehicleDef& v);
+int adasLevel(const VehicleDef& v, const Tune& t);
+const char* adasName(int level);
 int  partTab(PartCat c);
 bool usedAvailable(PartCat c, int level);   // ikinci el satiliyor mu (aktarma, atolye ve ucretsiz parcalar haric)
 int  usedPrice(int newPrice);               // %55

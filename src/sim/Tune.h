@@ -35,6 +35,7 @@ struct Tune {
     int turbine = 0, wastegate = 0, boostCtl = 0, gbStrength = 0, cooling = 0;
     int oil = 0, fuelSel = 0, elec = 0, susp = 0, brakes = 0, aero = 0;
     int launchRpm = 0;                        // 2-step kalkis devri (0: otomatik, redline x 0.55)
+    int adas = 0;                             // surus yardimi (0 yok, 1 hiz sabitleyici, 2 adaptif, 3 + serit takip, 4 otonom)
     int roadTire = 0;                         // yol lastigi takimi (tireTable; 0 = yok: yolda da ana lastik). Drag ana lastikle.
     // Yakit sistemi (ayri parcalar; sinir = en zayif halka): pompa, enjektor, hat / regulator. Eski fuelSys yalniz eski kayit.
     int fuelPump = 0, injector = 0, fuelLine = 0;

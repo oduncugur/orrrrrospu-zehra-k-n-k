@@ -203,6 +203,7 @@ void PartsScreen::render(Renderer& r) {
             const int lvl = partLevel(oc.tune, c, v);
             std::string cur = partOptions(c)[lvl].name;
             if (c == PartCat::Electronics && lvl == 0) cur = v.abs ? (v.tc ? "FABRIKA ABS+TC" : "FABRIKA ABS") : "YOK";
+            if (c == PartCat::Adas && lvl <= adasFactory(v) && adasFactory(v) > 0) cur = std::string("FABRIKA: ") + adasName(adasFactory(v));
             char cnt[16]; std::snprintf(cnt, sizeof cnt, "%zu SECENEK", partOptions(c).size());
             const float y2 = rr.y0 + (rh < 38 ? rh - 14 : 24);
             r.text(16, y2, cnt, 1, kUiDim);
@@ -624,7 +625,7 @@ void EcuScreen::render(Renderer& r) {
         const float y = kSwY0 + i * kSwH;
         r.rect(8, y, 352, y + kSwH - 4, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
         r.text(16, y + 5, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
-        if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 250);
+        if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
         else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
         r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
         r.text(16, y + 31, std::string(d.desc).substr(0, 30), 1, kUiDim);

@@ -79,7 +79,8 @@ public:
 private:
     float spinD_[2] = {0, 0};                    // gorsel teker donusu
     float boostShown_ = 0;                       // kadran: turbo ibresi (gecikmeli)
-    enum class Ctl { None, Clutch, Throttle, Shifter, Brake, PaddleUp, PaddleDown };
+    enum class Ctl { None, Clutch, Throttle, Shifter, Brake, PaddleUp, PaddleDown, AutoD, AutoS, AutoM };
+    int autoMode_ = 1;                           // otomatik / DCT drag: 0 D, 1 S, 2 M (+/-)
     struct Touch { int id; Ctl ctl; };
     struct Smoke { float x, lane, y, vx, vy, life, size; };
     void restart();
@@ -474,7 +475,11 @@ private:
     Cockpit cockpit_;
     bool land_ = true;
     int W = 640, H = 360;
-    Rect free_{}, flow_{}, race_{}, touge_{}, karma_{}, chase_{}, marathon_{}, assistBtn_{}, tiltBtn_{};
+    Rect free_{}, flow_{}, race_{}, touge_{}, karma_{}, chase_{}, marathon_{}, assistBtn_{}, tiltBtn_{}, adasBtn_{};
+    // Surus yardimi: 0 kapali, 1 hiz sabitleyici / adaptif, 2 + serit takip, 3 otonom
+    int adasMode_ = 0; int adasLevel_ = 0; double ccSpeed_ = 0, ccI_ = 0;
+    void cycleAdas();
+    void applyAdas(RoadControls& c, double dt, bool steerInput);
     double camBlend_ = 1.0;                      // 0: drag gorunumu (yandan), 1: takip kamerasi (karma gecisi)
     bool menu_ = true, rewarded_ = false, record_ = false;
     long prize_ = 0;

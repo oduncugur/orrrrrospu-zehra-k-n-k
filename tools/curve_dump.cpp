@@ -32,8 +32,8 @@ int main(int argc, char** argv) {
     std::printf("%s  (HP her 500 devirde, 2000'den)\n", v.fullName().c_str());
     Tune stock; dump("stok", v, stock);
     Tune cam; cam.cam = 8; cam.valve = 6; dump("kam8 + supap6", v, cam);
-    Tune ce = cam; ce.ecuHw = 9; ce.swRev = 6; dump("kam8 + supap6 + ECU+1500", v, ce);
-    Tune e2; e2.ecuHw = 9; e2.swRev = 6; dump("yalniz ECU+1500", v, e2);
+    Tune ce = cam; ce.ecuHw = 9; ce.swRev = 30; dump("kam8 + supap6 + ECU+1500", v, ce);
+    Tune e2; e2.ecuHw = 9; e2.swRev = 30; dump("yalniz ECU+1500", v, e2);
     Tune sc = ce; sc.superch = 6; dump("+ kompresor 6", v, sc);
     Tune tb = ce; tb.turbo = 8; tb.fuelSys = 6; dump("+ turbo 8 + yakit", v, tb);
 }

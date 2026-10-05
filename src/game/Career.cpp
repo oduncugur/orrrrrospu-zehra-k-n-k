@@ -45,6 +45,13 @@ int customOption(PartCat c) {
     }
 }
 
+int adasFactory(const VehicleDef& v) { return v.year >= 2020 ? 3 : v.year >= 2014 ? 2 : v.year >= 1998 ? 1 : 0; }
+int adasLevel(const VehicleDef& v, const Tune& t) { return std::max(adasFactory(v), std::clamp(t.adas, 0, 4)); }
+const char* adasName(int l) {
+    static const char* n[5] = {"YOK", "HIZ SABITLEYICI", "ADAPTIF HIZ SABITLEYICI", "SERIT TAKIP + ADAPTIF", "OTONOM SURUS"};
+    return n[std::clamp(l, 0, 4)];
+}
+
 const char* partCatName(PartCat c) {
     static const char* n[(int)PartCat::Count] = {
         "SILINDIR KAPAGI", "SUPAP + YAY", "KAM MILI", "PISTON", "BIYEL", "KRANK", "YATAK", "ANA YATAK DESTEGI", "KAPAK CONTASI",
@@ -55,7 +62,7 @@ const char* partCatName(PartCat c) {
         "DEBRIYAJ", "SANZIMAN SWAP", "SANZIMAN GUCLENDIRME", "SON DISLI", "DIFERANSIYEL", "AKS",
         "LASTIK", "YOL LASTIGI (2. TAKIM)", "JANT", "SUSPANSIYON", "FREN BALATASI", "FREN DISKI", "KALIPER",
         "IC HAFIFLETME", "KAPORTA HAFIFLETME", "CAM", "SASI HAFIFLETME", "ON AERO", "YAN AERO", "ARKA KANAT / SPOILER", "ALT AERO",
-        "ECU", "ELEKTRONIK", "RADYATOR", "FAN", "TERMOSTAT / KATKI", "KARTER", "YAG SOGUTUCU", "YAG POMPASI"};
+        "ECU", "ELEKTRONIK", "RADYATOR", "FAN", "TERMOSTAT / KATKI", "KARTER", "YAG SOGUTUCU", "YAG POMPASI", "SURUS YARDIMI"};
     return n[(int)c];
 }
 
@@ -90,6 +97,8 @@ const std::vector<PartOption>& partOptions(PartCat c) {
         t[(int)PartCat::AeroUnder] = opts(aeroUnderTable());
         t[(int)PartCat::Fan] = opts(fanTable());            t[(int)PartCat::CoolMisc] = opts(coolMiscTable());
         t[(int)PartCat::OilCooler] = opts(oilCoolerTable()); t[(int)PartCat::OilPump] = opts(oilPumpTable());
+        t[(int)PartCat::Adas] = {{"YOK", 0}, {"HIZ SABITLEYICI", 450}, {"ADAPTIF HIZ SABITLEYICI", 1600}, {"SERIT TAKIP + ADAPTIF", 2900},
+                                 {"OTONOM SURUS", 6500}};
         {   // Motor swap: fabrika + tum motorlar (guce gore); ad: kod + duzen + guc
             static std::vector<std::string> names;
             names.reserve(swapEngines().size() + 1);
@@ -139,6 +148,7 @@ int partLevel(const Tune& t, PartCat c, const VehicleDef& v) {
     case PartCat::AeroFront: return t.aeroFront; case PartCat::AeroSide: return t.aeroSide; case PartCat::AeroUnder: return t.aeroUnder;
     case PartCat::Fan: return t.fan;             case PartCat::CoolMisc: return t.coolMisc;
     case PartCat::OilCooler: return t.oilCooler; case PartCat::OilPump: return t.oilPump;
+    case PartCat::Adas: return t.adas;
     case PartCat::Intake: return t.intake;       case PartCat::Exhaust: return t.exhaust;
     case PartCat::Turbo: return t.turbo;         case PartCat::Turbine: return t.turbine;
     case PartCat::Wastegate: return t.wastegate; case PartCat::BoostCtl: return t.boostCtl;
@@ -185,6 +195,7 @@ void setPartLevel(Tune& t, PartCat c, int l, const VehicleDef& v) {
     case PartCat::AeroFront: t.aeroFront = l; break; case PartCat::AeroSide: t.aeroSide = l; break; case PartCat::AeroUnder: t.aeroUnder = l; break;
     case PartCat::Fan: t.fan = l; break;             case PartCat::CoolMisc: t.coolMisc = l; break;
     case PartCat::OilCooler: t.oilCooler = l; break; case PartCat::OilPump: t.oilPump = l; break;
+    case PartCat::Adas: t.adas = l; break;
     case PartCat::Intake: t.intake = l; break;       case PartCat::Exhaust: t.exhaust = l; break;
     case PartCat::Turbo: t.turbo = l; break;         case PartCat::Turbine: t.turbine = l; break;
     case PartCat::Wastegate: t.wastegate = l; break; case PartCat::BoostCtl: t.boostCtl = l; break;
@@ -234,6 +245,7 @@ int partPrice(PartCat c, int level, const VehicleDef& v) {
 
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, const Tune* t) {
     auto no = [&](const char* m) { if (why) *why = m; return false; };
+    if (c == PartCat::Adas && level > 0 && level <= adasFactory(v)) return no("FABRIKADA VAR");
     if (c == PartCat::Electronics && level > 0) {
         // Fabrikada olan sistem tekrar takilmaz; olmayana ancak ECU yukseltmesiyle eklenir
         if (level == 1 && v.abs) return no("FABRIKADA VAR");
@@ -834,7 +846,7 @@ bool Career::sellCurrent(std::string* why) {
 }
 
 int ecuSwPrice(int sw, int level, const VehicleDef& v) {
-    if (level < 1 || level > 10) return 0;
+    if (level < 1 || level > 80) return 0;
     const double scale = std::clamp(0.6 + carPrice(v) / 40000.0, 0.6, 4.0);
     const int base = ecuSwDef(sw).price[std::min(level - 1, 9)];
     return (int)(std::round((base > 0 ? base : ecuSwDef(sw).price[0]) * scale / 10.0) * 10.0);
@@ -944,7 +956,7 @@ void migrateTune(Tune& t) {
                                 {6, 3, 1, 0, 0, 0, 0}, {4, 1, 2, 0, 0, 0, 0}, {2, 1, 0, 0, 0, 0, 1}, {6, 1, 0, 0, 0, 1, 0},
                                 {4, 1, 0, 1, 1, 0, 0}, {8, 3, 2, 0, 0, 0, 0}};
         const M& x = m[std::clamp(t.ecu, 0, 9)];
-        t.ecuHw = x.hw; t.swMap = x.map; t.swRev = x.rev; t.swLaunch = x.lc; t.swFlat = x.flat; t.swAntiLag = x.al; t.swFlex = x.flex;
+        t.ecuHw = x.hw; t.swMap = x.map; t.swRev = x.rev * 5; t.swLaunch = x.lc; t.swFlat = x.flat; t.swAntiLag = x.al; t.swFlex = x.flex;
         t.ecu = 0;
         clampEcuSoftware(t);
     }
@@ -1262,9 +1274,9 @@ const IntField kIntFields[] = {
     {"brg", &Tune::bearing, 9}, {"gsk", &Tune::gasket, 9}, {"trb", &Tune::turbine, 9}, {"wg", &Tune::wastegate, 9},
     {"bc", &Tune::boostCtl, 9}, {"gbs", &Tune::gbStrength, 9}, {"cool", &Tune::cooling, 9}, {"oil", &Tune::oil, 9},
     {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
-    {"lrpm", &Tune::launchRpm, 12000}, {"rtir", &Tune::roadTire, 29},
+    {"lrpm", &Tune::launchRpm, 12000}, {"rtir", &Tune::roadTire, 29}, {"adas", &Tune::adas, 4},
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
-    {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srev", &Tune::swRev, 16}, {"slc", &Tune::swLaunch, 1},
+    {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srv", &Tune::swRev, 80}, {"slc", &Tune::swLaunch, 1},
     {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1}, {"stcu", &Tune::swTcu, 1},
     {"pv", &Tune::partsVer, 9}, {"thr", &Tune::throttleBody, 9}, {"imf", &Tune::intakeMani, 9}, {"hdr", &Tune::header, 9},
     {"cat", &Tune::catalyst, 5}, {"meth", &Tune::meth, 5}, {"stud", &Tune::headStud, 4}, {"msup", &Tune::mainSupport, 5},
@@ -1304,6 +1316,7 @@ void parseTuneV2(const std::string& v, Tune& t) {
             const std::string k = item.substr(0, c);
             const double x = std::atof(item.c_str() + c + 1);
             for (const IntField& f : kIntFields) if (k == f.key) t.*(f.f) = std::clamp((int)x, f.min, f.max);
+            if (k == "srev") t.swRev = std::clamp((int)x * 5, 0, 80);           // eski kayit: 250 rpm adimlari -> 50 rpm
             for (const DblField& f : kDblFields) if (k == f.key) t.*(f.f) = std::clamp(x, 0.0, f.max);
             if (k.size() == 3 && k[0] == 'c' && k[1] == 'g' && k[2] >= '0' && k[2] <= '7') t.custGear[k[2] - '0'] = std::clamp(x, 0.0, 1.5);
         }
@@ -1330,7 +1343,7 @@ void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun
     {   // Olagan asinma (her yaris): motor (asiri besleme / yuksek devir yazilimi hizlandirir), fren, suspansiyon, elektrik.
         // ~120 yarista motor %50 yipranir (guc -%20); restorasyon / bakim ekraninda yenilenir.
         const double boost = (c.tune.turbo > 0 || c.tune.superch > 0 || c.tune.nitrous > 0) ? 1.6 : 1.0;
-        const double rev = 1.0 + 0.05 * c.tune.swRev;
+        const double rev = 1.0 + 0.01 * c.tune.swRev;                   // +250 rpm basina %5 (50 rpm adim)
         auto add = [](double& w, double d) { w = std::clamp(w + d, 0.0, 1.0); };
         add(c.tune.wearEngine, 0.004 * boost * rev);
         add(c.tune.wearBrakes, 0.010);

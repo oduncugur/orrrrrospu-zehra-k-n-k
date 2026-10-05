@@ -23,6 +23,9 @@ constexpr float kShift[4] = {484, 250, 578, 356};   // vites alani buyutuldu
 constexpr float kColX[3] = {500, 531, 562};
 constexpr float kRowTop = 266, kRowMid = 303, kRowBot = 340;
 constexpr float kPadDn[4] = {484, 262, 528, 350}, kPadUp[4] = {534, 262, 578, 350};
+// Otomatik / DCT: ustte D S M secici, altta (M'de) +/- pedallari
+constexpr float kAutoSel[3][4] = {{484, 262, 513, 294}, {516, 262, 545, 294}, {548, 262, 578, 294}};
+constexpr float kAPadDn[4] = {484, 300, 528, 350}, kAPadUp[4] = {534, 300, 578, 350};
 constexpr float kStageBtn[4] = {250, 120, 390, 156};
 constexpr float kLcDn[4] = {352, 62, 382, 88}, kLcUp[4] = {484, 62, 514, 88};   // 2-step kalkis devri (yesilden once)
 constexpr float kDist[4] = {140, 62, 244, 88};                                      // yaris mesafesi (yesilden once)
@@ -78,7 +81,13 @@ DragScreen::Ctl DragScreen::hit(float x, float y) const {
     if (in(kBrake, x, y)) return Ctl::Brake;
     const Gearbox box = race_->lane(0).sim->gearboxType();
     if (box == Gearbox::HPattern && in(kShift, x, y)) return Ctl::Shifter;
-    if (box == Gearbox::Dogbox || box == Gearbox::DCT) {
+    if (box == Gearbox::DCT || box == Gearbox::TorqueConverter) {
+        if (in(kAutoSel[0], x, y)) return Ctl::AutoD;
+        if (in(kAutoSel[1], x, y)) return Ctl::AutoS;
+        if (in(kAutoSel[2], x, y)) return Ctl::AutoM;
+        if (autoMode_ == 2 && in(kAPadUp, x, y)) return Ctl::PaddleUp;
+        if (autoMode_ == 2 && in(kAPadDn, x, y)) return Ctl::PaddleDown;
+    } else if (box == Gearbox::Dogbox) {
         if (in(kPadUp, x, y)) return Ctl::PaddleUp;
         if (in(kPadDn, x, y)) return Ctl::PaddleDown;
     }
@@ -150,6 +159,9 @@ void DragScreen::pointerDown(int id, float x, float y) {
     case Ctl::Throttle: throttleUi_ = sliderValue(kThrottle, y); break;
     case Ctl::Brake: brakeBtn_ = true; break;
     case Ctl::Shifter: shifterFromPoint(x, y); lastShX_ = x; lastShY_ = y; break;
+    case Ctl::AutoD: autoMode_ = 0; break;
+    case Ctl::AutoS: autoMode_ = 1; break;
+    case Ctl::AutoM: autoMode_ = 2; break;
     case Ctl::PaddleUp: pendingPaddle_ = +1; break;
     case Ctl::PaddleDown: pendingPaddle_ = -1; break;
     default: break;
@@ -223,6 +235,7 @@ void DragScreen::update(double dt) {
     const Gearbox box = race_->lane(0).sim->gearboxType();
     pc_.requestedGear = box == Gearbox::HPattern ? pendingGear_ : -1;
     pc_.paddle = pendingPaddle_;
+    pc_.autoMode = autoMode_;
     pendingPaddle_ = 0;
     race_->advance(dt, pc_);
     {   // Hayalet izi: kalkistan bitise 20 Hz mesafe; bitiste en iyiyse saklanir
@@ -691,8 +704,19 @@ void DragScreen::drawHud(Renderer& r) {
         { const float kx = knobDrag_ ? dragX_ : knobX_, ky = knobDrag_ ? dragY_ : knobY_;
           r.circle(kx, ky, 10, 14, {0.05f, 0.05f, 0.06f, 0.6f});
           r.circle(kx, ky, 8, 14, P.grind ? kRed : Color{0.9f, 0.9f, 0.92f}); }
-    } else if (box == Gearbox::TorqueConverter) {
-        r.textCentered(539, 300, "OTO", 2, {0.8f, 0.8f, 0.9f});
+    } else if (box == Gearbox::TorqueConverter || box == Gearbox::DCT) {      // D S M secici + M'de +/-
+        static const char* const kSel[3] = {"D", "S", "M"};
+        for (int k = 0; k < 3; ++k) {
+            const float* q = kAutoSel[k];
+            r.rect(q[0], q[1], q[2], q[3], k == autoMode_ ? Color{0.85f, 0.55f, 0.1f} : Color{0.22f, 0.24f, 0.3f});
+            r.textCentered((q[0] + q[2]) / 2, q[1] + 10, kSel[k], 2, {1, 1, 1});
+        }
+        const Color pc = autoMode_ == 2 ? Color{0.22f, 0.24f, 0.3f} : Color{0.14f, 0.14f, 0.17f};
+        r.rect(kAPadDn[0], kAPadDn[1], kAPadDn[2], kAPadDn[3], pc);
+        r.rect(kAPadUp[0], kAPadUp[1], kAPadUp[2], kAPadUp[3], pc);
+        const Color tc = autoMode_ == 2 ? Color{1, 1, 1} : Color{0.4f, 0.4f, 0.45f};
+        r.textCentered((kAPadDn[0] + kAPadDn[2]) / 2, 316, "-", 3, tc);
+        r.textCentered((kAPadUp[0] + kAPadUp[2]) / 2, 316, "+", 3, tc);
     } else {
         r.rect(kPadDn[0], kPadDn[1], kPadDn[2], kPadDn[3], {0.22f, 0.24f, 0.3f});
         r.rect(kPadUp[0], kPadUp[1], kPadUp[2], kPadUp[3], {0.22f, 0.24f, 0.3f});

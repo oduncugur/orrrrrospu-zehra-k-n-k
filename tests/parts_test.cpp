@@ -73,7 +73,7 @@ int main() {
         VehicleSimConfig b; b.car = &sahin; b.tune = &cam; const VehicleSim sb(b);
         CHECK(std::fabs(sb.engineSpec().redlineRpm - sa.engineSpec().redlineRpm) < 1.0 && sb.valveSafeRpm() > sa.valveSafeRpm() + 1000,
               "kam + supap kesiciyi degistirmez, guvenli devri (ECU payi) yukseltir");
-        Tune camEcu = cam; camEcu.ecuHw = 9; camEcu.swRev = 6;
+        Tune camEcu = cam; camEcu.ecuHw = 9; camEcu.swRev = 30;   // +1500 rpm (50 rpm adim)
         VehicleSimConfig c2; c2.car = &sahin; c2.tune = &camEcu; const VehicleSim sc(c2);
         CHECK(sc.engineSpec().redlineRpm > sa.engineSpec().redlineRpm + 1400 && sc.engineSpec().redlineRpm < sc.valveSafeRpm(),
               "ECU devri acar; kam + supap varken guvenli sinirin altinda");
@@ -159,7 +159,9 @@ int main() {
         CHECK(c.buyEcuSoftware(SwMap, &why), "stok ECU: stage 1 harita");
         CHECK(!c.buyEcuSoftware(SwMap, &why) && why == "ECU SINIRINDA", "stok ECU harita siniri 1");
         CHECK(c.buyPart(PartCat::Ecu, 4, &why), "plug-in ECU takildi");
-        CHECK(c.buyEcuSoftware(SwMap, &why) && c.buyEcuSoftware(SwRev, &why) && c.buyEcuSoftware(SwRev, &why) && c.buyEcuSoftware(SwLaunch, &why),
+        bool rev10 = true;
+        for (int k = 0; k < 10; ++k) rev10 = rev10 && c.buyEcuSoftware(SwRev, &why);              // 10 x 50 = +500 rpm
+        CHECK(c.buyEcuSoftware(SwMap, &why) && rev10 && c.buyEcuSoftware(SwLaunch, &why),
               "plug-in: stage 2 + devir +500 + launch");
         CHECK(!c.buyEcuSoftware(SwFlat, &why) && why == "YAZILIM YUVASI DOLU", "plug-in 3 yuva dolu");
         CHECK(!c.buyEcuSoftware(SwAntiLag, &why) && why == "ECU DESTEKLEMIYOR", "anti-lag plug-in'de yok");
