@@ -194,7 +194,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
 
     // ---- istasyonlar: uclarda sik (kosinus dagilimi) + profil anahtarlari + teker merkezleri ----
     std::vector<double> ss;
-    const int NS = 46;
+    const int NS = 80;
     for (int i = 0; i <= NS; ++i) ss.push_back(0.5 - 0.5 * std::cos(kPi * i / NS));
     for (double k : {A.cowlX, A.roofFX, A.roofRX, A.backX, sFront, sRear}) ss.push_back(std::clamp(k, 0.0, 1.0));
     std::sort(ss.begin(), ss.end());
@@ -202,7 +202,8 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
 
     // ---- kesit halkalari: 24 nokta (sol 0..11, sag 23..12 ayna) ----
     // 0 taban kenari, 1 marspiyel, 2-4 bombeli yan, 5 omuz, 6 ust kenar, 7 bel, 8-9 yan cam, 10 tavan rayi, 11 tavan
-    const int R = 24, RH = 12;
+    const int RH = 12;                                   // anahtar noktalar (yari kesit)
+    const int RH2 = 2 * RH - 1, R = 2 * RH2;             // 4 noktali yumusatma ile ara noktalar: yari 23, halka 46
     double flareF = 0.015, flareR = 0.02;                                         // camurluk siskinligi (W orani)
     if (sh.arch == BEETLE) flareF = flareR = 0.07;
     else if (sh.arch == P911) { flareF = 0.025; flareR = 0.05; }
@@ -267,16 +268,22 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         }
         {   // camurluk kabarigi: teker ustunde govde kenari teker tepesinin altinda kalmasin (alcak burunlu araclarda
             // teker kaputtan fiskiriyordu). Yalniz dis kenar noktalari (y > %55) yukselir; kaput ortasi alcak kalir.
-            const double gF = (s - sFront) / 0.075, gR = (s - sRear) / 0.075;
-            const double need = 2.0 * r + 0.07, w = std::max(std::exp(-gF * gF), std::exp(-gR * gR));
-            const double zNeed = need * std::min(1.0, w * 1.6);
-            if (w > 0.05)
-                for (int i = 4; i < RH; ++i)
-                    if (pts[i][0] >= hw * 0.55 && pts[i][1] < zNeed) pts[i][1] = std::max(pts[i][1], zNeed - (i == 4 ? 0.10 : 0.0));
+            // Tumsek degil: aks cevresinde kaputun tum genisligi yumusakca yukselir (yuzey tekerin ustunde duz kalir)
+            const double gF = (s - sFront) / 0.12, gR = (s - sRear) / 0.12;
+            const double w = std::max(std::exp(-gF * gF), std::exp(-gR * gR));
+            const double lift = std::max(0.0, 2.0 * r + 0.07 - pts[7][1]) * std::min(1.0, w * 1.4);
+            if (lift > 0.0) for (int i = 5; i < RH; ++i) pts[i][1] += lift * (i == 5 ? 0.6 : 1.0);
+        }
+        // Ara noktalar: 4 noktali enterpolasyon (-1, 9, 9, -1) / 16; uclar tekrarlanir (ust orta ayna simetrisi korunur)
+        double sub[RH2][2];
+        for (int i = 0; i < RH; ++i) { sub[2 * i][0] = pts[i][0]; sub[2 * i][1] = pts[i][1]; }
+        for (int i = 0; i + 1 < RH; ++i) {
+            const int a = std::max(i - 1, 0), d = std::min(i + 2, RH - 1);
+            for (int c = 0; c < 2; ++c) sub[2 * i + 1][c] = (-pts[a][c] + 9 * pts[i][c] + 9 * pts[i + 1][c] - pts[d][c]) / 16.0;
         }
         std::array<int, R> ring;
-        for (int i = 0; i < RH; ++i) ring[i] = B.v(x, pts[i][0], pts[i][1]);
-        for (int i = 0; i < RH; ++i) ring[R - 1 - i] = B.v(x, -pts[i][0], pts[i][1]);
+        for (int i = 0; i < RH2; ++i) ring[i] = B.v(x, sub[i][0], sub[i][1]);
+        for (int i = 0; i < RH2; ++i) ring[R - 1 - i] = B.v(x, -sub[i][0], sub[i][1]);
         rings.push_back(ring);
     }
     for (size_t k = 0; k + 1 < rings.size(); ++k) {
@@ -297,10 +304,10 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         (void)steep;
         for (int i = 0; i < R; ++i) {
             const int j = (i + 1) % R;
-            const int side = i < RH ? i : R - 2 - i;                              // sol indekse esle (ayna)
+            const int side = (i < RH2 ? i : R - 2 - i) / 2;                       // sol anahtar segmente esle (ayna)
             int mat = MatPaint;
             if (i == R - 1) mat = MatDark;                                        // taban
-            else if ((i == RH - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
+            else if ((i == RH2 - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
             else if (side == 9 && (windshield || rearGlass)) mat = modern ? MatDark : MatPaint;   // A / C direk
             else if (sideGlass && side >= 7 && side <= 9) mat = MatGlass;        // yan camlar
             if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
