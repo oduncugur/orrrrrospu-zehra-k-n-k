@@ -46,7 +46,7 @@ private:
 class IntroScreen : public Screen {
 public:
     explicit IntroScreen(App& app);
-    bool landscape() const override { return true; }
+    bool landscape() const override { return false; }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
