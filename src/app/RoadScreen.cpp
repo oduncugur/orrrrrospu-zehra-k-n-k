@@ -118,6 +118,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     P.stability = true;                                                 // duz yol dengesi (oyuncu)
     P.esp = app_.settings.esp;
     adasMode_ = 0; adasLevel_ = adasLevel(*findVehicle(carId_), tune_);
+    if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::atoi(a); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();
     const int gears = P.sim().powertrain().gearCount();
@@ -284,7 +285,7 @@ void RoadScreen::update(double dt) {
         if (ses_->mode() == RoadSession::Mode::Marathon) ses_->pitControls(0, 0.55, c);   // otopilot da benzinlige girer
         P.manual = false; P.slowClutch = false;
     }
-    applyAdas(c, dt, kL_ || kR_ || std::fabs(tiltF_) > 0.30);   // telefon hic tam duz durmaz: kucuk egim girdi sayilmaz
+    applyAdas(c, dt, kL_ || kR_);   // serit takip / otonom: jiroskop yok sayilir, yalniz tus direksiyonu
     ses_->update(dt, c);
     // Teker donusu ve lastik dumani
     spinP_ += std::clamp(P.sim().wheel(0).omega() * dt, -0.55, 0.55);   // gorsel: vagon tekerlegi yanilsamasi olmasin
@@ -1541,7 +1542,12 @@ void RoadScreen::cycleAdas() {
     if (adasLevel_ <= 0) { flash("SURUS YARDIMI YOK (MODIFIYE > ECU)", 2.0); return; }
     const int maxMode = adasLevel_ >= 4 ? 3 : adasLevel_ >= 3 ? 2 : 1;
     adasMode_ = adasMode_ >= maxMode ? 0 : adasMode_ + 1;
-    if (adasMode_ == 1) { ccSpeed_ = std::max(30.0 / 3.6, ses_->player().sim().speed()); ccI_ = 0; }
+    if (adasMode_ == 1 && ses_->player().sim().speed() < 30.0 / 3.6) {   // gercek araclardaki gibi: 30 km/h ustunde devreye girer
+        adasMode_ = maxMode >= 3 ? 3 : 0;
+        flash(adasMode_ ? "OTONOM SURUS" : "HIZ SABITLEYICI: 30 KM/H USTUNDE", 1.6);
+        return;
+    }
+    if (adasMode_ == 1) { ccSpeed_ = ses_->player().sim().speed(); ccI_ = 0; }
     static const char* n[4] = {"YARDIM KAPALI", "HIZ SABITLEYICI", "SERIT TAKIP", "OTONOM SURUS"};
     char b[64];
     std::snprintf(b, sizeof b, adasMode_ ? "%s: %.0f KM/H" : "%s", adasMode_ == 1 && adasLevel_ >= 2 ? "ADAPTIF HIZ SAB." : n[adasMode_], ccSpeed_ * 3.6);
@@ -1550,31 +1556,75 @@ void RoadScreen::cycleAdas() {
 
 // Hiz sabitleyici (PI), adaptif (ondeki aracla 2 s + 8 m mesafe), serit takip (direksiyon girdisi yokken serit ortasi),
 // otonom (YZ direksiyonu + adaptif hiz). Frene basmak hepsini kapatir; gaz pedali gecici olarak hizlandirir.
-void RoadScreen::applyAdas(RoadControls& c, double dt, bool steerInput) {
-    if (adasMode_ == 0) return;
+void RoadScreen::applyAdas(RoadControls& c, double dt, bool keySteer) {
     RoadCar& P = ses_->player();
-    if (c.brake > 0.05 || ses_->dragPart()) { adasMode_ = 0; flash("YARDIM KAPANDI", 1.0); return; }
-    if (adasMode_ == 3 && steerInput) { adasMode_ = 2; flash("OTONOM: DIREKSIYON SENDE (SERIT TAKIP)", 1.6); }
+    if (adasMode_ != 3 && autoDrive_) {                                   // otonomdan cikis: vites yine surucude
+        autoDrive_ = false; P.manual = prevManual_; cockpit_.setKnobGear(P.sim().powertrain().gear()); ov_ = false;
+    }
+    if (adasMode_ == 0) return;
+    if (c.brake > 0.05) { adasMode_ = 0; flash("YARDIM KAPANDI", 1.0); return; }   // fren pedali her yardimi kapatir
+    if (adasMode_ == 3 && keySteer) { adasMode_ = 2; flash("OTONOM: DIREKSIYON SENDE (SERIT TAKIP)", 1.6); }
     const double v = P.sim().speed();
-    // Adaptif: ayni seritte ondeki en yakin arac
+    const RoadPath& RR = ses_->road();
+    // Otonom: hizi kendisi secer (ekonomik: otoban 90, sehir 50, dag 60 km/h), vites D / otomatik
+    if (adasMode_ == 3) {
+        if (!autoDrive_) { autoDrive_ = true; prevManual_ = P.manual; }
+        P.manual = false;
+        c.gear = -1; c.shift = 0; c.clutch = -1.0; c.neutral = false; c.reverse = false;
+        if (c.autoMode >= 0) c.autoMode = 0;
+        cockpit_.setKnobGear(P.sim().powertrain().gear());
+        ccSpeed_ = (ses_->kind() == RoadSession::Kind::Touge ? 60.0 : ses_->zoneAt(P.s()) == 1 ? 50.0 : 90.0) / 3.6;
+    }
     double target = ccSpeed_;
+    // Adaptif: ayni seritte ondeki en yakin arac (trafik + The Run rakipleri)
+    double gap = 1e9, leadV = 0, leadS = 0;
     if (adasLevel_ >= 2) {
-        const double lat = P.lateral();
-        double gap = 1e9, leadV = 0;
-        for (const TrafficCar& t : ses_->traffic()) {
-            if (t.oncoming) continue;
-            const double d = t.s - P.s();
-            if (d > 2.0 && d < 150.0 && std::fabs(t.lane - lat) < 1.7 && d < gap) { gap = d; leadV = t.v; }
+        const double lat = adasMode_ == 3 && ov_ ? ovLat_ : P.lateral();
+        auto lead = [&](double s, double lane, double lv) {
+            const double d = s - P.s();
+            if (d > 2.0 && d < 160.0 && std::fabs(lane - lat) < 1.7 && d < gap) { gap = d; leadV = lv; leadS = s; }
+        };
+        for (const TrafficCar& t : ses_->traffic()) if (!t.oncoming) lead(t.s, t.lane, t.v);
+        if (ses_->mode() == RoadSession::Mode::Marathon) for (const Runner& Rn : ses_->runField().runners()) lead(Rn.s, Rn.lane, Rn.v);
+        if (RoadCar* rv = ses_->rival()) lead(rv->s(), rv->lateral(), rv->sim().speed());
+    }
+    // Otonom sollama: onde yavas arac varsa bos seride (cok seritli) ya da gorus acik ve karsi serit bossa karsiya cikar
+    if (adasMode_ == 3) {
+        if (!ov_ && gap < 70.0 && leadV < target - 3.0 && !ses_->dragPart()) {
+            const int nf = RR.lanesFwd(P.s());
+            auto laneFree = [&](double off, bool back) {
+                for (const TrafficCar& t : ses_->traffic()) {
+                    if (std::fabs(t.lane - off) > 1.7) continue;
+                    const double d = t.s - P.s();
+                    if (back ? (d > -10.0 && d < 320.0) : (d > -18.0 && d < 45.0)) return false;   // karsidan gelen: 320 m bos
+                }
+                return true;
+            };
+            bool straight = true;                                          // sollama mesafesinde keskin viraj yok
+            for (double d = 0; d < 260.0; d += 20.0) if (std::fabs(RR.at(P.s() + d).curvature) > 1.0 / 450.0) straight = false;
+            for (int k = 0; k < nf && !ov_; ++k) {
+                const double off = RR.laneOffset(P.s(), false, k);
+                if (std::fabs(off - P.lateral()) > 2.0 && laneFree(off, false)) { ov_ = true; ovLat_ = off; }
+            }
+            if (!ov_ && nf == 1 && RR.lanesBack(P.s()) > 0 && straight) {
+                const double off = RR.laneOffset(P.s(), true, 0);
+                if (laneFree(off, true)) { ov_ = true; ovLat_ = off; ovBack_ = true; }
+            }
+            if (ov_) { ovUntil_ = leadS + 18.0; flash("OTONOM: SOLLAMA", 1.0); }
         }
-        if (gap < 1e8) {
-            const double safe = 8.0 + 2.0 * v;
-            target = std::min(target, std::max(0.0, leadV + (gap - safe) * 0.35));
-            if (gap < safe * 0.6) c.brake = std::max(c.brake, std::clamp((safe * 0.6 - gap) / safe + (v - leadV) * 0.08, 0.0, 0.8));
+        if (ov_) {
+            target = std::max(target, leadV + 25.0 / 3.6);                   // sollarken kisa sure hizlanir
+            if (P.s() > ovUntil_ + v * 0.8) { ov_ = false; ovBack_ = false; }   // gecildi: seride don
+            gap = 1e9;
         }
     }
-    // Viraj hizi: otonom / serit takipte oneden gelen viraja gore yavaslama (YZ ile ayni yanal ivme payi)
+    if (gap < 1e8) {
+        const double safe = 8.0 + 2.0 * v;
+        target = std::min(target, std::max(0.0, leadV + (gap - safe) * 0.35));
+        if (gap < safe * 0.6) c.brake = std::max(c.brake, std::clamp((safe * 0.6 - gap) / safe + (v - leadV) * 0.08, 0.0, 0.8));
+    }
+    // Viraj hizi: serit takip / otonomda onden gelen viraja gore yavaslama
     if (adasMode_ >= 2) {
-        const RoadPath& RR = ses_->road();
         for (double d = 0; d < v * v / 8.0 + 40.0; d += 8.0) {
             const double k = std::max(std::fabs(RR.at(P.s() + d).curvature), 1e-4);
             target = std::min(target, std::sqrt(0.45 * 9.81 / k + 2.0 * 4.0 * d));
@@ -1582,17 +1632,16 @@ void RoadScreen::applyAdas(RoadControls& c, double dt, bool steerInput) {
     }
     const double e = target - v;
     ccI_ = std::clamp(ccI_ + e * dt, -6.0, 6.0);
-    const double thr = std::clamp(0.12 * e + 0.05 * ccI_ + 0.12, 0.0, 1.0);
-    if (e < -2.5 && c.brake < 0.05) c.brake = std::clamp((-e - 2.5) * 0.08, 0.0, 0.35);   // yokus asagi / yavas arac: hafif fren
-    c.throttle = std::max(c.throttle, c.brake > 0.05 ? 0.0 : thr);
-    // Serit ortasi: direksiyon girdisi yokken en yakin seridin merkezine
-    // Serit takip: gercek LKA gibi surekli duzeltir; belirgin direksiyon girdisinde (egim) zayiflar, tusla direksiyonda birakir
-    if (adasMode_ >= 2 && (adasMode_ == 3 || !(kL_ || kR_))) {
-        const RoadPath& R = ses_->road();
+    double thr = std::clamp(0.12 * e + 0.05 * ccI_ + 0.12, 0.0, 1.0);
+    if (adasMode_ == 3 && !ov_) thr = std::min(thr, 0.45);                  // ekonomi: yumusak gaz, erken vites
+    if (e < -2.5 && c.brake < 0.05) c.brake = std::clamp((-e - 2.5) * 0.08, 0.0, 0.35);
+    c.throttle = std::max(adasMode_ == 3 ? 0.0 : c.throttle, c.brake > 0.05 ? 0.0 : thr);
+    // Serit: jiroskop yok sayilir; tusla direksiyon yoksa serit ortasina (otonomda sollama seridi) kendisi oturur
+    if (adasMode_ >= 2 && !keySteer && !ses_->dragPart()) {
         int best = 0; double bd = 1e9;
-        for (int k = 0; k < R.lanesFwd(P.s()); ++k) { const double d = std::fabs(P.lateral() - R.laneOffset(P.s(), false, k)); if (d < bd) { bd = d; best = k; } }
-        const double aiSteer = P.aiControls(R.laneOffset(P.s(), false, best), 0.45, target).steer;
-        c.steer = adasMode_ == 3 ? aiSteer : c.steer + (steerInput ? 0.25 : 0.7) * (aiSteer - c.steer);
+        for (int k = 0; k < RR.lanesFwd(P.s()); ++k) { const double d = std::fabs(P.lateral() - RR.laneOffset(P.s(), false, k)); if (d < bd) { bd = d; best = k; } }
+        const double lane = adasMode_ == 3 && ov_ ? ovLat_ : RR.laneOffset(P.s(), false, best);
+        c.steer = P.aiControls(lane, 0.45, target).steer;
     }
 }
 // Yolda yapilan secimler ayarlara da yazilir (sonraki surus ayni modla baslar)

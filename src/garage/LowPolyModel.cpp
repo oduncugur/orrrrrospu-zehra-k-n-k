@@ -48,7 +48,14 @@ const CarProfile* profileFor(int id) {
 // Yan profil: x orani (on 0 .. arka 1) -> bel (kaput/bagaj/kapi ust kenari) ve tavan yuksekligi (H orani)
 struct Profile {
     ArchSpec a;
+    // Bel: kabin boyunca %18 yukari (cam / tavan bolgesi govdeye gore cok uzundu); uclarda yumusak gecis
     double belt(double s) const {
+        const double b = beltRaw(s);
+        if (a.open) return b;
+        const double w = smooth((s - a.cowlX) / 0.06) * smooth((a.backX - s) / 0.06);
+        return b + 0.18 * (1.0 - b) * w;
+    }
+    double beltRaw(double s) const {
         if (s < a.cowlX) {                                        // kaput: on kenardan cam dibine yumusak yukselis
             const double t = s / std::max(a.cowlX, 1e-3);
             return a.noseZ + (a.hoodZ - a.noseZ) * (1.0 - (1.0 - t) * (1.0 - t));
@@ -197,6 +204,10 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const int NS = 80;
     for (int i = 0; i <= NS; ++i) ss.push_back(0.5 - 0.5 * std::cos(kPi * i / NS));
     for (double k : {A.cowlX, A.roofFX, A.roofRX, A.backX, sFront, sRear}) ss.push_back(std::clamp(k, 0.0, 1.0));
+    if (!A.open) {                                                                // direk kenarlari (direk yuzeyde keskin dursun)
+        const double sB = A.roofFX + (A.roofRX - A.roofFX) * (sh.doors == 4 ? 0.48 : 0.86), sC = A.roofRX - 0.01;
+        for (double d : {-0.05, 0.05}) { ss.push_back(sB + d / L); if (sh.doors == 4) ss.push_back(sC + 1.6 * d / L); }
+    }
     std::sort(ss.begin(), ss.end());
     ss.erase(std::unique(ss.begin(), ss.end(), [](double a, double b) { return std::fabs(a - b) < 0.006; }), ss.end());
 
@@ -290,6 +301,13 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         for (int i = 0; i < RH2; ++i) ring[R - 1 - i] = B.v(x, -sub[i][0], sub[i][1]);
         rings.push_back(ring);
     }
+    std::vector<double> pillarS;                                                  // B (ve 4 kapida C) direk konumlari
+    if (!A.open) {
+        const double sB = A.roofFX + (A.roofRX - A.roofFX) * (sh.doors == 4 ? 0.48 : 0.86);
+        if (sB > A.roofFX + 0.02 && sB < A.backX - 0.01) pillarS.push_back(sB);
+        if (sh.doors == 4 && A.backX - A.roofRX < 0.18) pillarS.push_back(A.roofRX - 0.01);
+    }
+    if (pillarS.empty()) pillarS.push_back(-1.0);
     for (size_t k = 0; k + 1 < rings.size(); ++k) {
         const auto& a = rings[k]; const auto& b = rings[k + 1];
         const double s0 = ss[k], s1 = ss[k + 1], sm = 0.5 * (s0 + s1);
@@ -306,14 +324,18 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const bool windshield = cab && sm < A.roofFX;                             // konuma gore (egim degil): seritsiz cam
         const bool rearGlass = cab && sm > A.roofRX && glassHigh;
         (void)steep;
+        bool pillarHere = false;                                                  // B / C direk: yuzeyin parcasi (ayri panel yok)
+        for (double sp : pillarS) if (std::fabs(sm - sp) * L < (sp == pillarS[0] ? 0.05 : 0.08)) pillarHere = true;
         for (int i = 0; i < R; ++i) {
             const int j = (i + 1) % R;
-            const int side = (i < RH2 ? i : R - 2 - i) / 2;                       // sol anahtar segmente esle (ayna)
+            const int si = i < RH2 ? i : R - 2 - i;
+            const int side = si / 2;                                              // sol anahtar segmente esle (ayna)
             int mat = MatPaint;
             if (i == R - 1) mat = MatDark;                                        // taban
             else if ((i == RH2 - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
             else if (side == 9 && (windshield || rearGlass)) mat = modern ? MatDark : MatPaint;   // A / C direk
-            else if (sideGlass && side >= 7 && side <= 9) mat = MatGlass;        // yan camlar
+            else if (sideGlass && side >= 7 && side <= 9)                        // yan camlar; direk ve ust cerceve govdeden
+                mat = pillarHere || si == 19 ? (modern ? MatDark : MatPaint) : MatGlass;
             if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
             B.quad(a[i], b[i], b[j], a[j], mat);
         }
@@ -360,21 +382,6 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const double sC = A.roofRX - 0.01;
         std::vector<double> pillars = {sB};
         if (sh.doors == 4 && A.backX - A.roofRX < 0.18) pillars.push_back(sC);
-        for (double sp : pillars) {
-            if (sp <= A.roofFX + 0.02 || sp >= A.backX - 0.01) continue;
-            const double xb = L * (0.5 - sp);
-            const double pw = sp == sB ? 0.045 : 0.07;
-            size_t si = 0;                                                         // en yakin istasyonun yuzeyi
-            for (size_t k = 1; k < ss.size(); ++k) if (std::fabs(ss[k] - sp) < std::fabs(ss[si] - sp)) si = k;
-            const auto& sc = subs[si];
-            // cam bolgesi (anahtar 7 bel .. 10 tavan rayi = ara indeks 14 .. 20) boyunca, yuzeyin 6 mm disinda serit
-            for (int k = 14; k < 20; ++k)
-                for (double sg : {-1.0, 1.0}) {
-                    const double ya = sg * (sc[k][0] + 0.006), yb = sg * (sc[k + 1][0] + 0.006);
-                    B.panel(xb + pw, ya, sc[k][1], xb - pw, ya, sc[k][1], xb - pw, yb, sc[k + 1][1], xb + pw, yb, sc[k + 1][1],
-                            modern && sh.doors == 4 ? MatDark : MatPaint);
-                }
-        }
         // Kapi cizgileri (koyu ince serit) ve kollar
         std::vector<double> cuts = {A.cowlX + 0.015, sh.doors == 4 ? sB : std::min(sB + 0.02, A.backX - 0.02)};
         if (sh.doors == 4) cuts.push_back(std::min(sC + 0.01, sRear - 0.06));

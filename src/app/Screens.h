@@ -484,6 +484,8 @@ private:
     Rect free_{}, flow_{}, race_{}, touge_{}, karma_{}, chase_{}, marathon_{}, assistBtn_{}, tiltBtn_{}, adasBtn_{};
     // Surus yardimi: 0 kapali, 1 hiz sabitleyici / adaptif, 2 + serit takip, 3 otonom
     int adasMode_ = 0; int adasLevel_ = 0; double ccSpeed_ = 0, ccI_ = 0;
+    bool autoDrive_ = false, prevManual_ = false, ov_ = false, ovBack_ = false;   // otonom: vites devri, sollama
+    double ovLat_ = 0, ovUntil_ = 0;
     void cycleAdas();
     void applyAdas(RoadControls& c, double dt, bool steerInput);
     double camBlend_ = 1.0;                      // 0: drag gorunumu (yandan), 1: takip kamerasi (karma gecisi)
