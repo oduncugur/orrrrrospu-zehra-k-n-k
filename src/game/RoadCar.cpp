@@ -103,14 +103,14 @@ void RoadCar::playerClutch(const RoadControls& c) {
     } else launching_ = false;
     grind_ = false;
     if (c.gear >= 0 && c.gear != pt.gear()) {
-        // Debriyaj %40 basili yeterli; bosa almak debriyajsiz olur; gaz kesik ve devir uyumluysa (+-%15) debriyajsiz gecer
+        // Debriyaj kavrama bandinda (%30+) yeterli; bosa almak debriyajsiz olur; gaz kesik ve devir uyumluysa (+-%15) debriyajsiz gecer
         bool matched = false;
         if (c.gear > 0 && c.gear <= pt.gearCount() && c.throttle < 0.15) {
             const double wheelRpm = sim_->speed() / sim_->wheel(sim_->drivenLeft()).rEff() * 9.5493;
             const double target = wheelRpm * sim_->gearboxSpec().ratios[c.gear - 1] * sim_->gearboxSpec().finalDrive;
             matched = target > 900.0 && std::fabs(pt.rpm() - target) < 0.15 * target;
         }
-        if (c.clutch >= 0.40 || c.gear == 0 || matched) pt.setGear(std::min(c.gear, pt.gearCount()));
+        if (c.clutch >= 0.30 || c.gear == 0 || matched) pt.setGear(std::min(c.gear, pt.gearCount()));
         else grind_ = true;
     }
     pt.setClutchPedal(c.clutch);

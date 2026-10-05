@@ -91,7 +91,7 @@ void DragRace::advance(double realDt, const PlayerControls& pc) {
     if (autopilot_) { P.grind = false; }
     else if (box == Gearbox::HPattern && pc.requestedGear >= 0 && pc.requestedGear != pt.gear()) {
         const int g = std::min(pc.requestedGear, pt.gearCount());
-        if (pc.clutch >= 0.40 || g == 0) { pt.setGear(g); P.grind = false; }   // %40 debriyaj yeter; bosa almak debriyajsiz
+        if (pc.clutch >= 0.30 || g == 0) { pt.setGear(g); P.grind = false; }   // kavrama bandi (%30+) yeter; bosa almak debriyajsiz
         else if (!P.grind) { P.grind = true; events_.push_back("DISLI CITIRTISI! Vites icin debriyaja bas"); }
     }
     if (pc.requestedGear < 0 || pc.requestedGear == pt.gear()) P.grind = false;
