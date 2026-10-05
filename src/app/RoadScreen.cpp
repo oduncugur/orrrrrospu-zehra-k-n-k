@@ -1283,7 +1283,7 @@ void RoadScreen::drawHud(Renderer& r) {
     }
     if (gstyle) {                                                        // kadran: yatayda alt orta, dikeyde yol goruntusunun alti
         GaugeData gd;
-        gd.rpm = (float)pt.rpm(); gd.redline = (float)sim.engineSpec().redlineRpm; gd.shiftRpm = (float)sim.shiftRpm();
+        gd.vtec = pt.vtecActive(); gd.rpm = (float)pt.rpm(); gd.redline = (float)sim.engineSpec().redlineRpm; gd.shiftRpm = (float)sim.shiftRpm();
         gd.speed = (float)(sim.speed() * app_.settings.speedFactor()); gd.speedMax = app_.settings.speedFactor() > 3.0 ? 260.0f : 160.0f;
         gd.unit = app_.settings.speedUnit(); gd.gear = gs; gd.gearCol = Pc.grinding() ? Color{1.0f, 0.2f, 0.15f} : gc; gd.t = envT_;
         boostShown_ += ((float)sim.boostNow() - boostShown_) * 0.15f;     // ibre gecikmesi
@@ -1298,6 +1298,7 @@ void RoadScreen::drawHud(Renderer& r) {
     r.rect(rx, 6, rx + rw * fill, 16, pt.rpm() > red * 0.9 ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
     std::snprintf(b, sizeof b, "%5.0f RPM", pt.rpm());
     r.text(rx, 22, b, 1, {1, 1, 1});
+    if (pt.vtecActive()) r.text(rx + r.textWidth(b, 1) + 6, 22, "VTEC", 1, {1.0f, 0.15f, 0.12f});
     }
     if (adasLevel_ > 0) {
         static const char* n[4] = {"YARDIM", "HIZ SAB.", "SERIT", "OTONOM"};

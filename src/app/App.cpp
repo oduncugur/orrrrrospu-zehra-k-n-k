@@ -301,6 +301,10 @@ void App::setVoiceTuned(int i, int carId, const Tune* tune) {
     VehicleDef d = *v;
     if (tune) { d.engine = effectiveEngine(*v, tune); d.gearbox = effectiveGearbox(*v, tune); }
     setVoice(i, &d, tune && (tune->turbo > 0 || tune->superch > 0));        // ses kopyayi saklar (VehicleDef deger)
+    if (tune && tune->cam == kVtecKitCam) {                                  // VTEC kiti: seste de kam gecisi
+        std::lock_guard<std::mutex> g(audioLock_);
+        if (voices_[i].synth) voices_[i].synth->setVtecKit(vtecKitRpm(engineTable()[d.engine].redline));
+    }
 }
 
 void App::voice(int i, double rpm, double thr, bool cut, bool inGear, float gain) {

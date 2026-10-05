@@ -18,6 +18,7 @@ struct GaugeData {
     Color gearCol{1.0f, 0.62f, 0.05f};
     float boost = 0, boostMax = 0;          // bar (boostMax <= 0: atmosferik)
     double t = 0;                           // zaman (vites isigi yanip sonmesi)
+    bool vtec = false;                      // yuksek kam devrede (VTEC isigi)
 };
 
 void drawAnalogTach(Renderer& r, float cx, float cy, float R, const GaugeData& d);

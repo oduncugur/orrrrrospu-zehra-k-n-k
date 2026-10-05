@@ -156,15 +156,15 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
                     xF + kp + 0.004, yc + 0.003, kz1 - 0.016, xF + kp + 0.004, yc - 0.003, kz1 - 0.016, MatTrim);
         }
         // Tampon: yuvarlak sis fari yuvasi (koyu cep + lamba), yan kucuk giris
-        // Tampon yan girisi (M3): koyu yamuk cep, dis ust kosede yuvarlak sis fari
-        quadF(sg * 0.56 * HW, 0.240, 0.380, sg * 0.84 * HW, 0.250, 0.370, 0.004, MatDark);
-        const double yf = sg * 0.74 * HW;
-        B.diskX(frontX(yf) + 0.008, yf, 0.330, 0.036, 0.030, 14, MatLight);
+        const double yf = sg * 0.66 * HW;
+        B.diskX(frontX(yf) + 0.004, yf, 0.300, 0.058, 0.050, 16, MatDark);
+        B.diskX(frontX(yf) + 0.007, yf, 0.300, 0.038, 0.034, 14, MatLight);
+        quadF(sg * 0.40 * HW, 0.230, 0.290, sg * 0.54 * HW, 0.235, 0.285, 0.004, MatDark);
     }
     // Tampon ortasi: plaka (ust) + alt genis hava girisi + ince citalar; alt dudak
-    B.panel(xF + 0.012, 0.26, 0.545, xF + 0.012, 0.26, 0.435, xF + 0.012, -0.26, 0.435, xF + 0.012, -0.26, 0.545, MatPlate);   // plaka
-    B.panel(xF + 0.010, 0.38, 0.405, xF + 0.010, 0.33, 0.225, xF + 0.010, -0.33, 0.225, xF + 0.010, -0.38, 0.405, MatDark);   // orta buyuk giris
-    for (int k = -1; k <= 1; k += 2) B.panel(xF + 0.013, k * 0.13 - 0.006, 0.22, xF + 0.013, k * 0.13 + 0.006, 0.22, xF + 0.013, k * 0.13 + 0.006, 0.405, xF + 0.013, k * 0.13 - 0.006, 0.405, MatPaint);
+    B.panel(xF + 0.010, 0.25, 0.475, xF + 0.010, 0.25, 0.385, xF + 0.010, -0.25, 0.385, xF + 0.010, -0.25, 0.475, MatPlate);
+    B.panel(xF + 0.010, 0.36, 0.345, xF + 0.010, 0.34, 0.225, xF + 0.010, -0.34, 0.225, xF + 0.010, -0.36, 0.345, MatDark);
+    for (int k = -1; k <= 1; ++k) B.panel(xF + 0.013, k * 0.12 - 0.004, 0.23, xF + 0.013, k * 0.12 + 0.004, 0.23, xF + 0.013, k * 0.12 + 0.004, 0.34, xF + 0.013, k * 0.12 - 0.004, 0.34, MatTrim);
     B.panel(xF + 0.02, 0.80, 0.21, xF - 0.05, 0.80, 0.21, xF - 0.05, -0.80, 0.21, xF + 0.02, -0.80, 0.21, MatDark);   // alt dudak
     // ---- arka: L stoplar (yana sarar), bagaj cizgisi, plaka, difuzor, dortlu egzoz
     for (double sg : {1.0, -1.0}) {

@@ -5,6 +5,7 @@
 #include "sim/PowertrainCore.h"
 
 #include <vector>
+#include <cmath>
 
 namespace zk {
 
@@ -137,6 +138,9 @@ const std::vector<AeroOpt>&    aeroTable();
 const std::vector<ElecOpt>&    elecTable();
 
 // Ozel uretim (atolye) secenek indeksleri: bu satirlar Tune::cust* degerlerini kullanir
+// Sonradan VTEC kiti (kam tablosu 10): gercek iki kademeli kam; gecis devri kesicinin %65'i (100'e yuvarli)
+constexpr int kVtecKitCam = 10;
+inline double vtecKitRpm(double redline) { return std::round(0.65 * redline / 100.0) * 100.0; }
 constexpr int kCustomTurbo = 29, kCustomCam = 11, kCustomCrank = 9, kCustomFinal = 11, kCustomGear = 30, kCustomAero = 9;
 // Atolye ozel parca fiziği (turbo kompresor capi mm -> boost/spool, kam derecesi -> egri, hacim artisi, kanat)
 TurboOpt customTurbo(const Tune& t);

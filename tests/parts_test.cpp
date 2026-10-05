@@ -40,6 +40,18 @@ static RoadCar* runWot(const VehicleDef& v, const Tune& t, double seconds) {
 }
 
 int main() {
+    std::printf("[0] Sonradan VTEC kiti: VTEC'siz motorda gercek kam gecisi (gecis devri, yuksek kam ustte guclu)\n");
+    {
+        const VehicleDef& v = *findVehicle(217);
+        Tune t; t.cam = kVtecKitCam;
+        VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
+        const VehicleSim s(cfg);
+        const EngineSpec& e = s.engineSpec();
+        const double hiR = e.redlineRpm * 0.95, loR = e.redlineRpm * 0.35;
+        auto at = [](const auto& c, double r) { for (size_t i = 1; i < c.size(); ++i) if (c[i].first >= r) return c[i].second; return c.back().second; };
+        CHECK(e.vtecRpm < 1e8 && at(e.highCam, hiR) > at(e.lowCam, hiR) * 1.05 && at(e.lowCam, loR) > at(e.highCam, loR),
+              "VTEC kiti: gecis devri var, yuksek kam ustte, dusuk kam altta guclu");
+    }
     std::printf("[1] Kategori kapsami (ana parcalar 10, bilesenler en az 5 secenek; lastik ve turbo 30; motor swap tum motorlar)\n");
     {
         int few = 0;

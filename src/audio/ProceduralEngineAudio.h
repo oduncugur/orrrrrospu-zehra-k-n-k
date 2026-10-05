@@ -48,6 +48,10 @@ private:
     void  firePulse(double start, int bank, double amp, double tau, bool pop, bool mech);
 
     VehicleDef v_; EngineDef e_;
+public:
+    // Sonradan VTEC kiti: fabrikada degisken kam yoksa gecis devrinde emme / parlaklik sicramasi
+    void setVtecKit(double rpm) { if (!e_.variableCam) { e_.variableCam = true; e_.camSwitchRpm = rpm; } }
+private:
     int    fs_;
     bool   turboKit_ = false;
     double bovAmp_ = 0.0, bovT_ = -1.0, bovHp_ = 0.0, bovPrev_ = 0.0;

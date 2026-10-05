@@ -149,7 +149,14 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             heatMul_ = 1.0 + 0.06 * std::max(0.0, afr - 12.5) + 0.01 * std::max(0, tune->ecuTiming);
         }
         const CamOpt C = tune->cam == kCustomCam ? customCam(*tune) : row(camTable(), tune->cam);
-        if (tune->cam > 0) { ShapeCtx c{red0, C.low, C.high}; scaleCurves(eng_, shapeMul, &c); }
+        if (tune->cam == kVtecKitCam && eng_.vtecRpm > 1e8) {
+            // VTEC kiti (fabrikada yok): dusuk kam altta dolgun / ustte sonuk, yuksek kam ustte acik; gecis devrinde sicrama
+            eng_.highCam = eng_.lowCam;
+            const ShapeCtx lo{red0, 1.05, 0.95}, hi{red0, 0.96, 1.12};
+            for (auto& pr : eng_.lowCam) pr.second *= shapeMul(pr.first, &lo);
+            for (auto& pr : eng_.highCam) pr.second *= shapeMul(pr.first, &hi);
+            eng_.vtecRpm = vtecKitRpm(red0);
+        } else if (tune->cam > 0) { ShapeCtx c{red0, C.low, C.high}; scaleCurves(eng_, shapeMul, &c); }
         const HeadOpt& HD = row(headTable(), tune->head);
         if (tune->head > 0) { ShapeCtx h{red0, HD.low, HD.high}; scaleCurves(eng_, shapeMul, &h); }
         const PistonOpt& PI = row(pistonTable(), tune->piston);

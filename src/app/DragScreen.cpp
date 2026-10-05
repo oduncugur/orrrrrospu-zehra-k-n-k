@@ -647,7 +647,7 @@ void DragScreen::drawHud(Renderer& r) {
     float tx = 136;
     if (analog || boostG) {
         GaugeData gd;
-        gd.rpm = rpm; gd.redline = red; gd.shiftRpm = shiftAt; gd.gear = gear == 0 ? "N" : std::to_string(gear);
+        gd.vtec = pt.vtecActive(); gd.rpm = rpm; gd.redline = red; gd.shiftRpm = shiftAt; gd.gear = gear == 0 ? "N" : std::to_string(gear);
         gd.gearCol = P.grind ? kRed : Color{1, 1, 1}; gd.t = t_;
         boostShown_ += ((float)P.sim->boostNow() - boostShown_) * 0.15f;
         gd.boost = boostShown_; gd.boostMax = (float)P.sim->boostMax();

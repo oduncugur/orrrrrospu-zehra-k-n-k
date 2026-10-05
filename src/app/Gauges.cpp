@@ -62,6 +62,7 @@ void drawAnalogTach(Renderer& r, float cx, float cy, float R, const GaugeData& d
     r.textCentered(cx, cy + R * 0.48f, d.gear, txtScale(R) + (R >= 40 ? 1 : 0), d.gearCol);
     const bool shift = d.rpm > d.shiftRpm - 150 && std::fmod(d.t, 0.14) < 0.07;
     if (shift) r.circle(cx, cy - R * 0.36f, R * 0.08f, 10, {0.3f, 0.6f, 1.0f});   // vites isigi
+    if (d.vtec) r.textCentered(cx, cy - R * 0.22f, "VTEC", 1, {1.0f, 0.15f, 0.12f});
     needle(r, cx, cy, R, d.rpm / full, {1.0f, 0.35f, 0.15f});
 }
 
@@ -108,7 +109,7 @@ void drawDigitalCluster(Renderer& r, float x0, float y0, float x1, float y1, con
     r.text(x0 + 6, ty + 2, b, sc, lcd);
     r.text(x0 + 6 + r.textWidth(b, sc) + 4, ty + 2, d.unit, 1, {0.2f, 0.6f, 0.5f});
     r.text(x1 - 6 - r.textWidth(d.gear, sc), ty + 2, d.gear, sc, d.gearCol);
-    if (withTach) { std::snprintf(b, sizeof b, "%5.0f", d.rpm); r.text(x0 + 6 + r.textWidth("000", sc) + 4, ty + 2 + 9 * sc - 9, b, 1, {0.2f, 0.6f, 0.5f}); }
+    if (withTach) { std::snprintf(b, sizeof b, "%5.0f", d.rpm); r.text(x0 + 6 + r.textWidth("000", sc) + 4, ty + 2 + 9 * sc - 9, b, 1, {0.2f, 0.6f, 0.5f}); } if (withTach && d.vtec) r.text(x0 + 6 + r.textWidth("000", sc) + 4 + r.textWidth("00000", 1) + 4, ty + 2 + 9 * sc - 9, "VTEC", 1, {1.0f, 0.15f, 0.12f});
 }
 
 void drawBoostGauge(Renderer& r, float cx, float cy, float R, const GaugeData& d) {
