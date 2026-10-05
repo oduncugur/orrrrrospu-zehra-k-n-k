@@ -160,7 +160,7 @@ struct Career {
     long bestFlow = 0;                     // otoban akisi en iyi skoru
     // ---- ligler (League.h) ----
     int  rep = 0;                          // un puani
-    uint64_t eventWins = 0;                // kazanilmis etkinlikler (leagueEvents indeksi -> bit)
+    uint64_t eventWins = 0, eventWins2 = 0;                // kazanilmis etkinlikler (leagueEvents indeksi -> bit)
     int  dailyDay = -1;                    // gunluk gorevlerin gunu
     long dailyProg[3] = {0, 0, 0};
     int  dailyDone = 0;                    // tamamlanan gorev bitleri
@@ -169,7 +169,7 @@ struct Career {
     std::vector<int> checkAchievements();
     int  leagueUnlocked() const;           // acik en yuksek lig (onceki ligin patronu yenildiyse)
     int  leagueWins(int league) const;
-    bool eventWon(int idx) const { return idx >= 0 && idx < 64 && ((eventWins >> idx) & 1u); }
+    bool eventWon(int idx) const { return idx >= 0 && (idx < 64 ? ((eventWins >> idx) & 1u) : idx < 128 && ((eventWins2 >> (idx - 64)) & 1u)); }
     // Etkinlige girilebilir mi (lig kilidi, patron icin 3 galibiyet, pink slip 2+ arac, sinif siniri)
     bool eventAvailable(int idx, std::string* why = nullptr) const;
     // Etkinlik sonucu: odul (ilk galibiyet tam, tekrar %40), un, pink slip (araci al / kaybet), gunluk gorevler.

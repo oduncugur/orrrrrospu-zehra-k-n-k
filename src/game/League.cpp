@@ -65,6 +65,16 @@ const std::vector<RivalDef>& rivals() {
         // 27 PIST
         {"F40 SAMI", 4, 184, 1, 1.3, false}, {"VIPER RECEP", 4, 272, 1, 1.3, false}, {"LFA YUSUF", 4, 46, 2, 1.25, false},
         {"CARRERA GT BURCU", 4, 177, 1, 1.25, false}, {"720S KORAY", 4, 315, 1, 1.2, false}, {"EFSANE", 4, 313, 1, 1.1, true},
+        // Ligin ikinci sehirleri (sona eklenir). 33 IZMIT
+        {"KORFEZ CEM", 0, 302, 1, 1.75, false}, {"TERSANECI ALI", 0, 290, 0, 1.75, false}, {"SEKA YUSUF", 0, 216, 2, 1.65, false},
+        // 36 ESKISEHIR
+        {"OGRENCI KAAN", 1, 152, 0, 1.6, false}, {"PORSUK DENIZ", 1, 24, 2, 1.5, false}, {"TRAMVAY TUNA", 1, 118, 1, 1.5, false},
+        // 39 KONYA
+        {"OVA KARTALI SELIM", 2, 227, 2, 1.45, false}, {"SEMAZEN OZAN", 2, 78, 2, 1.4, false}, {"BOZKIR BURAK", 2, 88, 2, 1.4, false},
+        // 42 NIGDE
+        {"ALADAGLAR LALE", 3, 75, 1, 1.35, false}, {"KALE YOLU ARDA", 3, 17, 1, 1.35, false},
+        // 44 ANTALYA
+        {"SAHIL KRALI METE", 4, 272, 2, 1.25, false}, {"KONYAALTI SU", 4, 184, 2, 1.2, false}, {"GECE PISTI NIL", 4, 46, 1, 1.2, false},
     };
     return r;
 }
@@ -103,6 +113,29 @@ const std::vector<EventDef>& leagueEvents() {
         {"SON KACIS", 4, M::Chase, -1, 12000, 58, false, 0},
         // Maratonlar: 18 km, yakit + benzinlik (sona eklenir)
         {"SEHIRLERARASI MARATON", 2, M::Marathon, -1, 6500, 40, false, 0}, {"PIST MARATONU", 4, M::Marathon, -1, 20000, 80, false, 0},
+        // ---- ligin ikinci sehirleri: kendi yarislari (kSecondCityFirst'ten itibaren; sehir = lig*2+1)
+        // IZMIT (6)
+        {"KORFEZ SAHILI DRAG", 0, M::Drag, 33, 480, 10, false, 0}, {"TERSANE YOLU", 0, M::Road, 34, 560, 12, false, 0},
+        {"SEKA PARKI KARMA", 0, M::Karma, 35, 620, 13, false, 0}, {"D-100 GECE AKISI", 0, M::Flow, -1, 520, 10, false, 16000},
+        {"FABRIKA CIKISI DRAG", 0, M::Drag, -1, 470, 9, false, 0}, {"KORFEZ KACISI", 0, M::Chase, -1, 480, 10, false, 0},
+        // ESKISEHIR (7)
+        {"OGRENCI DRAG", 1, M::Drag, 36, 1350, 18, false, 0}, {"PORSUK KIYISI", 1, M::Road, 37, 1550, 20, false, 0},
+        {"TRAMVAY HATTI KARMA", 1, M::Karma, 38, 1750, 22, false, 0}, {"ODUNPAZARI AKISI", 1, M::Flow, -1, 1450, 16, false, 32000},
+        {"SAZOVA DRAG", 1, M::Drag, -1, 1300, 16, false, 0}, {"PINK SLIP: GOLF", 1, M::Drag, 37, 0, 30, true, 0},
+        {"ESKISEHIR KACISI", 1, M::Chase, -1, 1350, 18, false, 0},
+        // KONYA (6)
+        {"OVA DUZLUGU DRAG", 2, M::Drag, 39, 3500, 30, false, 0}, {"MEVLANA YOLU", 2, M::Road, 40, 3700, 32, false, 0},
+        {"BOZKIR KARMA", 2, M::Karma, 41, 3900, 34, false, 0}, {"KONYA OVASI AKISI", 2, M::Flow, -1, 3100, 26, false, 48000},
+        {"UZUN DUZ DRAG", 2, M::Drag, -1, 3300, 28, false, 0}, {"KONYA MARATONU", 2, M::Marathon, -1, 6800, 42, false, 0},
+        // NIGDE (5)
+        {"ALADAGLAR VIRAJLARI", 3, M::Touge, 42, 6400, 44, false, 0}, {"KALE TIRMANISI", 3, M::Touge, 43, 6700, 44, false, 0},
+        {"KAYA TUNELI KARMA", 3, M::Karma, -1, 6900, 46, false, 0}, {"PINK SLIP: NSX", 3, M::Touge, 43, 0, 55, true, 0},
+        {"NIGDE KACISI", 3, M::Chase, -1, 6200, 42, false, 0},
+        // ANTALYA (7)
+        {"SAHIL PISTI DRAG", 4, M::Drag, 44, 13000, 62, false, 0}, {"KONYAALTI SPRINT", 4, M::Road, 45, 14500, 64, false, 0},
+        {"GECE PISTI KARMA", 4, M::Karma, 46, 16500, 66, false, 0}, {"LARA AKISI", 4, M::Flow, -1, 12500, 50, false, 95000},
+        {"TOROS INISI", 4, M::Touge, -1, 15500, 64, false, 0}, {"ANTALYA MARATONU", 4, M::Marathon, -1, 21000, 82, false, 0},
+        {"ANTALYA KACISI", 4, M::Chase, -1, 12500, 58, false, 0},
     };
     return e;
 }
@@ -110,12 +143,7 @@ const std::vector<EventDef>& leagueEvents() {
 int eventCity(int idx) {
     const auto& ev = leagueEvents();
     if (idx < 0 || idx >= (int)ev.size()) return 0;
-    const EventDef& e = ev[idx];
-    if (e.rival >= 0 && rivals()[e.rival].boss) return e.league * 2 + 1;
-    int k = 0;                                                         // ligdeki patron olmayan sira
-    for (int i = 0; i < idx; ++i)
-        if (ev[i].league == e.league && !(ev[i].rival >= 0 && rivals()[ev[i].rival].boss)) ++k;
-    return e.league * 2 + (k % 2);
+    return ev[idx].league * 2 + (idx >= kSecondCityFirst ? 1 : 0);   // eski etkinlikler ligin ilk sehrinde
 }
 
 int todayIndex() { return (int)(std::time(nullptr) / 86400); }

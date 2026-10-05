@@ -1240,7 +1240,7 @@ long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pink
         ++wins; ++car().wins;
         prize = eventPrize(idx, first);
         rep += first ? e.rep : std::max(1, e.rep * 3 / 10);
-        eventWins |= (uint64_t)1 << idx;
+        if (idx < 64) eventWins |= (uint64_t)1 << idx; else eventWins2 |= (uint64_t)1 << (idx - 64);
         form = std::clamp(form + 1, -3, 3);
     } else {
         rep = std::max(0, rep - e.rep / 4);
@@ -1584,8 +1584,8 @@ std::string Career::serialize() const {
     o << "money=" << money << "\ncurrent=" << current << "\nraces=" << races << "\nwins=" << wins
       << "\nearnings=" << earnings << "\ntreePro=" << (treePro ? 1 : 0) << "\nstreak=" << lastOppId << ";" << sameOppWins << "\nflow=" << bestFlow << "\nform=" << form << "\nrep=" << rep << "\nchase=" << chaseEscapes << "\nslots=" << garageSlots << "\ntour=" << tourWeek << ";" << tourRound << ";" << (tourOut ? 1 : 0) << "\nstreet=" << meetDone << ";" << dynoWeek << ";" << jobDay << ";" << jobMask << "\ncity2=" << city << "\nsponsor=" << sponsor << ";" << spWins << ";" << spRaces << ";" << sponsorsDone << "\nloan=" << loan << ";" << loanRaces << ";" << showWeek << "\njobs=" << jobSeq[0] << ";" << jobSeq[1] << ";" << jobSeq[2] << "\n";
     {
-        char lb[160];
-        std::snprintf(lb, sizeof lb, "evw=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
+        char lb[200];
+        std::snprintf(lb, sizeof lb, "evw=%llx\nevw2=%llx\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, (unsigned long long)eventWins2, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
         o << lb;
     }
     char buf[256];
@@ -1662,6 +1662,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "form") c.form = std::clamp(std::atoi(v.c_str()), -3, 3);
         else if (k == "rep") c.rep = std::max(0, std::atoi(v.c_str()));
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
+        else if (k == "evw2") c.eventWins2 = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "ach") c.achieved = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
         else if (k == "daily") std::sscanf(v.c_str(), "%d;%ld;%ld;%ld;%d", &c.dailyDay, &c.dailyProg[0], &c.dailyProg[1], &c.dailyProg[2], &c.dailyDone);
         else if (k == "streak") {

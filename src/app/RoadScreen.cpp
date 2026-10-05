@@ -284,7 +284,7 @@ void RoadScreen::update(double dt) {
         if (ses_->mode() == RoadSession::Mode::Marathon) ses_->pitControls(0, 0.55, c);   // otopilot da benzinlige girer
         P.manual = false; P.slowClutch = false;
     }
-    applyAdas(c, dt, kL_ || kR_ || std::fabs(tiltF_) > 0.12);
+    applyAdas(c, dt, kL_ || kR_ || std::fabs(tiltF_) > 0.30);   // telefon hic tam duz durmaz: kucuk egim girdi sayilmaz
     ses_->update(dt, c);
     // Teker donusu ve lastik dumani
     spinP_ += std::clamp(P.sim().wheel(0).omega() * dt, -0.55, 0.55);   // gorsel: vagon tekerlegi yanilsamasi olmasin
@@ -1585,12 +1585,13 @@ void RoadScreen::applyAdas(RoadControls& c, double dt, bool steerInput) {
     if (e < -2.5 && c.brake < 0.05) c.brake = std::clamp((-e - 2.5) * 0.08, 0.0, 0.35);   // yokus asagi / yavas arac: hafif fren
     c.throttle = std::max(c.throttle, c.brake > 0.05 ? 0.0 : thr);
     // Serit ortasi: direksiyon girdisi yokken en yakin seridin merkezine
-    if (adasMode_ >= 2 && (!steerInput || adasMode_ == 3)) {
+    // Serit takip: gercek LKA gibi surekli duzeltir; belirgin direksiyon girdisinde (egim) zayiflar, tusla direksiyonda birakir
+    if (adasMode_ >= 2 && (adasMode_ == 3 || !(kL_ || kR_))) {
         const RoadPath& R = ses_->road();
         int best = 0; double bd = 1e9;
         for (int k = 0; k < R.lanesFwd(P.s()); ++k) { const double d = std::fabs(P.lateral() - R.laneOffset(P.s(), false, k)); if (d < bd) { bd = d; best = k; } }
         const double aiSteer = P.aiControls(R.laneOffset(P.s(), false, best), 0.45, target).steer;
-        c.steer = adasMode_ == 3 ? aiSteer : c.steer + 0.6 * (aiSteer - c.steer);
+        c.steer = adasMode_ == 3 ? aiSteer : c.steer + (steerInput ? 0.25 : 0.7) * (aiSteer - c.steer);
     }
 }
 // Yolda yapilan secimler ayarlara da yazilir (sonraki surus ayni modla baslar)
