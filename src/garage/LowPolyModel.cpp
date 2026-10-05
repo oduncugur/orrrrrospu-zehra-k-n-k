@@ -60,17 +60,17 @@ struct Profile {
     double roof(double s) const {
         if (!cabin(s)) return belt(s);
         const double b = belt(s);
-        if (s < a.roofFX) {                                       // on cam: hafif kavisli
+        const double edge = 0.988;                                // tavan on / arka kenari (kubbe ortada 1.0)
+        if (s < a.roofFX) {                                       // on cam: hafif kavis, tavan kenarinda biter (tavani asmaz)
             const double t = (s - a.cowlX) / std::max(a.roofFX - a.cowlX, 1e-3);
-            return b + (1.0 - b) * std::sin(t * kPi * 0.5);
+            return b + (edge - b) * (0.65 * t + 0.35 * std::sin(t * kPi * 0.5));
         }
-        if (s <= a.roofRX) {                                      // tavan: ortada hafif kubbe
+        if (s <= a.roofRX) {                                      // tavan: ortada cok hafif kubbe (balon olmasin)
             const double t = (s - a.roofFX) / std::max(a.roofRX - a.roofFX, 1e-3);
-            return 1.0 - 0.025 * std::pow(2.0 * t - 1.0, 2);
+            return 1.0 - (1.0 - edge) * std::pow(2.0 * t - 1.0, 2);
         }
         const double t = (s - a.roofRX) / std::max(a.backX - a.roofRX, 1e-3);   // arka cam (fastback disbukey)
-        const double top = 0.975;
-        return b + (top - b) * (1.0 - smooth(t) * 0.35 - t * 0.65);
+        return b + (edge - b) * (1.0 - smooth(t) * 0.35 - t * 0.65);
     }
     // Cam / panel egimi (tavan yuksekligi degisimi); on ve arka camlarda buyuk
     bool steep(double s0, double s1, double L, double H) const {
