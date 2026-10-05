@@ -265,6 +265,15 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             const double top = cab ? zR : zU;
             for (int k = 0; k < 4; ++k) { pts[8 + k][0] = hw * ww[k]; pts[8 + k][1] = top + zz[k] * H * (cab ? 0.3 : 1.0); }
         }
+        {   // camurluk kabarigi: teker ustunde govde kenari teker tepesinin altinda kalmasin (alcak burunlu araclarda
+            // teker kaputtan fiskiriyordu). Yalniz dis kenar noktalari (y > %55) yukselir; kaput ortasi alcak kalir.
+            const double gF = (s - sFront) / 0.075, gR = (s - sRear) / 0.075;
+            const double need = 2.0 * r + 0.07, w = std::max(std::exp(-gF * gF), std::exp(-gR * gR));
+            const double zNeed = need * std::min(1.0, w * 1.6);
+            if (w > 0.05)
+                for (int i = 4; i < RH; ++i)
+                    if (pts[i][0] >= hw * 0.55 && pts[i][1] < zNeed) pts[i][1] = std::max(pts[i][1], zNeed - (i == 4 ? 0.10 : 0.0));
+        }
         std::array<int, R> ring;
         for (int i = 0; i < RH; ++i) ring[i] = B.v(x, pts[i][0], pts[i][1]);
         for (int i = 0; i < RH; ++i) ring[R - 1 - i] = B.v(x, -pts[i][0], pts[i][1]);
