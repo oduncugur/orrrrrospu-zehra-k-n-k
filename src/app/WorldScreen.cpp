@@ -31,6 +31,24 @@ void triP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, Color col) {
 void quadP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, const Proj& d, Color col) {
     if (a.ok && b.ok && c.ok && d.ok) { triP(r, a, b, c, col); triP(r, a, c, d, col); }
 }
+struct Parked { double x, y, h; int carId; };
+// Park etmis araclar: sokaklarin iki yaninda (13 m aralik, %40 dolu); her karede ayni (belirlenimci)
+void parkedOn(const World& w, int e, std::vector<Parked>& out) {
+    const WorldEdge& E = w.edges[e];
+    if (E.highway || E.bridge || E.city < 0) return;
+    static std::vector<int> legal;
+    if (legal.empty()) for (const VehicleDef& d : vehicleCatalog()) if (d.streetLegal) legal.push_back(d.id);
+    const RoadPath& p = E.fwd();
+    for (int side = 0; side < 2; ++side)
+        for (int k = 0; 18.0 + k * 13.0 < p.length() - 18.0; ++k) {
+            unsigned hsh = (unsigned)(e * 7919 + k * 31 + side * 17) * 2654435761u; hsh ^= hsh >> 15;
+            if ((hsh & 0xFF) < 150) continue;
+            const double s = 18.0 + k * 13.0;
+            const RoadPoint q = p.at(s);
+            const double lat = side ? (q.hw + 1.1) : -(q.hw + 1.1);
+            out.push_back({q.x - lat * std::sin(q.heading), q.y + lat * std::cos(q.heading), q.heading + (side ? 3.14159265 : 0.0), legal[(hsh >> 8) % legal.size()]});
+        }
+}
 float hashW(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 constexpr double kTau = 6.283185307179586;
 } // namespace
@@ -93,6 +111,14 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     app.setVoice(1, nullptr);
     // Baslangic: donus noktasi ya da bulunulan sehrin bati girisi (otoban caddesi, doguya)
     double x, y, h;
+    if (const char* lm = std::getenv("ZK_WORLD_LM")) {                   // test: n. simge yapiya bakan yolda baslar
+        const WorldLandmark& l = M.w.landmarks[std::clamp(std::atoi(lm), 0, (int)M.w.landmarks.size() - 1)];
+        const double back = 120.0 + l.h * 1.2;
+        WorldLeg lg; double s0, la;
+        x = l.x - back * std::cos(l.heading + 0.5); y = l.y - back * std::sin(l.heading + 0.5);
+        if (M.w.nearestLeg(x, y, 0.0, lg, s0, la, 400.0)) { const RoadPoint q = M.w.path(lg).at(s0); x = q.x; y = q.y; }
+        h = std::atan2(l.y - y, l.x - x);
+    } else
     if (app.worldValid) { x = app.worldX; y = app.worldY; h = app.worldH; }
     else {
         const WorldCity& c = M.w.cities[std::clamp(app.career.city, 0, (int)M.w.cities.size() - 1)];
@@ -230,6 +256,27 @@ void WorldScreen::update(double dt) {
         double rel = 0;
         RoadSession::contact(P, b.cx, b.cy, std::atan2(b.uy, b.ux), 0.0, 1e7, b.hu, b.hv, rel);
         if (rel > 2.0) { M.shakeT = std::min(0.5, rel * 0.04); app.haptic(150, 220); if (rel > 6.0) M.flash("BINAYA CARPTIN!", 1.0); }
+    }
+    {   // Park etmis araclar ve simge yapilar: carpisma
+        std::vector<Parked> pk;
+        for (int e = 0; e < (int)M.w.edges.size(); ++e) {
+            const WorldEdge& E = M.w.edges[e];
+            if (sim.posX() < E.minX - 15 || sim.posX() > E.maxX + 15 || sim.posY() < E.minY - 15 || sim.posY() > E.maxY + 15) continue;
+            parkedOn(M.w, e, pk);
+        }
+        for (const Parked& q : pk) {
+            if (std::fabs(q.x - sim.posX()) > 8 || std::fabs(q.y - sim.posY()) > 8) continue;
+            double rel = 0;
+            RoadSession::contact(P, q.x, q.y, q.h, 0.0, 1300.0, 2.2, 0.9, rel);
+            if (rel > 2.0) { M.shakeT = 0.35; app.haptic(160, 230); if (rel > 5.0) M.flash("PARK ETMIS ARACA CARPTIN", 1.0); }
+        }
+        for (const WorldLandmark& l : M.w.landmarks) {
+            if (l.type == LmBalloon || l.type == LmMountain) continue;
+            if (std::fabs(l.x - sim.posX()) > l.r + 8 || std::fabs(l.y - sim.posY()) > l.r + 8) continue;
+            double rel = 0;
+            RoadSession::contact(P, l.x, l.y, l.heading, 0.0, 1e7, l.r * 0.85, l.r * 0.85, rel);
+            if (rel > 2.0) { M.shakeT = 0.4; app.haptic(160, 230); }
+        }
     }
     // Sehir sinirlari
     const int cNow = M.w.cityAt(sim.posX(), sim.posY());
@@ -448,6 +495,33 @@ void WorldScreen::render(Renderer& r) {
         items.push_back({d, 0, i});
     }
     for (int i = 0; i < (int)w.pois.size(); ++i) if (front(w.pois[i].x, w.pois[i].y, 800.0)) items.push_back({std::hypot(w.pois[i].x - ex, w.pois[i].y - ey), 1, i});
+    for (int i = 0; i < (int)w.landmarks.size(); ++i) {
+        const WorldLandmark& l = w.landmarks[i];
+        const double d = std::hypot(l.x - ex, l.y - ey);
+        if (d < (l.type == LmMountain ? 25000.0 : 9000.0) && (l.type == LmMountain || front(l.x, l.y, 9000.0))) items.push_back({d, 2, i});
+    }
+    // Yayalar: sokak kaldirimlarinda yuruyen insanlar (belirlenimci, zamana gore), yakinda
+    struct Ped { double x, y; float col; };
+    std::vector<Ped> peds;
+    for (int e = 0; e < (int)w.edges.size(); ++e) {
+        const WorldEdge& E = w.edges[e];
+        if (E.highway || E.bridge || E.city < 0) continue;
+        if (ex < E.minX - 170 || ex > E.maxX + 170 || ey < E.minY - 170 || ey > E.maxY + 170) continue;
+        const RoadPath& p = E.fwd();
+        for (int k = 0; k < 4; ++k) {
+            const float hh = hashW(e * 13 + k * 7);
+            const double dir = (k & 1) ? 1.0 : -1.0, L = p.length();
+            const double s = std::fmod(hh * L + dir * M.envT * (1.0 + 0.6 * hashW(e + k)) + 100.0 * L, L);
+            const RoadPoint q = p.at(s);
+            double lat = (k & 1 ? 1.0 : -1.0) * (q.hw + 2.6);
+            const double qx = q.x - lat * std::sin(q.heading), qy = q.y + lat * std::cos(q.heading);
+            if (std::hypot(qx - X, qy - Y) < 4.0) lat += (lat > 0 ? 2.5 : -2.5);   // arac yaklasinca kenara kacar
+            const double fx2 = q.x - lat * std::sin(q.heading), fy2 = q.y + lat * std::cos(q.heading);
+            if (!front(fx2, fy2, 170.0)) continue;
+            peds.push_back({fx2, fy2, hashW(e * 5 + k * 3)});
+        }
+    }
+    for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
     std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.d > b.d; });
     std::vector<std::pair<int, Mat4>> parked;                             // bulusma meydani araclari
     std::vector<Renderer::CarLook> parkedLook;
@@ -473,6 +547,119 @@ void WorldScreen::render(Renderer& r) {
                     }
             }
             quadP(r, P3(cx[0], cy[0], b.h), P3(cx[1], cy[1], b.h), P3(cx[2], cy[2], b.h), P3(cx[3], cy[3], b.h), fog({base.r * 0.7f, base.g * 0.7f, base.b * 0.7f}, (float)it.d));
+        } else if (it.kind == 3) {                                        // yaya: bacak + govde + kol + bas
+            const Ped& pd = peds[it.idx];
+            const Proj f0 = P3(pd.x, pd.y, 0.0), f1 = P3(pd.x, pd.y, 1.75);
+            if (!f0.ok || !f1.ok) continue;
+            r.setDepthW(f0.w);
+            const float sc = pxPerM / f0.w, hgt = f0.y - f1.y, wdt = std::max(1.0f, 0.42f * sc);
+            const float step = std::sin((float)M.envT * 7.0f + pd.col * 20.0f) * 0.12f * sc;
+            static const Color shirt[6] = {{0.85f, 0.2f, 0.2f}, {0.2f, 0.4f, 0.85f}, {0.95f, 0.85f, 0.3f}, {0.25f, 0.6f, 0.3f}, {0.9f, 0.9f, 0.9f}, {0.3f, 0.3f, 0.35f}};
+            const Color sh = fog(shirt[(int)(pd.col * 6) % 6], f0.w);
+            r.rect(f0.x - wdt * 0.45f + step, f0.y - hgt * 0.47f, f0.x - wdt * 0.05f + step, f0.y, fog({0.18f, 0.2f, 0.3f}, f0.w));   // bacaklar
+            r.rect(f0.x + wdt * 0.05f - step, f0.y - hgt * 0.47f, f0.x + wdt * 0.45f - step, f0.y, fog({0.18f, 0.2f, 0.3f}, f0.w));
+            r.rect(f0.x - wdt * 0.5f, f0.y - hgt * 0.84f, f0.x + wdt * 0.5f, f0.y - hgt * 0.45f, sh);                                 // govde
+            r.circle(f0.x, f0.y - hgt * 0.92f, std::max(1.0f, hgt * 0.09f), 8, fog({0.85f, 0.68f, 0.52f}, f0.w));                     // bas
+        } else if (it.kind == 2) {                                        // simge yapi
+            const WorldLandmark& l = w.landmarks[it.idx];
+            const double ux = std::cos(l.heading), uy = std::sin(l.heading);
+            // Prizma (silindir yaklasimi): kameraya bakan yuzler + ust kapak
+            auto prism = [&](double x, double y, double rr, double z0, double z1, int sides, Color col) {
+                for (int k = 0; k < sides; ++k) {
+                    const double a0 = kTau * k / sides, a1 = kTau * (k + 1) / sides, am = 0.5 * (a0 + a1);
+                    const double nx = std::cos(am), ny = std::sin(am);
+                    if (nx * (ex - (x + nx * rr)) + ny * (ey - (y + ny * rr)) <= 0) continue;
+                    const float sh = 0.75f + 0.25f * (float)std::fabs(std::cos(am - 0.6));
+                    quadP(r, P3(x + rr * std::cos(a0), y + rr * std::sin(a0), z0), P3(x + rr * std::cos(a1), y + rr * std::sin(a1), z0),
+                          P3(x + rr * std::cos(a1), y + rr * std::sin(a1), z1), P3(x + rr * std::cos(a0), y + rr * std::sin(a0), z1),
+                          fog({col.r * sh, col.g * sh, col.b * sh}, (float)it.d));
+                }
+                if (z1 < ez) return;
+                const Proj c0 = P3(x, y, z1);
+                for (int k = 0; k < sides; ++k) {
+                    const Proj a = P3(x + rr * std::cos(kTau * k / sides), y + rr * std::sin(kTau * k / sides), z1), b2 = P3(x + rr * std::cos(kTau * (k + 1) / sides), y + rr * std::sin(kTau * (k + 1) / sides), z1);
+                    if (a.ok && b2.ok && c0.ok) triP(r, c0, a, b2, fog({col.r * 0.9f, col.g * 0.9f, col.b * 0.9f}, (float)it.d));
+                }
+            };
+            auto cone = [&](double x, double y, double rr, double z0, double z1, int sides, Color col) {
+                const Proj apex = P3(x, y, z1);
+                for (int k = 0; k < sides; ++k) {
+                    const double a0 = kTau * k / sides, a1 = kTau * (k + 1) / sides, am = 0.5 * (a0 + a1);
+                    if (std::cos(am) * (ex - x) + std::sin(am) * (ey - y) <= 0) continue;
+                    const float sh = 0.7f + 0.3f * (float)std::fabs(std::cos(am - 0.6));
+                    const Proj a = P3(x + rr * std::cos(a0), y + rr * std::sin(a0), z0), b2 = P3(x + rr * std::cos(a1), y + rr * std::sin(a1), z0);
+                    if (a.ok && b2.ok && apex.ok) triP(r, a, b2, apex, fog({col.r * sh, col.g * sh, col.b * sh}, (float)it.d));
+                }
+            };
+            auto box = [&](double cxb, double cyb, double hu, double hv, double z0, double z1, Color col) {
+                const double vx = -uy, vy = ux;
+                double bx[4], by[4]; const int sg[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+                for (int k = 0; k < 4; ++k) { bx[k] = cxb + sg[k][0] * hu * ux + sg[k][1] * hv * vx; by[k] = cyb + sg[k][0] * hu * uy + sg[k][1] * hv * vy; }
+                for (int k = 0; k < 4; ++k) {
+                    const int k2 = (k + 1) % 4;
+                    const double mx = 0.5 * (bx[k] + bx[k2]) - cxb, my = 0.5 * (by[k] + by[k2]) - cyb;
+                    if (mx * (ex - (cxb + mx)) + my * (ey - (cyb + my)) <= 0) continue;
+                    const float sh = (k % 2) ? 0.82f : 0.95f;
+                    quadP(r, P3(bx[k], by[k], z0), P3(bx[k2], by[k2], z0), P3(bx[k2], by[k2], z1), P3(bx[k], by[k], z1), fog({col.r * sh, col.g * sh, col.b * sh}, (float)it.d));
+                }
+                quadP(r, P3(bx[0], by[0], z1), P3(bx[1], by[1], z1), P3(bx[2], by[2], z1), P3(bx[3], by[3], z1), fog({col.r * 0.75f, col.g * 0.75f, col.b * 0.75f}, (float)it.d));
+            };
+            auto dome = [&](double x, double y, double rr, double zb, Color col) {
+                for (int k = 0; k < 5; ++k) {
+                    const double a0 = 1.5708 * k / 5, a1 = 1.5708 * (k + 1) / 5;
+                    prism(x, y, rr * std::cos(a0), zb + rr * std::sin(a0), zb + rr * std::sin(a1), 12, col);
+                }
+            };
+            const Color stone{0.82f, 0.78f, 0.68f}, dark{0.32f, 0.32f, 0.36f};
+            const double x = l.x, y = l.y;
+            switch (l.type) {
+            case LmTower: prism(x, y, l.r, 0, l.h * 0.72, 12, stone); prism(x, y, l.r * 1.15, l.h * 0.72, l.h * 0.78, 12, {0.55f, 0.5f, 0.45f}); cone(x, y, l.r, l.h * 0.78, l.h, 12, dark); break;
+            case LmMaidenTower: prism(x, y, 16, -0.5, 2.5, 10, {0.5f, 0.48f, 0.44f}); box(x + 4, y, 7, 5, 2.5, 10, {0.92f, 0.9f, 0.85f});
+                                prism(x - 3, y, 4, 2.5, l.h * 0.8, 8, {0.95f, 0.93f, 0.88f}); cone(x - 3, y, 4.6, l.h * 0.8, l.h, 8, dark); break;
+            case LmPylon: box(x, y, 2.5, 4.5, 0, l.h, {0.75f, 0.75f, 0.78f}); box(x, y, 2.5, 4.5, l.h * 0.55, l.h * 0.6, {0.6f, 0.6f, 0.65f}); break;
+            case LmMausoleum:
+                box(x, y, l.r, l.r * 0.65, 0, 6, stone);
+                for (int k = -5; k <= 5; ++k) for (double sv : {-1.0, 1.0}) prism(x + ux * k * l.r * 0.15 - uy * sv * l.r * 0.32, y + uy * k * l.r * 0.15 + ux * sv * l.r * 0.32, 1.2, 6, 18, 6, {0.93f, 0.9f, 0.82f});
+                box(x, y, l.r * 0.85, l.r * 0.38, 18, l.h, stone); break;
+            case LmTvTower: prism(x, y, 5, 0, l.h * 0.84, 10, {0.9f, 0.9f, 0.88f}); prism(x, y, 15, l.h * 0.84, l.h * 0.92, 14, {0.35f, 0.5f, 0.6f}); prism(x, y, 1, l.h * 0.92, l.h, 6, {0.8f, 0.2f, 0.2f}); break;
+            case LmGreenDome: box(x, y, l.r, l.r, 0, 11, stone); prism(x, y, 8, 11, 15, 16, {0.2f, 0.65f, 0.55f}); cone(x, y, 8.5, 15, l.h, 16, {0.15f, 0.7f, 0.6f}); break;
+            case LmMosque: {
+                box(x, y, l.r * 0.5, l.r * 0.5, 0, l.h * 0.45, {0.9f, 0.88f, 0.82f});
+                dome(x, y, l.r * 0.42, l.h * 0.45, {0.5f, 0.55f, 0.6f});
+                for (double su2 : {-1.0, 1.0}) for (double sv2 : {-1.0, 1.0}) {
+                    const double mx = x + ux * su2 * l.r * 0.55 - uy * sv2 * l.r * 0.55, my = y + uy * su2 * l.r * 0.55 + ux * sv2 * l.r * 0.55;
+                    prism(mx, my, 1.8, 0, l.h * 1.4, 8, {0.95f, 0.94f, 0.9f}); cone(mx, my, 2.0, l.h * 1.4, l.h * 1.6, 8, {0.45f, 0.5f, 0.55f});
+                }
+                break;
+            }
+            case LmMountain: cone(x, y, l.r, 0, l.h, 28, {0.32f, 0.42f, 0.30f}); cone(x, y, l.r * 0.22, l.h * 0.78, l.h, 28, {0.95f, 0.95f, 0.97f}); break;
+            case LmFairy: cone(x, y, l.r, 0, l.h, 10, {0.86f, 0.74f, 0.58f}); cone(x, y, l.r * 0.32, l.h * 0.92, l.h * 1.12, 8, {0.45f, 0.38f, 0.32f}); break;
+            case LmBalloon: {
+                const double bz = l.h + 8.0 * std::sin(M.envT * 0.3 + l.x * 0.01);
+                const Proj b0 = P3(x, y, bz), bk = P3(x, y, bz - 14.0);
+                if (b0.ok) {
+                    r.setDepthW(b0.w);
+                    const float rr = (float)(9.0 * pxPerM / b0.w);
+                    static const Color bc[4] = {{0.9f, 0.25f, 0.2f}, {0.95f, 0.75f, 0.15f}, {0.25f, 0.45f, 0.85f}, {0.3f, 0.7f, 0.35f}};
+                    const Color c0 = fog(bc[(int)(hashW((int)l.x) * 4) % 4], b0.w);
+                    r.circle(b0.x, b0.y, rr, 16, c0);
+                    r.circle(b0.x - rr * 0.25f, b0.y - rr * 0.3f, rr * 0.45f, 12, {std::min(1.0f, c0.r + 0.15f), std::min(1.0f, c0.g + 0.15f), std::min(1.0f, c0.b + 0.15f)});
+                    if (bk.ok) r.rect(bk.x - rr * 0.18f, bk.y - rr * 0.15f, bk.x + rr * 0.18f, bk.y + rr * 0.15f, fog({0.45f, 0.3f, 0.15f}, b0.w));
+                }
+                break;
+            }
+            case LmClock: box(x, y, l.r, l.r, 0, l.h * 0.85, {0.85f, 0.8f, 0.7f}); cone(x, y, l.r * 1.3, l.h * 0.85, l.h, 4, {0.5f, 0.25f, 0.2f}); break;
+            case LmCastle: box(x, y, l.r, l.r * 0.7, 0, l.h * 0.7, {0.62f, 0.55f, 0.45f});
+                           for (double su2 : {-1.0, 1.0}) for (double sv2 : {-1.0, 1.0}) prism(x + ux * su2 * l.r - uy * sv2 * l.r * 0.7, y + uy * su2 * l.r + ux * sv2 * l.r * 0.7, 5, 0, l.h, 8, {0.58f, 0.5f, 0.42f}); break;
+            case LmSkyscraper: box(x, y, l.r, l.r, 0, l.h, {0.35f, 0.5f, 0.65f}); box(x, y, l.r * 0.6, l.r * 0.6, l.h, l.h + 12, {0.75f, 0.75f, 0.8f}); break;
+            case LmMinaret: prism(x, y, l.r, 0, l.h * 0.84, 12, {0.72f, 0.42f, 0.32f}); prism(x, y, l.r * 1.3, l.h * 0.84, l.h * 0.88, 12, {0.7f, 0.65f, 0.6f}); cone(x, y, l.r * 0.8, l.h * 0.88, l.h, 12, {0.35f, 0.38f, 0.42f}); break;
+            case LmGate: for (int k = -2; k <= 2; k += 1) if (k % 2 == 0 || true) box(x + ux * k * l.r * 0.42, y + uy * k * l.r * 0.42, 2.0, 3.0, 0, l.h * 0.75, {0.85f, 0.78f, 0.62f});
+                         box(x, y, l.r, 3.2, l.h * 0.75, l.h, {0.82f, 0.75f, 0.6f}); break;
+            }
+            if (it.d < 600.0 && l.type != LmFairy && l.type != LmBalloon) {   // ad
+                const Proj t0 = P3(x, y, l.h + 6.0);
+                if (t0.ok) { r.setDepthW(t0.w); r.textCentered(t0.x, t0.y - 8, l.name, 1, {1.0f, 0.95f, 0.75f}); }
+            }
         } else {
             const WorldPoi& q = w.pois[it.idx];
             const Proj b0 = P3(q.x, q.y, 0.0);
@@ -540,6 +727,18 @@ void WorldScreen::render(Renderer& r) {
         const double x = q.x - lo * std::sin(q.heading), y = q.y + lo * std::cos(q.heading);
         if (!front(x, y, 700.0)) continue;
         objs.push_back({std::hypot(x - ex, y - ey), t.carId, matMul(matTranslate((float)x, 0.0f, (float)-y), matRotY((float)q.heading)), t.role, (float)(M.envT * t.v / 0.31)});
+    }
+    {   // park etmis araclar (yakindakiler)
+        std::vector<Parked> pk;
+        for (int e = 0; e < (int)w.edges.size(); ++e) {
+            const WorldEdge& E = w.edges[e];
+            if (ex < E.minX - 220 || ex > E.maxX + 220 || ey < E.minY - 220 || ey > E.maxY + 220) continue;
+            parkedOn(w, e, pk);
+        }
+        for (const Parked& q : pk) {
+            if (!front(q.x, q.y, 220.0)) continue;
+            objs.push_back({std::hypot(q.x - ex, q.y - ey), q.carId, matMul(matTranslate((float)q.x, 0.0f, (float)-q.y), matRotY((float)q.h)), 0, 0.0f});
+        }
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& b) { return a.d > b.d; });
     for (size_t k = 0; k < parked.size(); ++k) { r.setCarLook(parkedLook[k]); r.drawCar(parked[k].first, 0, 0, W, H, proj, view, parked[k].second); }
@@ -634,6 +833,14 @@ void WorldScreen::render(Renderer& r) {
         static const Color pc[4] = {{1.0f, 0.5f, 0.1f}, {0.9f, 0.3f, 0.7f}, {0.6f, 0.45f, 0.25f}, {0.9f, 0.2f, 0.15f}};
         for (const WorldPoi& q : w.pois) { float sx, sy; S(q.x, q.y, sx, sy); r.circle(sx, sy, 4.0f, 10, pc[q.type]); }
         for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.textCentered(sx, sy - (float)(c.hv / M.mapScale) - 14, c.name, 1, {1, 1, 1}); }
+        if (M.mapScale < 25.0)
+            for (const WorldLandmark& l : w.landmarks) {
+                if (l.type == LmFairy || l.type == LmBalloon || l.type == LmPylon) continue;
+                float sx, sy; S(l.x, l.y, sx, sy);
+                if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
+                r.rect(sx - 3, sy - 3, sx + 3, sy + 3, {1.0f, 0.9f, 0.5f});
+                r.textCentered(sx, sy + 5, l.name, 1, {1.0f, 0.9f, 0.6f});
+            }
         if (M.hasWp) { float sx, sy; S(M.wpX, M.wpY, sx, sy); r.circle(sx, sy, 7, 14, {0.2f, 0.8f, 1.0f}); r.circle(sx, sy, 3, 10, {1, 1, 1}); }
         {   float sx, sy; S(X, Y, sx, sy);
             const float h = (float)sim.heading(), c2 = std::cos(h), s2 = -std::sin(h);

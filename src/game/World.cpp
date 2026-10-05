@@ -263,6 +263,49 @@ void World::build() {
             pois.push_back({WPoiRace, q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), q.heading, c, i, ev[i].name});
         }
     }
+    // Simge yapilar (sehir yerel normal koordinatlarinda: 4 x 4 km kutuda, sehrin boyuna olceklenir)
+    for (int c = 0; c < nC; ++c) {
+        const WorldCity& C = cities[c];
+        const double px = -C.dirY, py = C.dirX, su = C.hu / 2000.0, sv = C.hv / 2000.0;
+        auto add = [&](int type, double u, double v, double r, double h, const char* name) {
+            u *= su; v *= sv;
+            landmarks.push_back({type, C.x + u * C.dirX + v * px, C.y + u * C.dirY + v * py, r, h, std::atan2(C.dirY, C.dirX), c, name});
+        };
+        switch (C.style) {
+        case 0: {
+            add(LmTower, -380, 620, 9, 67, "GALATA KULESI");
+            const double vb = -1050, ub = 220.0 * std::sin(vb / 620.0 + 0.6) + 90.0 * std::sin(vb / 230.0);
+            add(LmMaidenTower, ub, vb, 8, 27, "KIZ KULESI");
+            for (double sgn : {-1.0, 1.0}) {                                // otoban koprusu kuleleri (Bogaz iki kiyisi)
+                const double v0 = 60.0 * std::sin(0.0 + c) / sv, uc = 220.0 * std::sin(v0 / 620.0 + 0.6) + 90.0 * std::sin(v0 / 230.0);
+                add(LmPylon, uc + sgn * 140.0, 0.0 + 30.0 / sv, 3, 165, "BOGAZ KOPRUSU");
+                add(LmPylon, uc + sgn * 140.0, 0.0 - 30.0 / sv, 3, 165, "BOGAZ KOPRUSU");
+            }
+            add(LmMosque, -900, -500, 45, 40, "CAMI");
+            break;
+        }
+        case 1: add(LmClock, 100, 300, 5, 24, "SAAT KULESI"); break;
+        case 2: add(LmMosque, 0, 250, 50, 38, "ULU CAMI"); add(LmMountain, 0, -3600, 3800, 1700, "ULUDAG"); break;
+        case 3: add(LmClock, -200, 420, 5, 26, "SAAT KULESI"); break;
+        case 4: add(LmMausoleum, -700, 350, 70, 24, "ANITKABIR"); add(LmTvTower, 450, -650, 9, 125, "ATAKULE"); break;
+        case 5: add(LmGreenDome, 380, 160, 22, 30, "MEVLANA"); break;
+        case 6:
+            for (int k = 0; k < 140; ++k) {                                  // peri bacalari: yesil vadilerde
+                const double u = -1800 + 3600 * hashW(k * 7 + 3), v = -1300 + 2600 * hashW(k * 11 + 5);
+                if (std::sin(u / 330.0) * std::sin(v / 290.0) <= 0.55 && std::hypot(u / 1800.0, v / 1300.0) < 1.0) continue;
+                add(LmFairy, u, v, 6 + 6 * hashW(k * 13), 14 + 16 * hashW(k * 17), "PERI BACASI");
+            }
+            for (int k = 0; k < 12; ++k) add(LmBalloon, -1500 + 3000 * hashW(k * 23), -1100 + 2200 * hashW(k * 29), 9, 120 + 260 * hashW(k * 31), "BALON");
+            break;
+        case 7: add(LmCastle, 150, 250, 40, 22, "NIGDE KALESI"); break;
+        case 8: add(LmSkyscraper, -200, 100, 22, 175, "METROPOL KULESI"); break;
+        default: add(LmMinaret, -300, -150, 4, 38, "YIVLI MINARE"); add(LmGate, 200, 0, 20, 12, "HADRIAN KAPISI"); break;
+        }
+    }
+    // Simge yapilarin uzerindeki binalar kaldirilir
+    buildings.erase(std::remove_if(buildings.begin(), buildings.end(), [&](const WorldBuilding& b) {
+        for (const WorldLandmark& l : landmarks) if (l.type != LmMountain && l.type != LmBalloon && std::hypot(b.cx - l.x, b.cy - l.y) < l.r + 30.0) return true;
+        return false; }), buildings.end());
     // Ozel parsellerin uzerindeki binalar kaldirilir (benzinlik / bulusma / hurdalik / yaris tabelasi)
     buildings.erase(std::remove_if(buildings.begin(), buildings.end(), [&](const WorldBuilding& b) {
         for (const WorldPoi& q : pois) if (std::hypot(b.cx - q.x, b.cy - q.y) < (q.type == WPoiRace ? 14.0 : 48.0)) return true;

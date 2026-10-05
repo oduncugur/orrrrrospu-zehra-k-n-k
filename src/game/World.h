@@ -16,6 +16,10 @@ struct WorldBuilding { double cx, cy, hu, hv, ux, uy, h; int city; float tone; }
 enum WorldPoiType { WPoiRace = 0, WPoiMeet = 1, WPoiJunk = 2, WPoiGas = 3 };
 struct WorldPoi { int type; double x, y, heading; int city; int ref; std::string name; };
 struct WorldNode { double x, y; std::vector<int> edges; };
+// Simge yapilar: tip (cizim), konum, olcu, ad. Carpisma: yaricap r (silindir).
+enum LandmarkType { LmTower = 0, LmMaidenTower, LmPylon, LmMausoleum, LmTvTower, LmGreenDome, LmMosque, LmMountain, LmFairy, LmBalloon,
+                    LmClock, LmCastle, LmSkyscraper, LmMinaret, LmGate };
+struct WorldLandmark { int type; double x, y, r, h, heading; int city; std::string name; };
 // Yol (kenar): kose noktalari tutulur; surus hatti (RoadPath) ilk kullanimda uretilir (4x4 km sehirlerde bellek)
 struct WorldEdge {
     std::vector<std::pair<double, double>> pts;
@@ -38,6 +42,7 @@ public:
     std::vector<WorldEdge> edges;
     std::vector<WorldBuilding> buildings;
     std::vector<WorldPoi> pois;
+    std::vector<WorldLandmark> landmarks;
     double minX = 0, minY = 0, maxX = 0, maxY = 0;
     static constexpr double kBlock = 333.0;   // baslangic konumu icin ornek blok
     // Sehir yari boylari (m): gercek olcege yakin (Istanbul 10 x 7 km ... Nigde 3 x 2.5 km)
