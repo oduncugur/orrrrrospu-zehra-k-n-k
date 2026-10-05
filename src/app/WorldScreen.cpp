@@ -243,10 +243,15 @@ void WorldScreen::update(double dt) {
         M.traffic.erase(std::remove_if(M.traffic.begin(), M.traffic.end(), [&](const Impl::T& t) {
             const RoadPoint q = M.w.path(t.leg).at(t.s); return std::hypot(q.x - px, q.y - py) > 750.0; }), M.traffic.end());
         int guard = 0;
-        while (M.traffic.size() < 24 && guard++ < 40) {
-            const int e = (int)(M.rnd() * M.w.edges.size());
+        std::vector<int> nearE;                                          // yakindaki yollar (dogma adaylari)
+        if (M.traffic.size() < 24)
+            for (int e = 0; e < (int)M.w.edges.size(); ++e) {
+                const WorldEdge& E = M.w.edges[e];
+                if (!(px < E.minX - 650 || px > E.maxX + 650 || py < E.minY - 650 || py > E.maxY + 650)) nearE.push_back(e);
+            }
+        while (!nearE.empty() && M.traffic.size() < 24 && guard++ < 40) {
+            const int e = nearE[(size_t)(M.rnd() * nearE.size()) % nearE.size()];
             const WorldEdge& E = M.w.edges[e];
-            if (px < E.minX - 650 || px > E.maxX + 650 || py < E.minY - 650 || py > E.maxY + 650) continue;
             Impl::T t{};
             t.leg = {e, M.rnd() < 0.5}; const RoadPath& tp = M.w.path(t.leg);
             t.s = M.rnd() * tp.length();
@@ -365,10 +370,13 @@ void WorldScreen::render(Renderer& r) {
     // Sehir zeminleri (kaldirim / beton): 20 m karolar (yakindaki buyuk karo kameranin arkasina tasip atlaniyordu)
     for (const WorldCity& c : w.cities) {
         if (std::hypot(c.x - ex, c.y - ey) > 2400.0) continue;              // merkez arkada kalsa da sehrin bir kismi onde olabilir
-        const double R = World::kBlock * 2.0 + 40.0, px = -c.dirY, py = c.dirX;
+        const double R = World::kBlock * (World::kGrid - 1) * 0.5 + 40.0, px = -c.dirY, py = c.dirX;
         const int N = (int)(2 * R / 20.0);
-        for (int i = 0; i < N; ++i)
-            for (int j = 0; j < N; ++j) {
+        const double cu = (ex - c.x) * c.dirX + (ey - c.y) * c.dirY, cv = (ex - c.x) * px + (ey - c.y) * py;   // kamera yerel
+        const int i0 = std::max(0, (int)((cu - 650.0 + R) / 20.0)), i1 = std::min(N, (int)((cu + 650.0 + R) / 20.0) + 1);
+        const int j0 = std::max(0, (int)((cv - 650.0 + R) / 20.0)), j1 = std::min(N, (int)((cv + 650.0 + R) / 20.0) + 1);
+        for (int i = i0; i < i1; ++i)
+            for (int j = j0; j < j1; ++j) {
                 const double u0 = -R + 2 * R * i / N, u1 = -R + 2 * R * (i + 1) / N, v0 = -R + 2 * R * j / N, v1 = -R + 2 * R * (j + 1) / N;
                 const double mu = 0.5 * (u0 + u1), mv = 0.5 * (v0 + v1);
                 if (!front(c.x + mu * c.dirX + mv * px, c.y + mu * c.dirY + mv * py, 650.0)) continue;
@@ -387,7 +395,7 @@ void WorldScreen::render(Renderer& r) {
     // Yollar: gorus mesafesindeki kenarlar; asfalt + serit cizgileri
     for (const WorldEdge& E : w.edges) {
         if (ex < E.minX - 900 || ex > E.maxX + 900 || ey < E.minY - 900 || ey > E.maxY + 900) continue;
-        const auto& pts = E.fwd.points();
+        const auto& pts = E.fwd().points();
         const int step = E.highway ? 2 : 1;
         for (size_t i = 0; i + step < pts.size(); i += step) {
             const RoadPoint &a = pts[i], &b = pts[i + step];
@@ -587,7 +595,7 @@ void WorldScreen::render(Renderer& r) {
         };
         for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.circle(sx, sy, (float)(c.r / M.mapScale), 20, {0.18f, 0.2f, 0.22f}); }
         for (const WorldEdge& E : w.edges) {
-            const auto& pts = E.fwd.points();
+            const auto& pts = E.fwd().points();
             const int st = std::max(1, (int)(M.mapScale * 2.0 / RoadPath::kStep));
             for (size_t i = 0; i + st < pts.size(); i += st) seg(pts[i].x, pts[i].y, pts[i + st].x, pts[i + st].y, E.highway ? 1.6f : 0.8f, E.highway ? Color{0.95f, 0.75f, 0.3f} : Color{0.75f, 0.75f, 0.75f});
             seg(pts[pts.size() - 1 - (pts.size() - 1) % st].x, pts[pts.size() - 1 - (pts.size() - 1) % st].y, pts.back().x, pts.back().y, E.highway ? 1.6f : 0.8f, E.highway ? Color{0.95f, 0.75f, 0.3f} : Color{0.75f, 0.75f, 0.75f});
