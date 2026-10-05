@@ -1,5 +1,7 @@
 pluginManagement {
     repositories { google(); mavenCentral(); gradlePluginPortal() }
+    // Yerel derleme: ZK_AGP ile onbellekteki AGP surumu kullanilabilir (CI: build.gradle'daki surum)
+    resolutionStrategy { eachPlugin { if (requested.id.id == 'com.android.application' && System.getenv('ZK_AGP')) useVersion(System.getenv('ZK_AGP')) } }
 }
 dependencyResolutionManagement {
     repositories { google(); mavenCentral() }

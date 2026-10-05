@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.zehrakinik.game'
-    compileSdk 34
+    compileSdk = Integer.parseInt(System.getenv('ZK_COMPILE_SDK') ?: '34')   // yerel: kurulu SDK
     // CI: GitHub runner'daki en guncel NDK (ZK_NDK_VERSION); yerelde AGP varsayilani
     if (System.getenv('ZK_NDK_VERSION')) { ndkVersion System.getenv('ZK_NDK_VERSION') }
 
