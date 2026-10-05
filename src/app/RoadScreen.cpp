@@ -91,7 +91,8 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     }
     static uint32_t runs = 0;                                      // ayni oturumda her surus farkli yol/trafik
     const uint32_t seed = (uint32_t)(app_.career.races + 1 + (m == RoadSession::Mode::Flow ? runs++ : 0)) * 2654435761u;
-    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seed, kind, app_.runPlan.active ? app_.runPlan.realKm : 300.0);
+    const uint32_t seedR = m == RoadSession::Mode::Free ? ((uint32_t)(app_.career.city + 1) << 24) | (seed & 0xFFFFFFu) : seed;   // sehir turu: sehre ozel yol
+    ses_ = std::make_unique<RoadSession>(m, carId_, &tune_, rival, &rt, seedR, kind, app_.runPlan.active ? app_.runPlan.realKm : 300.0);
     if (m == RoadSession::Mode::Marathon) {                              // alan: seyahat plani ya da kariyer seviyesinde 20 arac
         if (app_.runPlan.active) {
             ses_->setRunField(app_.runPlan.field, app_.runPlan.realKm);

@@ -13,7 +13,7 @@ double RoadSession::rnd() { rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_
 RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int rivalCar, const Tune* rivalTune, uint32_t seed, Kind kind, double runRealKm)
     : mode_(mode), kind_(kind),
       road_(mode == Mode::Karma ? RoadPath::karma(seed, 0.04) : mode == Mode::Marathon ? RoadPath::run(seed, runDrivenM(runRealKm) + kRunStartS, 0.07)
-            : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : 0) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,
+            : RoadPath(20250930u + (mode != Mode::Free ? seed % 7 : (seed >> 24) * 1009u) + (kind == Kind::Touge ? 1000u : 0u), 20000.0,   // Free: ust bayt sehir (tur yolu)
                        kind == Kind::Touge ? 28.0 : 90.0, kind == Kind::Touge ? 3.0 : 3.6, kind == Kind::Touge ? 0.09 : 0.05)),
       playerCar_(playerCar), rivalCar_(rivalCar), rng_(seed ? seed : 1u) {
     runLen_ = runDrivenM(runRealKm);
