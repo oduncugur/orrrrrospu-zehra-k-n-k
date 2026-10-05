@@ -18,7 +18,7 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     // Yan profil (z, m): ust yuzey (kaput / cam / tavan / bagaj), bel cizgisi, alt
     // Referans: yandan fotograf (Wikimedia Commons, "BMW M3 Coupe E46", CC BY 2.0) uzerinde olculen oranlar; olcek teker
     // capindan (0.64 m), tavan / kaput orta hatti kamera yuksekligi icin duzeltildi. Kopya degil, oran referansi.
-    static const double kTop[][2] = {{0.0, 0.70}, {0.012, 0.735}, {0.035, 0.765}, {0.08, 0.80}, {0.16, 0.845}, {0.24, 0.885}, {0.283, 0.905},
+    static const double kTop[][2] = {{0.0, 0.66}, {0.012, 0.70}, {0.035, 0.745}, {0.08, 0.79}, {0.16, 0.845}, {0.24, 0.885}, {0.283, 0.905},
                                      {0.443, 1.30}, {0.54, 1.37}, {0.64, 1.345}, {0.71, 1.30}, {0.75, 1.24}, {0.893, 0.94},
                                      {0.945, 0.965}, {0.985, 0.99}, {0.995, 0.95}, {1.0, 0.82}};
     static const double kBelt[][2] = {{0.0, 0.62}, {0.04, 0.70}, {0.20, 0.80}, {0.283, 0.85}, {0.55, 0.875}, {0.75, 0.905}, {0.85, 0.915},
@@ -107,60 +107,34 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         for (int k = 0; k < NR; ++k) B.tri(c, R[k], R[(k + 1) % NR], MatPaint);
     }
     const double xF = X(0.0), xB = X(1.0);
-    // ---- on yuz (referans: Wikimedia Commons "BMW M3 CSL (E46) front", CC0; oranlar olculdu)
-    // Yuzey uzerinde x: on kapak duz (|y| <= hw(0)), kose disinda govde kavsine (s) cekilir -> far / sinyal koseye sarilir
-    auto frontX = [&](double y) {
-        const double ay = std::fabs(y);
-        if (ay <= hw(0.0) * 0.985) return xF + 0.006;
-        double sl = 0.0;
-        for (double t = 0.0; t < 0.12; t += 0.002) { sl = t; if (hw(t) >= ay) break; }
-        return X(sl) + 0.004;
-    };
-    auto quadF = [&](double ya, double za0, double za1, double yb, double zb0, double zb1, double dx, int mat) {   // on yuzde y-z dortgeni
-        const double xa = frontX(ya) + dx, xb = frontX(yb) + dx;
-        B.panel(xa, ya, za0, xb, yb, zb0, xb, yb, zb1, xa, ya, za1, mat);
-    };
-    // Far lensi dis hatti (|y| / HW, alt z, ust z): ic uc uzun (bobrek yaninda), disa dogru daralan damla, koseye sarilir
-    static const double kHL[][3] = {{0.205, 0.545, 0.690}, {0.30, 0.543, 0.688}, {0.40, 0.546, 0.682}, {0.50, 0.553, 0.672},
-                                    {0.62, 0.566, 0.660}, {0.74, 0.585, 0.648}, {0.85, 0.606, 0.637}, {0.94, 0.622, 0.630}, {0.985, 0.628, 0.629}};
-    constexpr int nHL = sizeof kHL / sizeof *kHL;
+    // ---- on yuz: bobrek izgara, angel-eye farlar, alt hava girisi, sis farlari, plaka
     for (double sg : {1.0, -1.0}) {
-        // kaput kapanma cizgisi: farlarin ve bobregin ustunden (ince koyu)
-        for (int k = 0; k + 1 < nHL; ++k)
-            quadF(sg * kHL[k][0] * HW, kHL[k][2] + 0.004, kHL[k][2] + 0.012, sg * kHL[k + 1][0] * HW, kHL[k + 1][2] + 0.004, kHL[k + 1][2] + 0.012, 0.002, MatDark);
-        // lens: koyu cerceve (cizgi) + gumus yansitici ic
-        for (int k = 0; k + 1 < nHL; ++k) {
-            quadF(sg * kHL[k][0] * HW, kHL[k][1] - 0.006, kHL[k][2] + 0.003, sg * kHL[k + 1][0] * HW, kHL[k + 1][1] - 0.006, kHL[k + 1][2] + 0.003, 0.001, MatDark);
-            quadF(sg * kHL[k][0] * HW, kHL[k][1], kHL[k][2], sg * kHL[k + 1][0] * HW, kHL[k + 1][1], kHL[k + 1][2], 0.003, MatChrome);
+        // Bobrek izgara: kaputun on kenarinda, kromlu cerceve + dikey citalar
+        B.diskX(xF + 0.010, sg * 0.098, 0.590, 0.080, 0.070, 14, MatChrome);
+        B.diskX(xF + 0.014, sg * 0.098, 0.590, 0.066, 0.057, 14, MatDark);
+        for (int k = -2; k <= 2; ++k) B.panel(xF + 0.016, sg * (0.098 + k * 0.022) - 0.003, 0.545, xF + 0.016, sg * (0.098 + k * 0.022) + 0.003, 0.545,
+                                              xF + 0.016, sg * (0.098 + k * 0.022) + 0.003, 0.635, xF + 0.016, sg * (0.098 + k * 0.022) - 0.003, 0.635, MatTrim);
+        // Far grubu: genis, disa dogru yukselen ve kaputa / camurluga egimle sarilan seffaf lens (krom yansitici ici)
+        const double yIn = 0.19, yOut = HW * 0.93, sTop = 0.05;
+        const double zInB = 0.560, zOutB = 0.585, zInT = top(sTop) - 0.012, zOutT = std::min(top(sTop) - 0.05, belt(sTop) + 0.02);
+        B.panel(xF + 0.006, sg * yIn, zInB, xF + 0.006, sg * yOut, zOutB, X(sTop), sg * hw(sTop) * 0.93, zOutT, X(sTop), sg * yIn, zInT, MatChrome);
+        B.panel(xF + 0.009, sg * (yIn + 0.01), zInB + 0.008, xF + 0.009, sg * (yOut - 0.01), zOutB + 0.006,
+                X(sTop - 0.006), sg * (hw(sTop) * 0.93 - 0.01), zOutT - 0.006, X(sTop - 0.006), sg * (yIn + 0.01), zInT - 0.006, MatDark);   // lens ici koyu
+        for (double yc : {0.30, 0.52}) {                                  // cift yuvarlak angel-eye (lensin onunde)
+            B.diskX(xF + 0.012, sg * yc, 0.605, 0.064, 0.054, 14, MatChrome);
+            B.diskX(xF + 0.014, sg * yc, 0.605, 0.054, 0.045, 14, MatLight);
+            B.diskX(xF + 0.017, sg * yc, 0.605, 0.030, 0.025, 10, MatChrome);
         }
-        // iki yuvarlak far: ic kucuk (kisa huzme), dis buyuk (uzun) - krom halka + lamba
-        const double yi = sg * 0.30 * HW, yo = sg * 0.50 * HW;
-        B.diskX(frontX(yi) + 0.006, yi, 0.618, 0.050, 0.050, 16, MatTrim);
-        B.diskX(frontX(yi) + 0.008, yi, 0.618, 0.044, 0.044, 16, MatLight);
-        B.diskX(frontX(yi) + 0.010, yi, 0.618, 0.019, 0.019, 10, MatChrome);
-        B.diskX(frontX(yo) + 0.006, yo, 0.613, 0.058, 0.054, 16, MatTrim);
-        B.diskX(frontX(yo) + 0.008, yo, 0.613, 0.051, 0.047, 16, MatLight);
-        B.diskX(frontX(yo) + 0.010, yo, 0.610, 0.024, 0.022, 10, MatChrome);
-        quadF(sg * 0.86 * HW, 0.592, 0.620, sg * 0.95 * HW, 0.605, 0.620, 0.005, MatIndicator);   // lens icinde sinyal (dis uc)
-        // Bobrek: kaputun on kenarina gomulu, yaklasik kare, kromlu cerceve + 9 dikey cita
-        const double kc = sg * 0.100, kw = 0.084, kz0 = 0.548, kz1 = 0.688;
-        quadF(kc - kw, kz0, kz1, kc + kw, kz0 + 0.004, kz1 - 0.004, 0.002, MatChrome);
-        quadF(kc - kw + 0.010, kz0 + 0.010, kz1 - 0.010, kc + kw - 0.010, kz0 + 0.013, kz1 - 0.013, 0.005, MatDark);
-        for (int k = -4; k <= 4; ++k) {
-            const double yc = kc + k * 0.0145;
-            quadF(yc - 0.0025, kz0 + 0.012, kz1 - 0.012, yc + 0.0025, kz0 + 0.012, kz1 - 0.012, 0.008, MatTrim);
-        }
-        // Tampon: yuvarlak sis fari yuvasi (koyu cep + lamba), yan kucuk giris
-        const double yf = sg * 0.66 * HW;
-        B.diskX(frontX(yf) + 0.004, yf, 0.300, 0.058, 0.050, 16, MatDark);
-        B.diskX(frontX(yf) + 0.007, yf, 0.300, 0.038, 0.034, 14, MatLight);
-        quadF(sg * 0.40 * HW, 0.230, 0.290, sg * 0.54 * HW, 0.235, 0.285, 0.004, MatDark);
+        B.panel(X(0.03), sg * HW * 0.945, 0.600, X(0.03), sg * HW * 0.955, 0.575, X(0.012), sg * HW * 0.90, 0.570, X(0.012), sg * HW * 0.89, 0.595, MatIndicator);   // kose sinyal
+        // M3 tampon: yan hava girisleri (sis farli)
+        B.panel(xF + 0.010, sg * 0.50, 0.405, xF + 0.010, sg * 0.50, 0.275, xF + 0.010, sg * 0.74, 0.290, xF + 0.010, sg * 0.74, 0.395, MatDark);
+        B.diskX(xF + 0.013, sg * 0.62, 0.340, 0.040, 0.034, 12, MatLight);   // sis fari
     }
-    // Tampon ortasi: plaka (ust) + alt genis hava girisi + ince citalar; alt dudak
-    B.panel(xF + 0.010, 0.25, 0.475, xF + 0.010, 0.25, 0.385, xF + 0.010, -0.25, 0.385, xF + 0.010, -0.25, 0.475, MatPlate);
-    B.panel(xF + 0.010, 0.36, 0.345, xF + 0.010, 0.34, 0.225, xF + 0.010, -0.34, 0.225, xF + 0.010, -0.36, 0.345, MatDark);
-    for (int k = -1; k <= 1; ++k) B.panel(xF + 0.013, k * 0.12 - 0.004, 0.23, xF + 0.013, k * 0.12 + 0.004, 0.23, xF + 0.013, k * 0.12 + 0.004, 0.34, xF + 0.013, k * 0.12 - 0.004, 0.34, MatTrim);
-    B.panel(xF + 0.02, 0.80, 0.21, xF - 0.05, 0.80, 0.21, xF - 0.05, -0.80, 0.21, xF + 0.02, -0.80, 0.21, MatDark);   // alt dudak
+    // M3 tampon: buyuk orta hava girisi (trapez), plaka uzerinde; alt splitter
+    B.panel(xF + 0.012, 0.40, 0.410, xF + 0.012, 0.36, 0.245, xF + 0.012, -0.36, 0.245, xF + 0.012, -0.40, 0.410, MatDark);
+    for (int k = -3; k <= 3; ++k) B.panel(xF + 0.015, k * 0.10 - 0.004, 0.25, xF + 0.015, k * 0.10 + 0.004, 0.25, xF + 0.015, k * 0.10 + 0.004, 0.40, xF + 0.015, k * 0.10 - 0.004, 0.40, MatTrim);
+    B.panel(xF + 0.016, 0.24, 0.500, xF + 0.016, 0.24, 0.425, xF + 0.016, -0.24, 0.425, xF + 0.016, -0.24, 0.500, MatPlate);
+    B.panel(xF + 0.02, 0.78, 0.205, xF - 0.06, 0.78, 0.205, xF - 0.06, -0.78, 0.205, xF + 0.02, -0.78, 0.205, MatDark);   // splitter
     // ---- arka: L stoplar (yana sarar), bagaj cizgisi, plaka, difuzor, dortlu egzoz
     for (double sg : {1.0, -1.0}) {
         B.panel(xB - 0.008, sg * 0.40, 0.905, xB - 0.008, sg * 0.40, 0.835, xB - 0.008, sg * HW * 0.85, 0.835, xB - 0.008, sg * HW * 0.85, 0.905, MatTail);
