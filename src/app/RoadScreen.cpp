@@ -452,10 +452,10 @@ void RoadScreen::drawWorld(Renderer& r) {
             ex += lat * -sp; ey += lat * cp;
         }
     }
-    const Mat4 proj = matPerspective((float)camFov, (float)W / H, 0.3f, 900.0f);
+    const Mat4 proj = matPerspective((float)camFov, (float)W / H, 0.3f, 2500.0f);
     const Mat4 view = matLookAt((float)ex, (float)ez, (float)-ey, (float)tx, (float)tz, (float)-ty);
     const Mat4 vp = matMul(proj, view);
-    r.beginWorldDepth(0.3f, 900.0f);                                   // dunya derinlik yazar: araclar binalarin arkasinda kalir
+    r.beginWorldDepth(0.3f, 2500.0f);                                   // dunya derinlik yazar: araclar binalarin arkasinda kalir
     const float pxPerM = H * 0.5f / std::tan((float)camFov * 0.5f);      // derinlik 1 m'de metre basina piksel
     double dx = tx - ex, dy = ty - ey;
     { const double l = std::max(1e-6, std::hypot(dx, dy)); dx /= l; dy /= l; }
@@ -472,7 +472,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     // Hava perspektifi: uzaklastikca renk ufuk rengine karisir (derinlik hissi, uzaktaki cizgiler sakinlesir)
     const Color fogCol{skyLow.r * 0.85f + 0.10f, skyLow.g * 0.85f + 0.10f, skyLow.b * 0.85f + 0.12f};
     auto fog = [&](Color c, float w) {
-        const float f = std::clamp((w - (rain_ ? 20.0f : 40.0f)) / (rain_ ? 220.0f : 360.0f), 0.0f, 0.85f);
+        const float f = std::clamp((w - (rain_ ? 30.0f : 80.0f)) / (rain_ ? 400.0f : 1300.0f), 0.0f, 0.85f);   // uzak gorus
         return Color{c.r + (fogCol.r - c.r) * f, c.g + (fogCol.g - c.g) * f, c.b + (fogCol.b - c.b) * f, c.a};
     };
     r.rect(0, horizon, W, H, grass);
@@ -548,8 +548,8 @@ void RoadScreen::drawWorld(Renderer& r) {
     r.rect(0, horizon, W, horizon + 2, {0.35f, 0.42f, 0.38f});
 
     const double hw = R.halfWidth();
-    const int i0 = std::max(0, (int)((ps - (sideCam ? 70.0 : 44.0)) / RoadPath::kStep)), n = (int)R.points().size();
-    const int i1 = std::min(n - 2, i0 + (sideCam ? 240 : 280));   // gorus: ~520 m ileri
+    const int i0 = std::max(0, (int)((ps - (sideCam ? 140.0 : 90.0)) / RoadPath::kStep)), n = (int)R.points().size();
+    const int i1 = std::min(n - 2, i0 + (sideCam ? 500 : 745));   // gorus: ~1400 m ileri, 90 m geri
     const auto& P = R.points();
     auto edge = [&](int i, double off) {
         const RoadPoint& p = P[i];
@@ -1058,7 +1058,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     }
     if (ses_->hasRival() || ses_->mode() == RoadSession::Mode::Marathon) {   // bitis cizgisi
         const double fs = ses_->startS() + ses_->raceLength();
-        if (fs > ps - 5 && fs < ps + 300) {
+        if (fs > ps - 60 && fs < ps + 1400) {
             const RoadPoint q = R.at(fs), q2 = R.at(fs + 1.5);
             for (int k = 0; k < 10; ++k) {
                 const double o0 = -hw + k * (2 * hw / 10), o1 = o0 + 2 * hw / 10;
@@ -1090,7 +1090,7 @@ void RoadScreen::drawWorld(Renderer& r) {
         for (const RoadSection& q : R.sections()) {
             for (int k = 3; k >= 1; --k) {
                 const double sb = q.entry - 100.0 * k;
-                if (sb < ps - 30 || sb > ps + 320) continue;
+                if (sb < ps - 60 || sb > ps + 1400) continue;
                 Proj t, m;
                 if (camBlend_ < 0.5) continue;                             // yandan: kamera tarafinda, arabayi kapatir
                 const float sc = post(sb, -(hw + 3.0), 0.9, 2.7, t, m);
@@ -1103,7 +1103,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 }
             }
             const double se = q.entry - 15.0;
-            if (se > ps - 30 && se < ps + 320) {
+            if (se > ps - 60 && se < ps + 1400) {
                 const double kk = R.at(q.entry + 40.0).curvature;         // sola donus (+) -> levha sagda, ok sola
                 Proj t, m;
                 const float sc = (camBlend_ < 0.5 && kk > 0) ? 0.0f : post(se, kk > 0 ? -(hw + 3.0) : (hw + 3.0), 1.0, 2.4, t, m);
@@ -1144,7 +1144,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     };
     std::vector<Obj> objs;
     for (const TrafficCar& t : ses_->traffic()) {
-        if (t.s < ps - 12 || t.s > ps + 320) continue;
+        if (t.s < ps - 60 || t.s > ps + 1400) continue;
         const RoadPoint q = R.at(t.s);
         Obj o{}; ses_->trafficPose(t, o.x, o.y, o.psi); o.id = t.carId;
         o.z = q.z; o.pitch = t.oncoming ? -q.grade : q.grade;
@@ -1153,7 +1153,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     }
     if (ses_->mode() == RoadSession::Mode::Marathon)                   // The Run alani (gorus mesafesindekiler)
         for (const Runner& Rn : ses_->runField().runners()) {
-            if (Rn.s < ps - 12 || Rn.s > ps + 320) continue;
+            if (Rn.s < ps - 60 || Rn.s > ps + 1400) continue;
             const RoadPoint q = R.at(Rn.s);
             Obj o{}; o.x = q.x - Rn.lane * std::sin(q.heading); o.y = q.y + Rn.lane * std::cos(q.heading); o.psi = q.heading;
             o.id = Rn.carId; o.z = q.z; o.pitch = q.grade; o.spin = (float)Rn.spin; o.steer = (float)Rn.steer;
@@ -1166,7 +1166,7 @@ void RoadScreen::drawWorld(Renderer& r) {
               (float)spinR_, (float)(camBlend_ * std::clamp(std::atan(rs.yawRate() * rs.vehicleLoad().wheelbase / std::max(rs.speed(), 3.0)), -0.5, 0.5))};
         o.d = (o.x - ex) * dx + (o.y - ey) * dy;
         o.police = ses_->mode() == RoadSession::Mode::Chase;
-        if (o.d > 2 && o.d < 340) objs.push_back(o);
+        if (o.d > 2 && o.d < 1400) objs.push_back(o);
     }
     std::sort(objs.begin(), objs.end(), [](const Obj& a, const Obj& c) { return a.d > c.d; });
     for (const Obj& o : objs) {
