@@ -18,10 +18,10 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
     // Yan profil (z, m): ust yuzey (kaput / cam / tavan / bagaj), bel cizgisi, alt
     // Referans: yandan fotograf (Wikimedia Commons, "BMW M3 Coupe E46", CC BY 2.0) uzerinde olculen oranlar; olcek teker
     // capindan (0.64 m), tavan / kaput orta hatti kamera yuksekligi icin duzeltildi. Kopya degil, oran referansi.
-    static const double kTop[][2] = {{0.0, 0.765}, {0.012, 0.785}, {0.035, 0.80}, {0.08, 0.82}, {0.16, 0.85}, {0.24, 0.885}, {0.283, 0.905},
+    static const double kTop[][2] = {{0.0, 0.70}, {0.012, 0.735}, {0.035, 0.765}, {0.08, 0.80}, {0.16, 0.845}, {0.24, 0.885}, {0.283, 0.905},
                                      {0.443, 1.30}, {0.54, 1.37}, {0.64, 1.345}, {0.71, 1.30}, {0.75, 1.24}, {0.893, 0.94},
                                      {0.945, 0.965}, {0.985, 0.99}, {0.995, 0.95}, {1.0, 0.82}};
-    static const double kBelt[][2] = {{0.0, 0.70}, {0.04, 0.74}, {0.20, 0.80}, {0.283, 0.85}, {0.55, 0.875}, {0.75, 0.905}, {0.85, 0.915},
+    static const double kBelt[][2] = {{0.0, 0.62}, {0.04, 0.70}, {0.20, 0.80}, {0.283, 0.85}, {0.55, 0.875}, {0.75, 0.905}, {0.85, 0.915},
                                       {0.965, 0.92}, {1.0, 0.80}};
     static const double kBot[][2] = {{0.0, 0.30}, {0.03, 0.22}, {0.08, 0.16}, {0.92, 0.16}, {0.975, 0.22}, {1.0, 0.30}};
     static const double kHw[][2] = {{0.0, 0.87}, {0.015, 0.935}, {0.05, 0.97}, {0.13, 0.985}, {0.5, 1.0}, {0.86, 0.99}, {0.955, 0.955},
@@ -121,8 +121,8 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
         B.panel(xa, ya, za0, xb, yb, zb0, xb, yb, zb1, xa, ya, za1, mat);
     };
     // Far lensi dis hatti (|y| / HW, alt z, ust z): ic uc uzun (bobrek yaninda), disa dogru daralan damla, koseye sarilir
-    static const double kHL[][3] = {{0.215, 0.605, 0.738}, {0.30, 0.600, 0.742}, {0.45, 0.602, 0.742}, {0.60, 0.612, 0.738},
-                                    {0.72, 0.628, 0.732}, {0.82, 0.650, 0.724}, {0.89, 0.675, 0.715}, {0.94, 0.697, 0.708}};
+    static const double kHL[][3] = {{0.205, 0.545, 0.690}, {0.30, 0.543, 0.688}, {0.40, 0.546, 0.682}, {0.50, 0.553, 0.672},
+                                    {0.62, 0.566, 0.660}, {0.74, 0.585, 0.648}, {0.85, 0.606, 0.637}, {0.94, 0.622, 0.630}, {0.985, 0.628, 0.629}};
     constexpr int nHL = sizeof kHL / sizeof *kHL;
     for (double sg : {1.0, -1.0}) {
         // kaput kapanma cizgisi: farlarin ve bobregin ustunden (ince koyu)
@@ -134,26 +134,21 @@ static LowPolyMesh buildE46(const VehicleDef& v) {
             quadF(sg * kHL[k][0] * HW, kHL[k][1], kHL[k][2], sg * kHL[k + 1][0] * HW, kHL[k + 1][1], kHL[k + 1][2], 0.003, MatChrome);
         }
         // iki yuvarlak far: ic kucuk (kisa huzme), dis buyuk (uzun) - krom halka + lamba
-        const double yi = sg * 0.335 * HW, yo = sg * 0.580 * HW;            // ic (kisa) ve dis (uzun huzme) halka, ayni boy
-        for (double yc : {yi, yo}) {
-            const double zc = 0.672, rr = 0.058;
-            B.diskX(frontX(yc) + 0.006, yc, zc, rr, rr, 20, MatTrim);       // koyu yuva
-            B.diskX(frontX(yc) + 0.008, yc, zc, rr - 0.008, rr - 0.008, 20, MatChrome);   // yansitici
-            B.diskX(frontX(yc) + 0.010, yc, zc, rr - 0.030, rr - 0.030, 14, MatLight);    // mercek
-            B.diskX(frontX(yc) + 0.012, yc, zc, 0.012, 0.012, 8, MatChrome);
-        }
-        quadF(sg * 0.72 * HW, 0.630, 0.652, sg * 0.92 * HW, 0.688, 0.700, 0.005, MatIndicator);   // lens icinde sinyal (dis uc)
+        const double yi = sg * 0.30 * HW, yo = sg * 0.50 * HW;
+        B.diskX(frontX(yi) + 0.006, yi, 0.618, 0.050, 0.050, 16, MatTrim);
+        B.diskX(frontX(yi) + 0.008, yi, 0.618, 0.044, 0.044, 16, MatLight);
+        B.diskX(frontX(yi) + 0.010, yi, 0.618, 0.019, 0.019, 10, MatChrome);
+        B.diskX(frontX(yo) + 0.006, yo, 0.613, 0.058, 0.054, 16, MatTrim);
+        B.diskX(frontX(yo) + 0.008, yo, 0.613, 0.051, 0.047, 16, MatLight);
+        B.diskX(frontX(yo) + 0.010, yo, 0.610, 0.024, 0.022, 10, MatChrome);
+        quadF(sg * 0.86 * HW, 0.592, 0.620, sg * 0.95 * HW, 0.605, 0.620, 0.005, MatIndicator);   // lens icinde sinyal (dis uc)
         // Bobrek: kaputun on kenarina gomulu, yaklasik kare, kromlu cerceve + 9 dikey cita
-        // Bobrek: buyuk, burundan one cikik, kalin krom cerceve (yuvarlak koseler: kesik koseli iki katman) + dikey citalar
-        const double kc = sg * 0.112, kw = 0.098, kz0 = 0.590, kz1 = 0.752, kp = 0.030;
-        B.box(xF - 0.02, xF + kp, kc - kw, kc + kw, kz0 + 0.015, kz1 - 0.015, MatChrome);
-        B.box(xF - 0.02, xF + kp, kc - kw + 0.015, kc + kw - 0.015, kz0, kz1, MatChrome);
-        B.panel(xF + kp + 0.002, kc - kw + 0.014, kz0 + 0.014, xF + kp + 0.002, kc + kw - 0.014, kz0 + 0.014,
-                xF + kp + 0.002, kc + kw - 0.014, kz1 - 0.014, xF + kp + 0.002, kc - kw + 0.014, kz1 - 0.014, MatDark);
+        const double kc = sg * 0.100, kw = 0.084, kz0 = 0.548, kz1 = 0.688;
+        quadF(kc - kw, kz0, kz1, kc + kw, kz0 + 0.004, kz1 - 0.004, 0.002, MatChrome);
+        quadF(kc - kw + 0.010, kz0 + 0.010, kz1 - 0.010, kc + kw - 0.010, kz0 + 0.013, kz1 - 0.013, 0.005, MatDark);
         for (int k = -4; k <= 4; ++k) {
-            const double yc = kc + k * 0.017;
-            B.panel(xF + kp + 0.004, yc - 0.003, kz0 + 0.016, xF + kp + 0.004, yc + 0.003, kz0 + 0.016,
-                    xF + kp + 0.004, yc + 0.003, kz1 - 0.016, xF + kp + 0.004, yc - 0.003, kz1 - 0.016, MatTrim);
+            const double yc = kc + k * 0.0145;
+            quadF(yc - 0.0025, kz0 + 0.012, kz1 - 0.012, yc + 0.0025, kz0 + 0.012, kz1 - 0.012, 0.008, MatTrim);
         }
         // Tampon: yuvarlak sis fari yuvasi (koyu cep + lamba), yan kucuk giris
         const double yf = sg * 0.66 * HW;
