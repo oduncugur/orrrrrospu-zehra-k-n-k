@@ -39,6 +39,8 @@ double leagueIndexCap(int league);              // sinif siniri (performans ende
 const std::vector<RivalDef>& rivals();
 const std::vector<EventDef>& leagueEvents();
 const char* eventModeName(EventMode m);
+// Etkinligin sehri: her lig iki sehirde (lig*2, lig*2+1); etkinlikler sirayla paylastirilir, patron ligin ikinci sehrinde
+int eventCity(int idx);
 // Patron etkinliginin acilmasi icin ayni ligde kazanilmasi gereken etkinlik sayisi
 constexpr int kBossUnlockWins = 3;
 

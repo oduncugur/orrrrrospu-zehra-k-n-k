@@ -31,7 +31,7 @@ LeagueScreen::LeagueScreen(App& app, int tab) : app_(app) {
 std::vector<int> LeagueScreen::rows() const {
     std::vector<int> r;
     const auto& ev = leagueEvents();
-    for (int i = 0; i < (int)ev.size(); ++i) if (ev[i].league == tab_) r.push_back(i);
+    for (int i = 0; i < (int)ev.size(); ++i) if (ev[i].league == tab_ && eventCity(i) == viewCity()) r.push_back(i);
     return r;
 }
 
@@ -66,6 +66,12 @@ void LeagueScreen::render(Renderer& r) {
     const double cap = leagueIndexCap(tab_);
     std::snprintf(b, sizeof b, cap > 0 ? "SINIF: ENDEKS %.0f VE ALTI" : "SINIF: SINIRSIZ", cap);
     r.text(8, 99, b, 1, kUiDim);
+    {   // sehir secici: ligin iki sehri (bulundugun sehir yesil)
+        std::snprintf(b, sizeof b, "%s >", Career::cityName(viewCity()));
+        const Rect cb{200, 95, 352, 111};
+        r.rect(cb.x0, cb.y0, cb.x1, cb.y1, viewCity() == c.city ? Color{0.12f, 0.35f, 0.18f} : kUiPanel);
+        r.textCentered(cb.cx(), cb.y0 + 4, b, 1, {1, 1, 1});
+    }
     // Etkinlikler
     const auto& ev = leagueEvents();
     const auto list = rows();
@@ -171,12 +177,13 @@ void LeagueScreen::pointerDown(int, float x, float y) {
     if (kBackL.hit(x, y)) { app_.goMap(); return; }
     if (kAchL.hit(x, y)) { app_.goAchievements(); return; }
     for (int l = 0; l < kLeagues; ++l)
-        if (Rect{4.0f + l * 70.8f, 64, 72.0f + l * 70.8f, 92}.hit(x, y)) { tab_ = l; sel_ = -1; confirm_ = false; return; }
+        if (Rect{4.0f + l * 70.8f, 64, 72.0f + l * 70.8f, 92}.hit(x, y)) { tab_ = l; side_ = -1; sel_ = -1; confirm_ = false; return; }
+    if (Rect{200, 95, 352, 111}.hit(x, y)) { side_ = viewCity() % 2 ? 0 : 1; sel_ = -1; confirm_ = false; return; }
     if (sel_ >= 0 && kStartL.hit(x, y)) {
         std::string why;
         if (!app_.career.eventAvailable(sel_, &why)) { msg_ = why; msgT_ = 2.0; return; }
-        if (leagueEvents()[sel_].league != Career::cityLeague(app_.career.city)) {   // etkinlik baska ligin sehrinde: haritadan seyahat
-            msg_ = std::string("ONCE ") + Career::cityName(leagueEvents()[sel_].league * 2) + " (HARITA)"; msgT_ = 2.2; return;
+        if (eventCity(sel_) != app_.career.city) {                        // etkinlik baska sehirde: haritadan seyahat
+            msg_ = std::string("ONCE ") + Career::cityName(eventCity(sel_)) + " (HARITA)"; msgT_ = 2.2; return;
         }
         confirm_ = true;                                                  // onay (pink slip uyarisi panelde)
         return;
@@ -189,8 +196,8 @@ void LeagueScreen::pointerDown(int, float x, float y) {
 void LeagueScreen::key(Key k, bool down) {
     if (!down) return;
     if (k == Key::Back) { if (confirm_) confirm_ = false; else if (sel_ >= 0) sel_ = -1; else app_.goMap(); }
-    if (k == Key::Left) { tab_ = std::max(0, tab_ - 1); sel_ = -1; }
-    if (k == Key::Right) { tab_ = std::min(kLeagues - 1, tab_ + 1); sel_ = -1; }
+    if (k == Key::Left) { tab_ = std::max(0, tab_ - 1); side_ = -1; sel_ = -1; }
+    if (k == Key::Right) { tab_ = std::min(kLeagues - 1, tab_ + 1); side_ = -1; sel_ = -1; }
     if (k == Key::Enter && sel_ >= 0) { if (confirm_) { app_.career.wager = leagueEvents()[sel_].pink ? 0 : app_.career.wagerFor(sel_, wagerStep_); app_.startEvent(sel_); } else if (app_.career.eventAvailable(sel_)) confirm_ = true; }
 }
 

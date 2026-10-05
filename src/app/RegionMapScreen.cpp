@@ -74,8 +74,8 @@ void RegionMapScreen::render(Renderer& r) {
         const int l = Career::cityLeague(ci);
         const Node& n = kNodes[ci];
         const bool locked = l > open;
-        int total = 0;
-        for (const EventDef& e : ev) total += e.league == l;
+        int total = 0, won = 0;                                          // bu sehrin etkinlikleri
+        for (int i = 0; i < (int)ev.size(); ++i) if (eventCity(i) == ci) { ++total; won += c.eventWon(i) ? 1 : 0; }
         const float pulse = (l == open && !locked && ci % 2 == 0) ? 2.0f + 2.0f * std::sin((float)t_ * 3.0f) : 0.0f;
         r.circle(n.x, n.y + 3, kR + 2, 24, {0, 0, 0, 0.35f});
         r.circle(n.x, n.y, kR + 3 + pulse, 24, locked ? Color{0.25f, 0.25f, 0.27f} : bossBeaten(c, l) ? kUiGold : Color{0.95f, 0.95f, 0.95f});
@@ -88,8 +88,8 @@ void RegionMapScreen::render(Renderer& r) {
             r.circle(n.x + kR * 0.8f, n.y - kR * 0.8f, 11, 16, {0.1f, 0.6f, 0.95f});
             icon(r, IconGallery, n.x + kR * 0.8f, n.y - kR * 0.8f, 7, {1, 1, 1});
         }
-        if (ci % 2 == 1) {
-            std::snprintf(b, sizeof b, locked ? "KILITLI" : "%d / %d", c.leagueWins(l), total);
+        {
+            std::snprintf(b, sizeof b, locked ? "KILITLI" : "%d / %d", won, total);
             r.textCentered(n.x, n.y + kR + 16, b, 1, locked ? kUiDim : kUiGold);
         }
     }

@@ -63,7 +63,7 @@ void SetupScreen::render(Renderer& r) {
         }
         const bool def = i == RPsi ? t.psi <= 0 : std::string(b).find_first_of("123456789") == std::string::npos || (i == RNos && !t.setNos);
         r.textFit(283, y + 13, b, 1, 54, def ? kUiText : kUiGold, true);
-        static const char* const kHint[RCount] = {"DUSUK: KALKIS TUTUSU, YUKSEK: HIZ", "ALCAK: AGIRLIK MERKEZI DUSER", "YUKSEK ARKA: DRAG YUK AKTARIMI",
+        static const char* const kHint[RCount] = {"DUSUK: TUTUS, YUKSEK: HIZ", "ALCAK: AGIRLIK MERKEZI DUSER", "YUKSEK ARKA: DRAG YUK AKTARIMI",
                                                   "SERT ON: ONDEN KAYAR", "SERT ARKA: ARKADAN KAYAR", "SERT: AZ DALIS (FREN)", "YUMUSAK: KALKISTA ARKA COKER",
                                                   "SERT: ONDEN KAYAR", "SERT: ARKADAN KAYAR", "YUKSEK: KILITLI, CEKISLI", "KUCUK MEME: UZUN TUP"};
         r.textFit(16, y + 19, kHint[i], 1, 192, kUiDim);

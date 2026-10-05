@@ -31,10 +31,13 @@ void AchievementsScreen::render(Renderer& r) {
         const bool done = (c.achieved >> i) & 1u;
         r.rect(8, y, 352, y + kRowH - 3, done ? Color{0.20f, 0.16f, 0.05f} : kUiPanel);
         if (done) r.rect(8, y, 11, y + kRowH - 3, kUiGold);
-        r.text(16, y + 3, a[i].name, 1, done ? kUiGold : Color{0.85f, 0.85f, 0.9f});
-        r.text(16, y + kRowH - 13, a[i].desc, 1, kUiDim);
+        // tek satir: ad + aciklama (satir alcak: iki satir ust uste binerdi); aciklama odul yazisina kadar sigdirilir
+        const float ty = y + (kRowH - 3) * 0.5f - 4;
+        r.text(16, ty, a[i].name, 1, done ? kUiGold : Color{0.85f, 0.85f, 0.9f});
+        const float dx = 16 + r.textWidth(a[i].name, 1) + 8;
+        r.textFit(dx, ty, a[i].desc, 1, 284 - dx, kUiDim);
         const std::string rw = done ? "TAMAM" : money(a[i].reward);
-        r.text(344 - r.textWidth(rw, 1), y + 7, rw, 1, done ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
+        r.text(344 - r.textWidth(rw, 1), ty, rw, 1, done ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
     }
     button(r, kBackA, "< KARIYER", kUiBtn, 2);
 }

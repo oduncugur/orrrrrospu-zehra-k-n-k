@@ -10,7 +10,8 @@ namespace zk {
 namespace {
 using It = SettingsScreen::Item;
 const Rect kDefaults{8, 596, 104, 634}, kSaveCode{108, 596, 212, 634}, kBack{216, 596, 352, 634};
-constexpr float kRowH = 26, kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
+float kRowH = 26;                       // satir yuksekligi: liste 62..546 arasina sigacak sekilde kurucuda ayarlanir
+constexpr float kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
 const char* const kSections[] = {"GORUNTU", "SES", "KONTROL", "OYUN"};
 
 const char* label(It it) {
@@ -88,6 +89,10 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
 #endif
         {2, It::Assist}, {2, It::Esp}, {2, It::Gears},
         {3, It::Speed}, {3, It::Tree}};
+    {   int secs = 0, l = -1;
+        for (const auto& [sec, it] : items) if (sec != l) { ++secs; l = sec; }
+        kRowH = std::min(26.0f, (546.0f - 62.0f - secs * 16.0f) / (float)items.size() - 2.0f);
+    }
     float y = 62;
     int last = -1;
     for (const auto& [sec, it] : items) {
@@ -187,10 +192,10 @@ void SettingsScreen::render(Renderer& r) {
         const bool sel = (int)i == sel_;
         r.rect(8, row.y, 352, row.y + kRowH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
         if (sel) r.rect(8, row.y, 11, row.y + kRowH, kUiOrange);
-        r.textFit(16, row.y + 7, label(row.item), 2, kArrowL0 - 20, {1, 1, 1});
-        r.text(kArrowL0 + 2, row.y + 7, "<", 2, kUiDim);
-        r.text(kArrowR1 - 12, row.y + 7, ">", 2, kUiDim);
-        r.textFit((kArrowL0 + kArrowR1) / 2 + 2, row.y + 7, value(row.item), 2, kArrowR1 - kArrowL0 - 30, kUiGold, true);
+        r.textFit(16, row.y + (kRowH - 14) * 0.5f + 1, label(row.item), 2, kArrowL0 - 20, {1, 1, 1});
+        r.text(kArrowL0 + 2, row.y + (kRowH - 14) * 0.5f + 1, "<", 2, kUiDim);
+        r.text(kArrowR1 - 12, row.y + (kRowH - 14) * 0.5f + 1, ">", 2, kUiDim);
+        r.textFit((kArrowL0 + kArrowR1) / 2 + 2, row.y + (kRowH - 14) * 0.5f + 1, value(row.item), 2, kArrowR1 - kArrowL0 - 30, kUiGold, true);
     }
     if (sel_ >= 0 && sel_ < (int)rows_.size()) {
         const It it = rows_[sel_].item;

@@ -107,6 +107,17 @@ const std::vector<EventDef>& leagueEvents() {
     return e;
 }
 
+int eventCity(int idx) {
+    const auto& ev = leagueEvents();
+    if (idx < 0 || idx >= (int)ev.size()) return 0;
+    const EventDef& e = ev[idx];
+    if (e.rival >= 0 && rivals()[e.rival].boss) return e.league * 2 + 1;
+    int k = 0;                                                         // ligdeki patron olmayan sira
+    for (int i = 0; i < idx; ++i)
+        if (ev[i].league == e.league && !(ev[i].rival >= 0 && rivals()[ev[i].rival].boss)) ++k;
+    return e.league * 2 + (k % 2);
+}
+
 int todayIndex() { return (int)(std::time(nullptr) / 86400); }
 
 std::vector<DailyTask> dailyTasks(int day, double playerEt) {

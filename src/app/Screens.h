@@ -238,6 +238,8 @@ public:
     void key(Key k, bool down) override;
 private:
     std::vector<int> rows() const;
+    int side_ = -1;                     // sehir secici: -1 bulundugun sehir (ligdeyse), 0 / 1 ligin sehirleri
+    int viewCity() const { return side_ >= 0 ? tab_ * 2 + side_ : Career::cityLeague(app_.career.city) == tab_ ? app_.career.city : tab_ * 2; }
     App& app_;
     int tab_ = 0, sel_ = -1;
     int wagerStep_ = 0;                         // bahis kademesi (Career::wagerFor)
