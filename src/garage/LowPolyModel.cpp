@@ -229,6 +229,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     };
     const double bulge = classic ? 0.02 : 0.04, bulgeP = classic ? 4.0 : 2.0;     // yan bombe (klasik: duz yan)
     std::vector<std::array<int, R>> rings;
+    std::vector<std::array<std::array<double, 2>, RH2>> subs;            // her istasyonun yari kesiti (direkler yuzeyi izler)
     for (double s : ss) {
         const double x = L * (0.5 - s);
         const double endT = std::min(s, 1.0 - s);
@@ -281,6 +282,9 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             const int a = std::max(i - 1, 0), d = std::min(i + 2, RH - 1);
             for (int c = 0; c < 2; ++c) sub[2 * i + 1][c] = (-pts[a][c] + 9 * pts[i][c] + 9 * pts[i + 1][c] - pts[d][c]) / 16.0;
         }
+        std::array<std::array<double, 2>, RH2> sc;
+        for (int i = 0; i < RH2; ++i) sc[i] = {sub[i][0], sub[i][1]};
+        subs.push_back(sc);
         std::array<int, R> ring;
         for (int i = 0; i < RH2; ++i) ring[i] = B.v(x, sub[i][0], sub[i][1]);
         for (int i = 0; i < RH2; ++i) ring[R - 1 - i] = B.v(x, -sub[i][0], sub[i][1]);
@@ -358,13 +362,18 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         if (sh.doors == 4 && A.backX - A.roofRX < 0.18) pillars.push_back(sC);
         for (double sp : pillars) {
             if (sp <= A.roofFX + 0.02 || sp >= A.backX - 0.01) continue;
-            const double xb = L * (0.5 - sp), zb = H * P.belt(sp), zr = H * P.roof(sp);
-            const double hw = halfW(sp), bw = hw * A.beltW;
-            const double cw = hw * A.roofW;
+            const double xb = L * (0.5 - sp);
             const double pw = sp == sB ? 0.045 : 0.07;
-            for (double sg : {-1.0, 1.0})
-                B.panel(xb + pw, sg * (bw + ox), zb, xb - pw, sg * (bw + ox), zb, xb - pw, sg * (cw + ox), zr - 0.05 * H, xb + pw, sg * (cw + ox), zr - 0.05 * H,
-                        modern && sh.doors == 4 ? MatDark : MatPaint);
+            size_t si = 0;                                                         // en yakin istasyonun yuzeyi
+            for (size_t k = 1; k < ss.size(); ++k) if (std::fabs(ss[k] - sp) < std::fabs(ss[si] - sp)) si = k;
+            const auto& sc = subs[si];
+            // cam bolgesi (anahtar 7 bel .. 10 tavan rayi = ara indeks 14 .. 20) boyunca, yuzeyin 6 mm disinda serit
+            for (int k = 14; k < 20; ++k)
+                for (double sg : {-1.0, 1.0}) {
+                    const double ya = sg * (sc[k][0] + 0.006), yb = sg * (sc[k + 1][0] + 0.006);
+                    B.panel(xb + pw, ya, sc[k][1], xb - pw, ya, sc[k][1], xb - pw, yb, sc[k + 1][1], xb + pw, yb, sc[k + 1][1],
+                            modern && sh.doors == 4 ? MatDark : MatPaint);
+                }
         }
         // Kapi cizgileri (koyu ince serit) ve kollar
         std::vector<double> cuts = {A.cowlX + 0.015, sh.doors == 4 ? sB : std::min(sB + 0.02, A.backX - 0.02)};
