@@ -53,6 +53,13 @@ public:
     std::vector<double> stations() const;
     double nextStation(double s) const;            // s'den sonraki ilk benzinlige kalan (m; yoksa -1)
     bool inStation(double s) const;
+    // Benzinlik: 3 pompa (istasyon basindan 26.25 / 35 / 43.75 m), yoldan 6.5 m icerde; yakit yalniz pompanin yaninda
+    // (yol tarafi 2 m) durunca. Pompaya > 30 km/h carpan istasyonu patlatir (kullanilamaz).
+    static double pumpOffset(int k) { return 26.25 + 8.75 * k; }
+    double pumpLat(double s) const { return -(road_.halfWidthAt(s) + 6.5); }
+    double pumpSlotLat(double s) const { return pumpLat(s) + 2.0; }
+    bool stationDestroyed(int idx) const { return idx >= 0 && idx < (int)stationDead_.size() && stationDead_[idx]; }
+    bool takeExplosion(double& s, double& lat) { if (explS_ < 0) return false; s = explS_; lat = explLat_; explS_ = -1; return true; }
     bool refueling(int car) const { return refuel_[car]; }   // 0 oyuncu, 1 rakip
     // Yakit stratejisi (rakip; oyuncu otopilotu / testler): mola gerekiyorsa kontrolleri doldurur ve true doner
     bool pitControls(int car, double pace, RoadControls& out);
@@ -117,6 +124,9 @@ public:
 private:
     void wallContact(RoadCar& car);              // arac duvara girdiyse geri itilir, yanal hiz soner (sekme)
     bool wallHit_ = false;
+    std::vector<bool> stationDead_;
+    double explS_ = -1, explLat_ = 0;
+    void pumpContact(RoadCar& car, bool isPlayer);
     double runLen_ = 18000.0;
     // Kinematik arac (trafik / The Run rakibi) ile carpisma: kutle + hiz + temas noktasi -> impuls (sekme e, surtunme mu).
     // Donus: kinematik aracin yeni ileri hizi (m/s); rel: carpisma hizi (m/s)

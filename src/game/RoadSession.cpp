@@ -129,6 +129,7 @@ int RoadSession::zoneAt(double s) const {
 double RoadSession::wallAt(double s, int side) const {
     const double hw = road_.halfWidthAt(s);
     const int z = zoneAt(s);
+    if (side < 0 && inStation(s)) return hw + 13.5;                   // benzinlik sahasi (sag): icine girilir
     if (z == 2) return hw + 1.2;                                       // tunel duvari
     for (double k = 2.0; k <= 160.0; k += 4.0)                         // tunel yaklasma yamaci (dag yanlarda yukselir)
         if (zoneAt(s + k) == 2 || zoneAt(s - k) == 2) return hw + 2.5;
@@ -200,6 +201,27 @@ double RoadSession::impactKinematic(RoadCar& car, double ox, double oy, double o
     return ov + dvo;
 }
 
+void RoadSession::pumpContact(RoadCar& car, bool isPlayer) {
+    const auto st = stations();
+    if (stationDead_.size() != st.size()) stationDead_.assign(st.size(), false);
+    for (size_t k = 0; k < st.size(); ++k) {
+        if (stationDead_[k] || car.s() < st[k] - 5.0 || car.s() > st[k] + kStationLen + 5.0) continue;
+        for (int p = 0; p < 3; ++p) {
+            const double ps = st[k] + pumpOffset(p), lat = pumpLat(ps);
+            const RoadPoint q = road_.at(ps);
+            const double px = q.x - lat * std::sin(q.heading), py = q.y + lat * std::cos(q.heading);
+            double rel = 0;
+            impactKinematic(car, px, py, q.heading, 0.0, 4000.0, 0.6, 0.45, rel);
+            if (rel > 30.0 / 3.6) {                                      // > 30 km/h: istasyon patlar
+                stationDead_[k] = true; explS_ = ps; explLat_ = lat;
+                car.sim().scaleVelocity(0.35);
+                if (isPlayer) { msgs_.push_back("BENZINLIK PATLADI!"); crashEv_ = true; ++collisions_; }
+                return;
+            } else if (rel > 2.0 && isPlayer) { msgs_.push_back("POMPAYA CARPTIN!"); crashEv_ = true; }
+        }
+    }
+}
+
 void RoadSession::collide(RoadCar& car, bool isPlayer) {
     const double cx = car.sim().posX(), cy = car.sim().posY();
     for (TrafficCar& t : traffic_) {
@@ -254,7 +276,15 @@ void RoadSession::fuelStep(double dt) {
     for (int i = 0; i < 2; ++i) {
         refuel_[i] = false;
         RoadCar* c = cars[i];
-        if (!c || !inStation(c->s()) || c->sim().speed() > 1.5 || c->lateral() > 0.0) continue;
+        if (!c || !inStation(c->s()) || c->sim().speed() > 1.5) continue;
+        bool atPump = false;
+        const auto st = stations();
+        for (size_t k = 0; k < st.size(); ++k) {
+            if (stationDestroyed((int)k) || c->s() < st[k] || c->s() > st[k] + kStationLen) continue;
+            for (int p = 0; p < 3; ++p)
+                if (std::fabs(c->s() - (st[k] + pumpOffset(p))) < 4.0 && std::fabs(c->lateral() - pumpSlotLat(c->s())) < 1.8) atPump = true;
+        }
+        if (!atPump) continue;
         if (c->sim().fuelLiters() < c->sim().tankLiters() - 0.01) { c->sim().addFuel(kRefuelLps * dt); refuel_[i] = true; refilled_[i] += kRefuelLps * dt; }
     }
 }
@@ -274,7 +304,7 @@ bool RoadSession::pitControls(int car, double pace, RoadControls& out) {
     if (pitAt_[car] < 0) return false;
     if (r.sim().fuelLiters() >= r.sim().tankLiters() - 0.05 || s > pitAt_[car] + kStationLen) { pitAt_[car] = -1; return false; }   // dolu / gecti
     const double dist = pitAt_[car] - s;
-    out = r.aiControls(rightLane(s), pace, dist > 0 ? std::sqrt(2.0 * 3.5 * dist) : 0.0);
+    out = r.aiControls(dist < 70.0 ? pumpSlotLat(s) : rightLane(s), pace, dist > 0 ? std::sqrt(2.0 * 3.5 * dist) : 0.0);   // orta pompanin yanina
     if (dist < 3.0 || (inStation(s) && r.sim().speed() < 1.0)) { out.throttle = 0.0; out.brake = 1.0; }
     return true;
 }
@@ -414,6 +444,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
     }
     player_->update(dt, in);
     wallContact(*player_);
+    pumpContact(*player_, true);
     if (mode_ == Mode::Marathon) {
         fuelStep(dt);
         static const double kWarn = 1.0;
@@ -474,6 +505,7 @@ void RoadSession::update(double dt, const RoadControls& in) {
     else rival_->update(dt, phase_ == Phase::Run || finishT_[1] <= 0 ? rivalControls() : RoadControls{0, 0, 0.4});
     rival_->takeRecovered(); rival_->takeStalled();
     wallContact(*rival_);
+    pumpContact(*rival_, false);
     collide(*rival_, false);
     // Oyuncu-rakip temasi: yonlu kutu cakismasi + kutle/atalet impulsu (Contact.h); 2B drag bolumunde yok
     if (dragPart()) touching_ = false;

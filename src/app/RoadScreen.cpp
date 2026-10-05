@@ -299,6 +299,19 @@ void RoadScreen::update(double dt) {
     }
     for (auto& m : ses_->drainMessages()) flash(m);
     for (auto& m : P.sim().drainFailEvents()) { flash(m, 3.0); app_.haptic(400, 255); }
+    {   double es = 0, el = 0;
+        if (ses_->takeExplosion(es, el)) {                                 // benzinlik patladi: alev topu, kivilcim, sarsinti
+            const RoadPoint q = ses_->road().at(es);
+            const double ex = q.x - el * std::sin(q.heading), ey = q.y + el * std::cos(q.heading);
+            for (int k = 0; k < 140 && sparks_.size() < 400; ++k) {
+                const double a = hashf(k * 7 + 3) * 6.2831853, up = 4.0 + 12.0 * hashf(k * 11), sp = 3.0 + 14.0 * hashf(k * 13 + 1);
+                sparks_.push_back({ex, ey, q.z + 1.0, sp * std::cos(a), sp * std::sin(a), up, 1.0 + 1.5 * hashf(k * 3), 0});
+            }
+            for (int k = 0; k < 30; ++k)
+                smoke_.push_back({ex + 3.0 * (hashf(k) - 0.5), ey + 3.0 * (hashf(k * 5) - 0.5), q.z + 1.0 + 2.0 * hashf(k * 9), 0.0, 0.0, 2.5, 3.0 + 3.0 * hashf(k * 2), 2.5 + 2.0 * hashf(k * 3)});
+            shakeT_ = 1.2; app_.haptic(600, 255);
+        }
+    }
     if (ses_->takeCrash()) {                                             // carpisma: titresim, kamera sarsintisi, kivilcim
         app_.haptic(220, 255);
         shakeT_ = 0.45;
@@ -742,8 +755,11 @@ void RoadScreen::drawWorld(Renderer& r) {
             }
             continue;
         }
-        for (double st : ses_->stations()) {                       // benzinlik: sag tarafta beton saha + sacak + pompa + tabela
+        const auto stList = ses_->stations();
+        for (size_t sti = 0; sti < stList.size(); ++sti) {           // benzinlik: sag tarafta beton saha + sacak + pompa + tabela
+            const double st = stList[sti];
             if (!(P[i].s <= st + 0.5 * RoadSession::kStationLen && P[j].s > st + 0.5 * RoadSession::kStationLen)) continue;
+            const bool dead = ses_->stationDestroyed((int)sti);
             const int ia = std::max(0, i - (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep)), ib = std::min(n - 1, i + (int)(0.5 * RoadSession::kStationLen / RoadPath::kStep));
             const double o0 = -(P[i].hw + 0.6), o1 = -(P[i].hw + 13.0);
             const Proj c0 = pt(ia, o0, 0.02), c1 = pt(ib, o0, 0.02), c2 = pt(ib, o1, 0.02), c3 = pt(ia, o1, 0.02);
@@ -757,7 +773,7 @@ void RoadScreen::drawWorld(Renderer& r) {
                 const Proj p0 = pt(pi, po, 0.0), p1 = pt(pi, po, 4.4);
                 if (p0.ok && p1.ok) { r.setDepthW(p0.w); const float pw = std::max(0.8f, 0.15f * pxPerM / p0.w); r.rect(p0.x - pw, p1.y, p0.x + pw, p0.y, fog(L({0.85f, 0.85f, 0.88f}), p0.w)); }
             }
-            for (int pk = 0; pk < 3; ++pk) {                                      // pompalar
+            for (int pk = 0; pk < 3 && !dead; ++pk) {                             // pompalar (patladiysa yok)
                 const int pi = ka + (kb - ka) * (pk + 1) / 4;
                 const Proj a0 = pt(pi, -(P[i].hw + 6.5), 0.0), a1 = pt(pi, -(P[i].hw + 6.5), 1.6);
                 if (!a0.ok || !a1.ok) continue;
@@ -767,9 +783,21 @@ void RoadScreen::drawWorld(Renderer& r) {
                 r.rect(a0.x - pw * 0.7f, a1.y + (a0.y - a1.y) * 0.15f, a0.x + pw * 0.7f, a1.y + (a0.y - a1.y) * 0.4f, fog(L({0.15f, 0.2f, 0.25f}), a0.w));
             }
             if (r0.ok && r1.ok && r2.ok && r3.ok) {
-                const Color roof = fog(night_ ? Color{0.95f, 0.95f, 0.9f} : L({0.92f, 0.92f, 0.94f}), r0.w), band = fog(L({0.85f, 0.15f, 0.12f}), r0.w);
+                const Color roof = dead ? Color{0.08f, 0.07f, 0.07f} : fog(night_ ? Color{0.95f, 0.95f, 0.9f} : L({0.92f, 0.92f, 0.94f}), r0.w),
+                            band = dead ? Color{0.15f, 0.08f, 0.05f} : fog(L({0.85f, 0.15f, 0.12f}), r0.w);
                 triP(r, r0, r1, r2, roof); triP(r, r0, r2, r3, roof);
                 if (r0b.ok && r1b.ok) { triP(r, r0b, r1b, r1, band); triP(r, r0b, r1, r0, band); }   // kirmizi sacak bandi
+            }
+            if (dead) {                                                           // yanik saha: titreyen alev + duman
+                for (int f = 0; f < 3; ++f) {
+                    const Proj fp = pt(ka + (kb - ka) * (f + 1) / 4, -(P[i].hw + 6.5), 0.8);
+                    if (!fp.ok) continue;
+                    r.setDepthW(fp.w - 0.1f);
+                    const float fs = pxPerM / fp.w * (1.1f + 0.4f * hashf((int)(envT_ * 20) + f * 7));
+                    r.circle(fp.x, fp.y, fs * 1.2f, 12, {1.0f, 0.45f, 0.08f, 0.55f});
+                    r.circle(fp.x, fp.y - fs * 0.4f, fs * 0.7f, 10, {1.0f, 0.85f, 0.3f, 0.7f});
+                    r.circle(fp.x + fs * 0.3f, fp.y - fs * 2.2f, fs * 1.6f, 12, {0.15f, 0.14f, 0.14f, 0.35f});
+                }
             }
             {   // tabela: yuksek direk + BENZIN + fiyat
                 const Proj g0 = pt(ia, -(P[i].hw + 1.8), 0.0), g1 = pt(ia, -(P[i].hw + 1.8), 7.0);
