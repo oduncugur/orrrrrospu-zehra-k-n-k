@@ -13,12 +13,16 @@ namespace zk {
 
 struct WorldCity { std::string name; double x, y, dirX, dirY, r; double fuelPrice; int style; double hu, hv; };   // hu / hv: yari boy (dogu-bati / kuzey-guney, m)   // style: sehir kimligi (sekil / su / doku)
 struct WorldBuilding { double cx, cy, hu, hv, ux, uy, h; int city; float tone; };   // yonlu kutu: merkez, yari boylar (u: sehir ekseni), yukseklik
-enum WorldPoiType { WPoiRace = 0, WPoiMeet = 1, WPoiJunk = 2, WPoiGas = 3 };
+enum WorldPoiType { WPoiRace = 0, WPoiMeet = 1, WPoiJunk = 2, WPoiGas = 3, WPoiGarage = 4 };
 struct WorldPoi { int type; double x, y, heading; int city; int ref; std::string name; };
 struct WorldNode { double x, y; std::vector<int> edges; };
 // Simge yapilar: tip (cizim), konum, olcu, ad. Carpisma: yaricap r (silindir).
 enum LandmarkType { LmTower = 0, LmMaidenTower, LmPylon, LmMausoleum, LmTvTower, LmGreenDome, LmMosque, LmMountain, LmFairy, LmBalloon,
                     LmClock, LmCastle, LmSkyscraper, LmMinaret, LmGate };
+// Hiz kamerasi (yol uzerinde, gidis yonu heading); limit m/s
+struct WorldCamera { double x, y, heading, limit; int city; };
+// Toplanabilir: 0 nadir parca (sokak kenari), 1 ahir bulgusu (sehir disi)
+struct WorldCollect { double x, y; int type, city, idx; };
 struct WorldLandmark { int type; double x, y, r, h, heading; int city; std::string name; };
 // Yol (kenar): kose noktalari tutulur; surus hatti (RoadPath) ilk kullanimda uretilir (4x4 km sehirlerde bellek)
 struct WorldEdge {
@@ -43,6 +47,8 @@ public:
     std::vector<WorldBuilding> buildings;
     std::vector<WorldPoi> pois;
     std::vector<WorldLandmark> landmarks;
+    std::vector<WorldCamera> cameras;
+    std::vector<WorldCollect> collect;
     double minX = 0, minY = 0, maxX = 0, maxY = 0;
     static constexpr double kBlock = 333.0;   // baslangic konumu icin ornek blok
     // Sehir yari boylari (m): gercek olcege yakin (Istanbul 10 x 7 km ... Nigde 3 x 2.5 km)

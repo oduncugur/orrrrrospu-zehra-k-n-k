@@ -110,6 +110,7 @@ bool App::backToWorld() {
     goWorld();
     return true;
 }
+void App::goGarageDirect() { worldReturn = false; setVoice(1, nullptr); setScreen(std::make_unique<GarageScreen>(*this)); }
 void App::goWorld() { setVoice(1, nullptr); setScreen(std::make_unique<WorldScreen>(*this)); }
 void App::goGarage() {
     if (backToWorld()) return;

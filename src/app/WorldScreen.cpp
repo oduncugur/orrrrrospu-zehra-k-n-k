@@ -78,6 +78,16 @@ struct WorldScreen::Impl {
     float dragX = -1, dragY = -1; int dragId = -1;
     Rect mapBtn, autoBtn, poiBtn{0, 0, 0, 0}, mPlus, mMinus, mClose, mClear;
     int lastGear = -2;
+    // Kesicide 5 s: yanindaki modifiyeli araca kapisma teklifi
+    double limT = 0;
+    // Hiz kameralari / radar / gecis rekoru
+    std::vector<double> camCool; int legFrom = -1; double legStart = 0; double radarBlink = 0;
+    // Isler (kurye / taksi)
+    struct Job { int type; double tx, ty; double reward; double deadline; int phase; double dx, dy; std::string name; };
+    bool jobsOpen = false; std::vector<Job> offers; bool hasJob = false; Job job{};
+    Rect jobBtn, jobRows[3], jobClose, buyBtn{0, 0, 0, 0};
+    void makeOffers();
+    void startJobTarget(double x, double y);
 
     Impl(App& a) : app(a) {}
     void flash(const std::string& m, double t = 1.8) { msg = m; msgT = t; }
@@ -100,6 +110,46 @@ struct WorldScreen::Impl {
             (nl.edge != leg.edge || nl.rev != leg.rev)) { leg = nl; car->setRoad(path()); }
     }
 };
+
+void WorldScreen::Impl::startJobTarget(double x, double y) {
+    WorldLeg l; double s, lat;
+    if (w.nearestLeg(x, y, 0.0, l, s, lat, 300.0)) { const RoadPoint q = w.path(l).at(s); wpX = q.x; wpY = q.y; }
+    else { wpX = x; wpY = y; }
+    hasWp = true; route = w.route(leg, car->s(), wpX, wpY); routeIdx = 0;
+}
+
+// Is teklifleri: kurye (paketi hedefe) / taksi (yolcuyu al, birak); odul mesafe ve sureye gore
+void WorldScreen::Impl::makeOffers() {
+    offers.clear();
+    const double px = car->sim().posX(), py = car->sim().posY();
+    for (int k = 0; k < 3; ++k) {
+        const int type = k == 2 ? 1 : 0;
+        // hedef: rastgele sokak noktasi (kurye: sehirde ya da komsu sehirde; taksi: yakinda al, sehirde birak)
+        auto pick = [&](double minD, double maxD) {
+            for (int g = 0; g < 200; ++g) {
+                const int e = (int)(rnd() * w.edges.size());
+                const WorldEdge& E = w.edges[e];
+                if (E.highway || E.city < 0) continue;
+                const RoadPoint q = E.fwd().at(E.fwd().length() * 0.5);
+                const double d = std::hypot(q.x - px, q.y - py);
+                if (d >= minD && d <= maxD) return std::make_pair(q.x, q.y);
+            }
+            return std::make_pair(px + 800.0, py);
+        };
+        Job j{};
+        j.type = type;
+        const auto t = pick(type ? 1200.0 : 1500.0, k == 1 ? 14000.0 : 4500.0);
+        j.tx = t.first; j.ty = t.second;
+        if (type == 1) { const auto pu = pick(200.0, 900.0); j.dx = j.tx; j.dy = j.ty; j.tx = pu.first; j.ty = pu.second; j.phase = 0; }
+        else j.phase = 1;
+        const double dist = std::hypot(j.tx - px, j.ty - py) + (type ? std::hypot(j.dx - j.tx, j.dy - j.ty) : 0.0);
+        j.deadline = 40.0 + dist / 11.0;
+        j.reward = std::round((150.0 + dist * 0.35) / 10.0) * 10.0;
+        const int c = w.cityAt(type ? j.dx : j.tx, type ? j.dy : j.ty);
+        j.name = std::string(type ? "TAKSI: YOLCUYU " : "KURYE: PAKETI ") + (c >= 0 ? w.cities[c].name : std::string("OTOBAN")) + (type ? "'A GOTUR" : "'A TESLIM ET");
+        offers.push_back(j);
+    }
+}
 
 WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     Impl& M = *m_;
@@ -146,8 +196,13 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     M.cockpit.setPortrait(!land_);
     M.cockpit.setKnobGear(1);
     M.adasLevel = adasLevel(*findVehicle(M.carId), M.tune);
-    if (land_) { M.mapBtn = {470, 2, 576, 34}; M.autoBtn = {362, 2, 466, 34}; }
-    else { M.mapBtn = {252, 4, 356, 26}; M.autoBtn = {252, 30, 356, 52}; }
+    if (land_) { M.mapBtn = {470, 2, 576, 34}; M.autoBtn = {362, 2, 466, 34}; M.jobBtn = {580, 2, 636, 34}; }
+    else { M.mapBtn = {252, 4, 356, 26}; M.autoBtn = {252, 30, 356, 52}; M.jobBtn = {252, 56, 356, 78}; }
+    for (int k = 0; k < 3; ++k) M.jobRows[k] = {20, 70.0f + k * 62.0f, (float)M.W - 20, 124.0f + k * 62.0f};
+    M.jobClose = {(float)M.W / 2 - 60, (float)M.H - 44, (float)M.W / 2 + 60, (float)M.H - 8};
+    M.camCool.assign(M.w.cameras.size(), 0.0);
+    if (app.career.camBest.size() < M.w.cameras.size()) app.career.camBest.resize(M.w.cameras.size(), 0);
+    if (app.career.legBest.size() < M.w.cities.size()) app.career.legBest.resize(M.w.cities.size(), 0.0);
     M.mPlus = {(float)M.W - 60, 40, (float)M.W - 8, 80}; M.mMinus = {(float)M.W - 60, 86, (float)M.W - 8, 126};
     M.mClose = {(float)M.W - 120, (float)M.H - 44, (float)M.W - 8, (float)M.H - 8}; M.mClear = {8, (float)M.H - 44, 140, (float)M.H - 8};
     M.rng ^= (uint32_t)(app.career.races * 7919 + 13);
@@ -284,6 +339,95 @@ void WorldScreen::update(double dt) {
         if (cNow >= 0) { app.career.city = cNow; app.toast(std::string(M.w.cities[cNow].name) + "'A HOS GELDIN"); app.saveCareer(); }
         else if (M.city >= 0) app.toast("OTOBAN: SEHIRLERARASI");
         M.city = cNow;
+    }
+    // Sehirlerarasi gecis rekoru: sehirden cikis -> komsu sehre giris suresi
+    if (cNow < 0 && M.legFrom < 0 && M.city < 0) {}
+    {
+        static int lastC = -2;
+        if (lastC >= 0 && cNow < 0) { M.legFrom = lastC; M.legStart = M.envT; }
+        if (cNow >= 0 && M.legFrom >= 0 && cNow != M.legFrom && std::abs(cNow - M.legFrom) == 1) {
+            const double tl = M.envT - M.legStart; const int li = std::min(cNow, M.legFrom);
+            double& best = app.career.legBest[li];
+            char b[96];
+            if (best <= 0 || tl < best) { best = tl; std::snprintf(b, sizeof b, "%s - %s: %d:%04.1f  REKOR!", M.w.cities[M.legFrom].name.c_str(), M.w.cities[cNow].name.c_str(), (int)tl / 60, std::fmod(tl, 60.0)); app.saveCareer(); }
+            else std::snprintf(b, sizeof b, "GECIS %d:%04.1f (REKOR %d:%04.1f)", (int)tl / 60, std::fmod(tl, 60.0), (int)best / 60, std::fmod(best, 60.0));
+            app.toast(b); M.legFrom = -1;
+        }
+        if (cNow >= 0) M.legFrom = cNow == M.legFrom ? M.legFrom : (lastC < 0 && M.legFrom >= 0 ? M.legFrom : -1);
+        lastC = cNow;
+    }
+    // Hiz kameralari: gecerken olcer; siniri 10 km/h asarsan ceza; rekor; radar dedektoru onceden uyarir
+    M.radarBlink = 0;
+    for (size_t k = 0; k < M.w.cameras.size(); ++k) {
+        const WorldCamera& cm = M.w.cameras[k];
+        M.camCool[k] = std::max(0.0, M.camCool[k] - dt);
+        const double ddx = cm.x - sim.posX(), ddy = cm.y - sim.posY(), d = std::hypot(ddx, ddy);
+        if (app.career.radarDetector && d < 450.0 && d > 14.0 && ddx * std::cos(sim.heading()) + ddy * std::sin(sim.heading()) > 0) M.radarBlink = std::max(M.radarBlink, 450.0 - d);
+        if (d < 14.0 && M.camCool[k] <= 0) {
+            M.camCool[k] = 6.0;
+            const int kmh = (int)std::lround(v * 3.6), lim = (int)std::lround(cm.limit * 3.6);
+            char b[96];
+            if (kmh > app.career.camBest[k]) app.career.camBest[k] = kmh;
+            if (kmh > lim + 10) {
+                const long fine = std::min(app.career.money, 300L + 20L * (kmh - lim));
+                app.career.money -= fine;
+                std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d) CEZA -%s  REKOR %d", kmh, lim, money(fine).c_str(), app.career.camBest[k]);
+            } else std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d)  REKOR %d", kmh, lim, app.career.camBest[k]);
+            app.toast(b); app.saveCareer();
+        }
+    }
+    // Toplanabilirler: nadir parca (yanindan gec) / ahir bulgusu (yaninda dur)
+    for (const WorldCollect& cl : M.w.collect) {
+        if ((app.career.collected >> cl.idx) & 1ull) continue;
+        const double d = std::hypot(cl.x - sim.posX(), cl.y - sim.posY());
+        if (cl.type == 0 && d < 4.5) {
+            app.career.collected |= 1ull << cl.idx;
+            static const char* const kPart[6] = {"TURBO SALYANGOZU", "DOVME PISTON", "YARIS KAM MILI", "TITANYUM EGZOZ", "KARBON KAPUT", "YARIS DEBRIYAJI"};
+            const long prize = 750 + 250 * (cl.idx % 7);
+            app.career.money += prize;
+            int n = 0; for (int b = 0; b < 64; ++b) n += (app.career.collected >> b) & 1ull;
+            char b[96]; std::snprintf(b, sizeof b, "NADIR PARCA: %s +%s (%d/%d)", kPart[cl.idx % 6], money(prize).c_str(), n, (int)M.w.collect.size());
+            app.toast(b); app.saveCareer();
+        }
+        if (cl.type == 1 && d < 14.0 && v < 2.0) {
+            app.career.collected |= 1ull << cl.idx;
+            std::string why;
+            if (app.career.claimBarn(cl.city, &why)) app.toast(std::string("AHIR BULGUSU: ") + upper(findVehicle(Career::barnCar(cl.city))->model) + " GARAJINDA!");
+            else app.toast(why);
+            app.saveCareer();
+        }
+    }
+    // Is (kurye / taksi): hedefe varinca (dur) asama / odul; sure biterse basarisiz
+    if (M.hasJob) {
+        M.job.deadline -= dt;
+        if (M.job.deadline <= 0) { M.hasJob = false; M.hasWp = false; M.route.clear(); app.toast("IS BASARISIZ: SURE BITTI"); }
+        else if (std::hypot(M.job.tx - sim.posX(), M.job.ty - sim.posY()) < 25.0 && v < 2.5) {
+            if (M.job.type == 1 && M.job.phase == 0) { M.job.phase = 1; M.job.tx = M.job.dx; M.job.ty = M.job.dy; M.startJobTarget(M.job.tx, M.job.ty); app.toast("YOLCU BINDI: HEDEFE GOTUR"); }
+            else { app.career.money += (long)M.job.reward; app.toast("IS TAMAM +" + money((long)M.job.reward)); app.saveCareer(); M.hasJob = false; M.hasWp = false; M.route.clear(); }
+        }
+    }
+    // Kesicide 5 s: yanindaki modifiyeli arac (serseri / bulusma / trafik) kapismaya gelir
+    {
+        int cand = 0; Tune ct{};
+        if (v < 1.5 && pt.limiterHit()) {
+            double bd = 1e9;
+            for (const auto& t : M.traffic) {
+                const RoadPoint q = M.w.path(t.leg).at(t.s);
+                const double d = std::hypot(q.x - sim.posX(), q.y - sim.posY());
+                if (d < (t.role == 2 ? 25.0 : 14.0) && d < bd) { bd = d; cand = t.carId; ct = t.role == 2 ? opponentPreset(2) : Tune{}; }
+            }
+            for (const WorldPoi& q : M.w.pois)
+                if (q.type == WPoiMeet && std::hypot(q.x - sim.posX(), q.y - sim.posY()) < 55.0) { static const int kMeet[12] = {2, 5, 12, 24, 34, 50, 59, 78, 88, 100, 122, 152}; cand = kMeet[(q.city * 5 + (int)M.envT) % 12]; ct = opponentPreset(1 + (q.city & 1)); }
+        }
+        M.limT = cand ? M.limT + dt : 0.0;
+        if (cand && M.limT > 5.0) {
+            M.limT = 0;
+            app.pendMode = 1; app.pendRival = cand; app.pendTune = ct;
+            app.worldValid = true; app.worldX = sim.posX(); app.worldY = sim.posY(); app.worldH = sim.heading();
+            app.worldReturn = true; app.career.car().fuelL = sim.fuelLiters();
+            app.goRoad();
+            return;
+        }
     }
     // Trafik: oyuncu cevresinde ~24 arac; kavsakta rastgele cikis; polis / serseri
     {
@@ -522,6 +666,9 @@ void WorldScreen::render(Renderer& r) {
         }
     }
     for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
+    for (int i = 0; i < (int)w.collect.size(); ++i)
+        if (!((M.app.career.collected >> w.collect[i].idx) & 1ull) && front(w.collect[i].x, w.collect[i].y, 260.0)) items.push_back({std::hypot(w.collect[i].x - ex, w.collect[i].y - ey), 4, i});
+    for (int i = 0; i < (int)w.cameras.size(); ++i) if (front(w.cameras[i].x, w.cameras[i].y, 500.0)) items.push_back({std::hypot(w.cameras[i].x - ex, w.cameras[i].y - ey), 5, i});
     std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.d > b.d; });
     std::vector<std::pair<int, Mat4>> parked;                             // bulusma meydani araclari
     std::vector<Renderer::CarLook> parkedLook;
@@ -547,6 +694,31 @@ void WorldScreen::render(Renderer& r) {
                     }
             }
             quadP(r, P3(cx[0], cy[0], b.h), P3(cx[1], cy[1], b.h), P3(cx[2], cy[2], b.h), P3(cx[3], cy[3], b.h), fog({base.r * 0.7f, base.g * 0.7f, base.b * 0.7f}, (float)it.d));
+        } else if (it.kind == 4) {                                        // toplanabilir: donen altin kutu / eski ahir
+            const WorldCollect& cl = w.collect[it.idx];
+            if (cl.type == 0) {
+                const double a = M.envT * 2.0, hz2 = 1.2 + 0.25 * std::sin(M.envT * 3.0);
+                Proj c4[4];
+                for (int k = 0; k < 4; ++k) c4[k] = P3(cl.x + 0.6 * std::cos(a + k * 1.5708), cl.y + 0.6 * std::sin(a + k * 1.5708), hz2);
+                const Proj top = P3(cl.x, cl.y, hz2 + 0.8), bot = P3(cl.x, cl.y, hz2 - 0.8);
+                for (int k = 0; k < 4; ++k) {
+                    if (top.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, top, c4[k], c4[(k + 1) % 4], k % 2 ? Color{1.0f, 0.85f, 0.2f} : Color{0.85f, 0.65f, 0.1f});
+                    if (bot.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, bot, c4[k], c4[(k + 1) % 4], k % 2 ? Color{0.8f, 0.6f, 0.1f} : Color{0.95f, 0.75f, 0.15f});
+                }
+            } else {
+                const Proj b0 = P3(cl.x, cl.y, 0), b1 = P3(cl.x, cl.y, 6.0);
+                if (b0.ok && b1.ok) { r.setDepthW(b0.w); const float sc = pxPerM / b0.w; r.rect(b0.x - 7 * sc, b1.y, b0.x + 7 * sc, b0.y, fog({0.45f, 0.28f, 0.16f}, b0.w));
+                                      r.tri(b0.x - 8 * sc, b1.y, b0.x + 8 * sc, b1.y, b0.x, b1.y - 3 * sc, fog({0.35f, 0.2f, 0.12f}, b0.w));
+                                      if (it.d < 120) r.textCentered(b0.x, b1.y - 3 * sc - 12, "TERK EDILMIS AHIR?", 1, {1.0f, 0.9f, 0.5f}); }
+            }
+        } else if (it.kind == 5) {                                        // hiz kamerasi: direk + kutu
+            const WorldCamera& cm = w.cameras[it.idx];
+            const double ox = -std::sin(cm.heading) * -11.0, oy = std::cos(cm.heading) * -11.0;
+            const Proj b0 = P3(cm.x + ox, cm.y + oy, 0), b1 = P3(cm.x + ox, cm.y + oy, 4.5);
+            if (b0.ok && b1.ok) { r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                                  r.rect(b0.x - 0.1f * sc, b1.y, b0.x + 0.1f * sc, b0.y, fog({0.5f, 0.5f, 0.52f}, b0.w));
+                                  r.rect(b1.x - 0.5f * sc, b1.y - 0.6f * sc, b1.x + 0.5f * sc, b1.y + 0.2f * sc, fog({0.9f, 0.75f, 0.1f}, b0.w));
+                                  r.circle(b1.x, b1.y - 0.2f * sc, std::max(1.0f, 0.18f * sc), 8, {0.1f, 0.1f, 0.12f}); }
         } else if (it.kind == 3) {                                        // yaya: bacak + govde + kol + bas
             const Ped& pd = peds[it.idx];
             const Proj f0 = P3(pd.x, pd.y, 0.0), f1 = P3(pd.x, pd.y, 1.75);
@@ -666,7 +838,7 @@ void WorldScreen::render(Renderer& r) {
             if (!b0.ok) continue;
             const float sc = pxPerM / b0.w;
             r.setDepthW(b0.w);
-            static const Color kc[4] = {{0.95f, 0.45f, 0.08f}, {0.75f, 0.15f, 0.55f}, {0.45f, 0.30f, 0.15f}, {0.85f, 0.15f, 0.12f}};
+            static const Color kc[5] = {{0.95f, 0.45f, 0.08f}, {0.75f, 0.15f, 0.55f}, {0.45f, 0.30f, 0.15f}, {0.85f, 0.15f, 0.12f}, {0.15f, 0.55f, 0.3f}};
             std::string label = q.name;
             if (q.type == WPoiGas) {                                          // benzinlik: sacak + pompalar + fiyat
                 char pb[48]; std::snprintf(pb, sizeof pb, "BENZIN %.2f TL", w.fuelPriceAt(q.city, M.app.career.marketWeek() < 0 ? 0 : M.app.career.marketWeek()));
@@ -774,6 +946,20 @@ void WorldScreen::render(Renderer& r) {
     std::snprintf(b, sizeof b, "SINIR %.0f  %s", M.speedLimit() * 3.6, money(M.app.career.money).c_str());
     r.text(150, 16, b, 1, {0.8f, 0.8f, 0.85f});
     button(r, M.mapBtn, "HARITA", {0.15f, 0.35f, 0.6f}, 1);
+    button(r, M.jobBtn, M.hasJob ? "IS VAR" : "ISLER", M.hasJob ? Color{0.55f, 0.4f, 0.1f} : Color{0.3f, 0.3f, 0.36f}, 1);
+    if (M.hasJob) {
+        std::snprintf(b, sizeof b, "%s  %.0f S  %s", M.job.type == 1 && M.job.phase == 0 ? "YOLCUYU AL" : M.job.name.c_str(), M.job.deadline, money((long)M.job.reward).c_str());
+        r.textFit(W * 0.42f, 60, b, 1, W * 0.8f, {1.0f, 0.85f, 0.3f}, true);
+    }
+    if (M.limT > 0.05) {                                                  // kesicide tut: kapisma
+        r.rect(W * 0.3f, H * 0.42f, W * 0.7f, H * 0.42f + 16, {0, 0, 0, 0.6f});
+        r.rect(W * 0.3f, H * 0.42f, W * 0.3f + W * 0.4f * (float)std::min(1.0, M.limT / 5.0), H * 0.42f + 16, {1.0f, 0.35f, 0.1f});
+        r.textCentered(W * 0.5f, H * 0.42f + 4, "KESICIDE TUT: KAPISMA", 1, {1, 1, 1});
+    }
+    if (M.radarBlink > 0 && std::fmod(M.envT, 0.5) < 0.3) {
+        std::snprintf(b, sizeof b, "!! RADAR %.0f M", 450.0 - M.radarBlink);
+        r.rect(W * 0.35f, 74, W * 0.65f, 94, {0.8f, 0.1f, 0.1f, 0.85f}); r.textCentered(W * 0.5f, 79, b, 1, {1, 1, 1});
+    }
     button(r, M.autoBtn, M.autoDrive ? "OTONOM ACIK" : "OTONOM", M.autoDrive ? Color{0.15f, 0.55f, 0.25f} : Color{0.25f, 0.27f, 0.32f}, 1);
     if (!M.route.empty() && M.routeIdx + 1 < M.route.size()) {             // sonraki donus
         const RoadPath& cp = M.path(); const RoadPath& np = w.path(M.route[M.routeIdx + 1]);
@@ -792,9 +978,26 @@ void WorldScreen::render(Renderer& r) {
                                                money((long)((sim.tankLiters() - sim.fuelLiters()) * M.fuelPrice())).c_str()); lab = b; }
         M.poiBtn = {W * 0.42f - 140, H - (M.land ? 86.0f : 140.0f), W * 0.42f + 140, H - (M.land ? 54.0f : 104.0f)};
         button(r, M.poiBtn, std::string("GIR: ") + lab, {0.85f, 0.45f, 0.08f}, 1);
+        if (q.type == WPoiGas && !M.app.career.radarDetector) {
+            M.buyBtn = {M.poiBtn.x0, M.poiBtn.y0 - 36, M.poiBtn.x1, M.poiBtn.y0 - 4};
+            button(r, M.buyBtn, "MARKET: RADAR DEDEKTORU $1,500", {0.25f, 0.3f, 0.5f}, 1);
+        } else M.buyBtn = {0, 0, 0, 0};
     }
     if (M.msgT > 0) { r.rect(0, H * 0.3f, W, H * 0.3f + 26, {0.02f, 0.02f, 0.04f, 0.75f}); r.textCentered(W / 2.0f, H * 0.3f + 7, M.msg, 2, kUiGold); }
     M.cockpit.render(r, g, P.grinding());
+    if (M.jobsOpen) {                                                     // is teklifleri
+        r.rect(0, 0, W, H, {0.05f, 0.06f, 0.08f, 0.95f});
+        r.textCentered(W * 0.5f, 24, "ISLER: KURYE / TAKSI", 2, kUiGold);
+        for (size_t k = 0; k < M.offers.size() && k < 3; ++k) {
+            const auto& j = M.offers[k];
+            r.rect(M.jobRows[k].x0, M.jobRows[k].y0, M.jobRows[k].x1, M.jobRows[k].y1, {0.14f, 0.16f, 0.22f});
+            r.text(M.jobRows[k].x0 + 10, M.jobRows[k].y0 + 8, j.name, 1, {1, 1, 1});
+            std::snprintf(b, sizeof b, "SURE %.0f S   ODUL %s   %.1f KM", j.deadline, money((long)j.reward).c_str(),
+                          (std::hypot(j.tx - X, j.ty - Y) + (j.type ? std::hypot(j.dx - j.tx, j.dy - j.ty) : 0.0)) / 1000.0);
+            r.text(M.jobRows[k].x0 + 10, M.jobRows[k].y0 + 28, b, 1, kUiGold);
+        }
+        button(r, M.jobClose, "KAPAT", kUiBtn, 2);
+    }
     // ---- Harita ----
     if (M.mapOpen) {
         r.rect(0, 0, W, H, {0.06f, 0.09f, 0.08f, 0.97f});
@@ -830,7 +1033,8 @@ void WorldScreen::render(Renderer& r) {
             const auto& pts = w.path(M.route[k]).points();
             for (size_t i = 0; i + 4 < pts.size(); i += 4) seg(pts[i].x, pts[i].y, pts[i + 4].x, pts[i + 4].y, 2.2f, {0.2f, 0.7f, 1.0f});
         }
-        static const Color pc[4] = {{1.0f, 0.5f, 0.1f}, {0.9f, 0.3f, 0.7f}, {0.6f, 0.45f, 0.25f}, {0.9f, 0.2f, 0.15f}};
+        static const Color pc[5] = {{1.0f, 0.5f, 0.1f}, {0.9f, 0.3f, 0.7f}, {0.6f, 0.45f, 0.25f}, {0.9f, 0.2f, 0.15f}, {0.2f, 0.85f, 0.4f}};
+        for (const WorldCamera& cm : w.cameras) { float sx, sy; S(cm.x, cm.y, sx, sy); r.rect(sx - 2, sy - 2, sx + 2, sy + 2, {1, 1, 1}); }
         for (const WorldPoi& q : w.pois) { float sx, sy; S(q.x, q.y, sx, sy); r.circle(sx, sy, 4.0f, 10, pc[q.type]); }
         for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.textCentered(sx, sy - (float)(c.hv / M.mapScale) - 14, c.name, 1, {1, 1, 1}); }
         if (M.mapScale < 25.0)
@@ -846,7 +1050,8 @@ void WorldScreen::render(Renderer& r) {
             const float h = (float)sim.heading(), c2 = std::cos(h), s2 = -std::sin(h);
             r.tri(sx + c2 * 9, sy + s2 * 9, sx - c2 * 6 - s2 * 5, sy - s2 * 6 + c2 * 5, sx - c2 * 6 + s2 * 5, sy - s2 * 6 - c2 * 5, {0.2f, 1.0f, 0.4f}); }
         r.text(8, 8, "HARITA: DOKUN = HEDEF, SURUKLE = KAYDIR", 1, {0.9f, 0.9f, 0.9f});
-        r.text(8, 20, "TURUNCU YARIS  PEMBE BULUSMA  KAHVE HURDALIK  KIRMIZI BENZIN", 1, {0.7f, 0.7f, 0.7f});
+        r.text(8, 20, "TURUNCU YARIS  PEMBE BULUSMA  KAHVE HURDALIK  KIRMIZI BENZIN  YESIL GARAJ  BEYAZ RADAR", 1, {0.7f, 0.7f, 0.7f});
+        { int n = 0; for (int bb = 0; bb < 64; ++bb) n += (M.app.career.collected >> bb) & 1ull; char cb[48]; std::snprintf(cb, sizeof cb, "TOPLANAN %d / %d", n, (int)w.collect.size()); r.text(8, 32, cb, 1, kUiGold); }
         button(r, M.mPlus, "+", kUiBtn, 3); button(r, M.mMinus, "-", kUiBtn, 3);
         button(r, M.mClose, "KAPAT", kUiBtn, 2); button(r, M.mClear, "HEDEF SIL", {0.45f, 0.2f, 0.15f}, 1);
     }
@@ -862,6 +1067,28 @@ void WorldScreen::pointerDown(int id, float x, float y) {
         if (M.mMinus.hit(x, y)) { M.mapScale = std::min(200.0, M.mapScale * 1.6); return; }
         if (M.mClear.hit(x, y)) { M.hasWp = false; M.route.clear(); return; }
         M.dragX = x; M.dragY = y; M.dragId = id;
+        return;
+    }
+    if (M.jobsOpen) {
+        if (M.jobClose.hit(x, y)) { M.jobsOpen = false; return; }
+        for (size_t k = 0; k < M.offers.size() && k < 3; ++k)
+            if (M.jobRows[k].hit(x, y)) {
+                M.job = M.offers[k]; M.hasJob = true; M.jobsOpen = false;
+                M.startJobTarget(M.job.tx, M.job.ty);
+                M.flash(M.job.type == 1 ? "TAKSI: ONCE YOLCUYU AL (HARITADA MAVI)" : "KURYE: PAKETI TESLIM ET (HARITADA MAVI)", 2.2);
+                return;
+            }
+        return;
+    }
+    if (M.jobBtn.hit(x, y)) {
+        if (M.hasJob) { M.hasJob = false; M.hasWp = false; M.route.clear(); M.flash("IS BIRAKILDI", 1.2); }
+        else { M.makeOffers(); M.jobsOpen = true; }
+        return;
+    }
+    if (M.buyBtn.x1 > 0 && M.buyBtn.hit(x, y)) {
+        if (app.career.money < 1500) { M.flash("PARA YETMIYOR", 1.4); return; }
+        app.career.money -= 1500; app.career.radarDetector = true; app.saveCareer();
+        M.flash("RADAR DEDEKTORU TAKILDI: KAMERALARI 450 M ONCEDEN UYARIR", 2.4);
         return;
     }
     if (M.mapBtn.hit(x, y)) { M.mapOpen = true; M.mapCx = M.car->sim().posX(); M.mapCy = M.car->sim().posY(); return; }
@@ -899,6 +1126,7 @@ void WorldScreen::pointerDown(int id, float x, float y) {
             leave(); app.startEvent(q.ref); return;
         case WPoiMeet: leave(); app.goStreet(); return;
         case WPoiJunk: leave(); app.goJunkyard(); return;
+        case WPoiGarage: leave(); app.goGarageDirect(); return;           // garajdan SERBEST YOL ile buraya donulur
         }
         return;
     }

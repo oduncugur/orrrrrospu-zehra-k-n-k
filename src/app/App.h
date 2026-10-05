@@ -108,6 +108,7 @@ public:
     bool worldReturn = false, worldValid = false; double worldX = 0, worldY = 0, worldH = 0;
     int pendMode = -1, pendRival = 0; Tune pendTune{};   // pendMode: 0 kovalamaca, 1 kapisma
     void goWorld();
+    void goGarageDirect();                               // acik dunya garaji: donus yonlendirmesi olmadan garaj
     bool backToWorld();                                  // donus bekliyorsa acik dunyaya don (true)
     void goGauges();                             // kadran dukkani                             // sokak: bulusma / dyno yarismasi / musteri isleri
     void startMeet();                            // gece bulusmasi: bahisli drag

@@ -196,6 +196,12 @@ struct Career {
     bool buyUsed(const UsedListing& l, std::string* why = nullptr);  // ikinci el ilan
     // Ahir bulgusu (sehir turu): her sehirde bir nadir arac; bedava ama yipranmis (hurdalik araci gibi), bir kez
     uint32_t barnFound = 0;
+    // Acik dunya: radar dedektoru (hiz kamerasi uyarisi), toplanan nadir parcalar (bit), kamera rekorlari (km/h),
+    // sehirlerarasi gecis rekorlari (s; 0 = yok)
+    bool radarDetector = false;
+    uint64_t collected = 0;
+    std::vector<int> camBest;
+    std::vector<double> legBest;
     static int barnCar(int city);                   // sehrin nadir araci
     bool claimBarn(int city, std::string* why = nullptr);
     void addKm(double km) { OwnedCar& c = car(); c.km = c.odo() + std::max(0.0, km); }

@@ -302,6 +302,45 @@ void World::build() {
         default: add(LmMinaret, -300, -150, 4, 38, "YIVLI MINARE"); add(LmGate, 200, 0, 20, 12, "HADRIAN KAPISI"); break;
         }
     }
+    // Hiz kameralari: sehirlerarasi otobanda kenar basina 2 (120 km/h), sehir otoban caddesinde 2 (70 km/h)
+    for (int e = 0; e < (int)edges.size(); ++e) {
+        const WorldEdge& E = edges[e];
+        if (!E.highway || E.bridge) continue;
+        if (E.city < 0) {
+            for (double f : {0.35, 0.72}) { const RoadPoint q = E.fwd().at(E.fwd().length() * f); cameras.push_back({q.x, q.y, q.heading, 120.0 / 3.6, -1}); }
+        } else if (E.hw >= 8.0 && hashW(e * 7) < 0.12) {
+            const RoadPoint q = E.fwd().at(E.fwd().length() * 0.5);
+            cameras.push_back({q.x, q.y, q.heading, 70.0 / 3.6, E.city});
+        }
+    }
+    // Garaj: her sehirde merkeze en yakin sokakta; toplanabilirler: sehir basina 5 nadir parca + sehir disinda ahir
+    for (int c = 0; c < nC; ++c) {
+        const WorldCity& C = cities[c];
+        int best = -1; double bd = 1e18;
+        std::vector<int> streets;
+        for (int e = 0; e < (int)edges.size(); ++e) {
+            const WorldEdge& E = edges[e];
+            if (E.city != c || E.highway || E.bridge) continue;
+            streets.push_back(e);
+            const double d = std::hypot(E.pts.front().first - C.x, E.pts.front().second - C.y);
+            if (d > 250.0 && d < bd) { bd = d; best = e; }
+        }
+        if (best >= 0) {
+            const RoadPath& fp = edges[best].fwd();
+            const RoadPoint q = fp.at(fp.length() * 0.5);
+            const double off = -(fp.halfWidthAt(q.s) + 20.0);
+            pois.push_back({WPoiGarage, q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), q.heading, c, 0, std::string("GARAJ: ") + C.name});
+        }
+        for (int k = 0; k < 5 && !streets.empty(); ++k) {
+            const int e = streets[(size_t)(hashW(c * 131 + k * 17) * streets.size()) % streets.size()];
+            const RoadPath& fp = edges[e].fwd();
+            const RoadPoint q = fp.at(fp.length() * (0.2 + 0.6 * hashW(c * 7 + k)));
+            const double off = -(fp.halfWidthAt(q.s) + 3.5);
+            collect.push_back({q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), 0, c, (int)collect.size()});
+        }
+        {   const double u = C.hu * 0.92, v = C.hv * 1.12;                      // ahir: sehrin kuzey dogusunda, yesil alanda
+            collect.push_back({C.x + u * C.dirX - v * C.dirY, C.y + u * C.dirY + v * C.dirX, 1, c, (int)collect.size()}); }
+    }
     // Simge yapilarin uzerindeki binalar kaldirilir
     buildings.erase(std::remove_if(buildings.begin(), buildings.end(), [&](const WorldBuilding& b) {
         for (const WorldLandmark& l : landmarks) if (l.type != LmMountain && l.type != LmBalloon && std::hypot(b.cx - l.x, b.cy - l.y) < l.r + 30.0) return true;

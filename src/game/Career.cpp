@@ -1609,6 +1609,10 @@ std::string Career::serialize() const {
         char lb[200];
         std::snprintf(lb, sizeof lb, "evw=%llx\nevw2=%llx\nbarn=%x\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, (unsigned long long)eventWins2, (unsigned)barnFound, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
         o << lb;
+        // Acik dunya: radar dedektoru, toplananlar, kamera rekorlari (km/h), sehirlerarasi gecis rekorlari (s)
+        o << "owr=" << (radarDetector ? 1 : 0) << ";" << std::hex << collected << std::dec << "\n";
+        if (!camBest.empty()) { o << "cams="; for (size_t i = 0; i < camBest.size(); ++i) o << (i ? "," : "") << camBest[i]; o << "\n"; }
+        if (!legBest.empty()) { o << "legs="; for (size_t i = 0; i < legBest.size(); ++i) o << (i ? "," : "") << legBest[i]; o << "\n"; }
     }
     char buf[256];
     for (const OwnedCar& c : cars) {
@@ -1687,6 +1691,9 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "evw2") c.eventWins2 = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "barn") c.barnFound = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
+        else if (k == "owr") { int rd = 0; unsigned long long col = 0; if (std::sscanf(v.c_str(), "%d;%llx", &rd, &col) == 2) { c.radarDetector = rd != 0; c.collected = col; } }
+        else if (k == "cams") { c.camBest.clear(); for (size_t a = 0; a < v.size();) { c.camBest.push_back(std::atoi(v.c_str() + a)); const size_t b = v.find(',', a); if (b == std::string::npos) break; a = b + 1; } }
+        else if (k == "legs") { c.legBest.clear(); for (size_t a = 0; a < v.size();) { c.legBest.push_back(std::atof(v.c_str() + a)); const size_t b = v.find(',', a); if (b == std::string::npos) break; a = b + 1; } }
         else if (k == "ach") c.achieved = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
         else if (k == "daily") std::sscanf(v.c_str(), "%d;%ld;%ld;%ld;%d", &c.dailyDay, &c.dailyProg[0], &c.dailyProg[1], &c.dailyProg[2], &c.dailyDone);
         else if (k == "streak") {
