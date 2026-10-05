@@ -370,29 +370,30 @@ void WorldScreen::render(Renderer& r) {
     };
     // Sehir zeminleri (kaldirim / beton): 20 m karolar (yakindaki buyuk karo kameranin arkasina tasip atlaniyordu)
     for (const WorldCity& c : w.cities) {
-        if (std::hypot(c.x - ex, c.y - ey) > 2400.0) continue;              // merkez arkada kalsa da sehrin bir kismi onde olabilir
-        const double R = std::max(c.hu, c.hv) + 40.0, px = -c.dirY, py = c.dirX;
-        const int N = (int)(2 * R / 20.0);
+        if (std::hypot(c.x - ex, c.y - ey) > c.hu + c.hv + 4000.0) continue;   // butun sehir (uzaktan da)
+        const double px = -c.dirY, py = c.dirX;
         const double cu = (ex - c.x) * c.dirX + (ey - c.y) * c.dirY, cv = (ex - c.x) * px + (ey - c.y) * py;   // kamera yerel
-        const int i0 = std::max(0, (int)((cu - 650.0 + R) / 20.0)), i1 = std::min(N, (int)((cu + 650.0 + R) / 20.0) + 1);
-        const int j0 = std::max(0, (int)((cv - 650.0 + R) / 20.0)), j1 = std::min(N, (int)((cv + 650.0 + R) / 20.0) + 1);
-        for (int i = i0; i < i1; ++i)
-            for (int j = j0; j < j1; ++j) {
-                const double u0 = -R + 2 * R * i / N, u1 = -R + 2 * R * (i + 1) / N, v0 = -R + 2 * R * j / N, v1 = -R + 2 * R * (j + 1) / N;
-                const double mu = 0.5 * (u0 + u1), mv = 0.5 * (v0 + v1);
-                if (!front(c.x + mu * c.dirX + mv * px, c.y + mu * c.dirY + mv * py, 650.0)) continue;
-                auto Q = [&](double u, double v) { return P3(c.x + u * c.dirX + v * px, c.y + u * c.dirY + v * py, 0.0); };
-                const double cxw = c.x + mu * c.dirX + mv * px - ex, cyw = c.y + mu * c.dirY + mv * py - ey;
-                const int sub = cxw * cxw + cyw * cyw < 60.0 * 60.0 ? 5 : 1;   // yakinda 4 m alt karolar (yakin duzlem kirpmasi)
+        const double T = 100.0;                                          // kaba karo; yakinda 20 m, cok yakinda 4 m
+        const int iu0 = (int)std::floor(std::max(-c.hu, cu - 4000.0) / T), iu1 = (int)std::ceil(std::min(c.hu, cu + 4000.0) / T);
+        const int iv0 = (int)std::floor(std::max(-c.hv, cv - 4000.0) / T), iv1 = (int)std::ceil(std::min(c.hv, cv + 4000.0) / T);
+        auto Q = [&](double u, double v) { return P3(c.x + u * c.dirX + v * px, c.y + u * c.dirY + v * py, 0.0); };
+        for (int i = iu0; i < iu1; ++i)
+            for (int j = iv0; j < iv1; ++j) {
+                const double u0 = i * T, u1 = u0 + T, v0 = j * T, v1 = v0 + T, mu = u0 + T * 0.5, mv = v0 + T * 0.5;
+                const double wx = c.x + mu * c.dirX + mv * px, wy = c.y + mu * c.dirY + mv * py;
+                if (!front(wx, wy, 4000.0)) continue;
+                const double d = std::hypot(wx - ex, wy - ey);
+                if (d > 700.0 && World::surfaceLocal(c.style, mu, mv) == 2) continue;
+                const int sub = d < 110.0 ? 25 : d < 700.0 ? 5 : 1;            // yakin duzlem kirpmasi icin kucuk karolar
                 for (int a2 = 0; a2 < sub; ++a2)
                     for (int b2 = 0; b2 < sub; ++b2) {
-                        const double ua = u0 + (u1 - u0) * a2 / sub, ub = u0 + (u1 - u0) * (a2 + 1) / sub;
-                        const double va = v0 + (v1 - v0) * b2 / sub, vb = v0 + (v1 - v0) * (b2 + 1) / sub;
+                        const double ua = u0 + T * a2 / sub, ub = u0 + T * (a2 + 1) / sub;
+                        const double va = v0 + T * b2 / sub, vb = v0 + T * (b2 + 1) / sub;
                         const int surf = World::surfaceLocal(c.style, 0.5 * (ua + ub), 0.5 * (va + vb));
                         if (surf == 2) continue;                              // yesil: cim zemini kalir
-                        const Proj a = Q(ua, va);
+                        const Proj q0 = Q(ua, va);
                         const float wv = 0.04f * std::sin((float)(M.envT * 1.3 + ua * 0.05 + va * 0.03));   // su parlamasi
-                        quadP(r, a, Q(ub, va), Q(ub, vb), Q(ua, vb), fog(surf == 1 ? Color{0.16f + wv, 0.38f + wv, 0.62f + wv} : Color{0.62f, 0.62f, 0.60f}, a.w));
+                        quadP(r, q0, Q(ub, va), Q(ub, vb), Q(ua, vb), fog(surf == 1 ? Color{0.16f + wv, 0.38f + wv, 0.62f + wv} : Color{0.62f, 0.62f, 0.60f}, q0.w));
                     }
             }
     }
@@ -441,8 +442,10 @@ void WorldScreen::render(Renderer& r) {
     std::vector<Item> items;
     for (int i = 0; i < (int)w.buildings.size(); ++i) {
         const WorldBuilding& b = w.buildings[i];
-        if (!front(b.cx, b.cy, 700.0)) continue;
-        items.push_back({std::hypot(b.cx - ex, b.cy - ey), 0, i});
+        if (!front(b.cx, b.cy, 6000.0)) continue;                          // butun sehir silueti
+        const double d = std::hypot(b.cx - ex, b.cy - ey);
+        if (d > 1800.0 && b.h < 14.0 + d * 0.004) continue;               // uzakta alcak binalar gorunmez (LOD)
+        items.push_back({d, 0, i});
     }
     for (int i = 0; i < (int)w.pois.size(); ++i) if (front(w.pois[i].x, w.pois[i].y, 800.0)) items.push_back({std::hypot(w.pois[i].x - ex, w.pois[i].y - ey), 1, i});
     std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.d > b.d; });

@@ -275,9 +275,18 @@ void World::build() {
 double World::halfU(int style) { static const double h[10] = {5000, 3000, 3500, 2500, 3500, 2750, 2000, 1500, 3500, 3500}; return h[std::clamp(style, 0, 9)]; }
 double World::halfV(int style) { static const double h[10] = {3500, 1250, 1750, 2000, 3000, 2750, 1500, 1250, 1500, 2250}; return h[std::clamp(style, 0, 9)]; }
 
+static int surfaceRaw(int style, double u, double v);
 int World::surfaceLocal(int style, double u, double v) {
     if (std::fabs(u) > halfU(style) || std::fabs(v) > halfV(style)) return 2;
     u *= 2000.0 / halfU(style); v *= 2000.0 / halfV(style);              // sekiller 4 x 4 km'lik normal kutuda tanimli
+    const int r = surfaceRaw(style, u, v);
+    // Sehir kenari: duzensiz, kivrimli sinir (kutu kenarinda duz kesilmez; su kenarda kalir)
+    const double eu = 1700.0 + 210.0 * std::sin(v / 330.0 + style * 1.7) + 70.0 * std::sin(v / 110.0 + style);
+    const double ev = 1700.0 + 210.0 * std::sin(u / 360.0 + style * 2.3) + 70.0 * std::sin(u / 130.0 + style);
+    if (r == 0 && (std::fabs(u) > eu || std::fabs(v) > ev)) return 2;
+    return r;
+}
+static int surfaceRaw(int style, double u, double v) {
     const double th = std::atan2(v, u), r = std::hypot(u, v);
     auto blob = [&](double a, double b, double seed) {                  // duzensiz kenarli elips
         const double k = 1.0 + 0.13 * std::sin(3 * th + seed) + 0.07 * std::sin(5 * th + 2 * seed) + 0.04 * std::sin(9 * th + seed);
