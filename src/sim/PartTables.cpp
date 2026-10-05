@@ -578,6 +578,9 @@ const std::vector<GearOpt>& gearTable() {
         {"AISIN 5 ILERI (OTOMATIK)", 1300, "TS5A", 480, 1.4}, {"SUBARU 4EAT (OTOMATIK, YAVAS)", 800, "SB4A", 420, 1.7},
         {"MERCEDES 722.6 5 ILERI (OTOMATIK)", 1900, "MB5A", 700, 1.3}, {"ZF 6HP (OTOMATIK)", 2600, "ZF6H", 650, 1.1},
         {"UCUZ 5 ILERI MANUEL (SERT VITES)", 650, "TS5T", 330, 1.5}, {"KULLANILMIS T5 5 ILERI", 900, "FO5T", 380, 1.3},
+        // 39+: ozel yapim, yalniz acik dunyada bulunur (kilitli, bulununca bedava)
+        {"OZEL 7 SIRALI DOGBOX (BULUNTU)", 14000, "ZKG1", 1600, 0.55}, {"OZEL 8 CIFT KAVRAMA (BULUNTU)", 12000, "ZKG2", 1400, 0.5},
+        {"PERT 6 ILERI H GUCLU (BULUNTU)", 6000, "ZKG3", 1500, 1.0},
     };
     return t;
 }

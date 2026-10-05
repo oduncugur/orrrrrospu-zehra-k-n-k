@@ -294,6 +294,20 @@ int partPrice(PartCat c, int level, const VehicleDef& v) {
     return (int)(std::round(o[level].basePrice * scale / 10.0) * 10.0);
 }
 
+int mapOnlyPart(PartCat c, int level) {
+    if (c == PartCat::EngineSwap && level > 0 && level <= (int)swapEngines().size()) {
+        const char* code = engineTable()[swapEngines()[level - 1]].code;
+        if (!std::strncmp(code, "ZKX", 3)) return code[3] - '1';
+    }
+    if (c == PartCat::Gearbox && level >= 39 && level <= 41) return 6 + (level - 39);
+    return -1;
+}
+const char* mapOnlyName(int k) {
+    static const char* const n[kMapOnlyParts] = {"KINIK 2.2 OZEL BITURBO", "PERT HATTI 3.4 I6 (900 HP)", "ATOLYE V12 6.5", "DORT ROTOR 2.6 OZEL",
+                                                 "BILLET V8 5.0 (2400 HP)", "KAPADOKYA BOXER 2.7 TURBO", "OZEL 7 SIRALI DOGBOX", "OZEL 8 CIFT KAVRAMA", "PERT 6 ILERI H GUCLU"};
+    return n[std::clamp(k, 0, kMapOnlyParts - 1)];
+}
+
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why, const Tune* t) {
     auto no = [&](const char* m) { if (why) *why = m; return false; };
     if (c == PartCat::Adas && level > 0 && level <= adasFactory(v)) return no("FABRIKADA VAR");
@@ -925,6 +939,23 @@ bool Career::claimBarn(int c, std::string* why) {
     return true;
 }
 
+bool Career::claimWreck(int seed, std::string* why, int* carOut) {
+    if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
+    static const int kTuners[14] = {2, 5, 8, 12, 24, 34, 50, 53, 59, 78, 88, 100, 102, 152};
+    OwnedCar oc; oc.carId = kTuners[(unsigned)(seed * 7 + 3) % 14];
+    oc.tune = opponentPreset(2);                                        // agir modifiye (drag paketi) + fazlasi
+    oc.tune.turbo = std::max(oc.tune.turbo, 6); oc.tune.fuelSys = std::max(oc.tune.fuelSys, 5); oc.tune.intercooler = std::max(oc.tune.intercooler, 4);
+    oc.paidParts = 12000 + 1500 * (seed % 7);
+    oc.fromJunk = true; oc.axleBroken = true; oc.gearboxBroken = (seed & 1) != 0; oc.engineWear = 0.6 + 0.08 * (seed % 5);
+    oc.tune.wearBody = 1.0; oc.tune.wearSusp = 0.9; oc.tune.wearTires = 0.8; oc.tune.wearElec = 0.6; oc.tune.wearBrakes = 0.7;
+    oc.km = std::round(typicalKm(*findVehicle(oc.carId)) * 0.8 / 100.0) * 100.0;
+    oc.paint = (seed * 3) % 12; oc.stripe = 1 + seed % 3; oc.stripeCol = (seed * 5) % 12;
+    cars.push_back(oc);
+    current = (int)cars.size() - 1;
+    if (carOut) *carOut = oc.carId;
+    return true;
+}
+
 bool Career::buyUsed(const UsedListing& l, std::string* why) {
     if (!findVehicle(l.carId)) { if (why) *why = "ARAC YOK"; return false; }
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
@@ -1075,6 +1106,7 @@ double marketMul(PartCat c, int week) {
 }
 int Career::marketWeek() const { return marketOff ? -1 : todayIndex() / 7; }
 int Career::shopPrice(PartCat c, int level) const {
+    if (const int k = mapOnlyPart(c, level); k >= 0) return 0;          // ozel yapim: bulunduysa bedava (bulunmadiysa takilamaz)
     const int p = partPrice(c, level, *findVehicle(car().carId));
     return p <= 0 ? p : (int)std::round(p * marketMul(c, marketWeek()) / 10.0) * 10;
 }
@@ -1139,6 +1171,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     if (refund) *refund = 0;
     if (level < 0 || level >= (int)partOptions(c).size()) { if (why) *why = "GECERSIZ"; return false; }
     if (partLevel(oc.tune, c, v) == level) { if (why) *why = "ZATEN TAKILI"; return false; }
+    if (const int k = mapOnlyPart(c, level); k >= 0 && !((foundParts >> k) & 1u)) { if (why) *why = "SADECE ACIK DUNYADA BULUNUR"; return false; }
     if (!partAvailable(c, level, v, why, &oc.tune)) return false;
     if (used && !usedAvailable(c, level)) { if (why) *why = "IKINCI EL YOK"; return false; }
     const int p = used ? usedPrice(shopPrice(c, level)) : shopPrice(c, level);   // haftalik pazar fiyati
@@ -1625,7 +1658,8 @@ std::string Career::serialize() const {
         std::snprintf(lb, sizeof lb, "evw=%llx\nevw2=%llx\nbarn=%x\ndaily=%d;%ld;%ld;%ld;%d\nach=%x\n", (unsigned long long)eventWins, (unsigned long long)eventWins2, (unsigned)barnFound, dailyDay, dailyProg[0], dailyProg[1], dailyProg[2], dailyDone, (unsigned)achieved);
         o << lb;
         // Acik dunya: radar dedektoru, toplananlar, kamera rekorlari (km/h), sehirlerarasi gecis rekorlari (s)
-        o << "owr=" << (radarDetector ? 1 : 0) << ";" << std::hex << collected << std::dec << "\n";
+        o << "owr=" << (radarDetector ? 1 : 0) << ";" << std::hex << collected << ";" << collected2 << ";" << foundParts << std::dec << "\n";
+        if (!disc.empty()) { o << "disc="; for (char ch : disc) { char hx[4]; std::snprintf(hx, sizeof hx, "%02x", (unsigned char)ch); o << hx; } o << "\n"; }
         if (!camBest.empty()) { o << "cams="; for (size_t i = 0; i < camBest.size(); ++i) o << (i ? "," : "") << camBest[i]; o << "\n"; }
         if (!legBest.empty()) { o << "legs="; for (size_t i = 0; i < legBest.size(); ++i) o << (i ? "," : "") << legBest[i]; o << "\n"; }
     }
@@ -1706,7 +1740,10 @@ bool Career::parse(const std::string& text, Career& out) {
         else if (k == "evw") c.eventWins = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "evw2") c.eventWins2 = std::strtoull(v.c_str(), nullptr, 16);
         else if (k == "barn") c.barnFound = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);
-        else if (k == "owr") { int rd = 0; unsigned long long col = 0; if (std::sscanf(v.c_str(), "%d;%llx", &rd, &col) == 2) { c.radarDetector = rd != 0; c.collected = col; } }
+        else if (k == "owr") { int rd = 0; unsigned long long col = 0, col2 = 0; unsigned fp = 0;
+                               const int got = std::sscanf(v.c_str(), "%d;%llx;%llx;%x", &rd, &col, &col2, &fp);
+                               if (got >= 2) { c.radarDetector = rd != 0; c.collected = col; } if (got >= 3) c.collected2 = col2; if (got >= 4) c.foundParts = fp; }
+        else if (k == "disc") { c.disc.clear(); for (size_t a = 0; a + 1 < v.size(); a += 2) c.disc.push_back((char)std::strtoul(v.substr(a, 2).c_str(), nullptr, 16)); }
         else if (k == "cams") { c.camBest.clear(); for (size_t a = 0; a < v.size();) { c.camBest.push_back(std::atoi(v.c_str() + a)); const size_t b = v.find(',', a); if (b == std::string::npos) break; a = b + 1; } }
         else if (k == "legs") { c.legBest.clear(); for (size_t a = 0; a < v.size();) { c.legBest.push_back(std::atof(v.c_str() + a)); const size_t b = v.find(',', a); if (b == std::string::npos) break; a = b + 1; } }
         else if (k == "ach") c.achieved = (uint32_t)std::strtoul(v.c_str(), nullptr, 16);

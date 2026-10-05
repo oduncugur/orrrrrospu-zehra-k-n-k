@@ -317,4 +317,11 @@ E("RE14",   "Renault 1.4 8V (E7J)",              L::I4, 4, 1.4, 2, false,    0, 
 E("OP16",   "Opel 1.6 8V (C16NZ)",               L::I4, 4, 1.6, 2, false,    0, 6000,  75, 5200, 125, 2600, In::NA, 0, "1-3-4-2", 'S', false),
 E("HY13",   "Hyundai 1.3 12V (Accent)",          L::I4, 4, 1.3, 3, false,    0, 6200,  84, 5500, 115, 3000, In::NA, 0, "1-3-4-2", 'S', false),
 E("VW14",   "VW 1.4 16V (Polo)",                 L::I4, 4, 1.4, 4, false,    0, 6400,  75, 5000, 126, 3800, In::NA, 0, "1-3-4-2", 'S', false),
+// ---- Ozel yapim (custom made): YALNIZ ACIK DUNYADA BULUNUR (kod ZKX*); dukkanda kilitli, bulununca bedava ----
+E("ZKX1",   "KINIK 2.2 OZEL BITURBO (ATOLYE)",   L::I4, 4, 2.2, 4, false,    0, 9000, 540, 8200, 560, 6200, In::TwinTurbo, 2.0, "1-3-4-2", 'S', false),
+E("ZKX2",   "PERT HATTI 3.4 I6 OZEL (900 HP)",   L::I6, 6, 3.4, 4, false,    0, 8200, 900, 7600, 980, 5800, In::TwinTurbo, 2.6, "1-5-3-6-2-4", 'S', false),
+E("ZKX3",   "ATOLYE V12 6.5 SERBEST EMISLI",     L::V12, 12, 6.5, 4, false,  0, 9400, 790, 9000, 720, 7200, In::NA, 0, "1-7-5-11-3-9-6-12-2-8-4-10", 'S', false),
+E("ZKX4",   "DORT ROTOR 2.6 OZEL (PERIFERIK)",   L::Rotary4, 4, 2.6, 0, false, 0, 10000, 720, 9500, 560, 8000, In::NA, 0, "1-3-2-4", 'S', false),
+E("ZKX5",   "BILLET V8 5.0 DRAG (2400 HP)",      L::V8Cross, 8, 5.0, 4, false, 0, 8500, 2400, 8000, 2150, 6800, In::TwinTurbo, 4.0, "1-8-4-3-6-5-7-2", 'S', false),
+E("ZKX6",   "KAPADOKYA BOXER 2.7 OZEL TURBO",    L::Boxer6, 6, 2.7, 4, true, 6200, 8800, 640, 8200, 690, 6000, In::Turbo, 1.8, "1-6-2-4-3-5", 'O', false),
 #undef E

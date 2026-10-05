@@ -231,7 +231,8 @@ void PartsScreen::render(Renderer& r) {
             if (y0 + kRowH < kListY0 || y0 > kListY0 + listH) continue;
             if (y0 < kListY0 - 1 || y0 + kRowH - 4 > kListY0 + listH + 1) continue;   // kismen gorunen satir cizilmez
             std::string why;
-            const bool avail = partAvailable(c, i, v, &why, &oc.tune);
+            bool avail = partAvailable(c, i, v, &why, &oc.tune);
+            if (const int mk = mapOnlyPart(c, i); mk >= 0 && !((app_.career.foundParts >> mk) & 1u)) { avail = false; why = "SADECE ACIK DUNYADA BULUNUR"; }
             const int price = app_.career.shopPrice(c, i);
             const bool mine = i == cur, afford = app_.career.money >= price;
             r.rect(8, y0, 352, y0 + kRowH - 4, mine ? Color{0.12f, 0.3f, 0.16f} : i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
@@ -328,6 +329,7 @@ void PartsScreen::tap(float x, float y) {
     if (i == customOption(c) && i != partLevel(oc.tune, c, v)) { app_.goFabricate(cat_); return; }   // atolye
     if (i == partLevel(oc.tune, c, v)) { msg_ = "ZATEN TAKILI"; msgT_ = 1.2; return; }
     std::string why;
+    if (const int mk = mapOnlyPart(c, i); mk >= 0 && !((app_.career.foundParts >> mk) & 1u)) { msg_ = "SADECE ACIK DUNYADA BULUNUR"; msgT_ = 1.8; return; }
     if (!partAvailable(c, i, v, &why, &oc.tune)) { msg_ = why; msgT_ = 1.8; return; }
     if (sel_ != i) select(i);
     else {

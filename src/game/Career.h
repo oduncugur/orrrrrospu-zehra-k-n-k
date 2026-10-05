@@ -95,6 +95,11 @@ int  partPrice(PartCat c, int level, const VehicleDef& v);      // arac sinifina
 bool partAvailable(PartCat c, int level, const VehicleDef& v, std::string* why = nullptr, const Tune* t = nullptr);
 
 int  carPrice(const VehicleDef& v);   // ortalama kilometrede piyasa degeri
+// Ozel yapim parcalar (yalniz acik dunyada bulunur): 0-5 motor (ZKX1..6), 6-8 sanziman (ZKG1..3).
+// mapOnlyPart: kategori + seviye -> bulunma biti (-1: normal parca). Bulunmadan takilamaz; bulununca bedava.
+constexpr int kMapOnlyParts = 9;
+int mapOnlyPart(PartCat c, int level);
+const char* mapOnlyName(int k);
 // Araba pazari: oyun yili; son 7 model yilinin araclari sifir da satilir, eskiler yalniz ikinci el ilanla.
 // Deger kilometreye gore: ayni arac 300 bin km'de 30 bin km'dekinin yaklasik yarisi.
 constexpr int kGameYear = 2024;
@@ -199,7 +204,16 @@ struct Career {
     // Acik dunya: radar dedektoru (hiz kamerasi uyarisi), toplanan nadir parcalar (bit), kamera rekorlari (km/h),
     // sehirlerarasi gecis rekorlari (s; 0 = yok)
     bool radarDetector = false;
-    uint64_t collected = 0;
+    uint64_t collected = 0, collected2 = 0;              // toplananlar (indeks 0-63, 64-127)
+    uint32_t foundParts = 0;                             // bulunan ozel yapim parcalar (bit: mapOnlyPart sirasi)
+    std::string disc;                                    // haritada kesfedilenler (bit dizisi, hex kayit): nokta / kamera / simge
+    bool discovered(int i) const { return i >= 0 && i / 8 < (int)disc.size() && ((unsigned char)disc[i / 8] >> (i % 8)) & 1; }
+    bool discover(int i) { if (i < 0 || discovered(i)) return false; if (i / 8 >= (int)disc.size()) disc.resize(i / 8 + 1, 0); disc[i / 8] = (char)((unsigned char)disc[i / 8] | (1 << (i % 8))); return true; }
+    // Pert arac: agir modifiyeli ama kazali (aks / sanziman kirik, motor yorgun, kaporta bitik); restorasyonla toparlanir
+    bool claimWreck(int seed, std::string* why = nullptr, int* carOut = nullptr);
+    bool gotCollect(int i) const { return i < 64 ? (collected >> i) & 1ull : i < 128 && ((collected2 >> (i - 64)) & 1ull); }
+    void setCollect(int i) { if (i < 64) collected |= 1ull << i; else if (i < 128) collected2 |= 1ull << (i - 64); }
+    int  collectedCount() const { int n = 0; for (int b = 0; b < 64; ++b) n += ((collected >> b) & 1ull) + ((collected2 >> b) & 1ull); return n; }
     std::vector<int> camBest;
     std::vector<double> legBest;
     static int barnCar(int city);                   // sehrin koleksiyon araci

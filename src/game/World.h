@@ -21,8 +21,9 @@ enum LandmarkType { LmTower = 0, LmMaidenTower, LmPylon, LmMausoleum, LmTvTower,
                     LmClock, LmCastle, LmSkyscraper, LmMinaret, LmGate };
 // Hiz kamerasi (yol uzerinde, gidis yonu heading); limit m/s
 struct WorldCamera { double x, y, heading, limit; int city; };
-// Toplanabilir: 0 nadir parca (sokak kenari), 1 ahir bulgusu (sehir disi)
-struct WorldCollect { double x, y; int type, city, idx; };
+// Toplanabilir: 0 nadir parca (sokak kenari), 1 ahir bulgusu (sehir disi), 2 pert arac (agir modifiyeli, kazali),
+// 3 ozel yapim motor / sanziman kasasi (ref: mapOnlyPart sirasi; pert icin arac tohumu)
+struct WorldCollect { double x, y; int type, city, idx; int ref = 0; double heading = 0; };
 struct WorldLandmark { int type; double x, y, r, h, heading; int city; std::string name; };
 // Yol (kenar): kose noktalari tutulur; surus hatti (RoadPath) ilk kullanimda uretilir (4x4 km sehirlerde bellek)
 struct WorldEdge {

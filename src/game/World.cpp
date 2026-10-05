@@ -341,6 +341,44 @@ void World::build() {
         {   const double u = C.hu * 0.92, v = C.hv * 1.12;                      // ahir: sehrin kuzey dogusunda, yesil alanda
             collect.push_back({C.x + u * C.dirX - v * C.dirY, C.y + u * C.dirY + v * C.dirX, 1, c, (int)collect.size()}); }
     }
+    // Pert araclar: sehirlerarasi otoban kenarinda kenar basina 2 + her sehirde 1 sokakta; ozel yapim parca kasalari: 9
+    // (gizli: sehrin uzak sokaklari / otoban banketi)
+    {
+        int seed = 1;
+        for (int e = 0; e < (int)edges.size(); ++e) {
+            const WorldEdge& E = edges[e];
+            if (!(E.highway && E.city < 0)) continue;
+            for (double f : {0.22, 0.61}) {
+                const RoadPath& fp = E.fwd(); const RoadPoint q = fp.at(fp.length() * f);
+                const double off = -(fp.halfWidthAt(q.s) + 9.0);
+                collect.push_back({q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), 2, -1, (int)collect.size(), seed++, q.heading + 0.7});
+            }
+        }
+        for (int c = 0; c < nC; ++c) {
+            std::vector<int> streets;
+            for (int e = 0; e < (int)edges.size(); ++e) if (edges[e].city == c && !edges[e].highway && !edges[e].bridge) streets.push_back(e);
+            if (streets.empty()) continue;
+            const int e = streets[(size_t)(hashW(c * 977 + 5) * streets.size()) % streets.size()];
+            const RoadPath& fp = edges[e].fwd(); const RoadPoint q = fp.at(fp.length() * 0.4);
+            const double off = -(fp.halfWidthAt(q.s) + 5.0);
+            collect.push_back({q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), 2, c, (int)collect.size(), seed++, q.heading - 0.4});
+        }
+        for (int k = 0; k < 9; ++k) {                                       // ozel yapim kasalari
+            const int c = k % nC;
+            std::vector<int> streets;
+            for (int e = 0; e < (int)edges.size(); ++e) if (edges[e].city == c && !edges[e].highway && !edges[e].bridge) streets.push_back(e);
+            int bestE = -1; double bd = -1;
+            for (int t = 0; t < 40 && !streets.empty(); ++t) {             // merkezden en uzak sokaklardan biri
+                const int e = streets[(size_t)(hashW(k * 331 + t * 7) * streets.size()) % streets.size()];
+                const double d = std::hypot(edges[e].pts.front().first - cities[c].x, edges[e].pts.front().second - cities[c].y);
+                if (d > bd) { bd = d; bestE = e; }
+            }
+            if (bestE < 0) continue;
+            const RoadPath& fp = edges[bestE].fwd(); const RoadPoint q = fp.at(fp.length() * 0.7);
+            const double off = -(fp.halfWidthAt(q.s) + 4.0);
+            collect.push_back({q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), 3, c, (int)collect.size(), k, 0.0});
+        }
+    }
     // Simge yapilarin uzerindeki binalar kaldirilir
     buildings.erase(std::remove_if(buildings.begin(), buildings.end(), [&](const WorldBuilding& b) {
         for (const WorldLandmark& l : landmarks) if (l.type != LmMountain && l.type != LmBalloon && std::hypot(b.cx - l.x, b.cy - l.y) < l.r + 30.0) return true;

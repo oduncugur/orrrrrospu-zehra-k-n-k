@@ -127,4 +127,8 @@ G("JG4M", "~Jaguar/Moss 4MT",                GB::HPattern, {2.68, 1.74, 1.27, 1.
 G("VL5M", "~Volvo M56 5MT",                  GB::HPattern, {3.07, 1.77, 1.19, 0.87, 0.70}, 4.00),
 G("SA5M", "~Saab 5MT",                       GB::HPattern, {3.38, 1.76, 1.12, 0.89, 0.70}, 3.82),
 G("RC6S", "~Hewland 5 sirali (yaris)",       GB::Dogbox,   {2.58, 1.86, 1.44, 1.17, 0.96}, 3.80),
+// Ozel yapim kutular: yalniz acik dunyada bulunur
+G("ZKG1", "~Ozel 7 sirali dogbox (atolye)",       GB::Dogbox,   {3.10, 2.20, 1.70, 1.38, 1.15, 0.98, 0.86}, 3.70),
+G("ZKG2", "~Ozel 8 ileri cift kavrama (atolye)",  GB::DCT,      {3.60, 2.50, 1.90, 1.50, 1.22, 1.00, 0.84, 0.71}, 3.55),
+G("ZKG3", "~Pert aracindan 6 ileri H (guclendirilmis)", GB::HPattern, {2.97, 2.07, 1.43, 1.00, 0.84, 0.56}, 3.42),
 #undef G

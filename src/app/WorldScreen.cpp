@@ -378,24 +378,48 @@ void WorldScreen::update(double dt) {
     }
     // Toplanabilirler: nadir parca (yanindan gec) / ahir bulgusu (yaninda dur)
     for (const WorldCollect& cl : M.w.collect) {
-        if ((app.career.collected >> cl.idx) & 1ull) continue;
+        if (app.career.gotCollect(cl.idx)) continue;
         const double d = std::hypot(cl.x - sim.posX(), cl.y - sim.posY());
         if (cl.type == 0 && d < 4.5) {
-            app.career.collected |= 1ull << cl.idx;
+            app.career.setCollect(cl.idx);
             static const char* const kPart[6] = {"TURBO SALYANGOZU", "DOVME PISTON", "YARIS KAM MILI", "TITANYUM EGZOZ", "KARBON KAPUT", "YARIS DEBRIYAJI"};
             const long prize = 750 + 250 * (cl.idx % 7);
             app.career.money += prize;
-            int n = 0; for (int b = 0; b < 64; ++b) n += (app.career.collected >> b) & 1ull;
+            const int n = app.career.collectedCount();
             char b[96]; std::snprintf(b, sizeof b, "NADIR PARCA: %s +%s (%d/%d)", kPart[cl.idx % 6], money(prize).c_str(), n, (int)M.w.collect.size());
             app.toast(b); app.saveCareer();
         }
         if (cl.type == 1 && d < 14.0 && v < 2.0) {
-            app.career.collected |= 1ull << cl.idx;
+            app.career.setCollect(cl.idx);
             std::string why;
             if (app.career.claimBarn(cl.city, &why))
                 app.toast(std::string("KOLEKSIYON: ") + upper(findVehicle(Career::barnCar(cl.city))->model) + (Career::barnMint(cl.city) ? " - SIFIR, 0 KM!" : " - HURDA: RESTORE ET"));
             else app.toast(why);
             app.saveCareer();
+        }
+    }
+    for (const WorldCollect& cl : M.w.collect) {                          // pert arac (yaninda dur) / ozel yapim kasasi (gec)
+        if (app.career.gotCollect(cl.idx) || (cl.type != 2 && cl.type != 3)) continue;
+        const double d = std::hypot(cl.x - sim.posX(), cl.y - sim.posY());
+        if (cl.type == 3 && d < 5.0) {
+            app.career.setCollect(cl.idx); app.career.foundParts |= 1u << cl.ref;
+            app.toast(std::string("OZEL YAPIM: ") + mapOnlyName(cl.ref) + " BULUNDU! (PARCA: BEDAVA TAK)"); app.saveCareer();
+        }
+        if (cl.type == 2 && d < 12.0 && v < 2.0) {
+            std::string why; int cid = 0;
+            if (app.career.claimWreck(cl.ref, &why, &cid)) { app.career.setCollect(cl.idx); app.toast(std::string("PERT: ") + upper(findVehicle(cid)->model) + " (AGIR MODIFIYELI) GARAJINDA"); app.saveCareer(); }
+            else M.flash(why, 1.5);
+        }
+    }
+    // Kesif: 250 m icindeki dukkanlar / kameralar / simge yapilar haritaya islenir (yarislar bastan gorunur)
+    {
+        static double acc = 0; acc += dt;
+        if (acc > 0.5) {
+            acc = 0; bool any = false;
+            for (size_t k = 0; k < M.w.pois.size(); ++k) if (std::hypot(M.w.pois[k].x - sim.posX(), M.w.pois[k].y - sim.posY()) < 250.0) any |= app.career.discover((int)k);
+            for (size_t k = 0; k < M.w.cameras.size(); ++k) if (std::hypot(M.w.cameras[k].x - sim.posX(), M.w.cameras[k].y - sim.posY()) < 250.0) any |= app.career.discover(512 + (int)k);
+            for (size_t k = 0; k < M.w.landmarks.size(); ++k) if (std::hypot(M.w.landmarks[k].x - sim.posX(), M.w.landmarks[k].y - sim.posY()) < 600.0) any |= app.career.discover(768 + (int)k);
+            if (any) app.saveCareer();
         }
     }
     // Is (kurye / taksi): hedefe varinca (dur) asama / odul; sure biterse basarisiz
@@ -668,7 +692,7 @@ void WorldScreen::render(Renderer& r) {
     }
     for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
     for (int i = 0; i < (int)w.collect.size(); ++i)
-        if (!((M.app.career.collected >> w.collect[i].idx) & 1ull) && front(w.collect[i].x, w.collect[i].y, 260.0)) items.push_back({std::hypot(w.collect[i].x - ex, w.collect[i].y - ey), 4, i});
+        if (!M.app.career.gotCollect(w.collect[i].idx) && front(w.collect[i].x, w.collect[i].y, 260.0)) items.push_back({std::hypot(w.collect[i].x - ex, w.collect[i].y - ey), 4, i});
     for (int i = 0; i < (int)w.cameras.size(); ++i) if (front(w.cameras[i].x, w.cameras[i].y, 500.0)) items.push_back({std::hypot(w.cameras[i].x - ex, w.cameras[i].y - ey), 5, i});
     std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.d > b.d; });
     std::vector<std::pair<int, Mat4>> parked;                             // bulusma meydani araclari
@@ -697,14 +721,17 @@ void WorldScreen::render(Renderer& r) {
             quadP(r, P3(cx[0], cy[0], b.h), P3(cx[1], cy[1], b.h), P3(cx[2], cy[2], b.h), P3(cx[3], cy[3], b.h), fog({base.r * 0.7f, base.g * 0.7f, base.b * 0.7f}, (float)it.d));
         } else if (it.kind == 4) {                                        // toplanabilir: donen altin kutu / eski ahir
             const WorldCollect& cl = w.collect[it.idx];
-            if (cl.type == 0) {
-                const double a = M.envT * 2.0, hz2 = 1.2 + 0.25 * std::sin(M.envT * 3.0);
+            if (cl.type == 2) continue;                                      // pert arac: arac olarak cizilir
+            if (cl.type == 0 || cl.type == 3) {
+                const bool sp = cl.type == 3;                                // ozel yapim: buyuk, mavi parlayan kasa
+                const double a = M.envT * 2.0, hz2 = (sp ? 1.6 : 1.2) + 0.25 * std::sin(M.envT * 3.0), rr = sp ? 1.0 : 0.6;
                 Proj c4[4];
-                for (int k = 0; k < 4; ++k) c4[k] = P3(cl.x + 0.6 * std::cos(a + k * 1.5708), cl.y + 0.6 * std::sin(a + k * 1.5708), hz2);
-                const Proj top = P3(cl.x, cl.y, hz2 + 0.8), bot = P3(cl.x, cl.y, hz2 - 0.8);
+                for (int k = 0; k < 4; ++k) c4[k] = P3(cl.x + rr * std::cos(a + k * 1.5708), cl.y + rr * std::sin(a + k * 1.5708), hz2);
+                const Proj top = P3(cl.x, cl.y, hz2 + rr * 1.33), bot = P3(cl.x, cl.y, hz2 - rr * 1.33);
+                const Color c1 = sp ? Color{0.3f, 0.85f, 1.0f} : Color{1.0f, 0.85f, 0.2f}, c2 = sp ? Color{0.1f, 0.55f, 0.9f} : Color{0.85f, 0.65f, 0.1f};
                 for (int k = 0; k < 4; ++k) {
-                    if (top.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, top, c4[k], c4[(k + 1) % 4], k % 2 ? Color{1.0f, 0.85f, 0.2f} : Color{0.85f, 0.65f, 0.1f});
-                    if (bot.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, bot, c4[k], c4[(k + 1) % 4], k % 2 ? Color{0.8f, 0.6f, 0.1f} : Color{0.95f, 0.75f, 0.15f});
+                    if (top.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, top, c4[k], c4[(k + 1) % 4], k % 2 ? c1 : c2);
+                    if (bot.ok && c4[k].ok && c4[(k + 1) % 4].ok) triP(r, bot, c4[k], c4[(k + 1) % 4], k % 2 ? c2 : c1);
                 }
             } else {
                 const Proj b0 = P3(cl.x, cl.y, 0), b1 = P3(cl.x, cl.y, 6.0);
@@ -901,6 +928,12 @@ void WorldScreen::render(Renderer& r) {
         if (!front(x, y, 700.0)) continue;
         objs.push_back({std::hypot(x - ex, y - ey), t.carId, matMul(matTranslate((float)x, 0.0f, (float)-y), matRotY((float)q.heading)), t.role, (float)(M.envT * t.v / 0.31)});
     }
+    for (const WorldCollect& cl : w.collect) {                          // pert araclar: yana yatik, hasarli gorunum
+        if (cl.type != 2 || M.app.career.gotCollect(cl.idx) || !front(cl.x, cl.y, 350.0)) continue;
+        static const int kTuners[14] = {2, 5, 8, 12, 24, 34, 50, 53, 59, 78, 88, 100, 102, 152};
+        const int id = kTuners[(unsigned)(cl.ref * 7 + 3) % 14];
+        objs.push_back({std::hypot(cl.x - ex, cl.y - ey), id, matMul(matTranslate((float)cl.x, 0.0f, (float)-cl.y), matRotY((float)cl.heading)), 3, 0.0f});
+    }
     {   // park etmis araclar (yakindakiler)
         std::vector<Parked> pk;
         for (int e = 0; e < (int)w.edges.size(); ++e) {
@@ -921,6 +954,10 @@ void WorldScreen::render(Renderer& r) {
             Renderer::CarLook pl; pl.paintOn = true; pl.paint[0] = pl.paint[1] = pl.paint[2] = 0.93f;
             pl.stripe = 3; pl.stripeCol[0] = 0.08f; pl.stripeCol[1] = 0.12f; pl.stripeCol[2] = 0.45f;
             r.setCarLook(pl);
+        } else if (o.role == 3) {                                         // pert: ezik, koyu, serit
+            Renderer::CarLook wl; wl.paintOn = true; wl.paint[0] = 0.25f; wl.paint[1] = 0.22f; wl.paint[2] = 0.22f;
+            wl.stripe = 2; wl.stripeCol[0] = 0.9f; wl.stripeCol[1] = 0.3f; wl.stripeCol[2] = 0.1f; wl.aero = 5; wl.drop = 0.06f; wl.roll = 0.12f;
+            r.setCarLook(wl);
         } else if (o.role == 2) {
             Renderer::CarLook hl; hl.paintOn = true; hl.paint[0] = 0.08f; hl.paint[1] = 0.08f; hl.paint[2] = 0.10f;
             hl.stripe = 2; hl.stripeCol[0] = 0.95f; hl.stripeCol[1] = 0.55f; hl.stripeCol[2] = 0.05f; hl.aero = 5; hl.drop = 0.04f;
@@ -1035,12 +1072,17 @@ void WorldScreen::render(Renderer& r) {
             for (size_t i = 0; i + 4 < pts.size(); i += 4) seg(pts[i].x, pts[i].y, pts[i + 4].x, pts[i + 4].y, 2.2f, {0.2f, 0.7f, 1.0f});
         }
         static const Color pc[5] = {{1.0f, 0.5f, 0.1f}, {0.9f, 0.3f, 0.7f}, {0.6f, 0.45f, 0.25f}, {0.9f, 0.2f, 0.15f}, {0.2f, 0.85f, 0.4f}};
-        for (const WorldCamera& cm : w.cameras) { float sx, sy; S(cm.x, cm.y, sx, sy); r.rect(sx - 2, sy - 2, sx + 2, sy + 2, {1, 1, 1}); }
-        for (const WorldPoi& q : w.pois) { float sx, sy; S(q.x, q.y, sx, sy); r.circle(sx, sy, 4.0f, 10, pc[q.type]); }
+        for (size_t k = 0; k < w.cameras.size(); ++k) { if (!M.app.career.discovered(512 + (int)k)) continue; const WorldCamera& cm = w.cameras[k]; float sx, sy; S(cm.x, cm.y, sx, sy); r.rect(sx - 2, sy - 2, sx + 2, sy + 2, {1, 1, 1}); }
+        for (size_t k = 0; k < w.pois.size(); ++k) {                     // yarislar hep; digerleri kesfedilince
+            const WorldPoi& q = w.pois[k];
+            if (q.type != WPoiRace && !M.app.career.discovered((int)k)) continue;
+            float sx, sy; S(q.x, q.y, sx, sy); r.circle(sx, sy, 4.0f, 10, pc[q.type]);
+        }
         for (const WorldCity& c : w.cities) { float sx, sy; S(c.x, c.y, sx, sy); r.textCentered(sx, sy - (float)(c.hv / M.mapScale) - 14, c.name, 1, {1, 1, 1}); }
         if (M.mapScale < 25.0)
-            for (const WorldLandmark& l : w.landmarks) {
-                if (l.type == LmFairy || l.type == LmBalloon || l.type == LmPylon) continue;
+            for (size_t li = 0; li < w.landmarks.size(); ++li) {
+                const WorldLandmark& l = w.landmarks[li];
+                if (l.type == LmFairy || l.type == LmBalloon || l.type == LmPylon || !M.app.career.discovered(768 + (int)li)) continue;
                 float sx, sy; S(l.x, l.y, sx, sy);
                 if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
                 r.rect(sx - 3, sy - 3, sx + 3, sy + 3, {1.0f, 0.9f, 0.5f});
@@ -1052,7 +1094,7 @@ void WorldScreen::render(Renderer& r) {
             r.tri(sx + c2 * 9, sy + s2 * 9, sx - c2 * 6 - s2 * 5, sy - s2 * 6 + c2 * 5, sx - c2 * 6 + s2 * 5, sy - s2 * 6 - c2 * 5, {0.2f, 1.0f, 0.4f}); }
         r.text(8, 8, "HARITA: DOKUN = HEDEF, SURUKLE = KAYDIR", 1, {0.9f, 0.9f, 0.9f});
         r.text(8, 20, "TURUNCU YARIS  PEMBE BULUSMA  KAHVE HURDALIK  KIRMIZI BENZIN  YESIL GARAJ  BEYAZ RADAR", 1, {0.7f, 0.7f, 0.7f});
-        { int n = 0; for (int bb = 0; bb < 64; ++bb) n += (M.app.career.collected >> bb) & 1ull; char cb[48]; std::snprintf(cb, sizeof cb, "TOPLANAN %d / %d", n, (int)w.collect.size()); r.text(8, 32, cb, 1, kUiGold); }
+        { const int n = M.app.career.collectedCount(); char cb[48]; std::snprintf(cb, sizeof cb, "TOPLANAN %d / %d", n, (int)w.collect.size()); r.text(8, 32, cb, 1, kUiGold); }
         button(r, M.mPlus, "+", kUiBtn, 3); button(r, M.mMinus, "-", kUiBtn, 3);
         button(r, M.mClose, "KAPAT", kUiBtn, 2); button(r, M.mClear, "HEDEF SIL", {0.45f, 0.2f, 0.15f}, 1);
     }
