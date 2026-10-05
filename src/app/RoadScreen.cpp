@@ -124,7 +124,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     P.esp = app_.settings.esp;
     adasMode_ = 0; adasLevel_ = adasLevel(*findVehicle(carId_), tune_);
     if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::atoi(a); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
-    if (std::getenv("ZK_AT_POI") && ses_ && !ses_->pois().empty()) ses_->player().recoverAt(ses_->pois()[0].s - 10.0, ses_->rightLane(ses_->pois()[0].s));   // test: ilk noktanin yaninda
+    if (std::getenv("ZK_AT_POI") && ses_ && !ses_->pois().empty()) ses_->player().recoverAt(ses_->pois()[0].s - std::max(10.0, std::atof(std::getenv("ZK_AT_POI"))), ses_->rightLane(ses_->pois()[0].s));   // test: ilk noktanin N m gerisinde
     if (std::getenv("ZK_AT_STATION") && ses_ && !ses_->stations().empty()) ses_->player().recoverAt(ses_->stations()[0] - 70.0, ses_->rightLane(ses_->stations()[0]));   // test: ilk benzinligin onunde
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
     const Gearbox box = P.sim().gearboxType();

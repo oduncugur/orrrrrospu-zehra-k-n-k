@@ -41,12 +41,15 @@ static void applyVSync(VSync v) {
 }
 
 int main(int argc, char** argv) {
-    std::string shot; int frames = 0, thrFrames = 0, carDelta = 0;
+    std::string shot, recDir; int frames = 0, thrFrames = 0, carDelta = 0, recEvery = 3, recFrom = 0;   // --record=klasor: her N karede bir kare (video)
     double runSeconds = 0;                         // olcum: gercek zamanli N s kos, ortalama FPS'i yaz, cik
     for (int i = 1; i < argc; ++i) {
         if (!std::strncmp(argv[i], "--run-seconds=", 14)) runSeconds = std::atof(argv[i] + 14);
         if (!std::strncmp(argv[i], "--screenshot=", 13)) shot = argv[i] + 13;
         else if (!std::strncmp(argv[i], "--frames=", 9)) frames = std::atoi(argv[i] + 9);
+        else if (!std::strncmp(argv[i], "--record=", 9)) recDir = argv[i] + 9;
+        else if (!std::strncmp(argv[i], "--record-every=", 15)) recEvery = std::max(1, std::atoi(argv[i] + 15));
+        else if (!std::strncmp(argv[i], "--record-from=", 14)) recFrom = std::atoi(argv[i] + 14);
         else if (!std::strncmp(argv[i], "--throttle-frames=", 18)) thrFrames = std::atoi(argv[i] + 18);
         else if (!std::strncmp(argv[i], "--car-offset=", 13)) carDelta = std::atoi(argv[i] + 13);
     }
@@ -265,6 +268,12 @@ int main(int argc, char** argv) {
         game.update(dt);
         game.render();
         ++frame;
+        if (!shot.empty() && !recDir.empty() && frame >= recFrom && (frame - recFrom) % recEvery == 0) {   // video karesi
+            std::vector<unsigned char> rgb; int w, h;
+            game.readPixelsRGB(rgb, w, h);
+            char fn[512]; std::snprintf(fn, sizeof fn, "%s/f%05d.ppm", recDir.c_str(), (frame - recFrom) / recEvery);
+            if (FILE* f = std::fopen(fn, "wb")) { std::fprintf(f, "P6\n%d %d\n255\n", w, h); std::fwrite(rgb.data(), 1, rgb.size(), f); std::fclose(f); }
+        }
         if (!shot.empty() && frame >= frames) {
             std::vector<unsigned char> rgb; int w, h;
             game.readPixelsRGB(rgb, w, h);
