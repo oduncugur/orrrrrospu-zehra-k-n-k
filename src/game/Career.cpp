@@ -890,20 +890,35 @@ bool Career::buyCar(int carId, std::string* why) {
     return true;
 }
 
-int Career::barnCar(int city) {
-    // Eski (1995 oncesi) sokak araclarindan en degerli 10'u; sehir sirasiyla
-    std::vector<std::pair<int, int>> v;
-    for (const VehicleDef& d : vehicleCatalog()) if (d.streetLegal && d.year < 1995) v.push_back({carPrice(d), d.id});
-    std::sort(v.rbegin(), v.rend());
-    return v.empty() ? 1 : v[std::min((size_t)std::clamp(city, 0, kCities - 1), v.size() - 1)].second;
-}
+// Koleksiyon (ozel) araclar: galeride / ilanda / hurdalikta YOK; yalniz sehrin gizli ahirinda, hesap basina bir kez.
+// mint: sifir, hic surulmemis (0 km); degilse hurda (bedava, restorasyonla toparlanir).
+namespace { struct Exclusive { int carId; bool mint; };
+const Exclusive kExclusive[Career::kCities] = {
+    {184, true},    // Istanbul: Ferrari F40, ambalajinda
+    {5, false},     // Izmit: Honda Civic EK9 Type R hurdasi
+    {164, false},   // Bursa: Porsche 911 Carrera RS 2.7 hurdasi
+    {123, true},    // Eskisehir: BMW M3 CSL E46, sifir
+    {177, true},    // Ankara: Porsche Carrera GT, sifir
+    {52, false},    // Konya: Nissan Skyline R34 GT-R V-Spec hurdasi
+    {214, false},   // Kapadokya: Lancia Stratos HF Stradale hurdasi
+    {213, false},   // Nigde: Lancia Delta HF Integrale Evo hurdasi
+    {20, true},     // Mersin: Honda NSX NA2 Type S, sifir
+    {313, true},    // Antalya: McLaren F1, sifir
+}; }
+int Career::barnCar(int city) { return kExclusive[std::clamp(city, 0, kCities - 1)].carId; }
+bool Career::barnMint(int city) { return kExclusive[std::clamp(city, 0, kCities - 1)].mint; }
+bool Career::isExclusive(int carId) { for (const Exclusive& e : kExclusive) if (e.carId == carId) return true; return false; }
 
 bool Career::claimBarn(int c, std::string* why) {
     if ((barnFound >> c) & 1u) { if (why) *why = "BU SEHRIN BULGUSU ALINDI"; return false; }
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
-    OwnedCar oc; oc.carId = barnCar(c); oc.fromJunk = true; oc.engineWear = 0.55;
-    oc.km = std::round(typicalKm(*findVehicle(oc.carId)) * 0.6 / 100.0) * 100.0;   // az km, uzun sure beklemis
-    oc.tune.wearTires = 0.9; oc.tune.wearBrakes = 0.7; oc.tune.wearSusp = 0.6; oc.tune.wearBody = 0.5; oc.tune.wearElec = 0.6;
+    OwnedCar oc; oc.carId = barnCar(c);
+    if (barnMint(c)) oc.km = 0.0;                                       // sifir: hic surulmemis, kusursuz
+    else {                                                              // hurda: bedava, restorasyon ister
+        oc.fromJunk = true; oc.engineWear = 1.0; oc.gearboxBroken = true;
+        oc.km = std::round(typicalKm(*findVehicle(oc.carId)) * 1.5 / 100.0) * 100.0;
+        oc.tune.wearEngine = 0.9; oc.tune.wearTires = 1.0; oc.tune.wearBrakes = 0.9; oc.tune.wearSusp = 0.85; oc.tune.wearBody = 0.8; oc.tune.wearElec = 0.8;
+    }
     cars.push_back(oc);
     current = (int)cars.size() - 1;
     barnFound |= 1u << c;
@@ -1501,7 +1516,7 @@ std::vector<JunkCar> junkyardOffers(uint32_t seed) {
     const auto& cat = vehicleCatalog();
     while (out.size() < 6) {
         const VehicleDef& v = cat[(size_t)(rnd() * cat.size())];
-        if (!v.streetLegal) continue;
+        if (!v.streetLegal || Career::isExclusive(v.id)) continue;       // koleksiyon araclari hurdalikta cikmaz
         bool dup = false;
         for (const JunkCar& j : out) dup |= j.carId == v.id;
         if (dup) continue;

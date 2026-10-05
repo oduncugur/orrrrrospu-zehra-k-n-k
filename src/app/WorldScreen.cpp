@@ -392,7 +392,8 @@ void WorldScreen::update(double dt) {
         if (cl.type == 1 && d < 14.0 && v < 2.0) {
             app.career.collected |= 1ull << cl.idx;
             std::string why;
-            if (app.career.claimBarn(cl.city, &why)) app.toast(std::string("AHIR BULGUSU: ") + upper(findVehicle(Career::barnCar(cl.city))->model) + " GARAJINDA!");
+            if (app.career.claimBarn(cl.city, &why))
+                app.toast(std::string("KOLEKSIYON: ") + upper(findVehicle(Career::barnCar(cl.city))->model) + (Career::barnMint(cl.city) ? " - SIFIR, 0 KM!" : " - HURDA: RESTORE ET"));
             else app.toast(why);
             app.saveCareer();
         }

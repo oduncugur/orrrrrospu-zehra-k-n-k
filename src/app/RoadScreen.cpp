@@ -207,7 +207,7 @@ void RoadScreen::activatePoi(int k) {
     case PoiBarn:
         if (app_.career.claimBarn(app_.career.city, &why)) {
             app_.saveCareer();
-            flash(std::string("AHIR BULGUSU: ") + upper(findVehicle(Career::barnCar(app_.career.city))->model) + " GARAJINDA!", 3.0);
+            flash(std::string("KOLEKSIYON: ") + upper(findVehicle(Career::barnCar(app_.career.city))->model) + (Career::barnMint(app_.career.city) ? " - SIFIR, 0 KM!" : " - HURDA: RESTORE ET"), 3.0);
         } else flash(why, 1.8);
         return;
     case PoiExit:

@@ -202,7 +202,9 @@ struct Career {
     uint64_t collected = 0;
     std::vector<int> camBest;
     std::vector<double> legBest;
-    static int barnCar(int city);                   // sehrin nadir araci
+    static int barnCar(int city);                   // sehrin koleksiyon araci
+    static bool barnMint(int city);                 // sifir (0 km) mi, hurda mi
+    static bool isExclusive(int carId);             // koleksiyon araci: satilmaz, yalniz ahirda bulunur
     bool claimBarn(int city, std::string* why = nullptr);
     void addKm(double km) { OwnedCar& c = car(); c.km = c.odo() + std::max(0.0, km); }
     bool sellCurrent(std::string* why = nullptr);

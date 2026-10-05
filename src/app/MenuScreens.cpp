@@ -127,7 +127,7 @@ void GalleryScreen::render(Renderer& r) {
     r.text(8, 376, b, 1, kUiDim);
     if (!v.streetLegal) r.text(8, 390, "YARIS ARACI (SOKAKTA SURULEMEZ)", 1, {1.0f, 0.35f, 0.3f});
     const long price = priceNow();
-    const std::string ps = money(price);
+    const std::string ps = Career::isExclusive(carId_) ? std::string("?") : money(price);
     {   // sifir / ikinci el ilan sekmeleri + ilan ayrintisi
         const bool nw = soldNew(v);
         for (int k = 0; k < 4; ++k) {
@@ -152,6 +152,7 @@ void GalleryScreen::render(Renderer& r) {
     for (const OwnedCar& oc : app_.career.cars) owned |= oc.carId == carId_;
     const Career& cr = app_.career;
     if (owned) button(r, kBuy, "GARAJINDA", {0.12f, 0.3f, 0.16f}, 2);
+    else if (Career::isExclusive(carId_)) button(r, kBuy, "KOLEKSIYON: SADECE GIZLI AHIRDA BULUNUR", {0.35f, 0.25f, 0.08f}, 1);
     else if (cr.garageFull()) {                                         // garaj dolu: once yuva
         if (cr.garageSlots >= Career::kMaxSlots) button(r, kBuy, "GARAJ DOLU (EN BUYUK)", {0.25f, 0.25f, 0.28f}, 2);
         else button(r, kBuy, "GARAJ DOLU: YUVA AL " + money(cr.slotPrice()), cr.money >= cr.slotPrice() ? Color{0.15f, 0.35f, 0.6f} : Color{0.25f, 0.25f, 0.28f}, 2);
@@ -248,6 +249,7 @@ void GalleryScreen::pointerDown(int, float x, float y) {
     for (int k = 0; k < 4; ++k)
         if (kLTab[k].hit(x, y)) { if (k > 0 || soldNew(*findVehicle(carId_))) listing_ = k - 1; return; }
     if (kBuy.hit(x, y)) {
+        if (Career::isExclusive(carId_)) { msg_ = "SATILMAZ: ACIK DUNYADA BUL"; msgT_ = 2.0; return; }
         bool owned = false;
         for (const OwnedCar& oc : app_.career.cars) owned |= oc.carId == carId_;
         if (owned) return;
