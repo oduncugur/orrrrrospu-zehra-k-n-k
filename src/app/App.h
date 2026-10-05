@@ -104,6 +104,11 @@ public:
     void goEcu();
     void goSetup();                              // kurulum (suspansiyon / lastik / profiller)
     void goStreet();
+    // Acik dunya (zehra_world): donus noktasi; polis / serseri kovalamaca-kapisma istegi (RoadScreen acar)
+    bool worldReturn = false, worldValid = false; double worldX = 0, worldY = 0, worldH = 0;
+    int pendMode = -1, pendRival = 0; Tune pendTune{};   // pendMode: 0 kovalamaca, 1 kapisma
+    void goWorld();
+    bool backToWorld();                                  // donus bekliyorsa acik dunyaya don (true)
     void goGauges();                             // kadran dukkani                             // sokak: bulusma / dyno yarismasi / musteri isleri
     void startMeet();                            // gece bulusmasi: bahisli drag
     // Sehirler arasi THE RUN seyahati: hedefe kadar her ara bir etap (yakit tasinir). Etap bitince sonraki etap ya da varis.

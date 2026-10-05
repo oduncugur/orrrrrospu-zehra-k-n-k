@@ -33,8 +33,8 @@ public:
     const VehicleSim& sim() const { return *sim_; }
     double s() const { return s_; }
     double lateral() const { return lat_; }
-    double elevation() const { return road_.at(s_).z; }      // yol yuksekligi (cizim)
-    bool offRoad() const { return std::fabs(lat_) > road_.halfWidthAt(s_) + 1.5; }   // banket (1.5 m) asfalt sayilir
+    double elevation() const { return road_->at(s_).z; }      // yol yuksekligi (cizim)
+    bool offRoad() const { return std::fabs(lat_) > road_->halfWidthAt(s_) + 1.5; }   // banket (1.5 m) asfalt sayilir
     double tireSlipSpeed() const;
     double tireLockSpeed() const;          // kilitli (frenle duran) teker varsa arac hizi, yoksa 0          // ses icin
 
@@ -55,6 +55,10 @@ public:
     void recover(double backM = 20.0);
     void recoverAt(double s, double lateral);   // dururken s / yanal konuma yerlestir (grid)
     void bump(double speedFactor);         // carpisma: hiz kaybi
+    // Acik dunya: arac yol agindaki baska bir yola gecer (s / yanal o yola gore); freeRoam: yoldan cikinca kurtarma yok
+    void setRoad(const RoadPath& r) { road_ = &r; road_->projectGlobal(sim_->posX(), sim_->posY(), hint_, s_, lat_); }
+    const RoadPath& road() const { return *road_; }
+    bool freeRoam = false;
     void nudge(double dx, double dy) { sim_->nudge(dx, dy); }   // temas: konumu it
 
 private:
@@ -62,7 +66,7 @@ private:
     void driverAssist(double dt, double thrIn, bool neutral);
     void playerClutch(const RoadControls& c);
     bool grind_ = false;
-    const RoadPath& road_;
+    const RoadPath* road_;
     Tune tune_; bool hasTune_ = false;
     std::unique_ptr<VehicleSim> sim_;
     int hint_ = 0; double s_ = 0, lat_ = 0, lane_ = -1.8;

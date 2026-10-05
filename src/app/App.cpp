@@ -104,7 +104,15 @@ void App::setScreen(std::unique_ptr<Screen> s) {
     windSpeed_ = 0.0f; nos_ = false; rain_ = false; siren_ = 0.0f;
     for (Voice& v : voices_) { v.slip = 0.0f; v.lock = 0.0f; }      // yaris bitince lastik sesi menuye tasinmasin
 }
+bool App::backToWorld() {
+    if (!worldReturn) return false;
+    worldReturn = false; activeEvent = -1; activeTour = false; activeMeet = false; runPlan.active = false;
+    goWorld();
+    return true;
+}
+void App::goWorld() { setVoice(1, nullptr); setScreen(std::make_unique<WorldScreen>(*this)); }
 void App::goGarage() {
+    if (backToWorld()) return;
     setVoice(1, nullptr);
     runPlan.active = false;                                             // yarim kalan seyahat iptal (bulunulan sehirde kalinir)
     if (activeEvent >= 0) {                                                       // etkinlikten donus: o lig
@@ -115,8 +123,8 @@ void App::goGarage() {
     if (activeMeet) { activeMeet = false; setScreen(std::make_unique<StreetScreen>(*this)); return; }       // bulusmadan donus
     setScreen(std::make_unique<GarageScreen>(*this));
 }
-void App::goLeague(int tab) { activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); }
-void App::goMap() { activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<RegionMapScreen>(*this)); }
+void App::goLeague(int tab) { if (backToWorld()) return; activeEvent = -1; setScreen(std::make_unique<LeagueScreen>(*this, tab)); }
+void App::goMap() { if (backToWorld()) return; activeEvent = -1; activeTour = false; activeMeet = false; setScreen(std::make_unique<RegionMapScreen>(*this)); }
 void App::startTour() {
     std::string why;
     if (!career.tourStart(&why)) return;
@@ -206,7 +214,7 @@ void App::startMeet() {
 }
 void App::goSaveCode() { setScreen(std::make_unique<SaveCodeScreen>(*this)); }
 void App::goRestore() { setScreen(std::make_unique<RestoreScreen>(*this)); }
-void App::goGallery() { setScreen(std::make_unique<GalleryScreen>(*this)); }
+void App::goGallery() { if (backToWorld()) return; setScreen(std::make_unique<GalleryScreen>(*this)); }
 void App::goDyno() { setScreen(std::make_unique<DynoScreen>(*this)); }
 void App::goSettings() { setScreen(std::make_unique<SettingsScreen>(*this)); }
 void App::goRoad() {

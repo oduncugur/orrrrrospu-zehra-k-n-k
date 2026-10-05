@@ -102,6 +102,9 @@ public:
     RoadCar* rival() { return rival_.get(); }
     const std::vector<TrafficCar>& traffic() const { return traffic_; }
     void clearTraffic() { traffic_.clear(); }   // testler: trafiksiz etap
+    // Kinematik (yolu izleyen) bir govdeyle temas: acik dunya trafigi / binalar (rel: carpisma hizi)
+    static double contact(RoadCar& car, double ox, double oy, double opsi, double ov, double omass, double halfL, double halfW, double& rel) {
+        return impactKinematic(car, ox, oy, opsi, ov, omass, halfL, halfW, rel); }
     // Sehir turu (Free modda acik dunya): yol kenari noktalari; trafigin ~%3'u polis, ~%1'i serseri.
     // Polis: yaninda (50 m) hiz siniri + 15 km/h asilirsa; serseri: yanindan 40 km/h fark ile gecilirse sataşir.
     void setupCruise(const std::vector<Poi>& pois, int policeCar, int hoolCar);
@@ -148,7 +151,7 @@ private:
     double runLen_ = 18000.0;
     // Kinematik arac (trafik / The Run rakibi) ile carpisma: kutle + hiz + temas noktasi -> impuls (sekme e, surtunme mu).
     // Donus: kinematik aracin yeni ileri hizi (m/s); rel: carpisma hizi (m/s)
-    double impactKinematic(RoadCar& car, double ox, double oy, double opsi, double ov, double omass, double halfL, double halfW, double& rel);
+    static double impactKinematic(RoadCar& car, double ox, double oy, double opsi, double ov, double omass, double halfL, double halfW, double& rel);
     void spawnTraffic(TrafficCar& t, double fromS);
     void collide(RoadCar& car, bool isPlayer);
     RoadControls rivalControls();

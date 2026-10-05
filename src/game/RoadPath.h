@@ -21,6 +21,8 @@ public:
     // Uzun etap (The Run): tekrar eden uzun duzluk (drag gorunumu) + viraj bloklari, uzun tirmanis / inisler
     // (dalga boyu 1.8-5 km; duzluklerde de egim). lengthM: surulen uzunluk (bitis + 400 m yavaslama dahil degil)
     static RoadPath run(uint32_t seed, double lengthM, double maxGrade);
+    // Acik dunya: kose noktalarindan yol (koseler cornerR yaricapla yuvarlatilir, duz zemin z = 0); sabit serit
+    static RoadPath polyline(const std::vector<std::pair<double, double>>& xy, double halfWidth, int lanesF, int lanesB, double cornerR);
     static constexpr double kKarmaLead = 450.0;  // virajli bolum ilk virajdan bu kadar once baslar (fren + kamera)
     const std::vector<RoadSection>& sections() const { return sections_; }
     bool curvyAt(double s) const;               // karma: s virajli bolumde mi (normal yolda hep false)
@@ -50,6 +52,7 @@ public:
     RoadPoint at(double s) const;
     // (x,y) icin en yakin yol koordinati. hint: onceki indeks (yerel arama, O(1)); guncellenir
     void project(double x, double y, int& hint, double& s, double& lateral) const;   // lateral: sola +
+    void projectGlobal(double x, double y, int& hint, double& s, double& lateral) const;   // tum yolda en yakin (yol degisimi)
 
 private:
     struct Seg { double len, k0, k1; };          // egrilik programi parcasi (k0 -> k1 dogrusal)

@@ -38,6 +38,7 @@ struct OwnedCar {
     int  gauge = 0, gaugeOwned = 0; bool boostGauge = false;
     // Kilometre sayaci (< 0: eski kayit / bilinmiyor -> yasina gore ortalama sayilir; odo() ile okunur)
     double km = -1.0;
+    double fuelL = -1.0;          // depodaki yakit (acik dunya; < 0: dolu)
     double odo() const;
     bool hasProfile(int k) const { return k >= 0 && k < 3 && !profile[k].empty(); }
     bool damaged() const { return axleBroken || gearboxBroken || engineWear > 0.02; }

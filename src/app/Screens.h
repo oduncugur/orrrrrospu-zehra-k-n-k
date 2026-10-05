@@ -465,7 +465,7 @@ private:
     // Sehir turu (acik dunya): yol kenari noktalari, polis / serseri sataşmasi -> kovalamaca / kapisma -> geri donus
     std::vector<Poi> cruisePois() const;
     void activatePoi(int k);
-    bool cruiseRet_ = false; double cruiseResume_ = 0; int forceRival_ = 0; Tune forceTune_{};
+    bool cruiseRet_ = false, worldChase_ = false; double cruiseResume_ = 0; int forceRival_ = 0; Tune forceTune_{};
     Rect poiBtn_{0, 0, 0, 0};
     void setupLayout();                          // ayardan yon: yatay 640x360 / dikey 360x640
     float fov() const { return land_ ? 0.85f : 1.05f; }
@@ -518,6 +518,25 @@ private:
     void spawnSmoke(const RoadCar& car, double dt);
     int zoneAt(double s) const;                  // 0 kir, 1 sehir, 2 tunel
     double Pc0z() const;                         // oyuncunun yol yuksekligi (kivilcim zemini)
+};
+
+// Acik dunya (zehra_world): otoban + sehir izgaralari, kavsakta donus, trafik (polis / serseri), benzinlik (fiyat),
+// bulusma meydani (modifiyeli araclar), yaris baslangiclari, hurdalik; harita + waypoint + otonom rota.
+class WorldScreen : public Screen {
+public:
+    explicit WorldScreen(App& app);
+    ~WorldScreen() override;
+    bool landscape() const override { return land_; }
+    void update(double dt) override;
+    void render(Renderer& r) override;
+    void pointerDown(int id, float x, float y) override;
+    void pointerMove(int id, float x, float y) override;
+    void pointerUp(int id) override;
+    void key(Key k, bool down) override;
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_;
+    bool land_ = true;
 };
 
 } // namespace zk

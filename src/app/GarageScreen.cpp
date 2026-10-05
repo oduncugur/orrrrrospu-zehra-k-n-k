@@ -221,7 +221,11 @@ void GarageScreen::pointerDown(int id, float x, float y) {
         case TGauge: app_.goGauges(); break;
         case TPaint: app_.goBodyShop(); break;
         case TDyno: app_.goDyno(); break;
-        case TRoad: if (c.car().raceable()) app_.goRoad(); else { msg_ = c.car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI - TAMIR"; msgT_ = 2.0; } break;
+#ifdef ZK_OPENWORLD
+        case TRoad: if (c.car().raceable()) app_.goWorld();   // acik dunya surumu: serbest yol = acik dunya
+#else
+        case TRoad: if (c.car().raceable()) app_.goRoad();
+#endif else { msg_ = c.car().jobHp ? "MUSTERI ARACIYLA OLMAZ" : "ARAC HASARLI - TAMIR"; msgT_ = 2.0; } break;
         case TGallery: app_.goGallery(); break;
         case TStreet: app_.goStreet(); break;
         default: break;

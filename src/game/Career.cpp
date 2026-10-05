@@ -1628,6 +1628,7 @@ std::string Career::serialize() const {
         for (int k = 0; k < 3; ++k) if (!c.profile[k].empty()) o << "prof" << k << "=" << c.profile[k] << "\n";
         if (c.nosFill < 0.999) { std::snprintf(buf, sizeof buf, "nosf=%.3f\n", c.nosFill); o << buf; }
         if (c.km >= 0) { std::snprintf(buf, sizeof buf, "km=%.1f\n", c.km); o << buf; }
+        if (c.fuelL >= 0) { std::snprintf(buf, sizeof buf, "fuel=%.2f\n", c.fuelL); o << buf; }
         if (c.jobHp > 0) { std::snprintf(buf, sizeof buf, "job=%d;%ld\n", c.jobHp, c.jobReward); o << buf; }
         if (c.gaugeOwned) { std::snprintf(buf, sizeof buf, "gauge=%d;%d;%d\n", c.gauge, c.gaugeOwned, c.boostGauge ? 1 : 0); o << buf; }
         if (t.absKit || t.tcKit) o << "elx=" << (t.absKit ? 1 : 0) << ";" << (t.tcKit ? 1 : 0) << "\n";   // ECU ile eklenen ABS / TC
@@ -1713,6 +1714,7 @@ bool Career::parse(const std::string& text, Career& out) {
         else if ((k == "prof0" || k == "prof1" || k == "prof2") && !c.cars.empty()) c.cars.back().profile[k[4] - '0'] = v;
         else if (k == "nosf" && !c.cars.empty()) c.cars.back().nosFill = std::clamp(std::atof(v.c_str()), 0.0, 1.0);
         else if (k == "km" && !c.cars.empty()) c.cars.back().km = std::max(0.0, std::atof(v.c_str()));
+        else if (k == "fuel" && !c.cars.empty()) c.cars.back().fuelL = std::max(0.0, std::atof(v.c_str()));
         else if (k == "job" && !c.cars.empty()) { OwnedCar& oc = c.cars.back(); if (std::sscanf(v.c_str(), "%d;%ld", &oc.jobHp, &oc.jobReward) != 2) oc.jobHp = 0; }
         else if (k == "gauge" && !c.cars.empty()) {
             OwnedCar& oc = c.cars.back(); int bg = 0;

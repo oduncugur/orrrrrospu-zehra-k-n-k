@@ -7,7 +7,7 @@
 namespace zk {
 
 RoadCar::RoadCar(const VehicleDef* car, const Tune* tune, const RoadPath& road, double s0, double laneOffset)
-    : road_(road), lane_(laneOffset) {
+    : road_(&road), lane_(laneOffset) {
     if (tune) tune_ = *tune;          // yoksa varsayilan Tune: sokak lastigi (drag ayari degil)
     if (tune_.roadTire > 0 && tune_.roadTire < (int)tireTable().size()) {   // yol lastigi takimi: drag lastigi yerine
         tune_.tireSel = tune_.roadTire; tune_.tires = (TireType)tireTable()[tune_.roadTire].type; tune_.psi = 0;
@@ -16,21 +16,21 @@ RoadCar::RoadCar(const VehicleDef* car, const Tune* tune, const RoadPath& road, 
     VehicleSimConfig c;
     c.car = car; c.tune = &tune_; c.planar = true; c.road = "acikyol"; c.laneAsymmetry = false;
     sim_ = std::make_unique<VehicleSim>(c);
-    const RoadPoint p = road_.at(s0);
+    const RoadPoint p = road_->at(s0);
     sim_->resetPose(p.x - laneOffset * std::sin(p.heading), p.y + laneOffset * std::cos(p.heading), p.heading);
     sim_->powertrain().setGear(1);
     sim_->powertrain().setClutchPedal(1.0);
     hint_ = (int)(s0 / RoadPath::kStep);
-    road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+    road_->project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
 }
 
 void RoadCar::recover(double backM) {
-    const RoadPoint p = road_.at(std::max(0.0, s_ - backM));
+    const RoadPoint p = road_->at(std::max(0.0, s_ - backM));
     sim_->resetPose(p.x - lane_ * std::sin(p.heading), p.y + lane_ * std::cos(p.heading), p.heading);
     sim_->powertrain().setGear(1); sim_->powertrain().restart();
     launching_ = true; launchPedal_ = 1.0; shiftT_ = -1;
     hint_ = std::max(0, (int)(p.s / RoadPath::kStep));
-    road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+    road_->project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
     offT_ = 0; recovered_ = true;
 }
 
@@ -72,10 +72,10 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
 }
 
 void RoadCar::recoverAt(double s, double lateral) {
-    const RoadPoint p = road_.at(s);
+    const RoadPoint p = road_->at(s);
     sim_->resetPose(p.x - lateral * std::sin(p.heading), p.y + lateral * std::cos(p.heading), p.heading);
     hint_ = (int)(s / RoadPath::kStep);
-    road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+    road_->project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
 }
 
 void RoadCar::requestShift(int dir) {
@@ -188,7 +188,7 @@ void RoadCar::update(double dt, const RoadControls& c) {
     }
     sim_->setSurfaceMu((offRoad() ? 0.55 : 1.0) * gripMul);           // cim/toprak; yagmur
     {   // yol egimi arac yonune izdusurulur (ters yonde giderken yokus inis olur)
-        const RoadPoint p = road_.at(s_);
+        const RoadPoint p = road_->at(s_);
         sim_->setGrade(p.grade * std::cos(sim_->heading() - p.heading));
     }
     VehicleInputs in; in.steer = c.steer; in.brake = c.brake;
@@ -235,9 +235,9 @@ void RoadCar::update(double dt, const RoadControls& c) {
     acc_ += dt;
     while (acc_ >= kStep) { sim_->step(kStep, in); acc_ -= kStep; }
     sim_->drainFailureEvents();
-    road_.project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
-    offT_ = std::fabs(lat_) > road_.halfWidthAt(s_) + 12.0 ? offT_ + dt : 0.0;
-    if (offT_ > 1.5) recover();
+    road_->project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+    offT_ = std::fabs(lat_) > road_->halfWidthAt(s_) + 12.0 ? offT_ + dt : 0.0;
+    if (offT_ > 1.5 && !freeRoam) recover();
 }
 
 RoadControls RoadCar::aiControls(double laneOffset, double pace, double speedCap) const {
@@ -245,17 +245,17 @@ RoadControls RoadCar::aiControls(double laneOffset, double pace, double speedCap
     const double v = sim_->speed();
     // Yol takibi: istenen egrilik = yol egriligi + serit/yon hatasi duzeltmesi; direksiyon = kinematik
     // on besleme + yaw hizi geri beslemesi (lastik gecikmesi/understeer'de asiri direksiyonu onler)
-    const RoadPoint here = road_.at(s_);
+    const RoadPoint here = road_->at(s_);
     double eh = sim_->heading() - here.heading;
     eh = std::remainder(eh, 2.0 * 3.14159265358979);
     const double e = lat_ - laneOffset, Ld = 8.0 + 0.5 * v;
-    const double kDes = road_.at(s_ + 0.45 * v).curvature - 2.0 * e / (Ld * Ld) - 1.6 * eh / Ld;
+    const double kDes = road_->at(s_ + 0.45 * v).curvature - 2.0 * e / (Ld * Ld) - 1.6 * eh / Ld;
     const double Lw = sim_->vehicleLoad().wheelbase;
     c.steer = std::clamp(Lw * kDes + 0.08 * (v * kDes - sim_->yawRate()), -0.5, 0.5);
     const double aLat = pace * 9.81, aBrake = 5.0;
     double vMax = speedCap;                                              // fren mesafesi icindeki en dar yer
     for (double d = 0; d < v * v / (2 * aBrake) + 30.0; d += 8.0) {
-        const double k = std::max(std::fabs(road_.at(s_ + d).curvature), 1e-4);
+        const double k = std::max(std::fabs(road_->at(s_ + d).curvature), 1e-4);
         vMax = std::min(vMax, std::sqrt(aLat / k + 2 * aBrake * d));
     }
     c.throttle = std::clamp((vMax - v) * 0.4 + 0.2, 0.0, 1.0);                // yumusak gaz (ac-kapa degil)

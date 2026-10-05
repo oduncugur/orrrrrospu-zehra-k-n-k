@@ -203,6 +203,65 @@ double RoadPath::dividerOffset(double s) const {
     return -p.hw + 2.0 * p.hw * p.lf / std::max(1.0, p.lf + p.lb);
 }
 
+RoadPath RoadPath::polyline(const std::vector<std::pair<double, double>>& xy, double halfWidth, int lanesF, int lanesB, double cornerR) {
+    // 1) Koseleri yay ile yuvarlat (yogun ham noktalar), 2) kStep araliklarla yeniden ornekle, yon / egrilik hesapla
+    std::vector<std::pair<double, double>> raw;
+    const size_t n = xy.size();
+    raw.push_back(xy.front());
+    for (size_t i = 1; i + 1 < n; ++i) {
+        const double ax = xy[i].first - xy[i - 1].first, ay = xy[i].second - xy[i - 1].second;
+        const double bx = xy[i + 1].first - xy[i].first, by = xy[i + 1].second - xy[i].second;
+        const double la = std::hypot(ax, ay), lb = std::hypot(bx, by);
+        const double h0 = std::atan2(ay, ax), h1 = std::atan2(by, bx);
+        const double turn = std::remainder(h1 - h0, 6.283185307179586);
+        const double d = std::min({cornerR * std::tan(std::fabs(turn) * 0.5), 0.45 * la, 0.45 * lb});
+        if (std::fabs(turn) < 1e-3 || d < 0.5) { raw.push_back(xy[i]); continue; }
+        const double r = d / std::tan(std::fabs(turn) * 0.5);
+        const double tx = xy[i].first - ax / la * d, ty = xy[i].second - ay / la * d;   // yay baslangici
+        const int m = std::max(4, (int)(std::fabs(turn) * r / 1.0));
+        for (int k = 0; k <= m; ++k) {
+            const double h = h0 + turn * k / m, sgn = turn > 0 ? 1.0 : -1.0;
+            // yay merkezi: baslangic noktasindan sola / saga r
+            const double cx = tx - sgn * r * std::sin(h0), cy = ty + sgn * r * std::cos(h0);
+            raw.push_back({cx + sgn * r * std::sin(h), cy - sgn * r * std::cos(h)});
+        }
+    }
+    raw.push_back(xy.back());
+    RoadPath P;
+    double s = 0, acc = 0;
+    auto add = [&](double x, double y) { P.pts_.push_back({x, y, 0.0, 0.0, s, 0.0, 0.0, halfWidth, (double)lanesF, (double)lanesB}); };
+    add(raw[0].first, raw[0].second);
+    for (size_t i = 1; i < raw.size(); ++i) {
+        double x0 = raw[i - 1].first, y0 = raw[i - 1].second;
+        const double dx = raw[i].first - x0, dy = raw[i].second - y0, L = std::hypot(dx, dy);
+        double t = 0;
+        while (L > 1e-9 && acc + (L - t) >= kStep) {
+            t += kStep - acc; acc = 0; s += kStep;
+            add(x0 + dx * t / L, y0 + dy * t / L);
+        }
+        acc += L - t;
+    }
+    if (P.pts_.size() < 2) { s += kStep; add(raw.back().first, raw.back().second); }
+    for (size_t i = 0; i < P.pts_.size(); ++i) {
+        const size_t a = i == 0 ? 0 : i - 1, b = std::min(i + 1, P.pts_.size() - 1);
+        P.pts_[i].heading = std::atan2(P.pts_[b].y - P.pts_[a].y, P.pts_[b].x - P.pts_[a].x);
+    }
+    for (size_t i = 1; i + 1 < P.pts_.size(); ++i)
+        P.pts_[i].curvature = std::remainder(P.pts_[i + 1].heading - P.pts_[i - 1].heading, 6.283185307179586) / (2.0 * kStep);
+    P.halfWidth_ = halfWidth;
+    return P;
+}
+
+void RoadPath::projectGlobal(double x, double y, int& hint, double& s, double& lateral) const {
+    int best = 0; double bd = 1e300;
+    for (int i = 0; i < (int)pts_.size(); i += 4) {
+        const double dx = x - pts_[i].x, dy = y - pts_[i].y, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = i; }
+    }
+    hint = best;
+    project(x, y, hint, s, lateral);
+}
+
 void RoadPath::project(double x, double y, int& hint, double& s, double& lateral) const {
     const int n = (int)pts_.size();
     int best = std::clamp(hint, 0, n - 1);

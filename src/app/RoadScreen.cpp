@@ -57,6 +57,13 @@ RoadScreen::RoadScreen(App& app, int carId, const Tune* tune) : app_(app), carId
     app_.setVoiceTuned(0, carId, &tune_);
     app_.setVoice(1, nullptr);
     autopilot_ = std::getenv("ZK_AUTOPILOT") != nullptr;
+    if (app_.pendMode >= 0) {                                           // acik dunya: polis kovalamacasi / serseri kapismasi
+        forceRival_ = app_.pendRival; forceTune_ = app_.pendTune; worldChase_ = app_.pendMode == 0;
+        const int pm = app_.pendMode; app_.pendMode = -1; app_.activeEvent = -1;
+        start(pm == 0 ? RoadSession::Mode::Chase : RoadSession::Mode::Race);
+        flash(pm == 0 ? "POLIS PESINDE! 400 M ACIL VE TUT" : "SERSERI SATASTI: 4 KM KAPISMA", 2.5);
+        return;
+    }
     if (app_.runPlan.active) { start(RoadSession::Mode::Marathon); return; }   // sehirler arasi etap
     if (const char* m = std::getenv("ZK_ROAD_MODE")) {
         const std::string n = m;
@@ -220,7 +227,7 @@ void RoadScreen::finishRace() {
         const double m = std::max(0.0, ses_->player().s() - ses_->startS());
         app_.career.addKm(m / 1000.0 * (ses_->mode() == RoadSession::Mode::Marathon ? ses_->compression() : 1.0));
     }
-    if (cruiseRet_ && ses_->mode() == RoadSession::Mode::Chase) {        // sehir turu polisi: kacarsan odul yok, yakalanirsan ceza
+    if ((cruiseRet_ || worldChase_) && ses_->mode() == RoadSession::Mode::Chase) {        // sehir turu polisi: kacarsan odul yok, yakalanirsan ceza
         prize_ = 0;
         if (!ses_->playerWon()) {
             const long fine = std::min(app_.career.money, 500L + app_.career.money / 20);
