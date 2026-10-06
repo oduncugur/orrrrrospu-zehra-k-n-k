@@ -582,7 +582,7 @@ void WorldScreen::render(Renderer& r) {
     auto front = [&](double x, double y, double maxD) {                   // gorus konisinde mi (kamera onunde)
         const double dx = x - ex, dy = y - ey;
         const double along = dx * fx + dy * fy;
-        return along > -30.0 && dx * dx + dy * dy < maxD * maxD;
+        return along > -80.0 && dx * dx + dy * dy < maxD * maxD;   // genis koni: donuste yandakiler erken silinmez
     };
     // Sehir zeminleri (kaldirim / beton): 20 m karolar (yakindaki buyuk karo kameranin arkasina tasip atlaniyordu)
     for (const WorldCity& c : w.cities) {
@@ -615,22 +615,34 @@ void WorldScreen::render(Renderer& r) {
     }
     // Yollar: gorus mesafesindeki kenarlar; asfalt + serit cizgileri
     for (const WorldEdge& E : w.edges) {
-        if (ex < E.minX - 900 || ex > E.maxX + 900 || ey < E.minY - 900 || ey > E.maxY + 900) continue;
+        if (ex < E.minX - 2500 || ex > E.maxX + 2500 || ey < E.minY - 2500 || ey > E.maxY + 2500) continue;   // uzak yollar da (LOD)
         const auto& pts = E.fwd().points();
-        const int step = E.highway ? 2 : 1;
-        for (size_t i = 0; i + step < pts.size(); i += step) {
-            const RoadPoint &a = pts[i], &b = pts[i + step];
-            if (!front(a.x, a.y, 900.0)) continue;
+        const int step0 = E.highway ? 2 : 1;
+        int step = step0;
+        for (size_t i = 0; i + 1 < pts.size(); i += step) {
+            const RoadPoint& a = pts[i];
+            const double da = std::hypot(a.x - ex, a.y - ey);
+            step = da < 350.0 ? step0 : da < 1000.0 ? step0 * 3 : step0 * 8;   // uzakta seyrek nokta
+            const RoadPoint& b = pts[std::min(i + step, pts.size() - 1)];
+            if (!front(a.x, a.y, 2500.0) && !front(b.x, b.y, 2500.0)) continue;
             auto edge = [&](const RoadPoint& p, double off, double h) { return P3(p.x - off * std::sin(p.heading), p.y + off * std::cos(p.heading), h); };
             const Proj aL = edge(a, a.hw, 0.01), aR = edge(a, -a.hw, 0.01), bL = edge(b, b.hw, 0.01), bR = edge(b, -b.hw, 0.01);
-            const bool band = (i / step / 4) % 2 == 0;
-            quadP(r, aL, bL, bR, aR, fog(band ? Color{0.30f, 0.30f, 0.32f} : Color{0.28f, 0.28f, 0.30f}, aL.w));
-            if (E.bridge && aL.w < 400.0f)                                   // kopru korkulugu
+            const bool band = (i / step0 / 4) % 2 == 0;
+            const Color rc = fog(band ? Color{0.30f, 0.30f, 0.32f} : Color{0.28f, 0.28f, 0.30f}, aL.ok ? aL.w : bL.w);
+            if (aL.ok && aR.ok && bL.ok && bR.ok) quadP(r, aL, bL, bR, aR, rc);
+            else if (da < 80.0) {                                           // kamera yakininda kirpilan parca: 8 dilime bol
+                for (int k = 0; k < 8; ++k) {
+                    auto lerpP = [&](double t) { RoadPoint q = a; q.x = a.x + (b.x - a.x) * t; q.y = a.y + (b.y - a.y) * t; q.hw = a.hw + (b.hw - a.hw) * t; return q; };
+                    const RoadPoint p0 = lerpP(k / 8.0), p1 = lerpP((k + 1) / 8.0);
+                    quadP(r, edge(p0, p0.hw, 0.01), edge(p1, p1.hw, 0.01), edge(p1, -p1.hw, 0.01), edge(p0, -p0.hw, 0.01), rc);
+                }
+            }
+            if (E.bridge && aL.ok && aL.w < 400.0f)                                   // kopru korkulugu
                 for (double sg : {1.0, -1.0}) {
                     const Proj k0 = edge(a, sg * (a.hw + 0.3), 0.0), k1 = edge(b, sg * (b.hw + 0.3), 0.0), k2 = edge(b, sg * (b.hw + 0.3), 1.1), k3 = edge(a, sg * (a.hw + 0.3), 1.1);
                     quadP(r, k0, k1, k2, k3, fog({0.72f, 0.72f, 0.75f}, aL.w));
                 }
-            if (aL.w < 260.0f && (i / step) % 3 == 0) {                     // kesik cizgiler: serit sinirlari
+            if (aL.ok && aL.w < 260.0f && (i / step0) % 3 == 0) {                     // kesik cizgiler: serit sinirlari
                 const int nl = (int)(a.lf + a.lb);
                 for (int k = 1; k < nl; ++k) {
                     const double off = -a.hw + 2.0 * a.hw * k / nl;
@@ -663,7 +675,7 @@ void WorldScreen::render(Renderer& r) {
         if (d > 1800.0 && b.h < 14.0 + d * 0.004) continue;               // uzakta alcak binalar gorunmez (LOD)
         items.push_back({d, 0, i});
     }
-    for (int i = 0; i < (int)w.pois.size(); ++i) if (front(w.pois[i].x, w.pois[i].y, 800.0)) items.push_back({std::hypot(w.pois[i].x - ex, w.pois[i].y - ey), 1, i});
+    for (int i = 0; i < (int)w.pois.size(); ++i) if (front(w.pois[i].x, w.pois[i].y, 2500.0)) items.push_back({std::hypot(w.pois[i].x - ex, w.pois[i].y - ey), 1, i});
     for (int i = 0; i < (int)w.landmarks.size(); ++i) {
         const WorldLandmark& l = w.landmarks[i];
         const double d = std::hypot(l.x - ex, l.y - ey);
@@ -938,11 +950,11 @@ void WorldScreen::render(Renderer& r) {
         std::vector<Parked> pk;
         for (int e = 0; e < (int)w.edges.size(); ++e) {
             const WorldEdge& E = w.edges[e];
-            if (ex < E.minX - 220 || ex > E.maxX + 220 || ey < E.minY - 220 || ey > E.maxY + 220) continue;
+            if (ex < E.minX - 400 || ex > E.maxX + 400 || ey < E.minY - 400 || ey > E.maxY + 400) continue;
             parkedOn(w, e, pk);
         }
         for (const Parked& q : pk) {
-            if (!front(q.x, q.y, 220.0)) continue;
+            if (!front(q.x, q.y, 400.0)) continue;
             objs.push_back({std::hypot(q.x - ex, q.y - ey), q.carId, matMul(matTranslate((float)q.x, 0.0f, (float)-q.y), matRotY((float)q.h)), 0, 0.0f});
         }
     }
