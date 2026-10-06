@@ -21,7 +21,11 @@ const Rect kGas{282, 246, 354, 288};
 const Rect kRace{8, 386, 352, 436};
 Rect tileR(int i) { return {8 + (i % 4) * 87.0f, 444 + (i / 4) * 92.0f, 8 + (i % 4) * 87.0f + 82, 444 + (i / 4) * 92.0f + 86}; }
 enum GTile { TParts, TSetup, TGauge, TPaint, TDyno, TRoad, TGallery, TStreet, TCount };
+#ifdef ZK_OPENWORLD
+const char* const kTileName[TCount] = {"PARCA", "KURULUM", "KADRAN", "BOYA", "DYNO", "ACIK DUNYA", "GALERI", "SOKAK"};   // acik dunya surumu
+#else
 const char* const kTileName[TCount] = {"PARCA", "KURULUM", "KADRAN", "BOYA", "DYNO", "SERBEST YOL", "GALERI", "SOKAK"};
+#endif
 const int kTileIcon[TCount] = {IconParts, IconSetup, IconGauge, IconPaint, IconDyno, IconRoad, IconGallery, IconStreet};
 
 double peakHp(const EngineSpec& e) {
@@ -174,7 +178,11 @@ void GarageScreen::render(Renderer& r) {
         tile(r, tileR(i), kTileIcon[i], kTileName[i], kTileCol[i], badge);
     }
 #ifndef __ANDROID__
+#ifdef ZK_OPENWORLD
+    r.textCentered(180, 630, "<> ARAC  ENTER YARIS  PGUP ACIK DUNYA  W GAZ  O AYAR", 1, {0.45f, 0.6f, 0.85f});
+#else
     r.textCentered(180, 630, "<> ARAC  ENTER YARIS  PGUP YOL  W GAZ  O AYAR", 1, {0.45f, 0.6f, 0.85f});
+#endif
 #endif
     if (msgT_ > 0) {
         r.rect(0, 240, 360, 270, {0.02f, 0.02f, 0.04f, 0.88f});
@@ -264,7 +272,11 @@ void GarageScreen::key(Key k, bool down) {
     if (k == Key::Left) select(app_.career.current - 1);
     else if (k == Key::Right) select(app_.career.current + 1);
     else if (k == Key::Enter) raceOrRepair();
+#ifdef ZK_OPENWORLD
+    else if (k == Key::PageUp && app_.career.car().raceable()) app_.goWorld();
+#else
     else if (k == Key::PageUp && app_.career.car().raceable()) app_.goRoad();
+#endif
     else if (k == Key::Settings) app_.goSettings();
 }
 
