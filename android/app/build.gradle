@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace 'com.zehrakinik.game'
-    compileSdk = Integer.parseInt(System.getenv('ZK_COMPILE_SDK') ?: '34')   // yerel: kurulu SDK
+    compileSdk = Integer.parseInt(System.getenv('ZK_COMPILE_SDK') ?: '36')   // yerel: kurulu SDK
     // CI: GitHub runner'daki en guncel NDK (ZK_NDK_VERSION); yerelde AGP varsayilani
     if (System.getenv('ZK_NDK_VERSION')) { ndkVersion System.getenv('ZK_NDK_VERSION') }
 
     defaultConfig {
         applicationId 'com.zehrakinik.game'
         minSdk 26            // AAudio
-        targetSdk 34
+        targetSdk 35   // Play Store: yeni surumler icin en az 35
         // Surum: CI calisma numarasi (her build bir oncekinin uzerine guncelleme olarak kurulur)
         versionCode (System.getenv('GITHUB_RUN_NUMBER') ? 100 + System.getenv('GITHUB_RUN_NUMBER').toInteger() : 2)
         versionName (System.getenv('GITHUB_RUN_NUMBER') ? "0.${System.getenv('GITHUB_RUN_NUMBER')}" : '0.2-garaj')
@@ -53,7 +53,10 @@ android {
         }
     }
     buildTypes {
-        release { minifyEnabled false }
+        release {
+            minifyEnabled false
+            if (System.getenv('ZK_KEYSTORE')) signingConfig signingConfigs.zk   // Play: imzali AAB (bundleRelease)
+        }
         debug { if (System.getenv('ZK_KEYSTORE')) signingConfig signingConfigs.zk }
     }
 }

@@ -60,5 +60,5 @@ target_compile_features(zehra PRIVATE cxx_std_17)
 if(ZK_OPENWORLD)
   target_compile_definitions(zehra PRIVATE ZK_OPENWORLD=1)
 endif()
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate -Wl,-z,max-page-size=16384")   # Play: 16 KB sayfa uyumu
 target_link_libraries(zehra native_app_glue android log EGL GLESv3 aaudio)

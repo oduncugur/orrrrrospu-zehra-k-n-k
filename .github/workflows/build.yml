@@ -84,6 +84,17 @@ jobs:
           gradle -p android assembleDebug --no-daemon --stacktrace
           mkdir -p out && cp android/app/build/outputs/apk/classic/debug/app-classic-debug.apk out/ZehraKinik.apk
           cp android/app/build/outputs/apk/world/debug/app-world-debug.apk out/ZehraKinikAcikDunya.apk
+          # Play Store paketi (AAB): yalnizca sabit imza varsa
+          if [ -n "$ZK_KEYSTORE_B64" ]; then
+            gradle -p android bundleRelease --no-daemon
+            mkdir -p play && cp android/app/build/outputs/bundle/classicRelease/*.aab play/ZehraKinik.aab
+            cp android/app/build/outputs/bundle/worldRelease/*.aab play/ZehraKinikAcikDunya.aab
+          fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('play/*.aab') != '' }}
+        with:
+          name: play-store-aab
+          path: play/*.aab
       - uses: actions/upload-artifact@v4
         with:
           name: android
