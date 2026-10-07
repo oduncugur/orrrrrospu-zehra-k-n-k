@@ -2,6 +2,7 @@
 // donus), binalar, trafik (polis ~%3, serseri ~%1), benzinlikler (sehre gore litre fiyati), bulusma meydanlari
 // (modifiyeli araclar), yaris baslangiclari, hurdalik. Harita: dokunarak waypoint, rota; otonom surus rotayi izler.
 #include "Screens.h"
+#include "Gauges.h"
 #include "Ui.h"
 #include "app/Looks.h"
 #include "game/League.h"
@@ -58,6 +59,7 @@ struct WorldScreen::Impl {
     const World& w = World::get();
     int carId; Tune tune;
     int W = 640, H = 360; bool land = true;
+    double gaugeT = 0.0;
     WorldLeg leg{0, false};
     std::unique_ptr<RoadCar> car;
     Cockpit cockpit;
@@ -995,6 +997,17 @@ void WorldScreen::render(Renderer& r) {
     r.text(150, 4, b, 1, sim.fuelLiters() < 5.0 ? Color{1.0f, 0.35f, 0.3f} : Color{0.75f, 0.85f, 1.0f});
     std::snprintf(b, sizeof b, "SINIR %.0f  %s", M.speedLimit() * 3.6, money(M.app.career.money).c_str());
     r.text(150, 16, b, 1, {0.8f, 0.8f, 0.85f});
+    {   // kadran: satin alinan (yoksa temel analog); yatayda alt orta, dikeyde pedallarin ustu
+        GaugeData gd;
+        const auto& pt = sim.powertrain();
+        gd.vtec = pt.vtecActive(); gd.rpm = (float)pt.rpm(); gd.redline = (float)sim.engineSpec().redlineRpm; gd.shiftRpm = (float)sim.shiftRpm();
+        gd.speed = (float)(sim.speed() * 3.6); gd.speedMax = 260.0f;
+        gd.gear = g == 0 ? "N" : std::to_string(g); gd.t = M.gaugeT += 1.0 / 60.0;
+        gd.boost = (float)sim.boostNow(); gd.boostMax = (float)sim.boostMax();
+        const int gs = std::max(1, M.app.career.car().gauge);
+        if (M.land) drawGaugeCluster(r, W * 0.5f - 160, H - 98, W * 0.5f + 64, H - 2, gs, M.app.career.car().boostGauge, gd);
+        else drawGaugeCluster(r, 40, H - 290, 320, H - 206, gs, M.app.career.car().boostGauge, gd);
+    }
     button(r, M.mapBtn, "HARITA", {0.15f, 0.35f, 0.6f}, 1);
     button(r, M.jobBtn, M.hasJob ? "IS VAR" : "ISLER", M.hasJob ? Color{0.55f, 0.4f, 0.1f} : Color{0.3f, 0.3f, 0.36f}, 1);
     if (M.hasJob) {
