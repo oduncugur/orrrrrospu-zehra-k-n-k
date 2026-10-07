@@ -61,8 +61,11 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    // Test (--screenshot / --record): pencere gizli acilir (kullanicinin ekranina cikmaz), kare ic tampondan okunur
+    const bool hidden = !shot.empty() && !std::getenv("ZK_SHOW");
+    if (hidden) SDL_setenv_unsafe("ZK_SHOT_FBO", "1", 1);
     SDL_Window* win = SDL_CreateWindow("Zehra Kinik - Garaj", 450, 800,
-                                       SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+                                       SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (hidden ? SDL_WINDOW_HIDDEN : 0));
     if (!win) { std::fprintf(stderr, "Pencere: %s\n", SDL_GetError()); return 1; }
     SDL_GLContext ctx = SDL_GL_CreateContext(win);
     if (!ctx || !zkLoadGL(getProc)) { std::fprintf(stderr, "OpenGL 3.3 baglami: %s\n", SDL_GetError()); return 1; }
@@ -92,7 +95,7 @@ int main(int argc, char** argv) {
         game.displayHz = dm && dm->refresh_rate > 1.0f ? dm->refresh_rate : 60.0f;
     };
     syncVSync();
-    if (fullNow) SDL_SetWindowFullscreen(win, true);
+    if (fullNow && !hidden) SDL_SetWindowFullscreen(win, true);
     FramePacer pacer;
     // Test: zamanli tus betigi "sure:tus:1/0,..." (ornek: ZK_KEYS="0.5:Enter:1,0.6:Enter:0")
     struct KeyEv { double t; Key k; bool down; };

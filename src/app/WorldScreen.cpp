@@ -282,6 +282,9 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
         x = l.x - back * std::cos(l.heading + 0.5); y = l.y - back * std::sin(l.heading + 0.5);
         if (M.w.nearestLeg(x, y, 0.0, lg, s0, la, 400.0)) { const RoadPoint q = M.w.path(lg).at(s0); x = q.x; y = q.y; }
         h = std::atan2(l.y - y, l.x - x);
+    } else if (const char* ap = std::getenv("ZK_WORLD_AT")) {            // test: n. noktanin yanindaki yolda baslar
+        const WorldPoi& q = M.w.pois[(size_t)std::clamp(std::atoi(ap), 0, (int)M.w.pois.size() - 1)];
+        x = q.x; y = q.y; h = q.heading;
     } else
     if (app.worldValid) { x = app.worldX; y = app.worldY; h = app.worldH; }
     else {
@@ -785,6 +788,21 @@ void WorldScreen::render(Renderer& r) {
     };
     r.rect(0, horizon, W, H, {0.36f, 0.55f, 0.28f});
     r.gradientV(0, 0, W, horizon, {0.30f, 0.45f, 0.85f}, skyLow);
+    {   // Ufuk: iki kat tepe / dag silueti (bakis yonune gore doner, sonsuz uzakta: ufuk asla bos kalmaz)
+        const double yaw = std::atan2(fy, fx), hfov = std::atan(std::tan(fov * 0.5) * (double)W / H);
+        auto ridge = [&](double a, double f1, double f2, double ph) {
+            return 0.55 + 0.25 * std::sin(a * f1 + ph) + 0.15 * std::sin(a * f2 + ph * 1.7) + 0.08 * std::sin(a * 23.0 + ph);
+        };
+        for (int layer = 0; layer < 2; ++layer) {
+            const float hMax = layer == 0 ? H * 0.11f : H * 0.06f;
+            const Color c = layer == 0 ? Color{0.55f, 0.6f, 0.72f} : Color{0.42f, 0.52f, 0.42f};
+            for (int x = 0; x < W; x += 4) {
+                const double a = yaw - ((x + 2.0) / W - 0.5) * 2.0 * hfov;
+                const float hh = (float)(hMax * ridge(a, layer ? 5.0 : 3.0, layer ? 11.0 : 7.0, layer * 2.3));
+                r.rect((float)x, horizon - hh, (float)x + 4.0f, horizon + 1.0f, c);
+            }
+        }
+    }
     r.setSceneLight(1.0f, 1.0f);
     auto front = [&](double x, double y, double maxD) {                   // gorus konisinde mi (kamera onunde)
         const double dx = x - ex, dy = y - ey;
@@ -919,9 +937,28 @@ void WorldScreen::render(Renderer& r) {
             if (front(lx, ly, 300.0)) props.push_back({lx, ly, 0, 0.0f});
         }
     }
+    for (int e = 0; e < (int)w.edges.size(); ++e) {                      // otoban kenari: elektrik direkleri (80 m) + reklam panolari (1.1 km)
+        const WorldEdge& E = w.edges[e];
+        if (E.city >= 0) continue;
+        if (ex < E.minX - 700 || ex > E.maxX + 700 || ey < E.minY - 700 || ey > E.maxY + 700) continue;
+        const RoadPath& p = E.fwd();
+        const double s0 = std::max(0.0, p.length() * 0.0);
+        for (double s = s0 + 40.0; s < p.length() - 40.0; s += 80.0) {
+            const RoadPoint q = p.at(s);
+            if (std::fabs(q.x - ex) > 700 || std::fabs(q.y - ey) > 700) continue;
+            const double lat = -(q.hw + 32.0);
+            const double lx = q.x - lat * std::sin(q.heading), ly = q.y + lat * std::cos(q.heading);
+            if (front(lx, ly, 700.0)) props.push_back({lx, ly, 2, 0.0f});
+            if (std::fmod(s, 1120.0) < 80.0) {
+                const double lb = q.hw + 14.0;
+                const double bx = q.x - lb * std::sin(q.heading), by = q.y + lb * std::cos(q.heading);
+                if (front(bx, by, 700.0)) props.push_back({bx, by, 3, (float)hashW((int)s + e * 7)});
+            }
+        }
+    }
     for (int i = 0; i < (int)w.buildings.size(); ++i) {                  // site bahceleri: on bahcede sira sira, yanlarda tek tuk
         const WorldBuilding& b = w.buildings[i];
-        if (std::fabs(b.cx - ex) > 260 || std::fabs(b.cy - ey) > 260) continue;
+        if (b.city < 0 || std::fabs(b.cx - ex) > 260 || std::fabs(b.cy - ey) > 260) continue;
         const double vx = -b.uy, vy = b.ux;
         double U, v0, v1; siteBox(b, U, v0, v1);
         const double fa = b.roadSide > 0 ? b.hv + 1.5 : v0 + 1.5, fb = b.roadSide > 0 ? v1 - 1.5 : -(b.hv + 1.5);   // on bahce bandi
@@ -940,9 +977,10 @@ void WorldScreen::render(Renderer& r) {
             if (front(tx, ty, 260.0)) props.push_back({tx, ty, 1, hashW(i * 43 + (su > 0))});
         }
     }
-    for (const WorldTree& t : w.trees) {                                  // parklar / bos arsalar
-        if (std::fabs(t.x - ex) > 320 || std::fabs(t.y - ey) > 320) continue;
-        if (front(t.x, t.y, 320.0)) props.push_back({t.x, t.y, 1, t.s});
+    for (const WorldTree& t : w.trees) {                                  // parklar / bos arsalar / yol kenari
+        const double tr = t.city < 0 ? 650.0 : 320.0;
+        if (std::fabs(t.x - ex) > tr || std::fabs(t.y - ey) > tr) continue;
+        if (front(t.x, t.y, tr)) props.push_back({t.x, t.y, 1, t.s});
     }
     for (int i = 0; i < (int)props.size(); ++i) items.push_back({std::hypot(props[i].x - ex, props[i].y - ey), 10, i});
     struct Light { double x, y; int state; };                            // state 0 yesil, 1 sari, 2 kirmizi
@@ -1066,6 +1104,27 @@ void WorldScreen::render(Renderer& r) {
             flat(0.62, 0.85, 0.12, {0.85f, 0.68f, 0.52f});                // bas
         } else if (it.kind == 10) {                                       // sokak lambasi / bahce agaci
             const Prop& pr = props[it.idx];
+            if (pr.type == 2) {                                           // elektrik diregi: ahsap direk + travers
+                const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, 9.0);
+                if (!b0.ok || !b1.ok) continue;
+                r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                r.rect(b0.x - 0.12f * sc, b1.y, b0.x + 0.12f * sc, b0.y, fog({0.36f, 0.27f, 0.18f}, b0.w));
+                r.rect(b1.x - 1.2f * sc, b1.y + 0.3f * sc, b1.x + 1.2f * sc, b1.y + 0.5f * sc, fog({0.3f, 0.22f, 0.15f}, b0.w));
+                continue;
+            }
+            if (pr.type == 3) {                                           // reklam panosu: iki ayak + renkli yuz + yazi
+                const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, 7.0);
+                if (!b0.ok || !b1.ok) continue;
+                r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                r.rect(b0.x - 2.6f * sc, b1.y + 2.5f * sc, b0.x - 2.3f * sc, b0.y, fog({0.4f, 0.4f, 0.42f}, b0.w));
+                r.rect(b0.x + 2.3f * sc, b1.y + 2.5f * sc, b0.x + 2.6f * sc, b0.y, fog({0.4f, 0.4f, 0.42f}, b0.w));
+                static const Color bc[5] = {{0.9f, 0.2f, 0.15f}, {0.15f, 0.45f, 0.9f}, {0.95f, 0.75f, 0.1f}, {0.1f, 0.6f, 0.3f}, {0.95f, 0.95f, 0.95f}};
+                const int k = (int)(pr.v * 5) % 5;
+                r.rect(b0.x - 3.2f * sc, b1.y, b0.x + 3.2f * sc, b1.y + 2.6f * sc, fog(bc[k], b0.w));
+                static const char* const ads[5] = {"ZEHRA KINIK", "TOFAZ SAHIN", "KARDESLER OTO", "ACIK DUNYA", "HURDACI CEMAL"};
+                if (sc > 6.0f) r.textCentered(b0.x, b1.y + 1.0f * sc - 4, ads[k], sc > 14.0f ? 2 : 1, k == 4 ? Color{0.1f, 0.1f, 0.1f} : Color{1, 1, 1});
+                continue;
+            }
             if (pr.type == 0) {
                 const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, 6.0);
                 if (!b0.ok || !b1.ok) continue;

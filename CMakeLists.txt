@@ -113,3 +113,6 @@ target_link_libraries(zehra_handling PRIVATE zk_sim)
 
 add_executable(steer_probe tests/steer_probe.cpp)
 target_link_libraries(steer_probe PRIVATE zk_sim)
+
+add_executable(world_probe tests/world_probe.cpp)
+target_link_libraries(world_probe PRIVATE zk_sim)

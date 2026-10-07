@@ -50,7 +50,7 @@ void World::build() {
     // Sehir merkezleri: aralik = 4 km sehir + otoban (gercek km x 15 m), kuzey-guney dalga
     std::vector<double> cx(nC), cy(nC);
     for (int c = 0; c < nC; ++c) {
-        cx[c] = c == 0 ? 0.0 : cx[c - 1] + halfU(c - 1) + halfU(c) + 1200.0 + Career::legKm(c - 1) * 15.0;
+        cx[c] = c == 0 ? 0.0 : cx[c - 1] + halfU(c - 1) + halfU(c) + 2500.0 + Career::legKm(c - 1) * 55.0;   // otoban: gercek km x 55 m
         cy[c] = 3000.0 * std::sin(c * 1.3) + 900.0 * std::sin(c * 2.9);
     }
     std::vector<int> west(nC), east(nC);
@@ -241,7 +241,7 @@ void World::build() {
         }
         (void)hdg;
     }
-    // Sehirlerarasi otoban: sehir cikisi -> sonraki sehir girisi (dalgali, 450 m yaricapli koseler)
+    // Sehirlerarasi otoban: sehir cikisi -> sonraki sehir girisi (dalgali, 450 m yaricapli koseler); kenarinda koyler, agaclar
     for (int c = 0; c + 1 < nC; ++c) {
         const WorldNode &A = nodes[east[c]], &Bn = nodes[west[c + 1]];
         std::vector<std::pair<double, double>> pts = {{A.x, A.y}, {A.x + cities[c].dirX * 400.0, A.y + cities[c].dirY * 400.0}};
@@ -258,6 +258,42 @@ void World::build() {
         const RoadPoint q = fp.at(std::min(1200.0, fp.length() * 0.3));
         const double off = -(fp.halfWidthAt(q.s) + 22.0);
         pois.push_back({WPoiGas, q.x - off * std::sin(q.heading), q.y + off * std::cos(q.heading), q.heading, c, 2, "OTOBAN BENZINLIK"});
+        {   // karsi yonde ikinci dinlenme tesisi (uzun otobanda)
+            const RoadPoint q2 = fp.at(fp.length() * 0.68);
+            const double off2 = fp.halfWidthAt(q2.s) + 22.0;
+            pois.push_back({WPoiGas, q2.x - off2 * std::sin(q2.heading), q2.y + off2 * std::cos(q2.heading), q2.heading + kPiW, c, 1, "DINLENME TESISI"});
+        }
+        // Yol kenari: agac kumeleri (iki yanda), her 1.4-2.6 km'de bir koy (6-14 ev + bahce agaclari)
+        const double Lh = fp.length();
+        int key = 7000000 + c * 100000;
+        for (double s = 300.0; s < Lh - 300.0; s += 13.0) {
+            const RoadPoint p = fp.at(s);
+            for (int side = 0; side < 2; ++side) {
+                ++key;
+                if (hashW(key) < 0.35) continue;
+                const double off3 = (side ? 1.0 : -1.0) * (p.hw + 14.0 + 70.0 * hashW(key * 3));
+                trees.push_back({p.x - off3 * std::sin(p.heading), p.y + off3 * std::cos(p.heading), (float)hashW(key * 5), -1});
+            }
+        }
+        for (double s = 900.0 + 500.0 * hashW(c * 17); s < Lh - 900.0; s += 1400.0 + 1200.0 * hashW((int)s + c)) {
+            const RoadPoint p = fp.at(s);
+            const double side = hashW((int)s * 3 + c) < 0.5 ? 1.0 : -1.0;
+            const double vo = side * (p.hw + 60.0 + 80.0 * hashW((int)s * 7 + c));        // koy merkezi yoldan 60-140 m
+            const double vx0 = p.x - vo * std::sin(p.heading), vy0 = p.y + vo * std::cos(p.heading);
+            const double ux = std::cos(p.heading), uy = std::sin(p.heading);
+            const int nh = 6 + (int)(hashW((int)s * 11 + c) * 9);
+            for (int h = 0; h < nh; ++h) {
+                ++key;
+                const double a = hashW(key * 13) * 6.2832, rr = 12.0 + 55.0 * hashW(key * 17);
+                const double hx = vx0 + rr * std::cos(a), hy = vy0 + rr * std::sin(a);
+                const double rot = (hashW(key * 19) - 0.5) * 0.5;                                  // evler yola yakin dogrultuda
+                const double cu = std::cos(p.heading + rot), su = std::sin(p.heading + rot);
+                buildings.push_back({hx, hy, 4.0 + 3.0 * hashW(key * 23), 3.5 + 2.5 * hashW(key * 29), cu, su, 4.0 + 4.5 * hashW(key * 31), -1,
+                                     (float)hashW(key * 37), 6.0, 1.0f});
+                for (int t = 0; t < 2; ++t) trees.push_back({hx + (hashW(key * 41 + t) - 0.5) * 22.0, hy + (hashW(key * 43 + t) - 0.5) * 22.0, (float)hashW(key * 47 + t), -1});
+            }
+            (void)ux; (void)uy;
+        }
     }
     // Yaris baslangiclari: o sehrin etkinlikleri, sehre dagilmis sokaklarin ortasinda sag kenar
     const auto& ev = leagueEvents();
@@ -404,8 +440,9 @@ void World::build() {
 }
 
 // Sehir sekilleri (yerel: u otoban yonu dogu, v sol / kuzey; metre). 0 kara (sehir), 1 su, 2 yesil (park / dag / disi)
-double World::halfU(int style) { static const double h[10] = {5000, 3000, 3500, 2500, 3500, 2750, 2000, 1500, 3500, 3500}; return h[std::clamp(style, 0, 9)]; }
-double World::halfV(int style) { static const double h[10] = {3500, 1250, 1750, 2000, 3000, 2750, 1500, 1250, 1500, 2250}; return h[std::clamp(style, 0, 9)]; }
+// Sehir yari boylari (m) x 1.3: daha buyuk sehirler, daha cok sokak
+double World::halfU(int style) { static const double h[10] = {5000, 3000, 3500, 2500, 3500, 2750, 2000, 1500, 3500, 3500}; return 1.3 * h[std::clamp(style, 0, 9)]; }
+double World::halfV(int style) { static const double h[10] = {3500, 1250, 1750, 2000, 3000, 2750, 1500, 1250, 1500, 2250}; return 1.3 * h[std::clamp(style, 0, 9)]; }
 
 static int surfaceRaw(int style, double u, double v);
 int World::surfaceLocal(int style, double u, double v) {

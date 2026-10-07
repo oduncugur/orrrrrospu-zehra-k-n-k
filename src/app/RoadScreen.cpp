@@ -495,7 +495,7 @@ void RoadScreen::drawMenu(Renderer& r) {
     r.gradientV(0, 0, W, H, {0.10f, 0.12f, 0.2f}, {0.05f, 0.05f, 0.07f});
     const float ty = land_ ? 30 : 110, by = marathon_.y1;                // baslik / dugmelerin alti
     r.textCentered(W / 2.0f, ty, "ACIK YOL", 4, {1.0f, 0.62f, 0.05f});
-    r.textCentered(W / 2.0f, ty + 40, "ARA TASLAK", 1, {0.6f, 0.6f, 0.65f});
+    r.textCentered(W / 2.0f, ty + 40, "MOD SEC", 1, {0.6f, 0.6f, 0.65f});
     button(r, free_, "SERBEST SURUS", Color{0.15f, 0.45f, 0.7f}, 2);
     button(r, flow_, "OTOBAN AKISI 2 DK", Color{0.1f, 0.5f, 0.35f}, 2);
     button(r, race_, "YOL YARISI 4 KM", kUiOrange, 2);

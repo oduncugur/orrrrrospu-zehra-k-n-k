@@ -9,10 +9,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 namespace zk {
 
 namespace {
+bool cheat() { static const bool on = std::getenv("ZK_CHEAT") != nullptr; return on; }   // magaza surumunde para hilesi yok
 // Yerlesim (v2, kullanici dostu): ust serit (para / un), 3B arac (iki yanda ok, sag ustte ayar), bilgi kartlari,
 // buyuk YARIS dugmesi, iki sira ikonlu kutucuk. Devir testi: 3B gorunumde GAZ dugmesi (basili tut).
 const Rect kPrev{4, 140, 42, 214}, kNext{318, 140, 356, 214};
@@ -107,7 +109,7 @@ void GarageScreen::render(Renderer& r) {
     icon(r, IconSettings, kSettingsG.cx(), kSettingsG.cy(), 11, {0.9f, 0.9f, 0.95f});
     if (c.cars.size() > 1 && oc.jobHp == 0) button(r, kSellG, "SAT", Color{0.5f, 0.12f, 0.12f, 0.9f}, 1);
     if (worn()) button(r, kRestoreG, "RESTORASYON", Color{0.45f, 0.30f, 0.12f, 0.95f}, 1);
-    button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.9f}, 1);         // TEST: yayin oncesi kaldirilacak
+    if (cheat()) button(r, kCashG, "+10K", Color{0.1f, 0.4f, 0.15f, 0.9f}, 1);   // yalniz gelistirici (ZK_CHEAT)
     if (!v.streetLegal) r.textCentered(180, 80, "YARIS ARACI - ROMORK", 1, {1.0f, 0.3f, 0.3f});
     // Devir testi: GAZ dugmesi + devir + ince serit (kesici cizgisi)
     const float rpm = (float)pt_->rpm(), red = (float)pt_->engine().redlineRpm;
@@ -213,7 +215,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
     if (c.cars.size() > 1 && c.car().jobHp == 0 && kSellG.hit(x, y)) { selling_ = true; return; }
     if (kSettingsG.hit(x, y)) { app_.goSettings(); return; }
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
-    if (kCashG.hit(x, y)) {                                      // TEST: para
+    if (cheat() && kCashG.hit(x, y)) {                           // gelistirici: para
         c.money += 10000;
         app_.saveCareer();
         msg_ = "TEST: +$10,000"; msgT_ = 1.2;
