@@ -286,6 +286,15 @@ void App::pointerMove(int id, float px, float py) {
     screen_->pointerMove(id, x, y);
 }
 void App::pointerUp(int id) { screen_->pointerUp(id); }
+void App::padStick(float x, float y) {
+    static int slot = -1;                                    // son yuva (tekrar gonderilmez)
+    if (std::fabs(y) < 0.6f) { if (std::fabs(y) < 0.3f) slot = -1; return; }   // kanalda degil: secim yok
+    const int col = x < -0.35f ? 0 : x > 0.35f ? 2 : 1;
+    const int g = col * 2 + (y < 0 ? 1 : 2);
+    if (g == slot) return;
+    slot = g;
+    key((Key)((int)Key::Gear0 + g), true); key((Key)((int)Key::Gear0 + g), false);
+}
 void App::key(Key k, bool down) {
     if (!hint_.empty()) { if (down && (k == Key::Enter || k == Key::Back)) hint_.clear(); return; }
     screen_->key(k, down);

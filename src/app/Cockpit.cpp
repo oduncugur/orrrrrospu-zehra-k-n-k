@@ -162,6 +162,7 @@ void Cockpit::key(Key k, bool down) {
     if (!down) return;
     if (lever_ == Lever::HPattern) {
         if (k >= Key::Gear0 && k <= Key::Gear6) setKnobGear((int)k - (int)Key::Gear0);
+        if (k == Key::GearR) setKnobGear(-1);
         if (k == Key::ShiftUp) setKnobGear(knobGear_ + 1);
         if (k == Key::ShiftDown) setKnobGear(knobGear_ - 1);                // bostan asagi: R
     } else if (lever_ == Lever::Sequential) {
@@ -176,6 +177,7 @@ void Cockpit::key(Key k, bool down) {
         if (k == Key::Gear3) autoPos_ = AutoPos::M;
         if (k == Key::Gear5) autoPos_ = AutoPos::R;
         if (k == Key::Gear6) autoPos_ = AutoPos::P;
+        if (k == Key::GearR) autoPos_ = AutoPos::R;
     }
 }
 

@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
     // B geri, Start onay, Back ayarlar, D-pad sol / sag / yukari (yol) / asagi. Eksenler esikli dijital tusa cevrilir.
     bool padThr = false, padBrk = false, padL = false, padR = false;
     auto padAxis = [&](bool& st, bool now, Key k) { if (now != st) { st = now; game.key(k, now); } };
-    float padT = 0.0f, padB = 0.0f;
+    float padT = 0.0f, padB = 0.0f, padRX = 0.0f, padRY = 0.0f;
     while (!quit) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -225,6 +225,7 @@ int main(int argc, char** argv) {
                 case SDL_GAMEPAD_BUTTON_NORTH: game.key(Key::PageUp, down); break;
                 case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER: game.key(Key::Clutch, down); break;
                 case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: game.key(Key::Gear0, down); break;
+                case SDL_GAMEPAD_BUTTON_RIGHT_STICK: game.key(Key::GearR, down); break;          // sag analoga basma: geri vites
                 case SDL_GAMEPAD_BUTTON_START: game.key(Key::Enter, down); break;
                 case SDL_GAMEPAD_BUTTON_BACK: game.key(Key::Settings, down); break;
                 case SDL_GAMEPAD_BUTTON_DPAD_LEFT: game.key(Key::Left, down); break;
@@ -241,6 +242,8 @@ int main(int argc, char** argv) {
                 // Tetikler analog (surus ekraninda pedal tetige oranli); yalniz dibe yakin basis tus olayi (drag vb. ekranlar)
                 case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER: padT = std::max(0.0f, v); game.setPadPedals(padT, padB); padAxis(padThr, v > (padThr ? 0.80f : 0.90f), Key::Throttle); break;
                 case SDL_GAMEPAD_AXIS_LEFT_TRIGGER: padB = std::max(0.0f, v); game.setPadPedals(padT, padB); padAxis(padBrk, v > (padBrk ? 0.80f : 0.90f), Key::Brake); break;
+                case SDL_GAMEPAD_AXIS_RIGHTX: padRX = v; game.padStick(padRX, padRY); break;   // sag analog: H vites
+                case SDL_GAMEPAD_AXIS_RIGHTY: padRY = v; game.padStick(padRX, padRY); break;
                 case SDL_GAMEPAD_AXIS_LEFTX:
                     padAxis(padL, v < (padL ? -0.3f : -0.4f), Key::Left);
                     padAxis(padR, v > (padR ? 0.3f : 0.4f), Key::Right);

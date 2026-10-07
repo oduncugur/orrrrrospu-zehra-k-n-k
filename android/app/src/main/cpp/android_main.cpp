@@ -294,6 +294,7 @@ bool padKey(zk::App& g, int32_t code, bool down) {
     case AKEYCODE_BUTTON_Y: g.key(Key::PageUp, down); return true;
     case AKEYCODE_BUTTON_L1: g.key(Key::Clutch, down); return true;
     case AKEYCODE_BUTTON_R1: g.key(Key::Gear0, down); return true;
+    case AKEYCODE_BUTTON_THUMBR: g.key(Key::GearR, down); return true;   // sag analoga basma: geri vites
     case AKEYCODE_BUTTON_START: g.key(Key::Enter, down); return true;
     case AKEYCODE_BUTTON_SELECT: g.key(Key::Settings, down); return true;
     case AKEYCODE_BUTTON_B: if (!down) g.back(); return true;
@@ -312,6 +313,7 @@ void padAxes(zk::App& g, const AInputEvent* ev) {
     float x = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_X, 0);
     const float hx = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_HAT_X, 0);
     if (std::fabs(hx) > std::fabs(x)) x = hx;
+    g.padStick(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_Z, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_RZ, 0));   // sag analog: H vites
     g.setPadPedals(std::clamp(rt, 0.0f, 1.0f), std::clamp(lt, 0.0f, 1.0f));   // analog pedal (surus); dipte tus olayi
     set(thr, rt > (thr ? 0.80f : 0.90f), zk::Key::Throttle);
     set(brk, lt > (brk ? 0.80f : 0.90f), zk::Key::Brake);

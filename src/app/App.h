@@ -19,7 +19,7 @@
 namespace zk {
 
 enum class Key { Throttle, Brake, Clutch, ShiftUp, ShiftDown, Gear0, Gear1, Gear2, Gear3, Gear4, Gear5, Gear6,
-                 Left, Right, PageUp, PageDown, Enter, Back, Settings };
+                 Left, Right, PageUp, PageDown, Enter, Back, Settings, GearR };
 
 class App;
 
@@ -65,6 +65,9 @@ public:
     float tilt() const { return tilt_; }
     // Oyun kolu tetikleri (analog 0..1): platform yazar; gaz / fren pedali tetige oranli
     void setPadPedals(float thr, float brk) { padThr_ = thr; padBrk_ = brk; }
+    // Gamepad sag analog = H vites kolu: sol ust 1, sol alt 2, orta ust 3, orta alt 4, sag ust 5, sag alt 6.
+    // Cubuk birakilinca (merkez) vites kalir; bos: R1, geri: sag analoga basma (R3). y: asagi pozitif.
+    void padStick(float x, float y);
     float padThrottle() const { return padThr_; }
     float padBrake() const { return padBrk_; }
     bool tiltAvailable = false;
