@@ -1388,6 +1388,54 @@ void WorldScreen::render(Renderer& r) {
         if (M.land) drawGaugeCluster(r, W * 0.5f - 160, H - 98, W * 0.5f + 64, H - 2, gs, M.app.career.car().boostGauge, gd);
         else drawGaugeCluster(r, 40, H - 290, 320, H - 206, gs, M.app.career.car().boostGauge, gd);
     }
+    if (!M.mapOpen) {   // Mini harita (radar): 700 m, burun yukari; yollar, rota, kesfedilen noktalar, polis
+        const float bw = 104.0f, bx0 = W - bw - 6.0f, by0 = M.land ? 38.0f : 84.0f, cxm = bx0 + bw * 0.5f, cym = by0 + bw * 0.5f;
+        const double Rm = 350.0, k = (bw * 0.5 - 2.0) / Rm, hd = sim.heading(), fx2 = std::cos(hd), fy2 = std::sin(hd);
+        const double PX = sim.posX(), PY = sim.posY();
+        r.rect(bx0, by0, bx0 + bw, by0 + bw, {0.05f, 0.07f, 0.1f, 0.78f});
+        auto toS = [&](double x, double y, float& sx, float& sy) {
+            const double dx = x - PX, dy = y - PY;
+            sx = cxm - (float)((-dx * fy2 + dy * fx2) * k); sy = cym - (float)((dx * fx2 + dy * fy2) * k);
+        };
+        auto seg = [&](double ax, double ay, double bx, double by, float th, Color c) {   // kutuya kirpilmis kalin cizgi
+            float x0, y0, x1, y1; toS(ax, ay, x0, y0); toS(bx, by, x1, y1);
+            double t0 = 0, t1 = 1; const double ddx = x1 - x0, ddy = y1 - y0;
+            auto clip = [&](double p, double q) { if (std::fabs(p) < 1e-9) return q >= 0; const double t = q / p; if (p < 0) { if (t > t1) return false; t0 = std::max(t0, t); } else { if (t < t0) return false; t1 = std::min(t1, t); } return true; };
+            if (!clip(-ddx, x0 - bx0) || !clip(ddx, bx0 + bw - x0) || !clip(-ddy, y0 - by0) || !clip(ddy, by0 + bw - y0)) return;
+            const float ax2 = (float)(x0 + ddx * t0), ay2 = (float)(y0 + ddy * t0), bx2 = (float)(x0 + ddx * t1), by2 = (float)(y0 + ddy * t1);
+            const float l = std::hypot(bx2 - ax2, by2 - ay2); if (l < 0.01f) return;
+            const float nx = -(by2 - ay2) / l * th * 0.5f, ny = (bx2 - ax2) / l * th * 0.5f;
+            r.tri(ax2 + nx, ay2 + ny, bx2 + nx, by2 + ny, bx2 - nx, by2 - ny, c); r.tri(ax2 + nx, ay2 + ny, bx2 - nx, by2 - ny, ax2 - nx, ay2 - ny, c);
+        };
+        for (const WorldEdge& E : w.edges) {
+            if (PX < E.minX - Rm * 1.5 || PX > E.maxX + Rm * 1.5 || PY < E.minY - Rm * 1.5 || PY > E.maxY + Rm * 1.5) continue;
+            for (size_t i = 0; i + 1 < E.pts.size(); ++i)
+                seg(E.pts[i].first, E.pts[i].second, E.pts[i + 1].first, E.pts[i + 1].second, E.highway ? 3.0f : 1.8f,
+                    E.highway ? Color{0.85f, 0.65f, 0.25f} : Color{0.55f, 0.57f, 0.62f});
+        }
+        if (!M.route.empty())
+            for (size_t q = M.routeIdx; q < M.route.size() && q < M.routeIdx + 6; ++q) {
+                const RoadPath& rp = w.path(M.route[q]);
+                for (double s2 = 0; s2 + 20.0 < rp.length(); s2 += 20.0) { const RoadPoint a = rp.at(s2), b = rp.at(s2 + 20.0); seg(a.x, a.y, b.x, b.y, 2.4f, {0.25f, 0.7f, 1.0f}); }
+            }
+        for (size_t q = 0; q < w.pois.size(); ++q) {
+            const WorldPoi& pq = w.pois[q];
+            if (std::fabs(pq.x - PX) > Rm || std::fabs(pq.y - PY) > Rm) continue;
+            if (pq.type != WPoiRace && !M.app.career.discovered((int)q)) continue;
+            static const Color pc[5] = {{1.0f, 0.55f, 0.1f}, {1.0f, 0.4f, 0.8f}, {0.6f, 0.45f, 0.3f}, {0.3f, 0.9f, 0.4f}, {0.4f, 0.7f, 1.0f}};
+            float sx, sy; toS(pq.x, pq.y, sx, sy);
+            if (sx > bx0 + 3 && sx < bx0 + bw - 3 && sy > by0 + 3 && sy < by0 + bw - 3) r.circle(sx, sy, 3.0f, 8, pc[std::clamp(pq.type, 0, 4)]);
+        }
+        for (const auto& t : M.traffic) if (t.role == 1) {                // polis: kirmizi-mavi yanip sonen
+            double x, y, th; M.tPose(t, x, y, th);
+            float sx, sy; toS(x, y, sx, sy);
+            if (sx > bx0 + 2 && sx < bx0 + bw - 2 && sy > by0 + 2 && sy < by0 + bw - 2)
+                r.rect(sx - 2, sy - 2, sx + 2, sy + 2, std::fmod(M.envT, 0.6) < 0.3 ? Color{1, 0.2f, 0.2f} : Color{0.3f, 0.5f, 1});
+        }
+        if (M.hasWp) { float sx, sy; toS(M.wpX, M.wpY, sx, sy); sx = std::clamp(sx, bx0 + 4, bx0 + bw - 4); sy = std::clamp(sy, by0 + 4, by0 + bw - 4); r.circle(sx, sy, 4.0f, 10, {0.2f, 0.75f, 1.0f}); }
+        r.tri(cxm, cym - 6, cxm - 4, cym + 4, cxm + 4, cym + 4, {1, 1, 1});   // oyuncu (burun yukari)
+        r.rect(bx0, by0, bx0 + bw, by0 + 1, {0.3f, 0.35f, 0.45f}); r.rect(bx0, by0 + bw - 1, bx0 + bw, by0 + bw, {0.3f, 0.35f, 0.45f});
+    }
     button(r, M.mapBtn, "HARITA", {0.15f, 0.35f, 0.6f}, 1);
     button(r, M.jobBtn, M.hasJob ? "IS VAR" : "ISLER", M.hasJob ? Color{0.55f, 0.4f, 0.1f} : Color{0.3f, 0.3f, 0.36f}, 1);
     if (M.hasJob) {
