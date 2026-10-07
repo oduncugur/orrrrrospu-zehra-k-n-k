@@ -241,7 +241,7 @@ void App::update(double dt) {
     }
     fade_ = std::max(0.0f, fade_ - (float)std::min(dt, 0.05) / 0.22f);
     const auto t0 = std::chrono::steady_clock::now();
-    if (hint_.empty()) screen_->update(std::min(dt, 0.1));            // ipucu karti acikken ekran durur
+    if (hint_.empty() && !confirmBack_) screen_->update(std::min(dt, 0.1));            // ipucu karti acikken ekran durur
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     updMs_ += (ms - updMs_) * 0.05;                          // yumusatilmis
     fpsAcc_ += dt; ++fpsFrames_;
@@ -273,12 +273,33 @@ void App::render() {
         for (size_t i = 0; i < lines.size(); ++i) renderer_.text(x0 + 14, y0 + 40 + i * 14.0f, lines[i], 1, {0.92f, 0.92f, 0.96f});
         renderer_.textCentered(W * 0.5f, y0 + ch - 16, "DOKUN: TAMAM", 1, {0.55f, 0.75f, 1.0f});
     }
+    if (confirmBack_) {                                           // ana menuye donus onayi
+        const float W = (float)renderer_.vw(), H = (float)renderer_.vh(), cw = 300, ch = 130;
+        const float x0 = (W - cw) * 0.5f, y0 = (H - ch) * 0.5f;
+        renderer_.rect(0, 0, W, H, {0, 0, 0, 0.6f});
+        renderer_.rect(x0, y0, x0 + cw, y0 + ch, {0.09f, 0.10f, 0.14f});
+        renderer_.rect(x0, y0, x0 + cw, y0 + 3, {1.0f, 0.35f, 0.2f});
+        renderer_.textCentered(W * 0.5f, y0 + 18, "ANA MENUYE DON?", 2, {1, 1, 1});
+        renderer_.textCentered(W * 0.5f, y0 + 44, "EMIN MISIN? ILERLEME BU SURUSTE KAYBOLUR", 1, {0.8f, 0.8f, 0.85f});
+        renderer_.rect(x0 + 16, y0 + 70, x0 + 140, y0 + 114, {0.55f, 0.15f, 0.12f});
+        renderer_.rect(x0 + 160, y0 + 70, x0 + 284, y0 + 114, {0.2f, 0.3f, 0.45f});
+        renderer_.textCentered(x0 + 78, y0 + 80, "EVET", 2, {1, 1, 1});
+        renderer_.textCentered(x0 + 78, y0 + 100, "(B / GERI)", 1, {0.9f, 0.8f, 0.8f});
+        renderer_.textCentered(x0 + 222, y0 + 80, "HAYIR", 2, {1, 1, 1});
+        renderer_.textCentered(x0 + 222, y0 + 100, "(A / START)", 1, {0.8f, 0.85f, 0.95f});
+    }
     renderer_.present(sw_, sh_);
 }
 
 void App::pointerDown(int id, float px, float py) {
     if (!hint_.empty()) { hint_.clear(); return; }               // ipucu karti: dokunus kapatir (ekrana gecmez)
     float x, y; renderer_.toVirtual(sw_, sh_, px, py, x, y);
+    if (confirmBack_) {                                           // onay: EVET sol, HAYIR sag (disari dokunus = hayir)
+        const float W = (float)renderer_.vw(), H = (float)renderer_.vh(), x0 = (W - 300) * 0.5f, y0 = (H - 130) * 0.5f;
+        confirmBack_ = false;
+        if (x >= x0 + 16 && x <= x0 + 140 && y >= y0 + 70 && y <= y0 + 114) screen_->key(Key::Back, true);
+        return;
+    }
     screen_->pointerDown(id, x, y);
 }
 void App::pointerMove(int id, float px, float py) {
@@ -297,11 +318,15 @@ void App::padStick(float x, float y) {
 }
 void App::key(Key k, bool down) {
     if (!hint_.empty()) { if (down && (k == Key::Enter || k == Key::Back)) hint_.clear(); return; }
+    if (confirmBack_) { if (down && k == Key::Back) { confirmBack_ = false; screen_->key(Key::Back, true); }
+                        else if (down && (k == Key::Enter || k == Key::ShiftUp)) confirmBack_ = false; return; }
     screen_->key(k, down);
 }
 bool App::back() {
     if (!hint_.empty()) { hint_.clear(); return true; }
     if (auto* g = dynamic_cast<GarageScreen*>(screen_.get()); g && !g->modal() && !pending_) return false;   // garajda geri = cikis (onay penceresi acik degilse)
+    if (confirmBack_) { confirmBack_ = false; screen_->key(Key::Back, true); return true; }   // ikinci basis: evet
+    if (screen_->backLeaves()) { confirmBack_ = true; return true; }   // surus ekranlari: once sor
     screen_->key(Key::Back, true);
     return true;
 }

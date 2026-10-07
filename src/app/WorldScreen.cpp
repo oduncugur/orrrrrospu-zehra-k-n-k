@@ -54,6 +54,21 @@ void quadP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, const Proj&
     for (int i = 1; i + 1 < n; ++i) triP(r, out[0], out[i], out[i + 1], col);
 }
 struct Parked { double x, y, h; int carId; };
+// Site duvari: binalarin cogu 3 m bahceli, 1.8 m duvarla cevrili; sokak yonlerinde (v kenarlari) 6 m kapi boslugu.
+// Parca: merkez, yon (heading), yari boy, yari kalinlik. Cizim ve carpisma ayni listeyi kullanir.
+struct WallSeg { double x, y, h, hl, ht; };
+float hashW(int k);
+int siteWalls(const WorldBuilding& b, int idx, WallSeg out[6]) {
+    if (hashW(idx * 23 + 5) < 0.3f) return 0;                           // %30 duvarsiz (acik bina onu)
+    const double m = 3.0, U = b.hu + m, V = b.hv + m, vx = -b.uy, vy = b.ux, hd = std::atan2(b.uy, b.ux);
+    int n = 0;
+    for (double sg : {1.0, -1.0}) out[n++] = {b.cx + sg * U * b.ux, b.cy + sg * U * b.uy, hd + 1.5707963, V, 0.15};   // yan duvarlar (tam)
+    const double gate = 3.0, hl = (U - gate) * 0.5, off = (U + gate) * 0.5;
+    if (hl > 0.5)
+        for (double sv : {1.0, -1.0})
+            for (double su : {1.0, -1.0}) out[n++] = {b.cx + su * off * b.ux + sv * V * vx, b.cy + su * off * b.uy + sv * V * vy, hd, hl, 0.15};
+    return n;
+}
 // Park etmis araclar: sokaklarin iki yaninda (13 m aralik, %40 dolu); her karede ayni (belirlenimci)
 void parkedOn(const World& w, int e, std::vector<Parked>& out) {
     const WorldEdge& E = w.edges[e];
@@ -241,6 +256,8 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     M.flash("ACIK DUNYA: HARITADAN HEDEF SEC, SUR YA DA OTONOM", 3.0);
 }
 
+bool WorldScreen::backLeaves() const { return !m_->mapOpen; }   // harita aciksa geri = haritayi kapat
+
 WorldScreen::~WorldScreen() {
     Impl& M = *m_;
     M.app.career.car().fuelL = M.car->sim().fuelLiters();                // yakit kalici
@@ -329,11 +346,18 @@ void WorldScreen::update(double dt) {
     P.update(dt, c);
     if (!M.autoDrive) M.pickLeg(false);
     // Binalar: yonlu kutu, arac (2.2 x 0.9) carparsa itilir
-    for (const WorldBuilding& b : M.w.buildings) {
+    for (int bi = 0; bi < (int)M.w.buildings.size(); ++bi) {
+        const WorldBuilding& b = M.w.buildings[bi];
         if (std::fabs(b.cx - sim.posX()) > 70 || std::fabs(b.cy - sim.posY()) > 70) continue;
         double rel = 0;
         RoadSession::contact(P, b.cx, b.cy, std::atan2(b.uy, b.ux), 0.0, 1e7, b.hu, b.hv, rel);
         if (rel > 2.0) { M.shakeT = std::min(0.5, rel * 0.04); app.haptic(150, 220); if (rel > 6.0) M.flash("BINAYA CARPTIN!", 1.0); }
+        WallSeg ws[6]; const int nw = siteWalls(b, bi, ws);
+        for (int k = 0; k < nw; ++k) {
+            double rw = 0;
+            RoadSession::contact(P, ws[k].x, ws[k].y, ws[k].h, 0.0, 1e7, ws[k].hl, ws[k].ht, rw);
+            if (rw > 2.0) { M.shakeT = std::min(0.5, rw * 0.04); app.haptic(150, 220); if (rw > 6.0) M.flash("DUVARA CARPTIN!", 1.0); }
+        }
     }
     {   // Park etmis araclar ve simge yapilar: carpisma
         std::vector<Parked> pk;
@@ -706,6 +730,7 @@ void WorldScreen::render(Renderer& r) {
         const double d = std::hypot(b.cx - ex, b.cy - ey);
         if (d > 1800.0 && b.h < 14.0 + d * 0.004) continue;               // uzakta alcak binalar gorunmez (LOD)
         items.push_back({d, 0, i});
+        if (d < 450.0) { items.push_back({d + 0.5, 7, i}); items.push_back({d - 0.5, 8, i}); }   // site duvari: arka parcalar binadan once, on parcalar sonra
     }
     for (int i = 0; i < (int)w.pois.size(); ++i) if (front(w.pois[i].x, w.pois[i].y, 2500.0)) items.push_back({std::hypot(w.pois[i].x - ex, w.pois[i].y - ey), 1, i});
     for (int i = 0; i < (int)w.landmarks.size(); ++i) {
@@ -805,6 +830,28 @@ void WorldScreen::render(Renderer& r) {
                 if (b0.ok && b1.ok) { r.setDepthW(b0.w); const float sc = pxPerM / b0.w; r.rect(b0.x - 7 * sc, b1.y, b0.x + 7 * sc, b0.y, fog({0.45f, 0.28f, 0.16f}, b0.w));
                                       r.tri(b0.x - 8 * sc, b1.y, b0.x + 8 * sc, b1.y, b0.x, b1.y - 3 * sc, fog({0.35f, 0.2f, 0.12f}, b0.w));
                                       if (it.d < 120) r.textCentered(b0.x, b1.y - 3 * sc - 12, "TERK EDILMIS AHIR?", 1, {1.0f, 0.9f, 0.5f}); }
+            }
+        } else if (it.kind == 7 || it.kind == 8) {                        // site duvari: 1.8 m, ust baslikli
+            const WorldBuilding& wb = w.buildings[it.idx];
+            WallSeg ws[6]; const int nw = siteWalls(wb, it.idx, ws);
+            const double bd = std::hypot(wb.cx - ex, wb.cy - ey);
+            const float tn = hashW(it.idx * 29);
+            const Color wc = tn < 0.4f ? Color{0.78f, 0.74f, 0.66f} : tn < 0.75f ? Color{0.62f, 0.38f, 0.30f} : Color{0.85f, 0.85f, 0.82f};
+            for (int k = 0; k < nw; ++k) {
+                const WallSeg& q = ws[k];
+                if ((std::hypot(q.x - ex, q.y - ey) > bd) != (it.kind == 7)) continue;
+                const double ux = std::cos(q.h), uy = std::sin(q.h), vx = -uy, vy = ux;
+                double bx[4], by[4]; const int sg[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+                for (int c = 0; c < 4; ++c) { bx[c] = q.x + sg[c][0] * q.hl * ux + sg[c][1] * q.ht * vx; by[c] = q.y + sg[c][0] * q.hl * uy + sg[c][1] * q.ht * vy; }
+                for (int c = 0; c < 4; ++c) {
+                    const int c2 = (c + 1) % 4;
+                    const double mx = 0.5 * (bx[c] + bx[c2]) - q.x, my = 0.5 * (by[c] + by[c2]) - q.y;
+                    if (mx * (ex - (q.x + mx)) + my * (ey - (q.y + my)) <= 0) continue;
+                    const float sh = (c % 2) ? 0.8f : 0.95f;
+                    const Proj p0 = P3(bx[c], by[c], 0), p1 = P3(bx[c2], by[c2], 0), p2 = P3(bx[c2], by[c2], 1.8), p3 = P3(bx[c], by[c], 1.8);
+                    quadP(r, p0, p1, p2, p3, fog({wc.r * sh, wc.g * sh, wc.b * sh}, (float)it.d));
+                }
+                quadP(r, P3(bx[0], by[0], 1.8), P3(bx[1], by[1], 1.8), P3(bx[2], by[2], 1.8), P3(bx[3], by[3], 1.8), fog({0.55f, 0.55f, 0.55f}, (float)it.d));
             }
         } else if (it.kind == 6) {                                        // trafik lambasi: direk + 3 isikli kafa
             const Light& lt = lights[it.idx];

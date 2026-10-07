@@ -68,6 +68,7 @@ class DragScreen : public Screen {
 public:
     DragScreen(App& app, int playerCar, int opponentCar, const Tune* playerTune, const Tune* opponentTune, bool career);
     void setAutopilot(bool on) { autopilot_ = on; race_->setPlayerAutopilot(on); }
+    bool backLeaves() const override { return true; }
     bool landscape() const override { return true; }
     void update(double dt) override;
     void render(Renderer& r) override;
@@ -453,6 +454,7 @@ class RoadScreen : public Screen {
 public:
     RoadScreen(App& app, int carId, const Tune* tune);
     bool landscape() const override { return land_; }
+    bool backLeaves() const override { return true; }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -527,6 +529,7 @@ public:
     explicit WorldScreen(App& app);
     ~WorldScreen() override;
     bool landscape() const override { return land_; }
+    bool backLeaves() const override;
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;

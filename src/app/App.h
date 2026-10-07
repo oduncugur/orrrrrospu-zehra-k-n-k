@@ -34,6 +34,8 @@ public:
     virtual void pointerMove(int, float, float) {}
     virtual void pointerUp(int) {}
     virtual void key(Key, bool) {}
+    // Geri tusu bu ekrandan ana menuye (garaja) cikariyorsa true: once 'emin misin' sorulur
+    virtual bool backLeaves() const { return false; }
 };
 
 class App {
@@ -196,6 +198,7 @@ private:
     float fade_ = 0.0f;                          // ekran gecis karartmasi (1 -> 0)
     std::vector<std::string> toasts_; double toastT_ = 0;
     std::string hint_;
+    bool confirmBack_ = false;   // 'ana menuye don?' onay penceresi
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 
