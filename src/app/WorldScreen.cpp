@@ -19,18 +19,39 @@
 namespace zk {
 
 namespace {
-struct Proj { float x, y, w; bool ok; };
+// Proj: ekran konumu + kirpma uzayi (cx, cy, cw): kameranin arkasina tasan yuzeyler atlanmaz, yakin duzlemde kirpilir
+struct Proj { float x, y, w; bool ok; float cx = 0, cy = 0, cw = 0; };
+constexpr float kNearW = 0.4f;
+int gVw = 640, gVh = 360;
+Proj fromClip(float cx, float cy, float cw) {
+    return {(cx / cw * 0.5f + 0.5f) * gVw, (1.0f - (cy / cw * 0.5f + 0.5f)) * gVh, cw, true, cx, cy, cw};
+}
 Proj project(const Mat4& vp, double X, double Y, double h, int vw, int vh) {
+    gVw = vw; gVh = vh;
     const float x = (float)X, y = (float)h, z = (float)-Y;
     const float cx = vp.m[0] * x + vp.m[4] * y + vp.m[8] * z + vp.m[12];
     const float cy = vp.m[1] * x + vp.m[5] * y + vp.m[9] * z + vp.m[13];
     const float cw = vp.m[3] * x + vp.m[7] * y + vp.m[11] * z + vp.m[15];
-    if (cw < 0.4f) return {0, 0, cw, false};
-    return {(cx / cw * 0.5f + 0.5f) * vw, (1.0f - (cy / cw * 0.5f + 0.5f)) * vh, cw, true};
+    if (cw < kNearW) return {0, 0, cw, false, cx, cy, cw};
+    return fromClip(cx, cy, cw);
 }
 void triP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, Color col) { r.triZ(a.x, a.y, a.w, b.x, b.y, b.w, c.x, c.y, c.w, col); }
+// Dortgen: tamami gorunurse dogrudan; bir kismi kameranin arkasindaysa yakin duzlemde kirpilir (Sutherland-Hodgman),
+// boylece arac yanindaki / altindaki yol, kaldirim ve zemin parcalari asla kaybolmaz
 void quadP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, const Proj& d, Color col) {
-    if (a.ok && b.ok && c.ok && d.ok) { triP(r, a, b, c, col); triP(r, a, c, d, col); }
+    if (a.ok && b.ok && c.ok && d.ok) { triP(r, a, b, c, col); triP(r, a, c, d, col); return; }
+    if (!a.ok && !b.ok && !c.ok && !d.ok) return;
+    const Proj* in[4] = {&a, &b, &c, &d};
+    Proj out[8]; int n = 0;
+    for (int i = 0; i < 4; ++i) {
+        const Proj& p = *in[i]; const Proj& q = *in[(i + 1) % 4];
+        if (p.ok) out[n++] = p;
+        if (p.ok != q.ok) {
+            const float t = (kNearW + 0.001f - p.cw) / (q.cw - p.cw);
+            out[n++] = fromClip(p.cx + (q.cx - p.cx) * t, p.cy + (q.cy - p.cy) * t, kNearW + 0.001f);
+        }
+    }
+    for (int i = 1; i + 1 < n; ++i) triP(r, out[0], out[i], out[i + 1], col);
 }
 struct Parked { double x, y, h; int carId; };
 // Park etmis araclar: sokaklarin iki yaninda (13 m aralik, %40 dolu); her karede ayni (belirlenimci)
@@ -584,6 +605,7 @@ void WorldScreen::render(Renderer& r) {
     auto front = [&](double x, double y, double maxD) {                   // gorus konisinde mi (kamera onunde)
         const double dx = x - ex, dy = y - ey;
         const double along = dx * fx + dy * fy;
+        if (std::fabs(x - X) < 250.0 && std::fabs(y - Y) < 250.0) return true;   // aracin cevresi 500x500 m: asla silinmez
         return along > -80.0 && dx * dx + dy * dy < maxD * maxD;   // genis koni: donuste yandakiler erken silinmez
     };
     // Sehir zeminleri (kaldirim / beton): 20 m karolar (yakindaki buyuk karo kameranin arkasina tasip atlaniyordu)
@@ -621,22 +643,30 @@ void WorldScreen::render(Renderer& r) {
         const auto& pts = E.fwd().points();
         const int step0 = E.highway ? 2 : 1;
         int step = step0;
+        const bool curbs = !E.highway && !E.bridge && E.city >= 0;
+        const WorldNode& nA = w.nodes[E.a]; const WorldNode& nB = w.nodes[E.b];
         for (size_t i = 0; i + 1 < pts.size(); i += step) {
             const RoadPoint& a = pts[i];
             const double da = std::hypot(a.x - ex, a.y - ey);
-            step = da < 350.0 ? step0 : da < 1000.0 ? step0 * 3 : step0 * 8;   // uzakta seyrek nokta
+            const bool nearCar = std::fabs(a.x - X) < 250.0 && std::fabs(a.y - Y) < 250.0;
+            step = (nearCar || da < 350.0) ? step0 : da < 1000.0 ? step0 * 3 : step0 * 8;   // uzakta seyrek nokta
             const RoadPoint& b = pts[std::min(i + step, pts.size() - 1)];
             if (!front(a.x, a.y, 2500.0) && !front(b.x, b.y, 2500.0)) continue;
             auto edge = [&](const RoadPoint& p, double off, double h) { return P3(p.x - off * std::sin(p.heading), p.y + off * std::cos(p.heading), h); };
             const Proj aL = edge(a, a.hw, 0.01), aR = edge(a, -a.hw, 0.01), bL = edge(b, b.hw, 0.01), bR = edge(b, -b.hw, 0.01);
             const bool band = (i / step0 / 4) % 2 == 0;
             const Color rc = fog(band ? Color{0.30f, 0.30f, 0.32f} : Color{0.28f, 0.28f, 0.30f}, aL.ok ? aL.w : bL.w);
-            if (aL.ok && aR.ok && bL.ok && bR.ok) quadP(r, aL, bL, bR, aR, rc);
-            else if (da < 80.0) {                                           // kamera yakininda kirpilan parca: 8 dilime bol
-                for (int k = 0; k < 8; ++k) {
-                    auto lerpP = [&](double t) { RoadPoint q = a; q.x = a.x + (b.x - a.x) * t; q.y = a.y + (b.y - a.y) * t; q.hw = a.hw + (b.hw - a.hw) * t; return q; };
-                    const RoadPoint p0 = lerpP(k / 8.0), p1 = lerpP((k + 1) / 8.0);
-                    quadP(r, edge(p0, p0.hw, 0.01), edge(p1, p1.hw, 0.01), edge(p1, -p1.hw, 0.01), edge(p0, -p0.hw, 0.01), rc);
+            quadP(r, aL, bL, bR, aR, rc);                                   // kismen arkadaysa yakin duzlemde kirpilir
+            if (curbs && da < 450.0) {                                      // kaldirim + bordur
+                const double dA = std::min(std::hypot(a.x - nA.x, a.y - nA.y), std::hypot(a.x - nB.x, a.y - nB.y));
+                const double dB = std::min(std::hypot(b.x - nA.x, b.y - nA.y), std::hypot(b.x - nB.x, b.y - nB.y));
+                const double cut = a.hw * 2.0 + 5.0;
+                if (dA > cut && dB > cut) {
+                    const Color top = fog({0.70f, 0.69f, 0.66f}, aL.ok ? aL.w : (float)da), face = fog({0.82f, 0.82f, 0.80f}, aL.ok ? aL.w : (float)da);
+                    for (double sg : {1.0, -1.0}) {
+                        quadP(r, edge(a, sg * a.hw, 0.0), edge(b, sg * b.hw, 0.0), edge(b, sg * b.hw, 0.15), edge(a, sg * a.hw, 0.15), face);
+                        quadP(r, edge(a, sg * a.hw, 0.15), edge(b, sg * b.hw, 0.15), edge(b, sg * (b.hw + 2.8), 0.15), edge(a, sg * (a.hw + 2.8), 0.15), top);
+                    }
                 }
             }
             if (E.bridge && aL.ok && aL.w < 400.0f)                                   // kopru korkulugu
@@ -705,6 +735,29 @@ void WorldScreen::render(Renderer& r) {
         }
     }
     for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
+    struct Light { double x, y; int state; };                            // state 0 yesil, 1 sari, 2 kirmizi
+    std::vector<Light> lights;
+    for (int ni = 0; ni < (int)w.nodes.size(); ++ni) {
+        const WorldNode& nd = w.nodes[ni];
+        if (nd.edges.size() < 3 || std::fabs(nd.x - X) > 400.0 || std::fabs(nd.y - Y) > 400.0) continue;
+        double d0x = 0, d0y = 0; bool first = true;
+        for (int ei : nd.edges) {
+            const WorldEdge& E = w.edges[ei];
+            if (E.highway || E.city < 0 || E.pts.size() < 2) { first = first && true; continue; }
+            const auto& q = E.a == ni ? E.pts[1] : E.pts[E.pts.size() - 2];
+            double dx = q.first - nd.x, dy = q.second - nd.y; const double l = std::hypot(dx, dy);
+            if (l < 1.0) continue;
+            dx /= l; dy /= l;
+            if (first) { d0x = dx; d0y = dy; first = false; }
+            const int grp = std::fabs(dx * d0y - dy * d0x) > 0.7 ? 1 : 0;
+            const double t = std::fmod(M.envT + 24.0 * hashW(ni * 7) + (grp ? 12.0 : 0.0), 24.0);
+            const int st = t < 10.0 ? 0 : t < 12.0 ? 1 : 2;
+            const double o = E.hw + 3.0;
+            const double lx = nd.x + dx * o + dy * (E.hw + 1.6), ly = nd.y + dy * o - dx * (E.hw + 1.6);
+            if (front(lx, ly, 400.0)) lights.push_back({lx, ly, st});
+        }
+    }
+    for (int i = 0; i < (int)lights.size(); ++i) items.push_back({std::hypot(lights[i].x - ex, lights[i].y - ey), 6, i});
     for (int i = 0; i < (int)w.collect.size(); ++i)
         if (!M.app.career.gotCollect(w.collect[i].idx) && front(w.collect[i].x, w.collect[i].y, 260.0)) items.push_back({std::hypot(w.collect[i].x - ex, w.collect[i].y - ey), 4, i});
     for (int i = 0; i < (int)w.cameras.size(); ++i) if (front(w.cameras[i].x, w.cameras[i].y, 500.0)) items.push_back({std::hypot(w.cameras[i].x - ex, w.cameras[i].y - ey), 5, i});
@@ -752,6 +805,20 @@ void WorldScreen::render(Renderer& r) {
                 if (b0.ok && b1.ok) { r.setDepthW(b0.w); const float sc = pxPerM / b0.w; r.rect(b0.x - 7 * sc, b1.y, b0.x + 7 * sc, b0.y, fog({0.45f, 0.28f, 0.16f}, b0.w));
                                       r.tri(b0.x - 8 * sc, b1.y, b0.x + 8 * sc, b1.y, b0.x, b1.y - 3 * sc, fog({0.35f, 0.2f, 0.12f}, b0.w));
                                       if (it.d < 120) r.textCentered(b0.x, b1.y - 3 * sc - 12, "TERK EDILMIS AHIR?", 1, {1.0f, 0.9f, 0.5f}); }
+            }
+        } else if (it.kind == 6) {                                        // trafik lambasi: direk + 3 isikli kafa
+            const Light& lt = lights[it.idx];
+            const Proj b0 = P3(lt.x, lt.y, 0), b1 = P3(lt.x, lt.y, 3.6);
+            if (b0.ok && b1.ok) {
+                r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                r.rect(b0.x - 0.07f * sc, b1.y, b0.x + 0.07f * sc, b0.y, fog({0.25f, 0.27f, 0.28f}, b0.w));
+                r.rect(b1.x - 0.22f * sc, b1.y - 1.0f * sc, b1.x + 0.22f * sc, b1.y + 0.05f * sc, fog({0.1f, 0.1f, 0.11f}, b0.w));
+                const Color on[3] = {{1.0f, 0.15f, 0.1f}, {1.0f, 0.75f, 0.1f}, {0.2f, 1.0f, 0.35f}};
+                for (int k = 0; k < 3; ++k) {                               // ust kirmizi, orta sari, alt yesil
+                    const bool lit = (k == 0 && lt.state == 2) || (k == 1 && lt.state == 1) || (k == 2 && lt.state == 0);
+                    const Color c = lit ? on[k] : Color{on[k].r * 0.2f, on[k].g * 0.2f, on[k].b * 0.2f};
+                    r.circle(b1.x, b1.y - (0.82f - 0.32f * k) * sc, std::max(1.0f, 0.12f * sc), 8, c);
+                }
             }
         } else if (it.kind == 5) {                                        // hiz kamerasi: direk + kutu
             const WorldCamera& cm = w.cameras[it.idx];
