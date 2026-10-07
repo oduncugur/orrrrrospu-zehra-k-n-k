@@ -286,20 +286,18 @@ void RoadScreen::update(double dt) {
     if (cockpit_.takeSeated()) app_.haptic(18, 160);                     // vites yuvaya oturdu: kisa "tik"
     // Direksiyon: hiza gore sinirli (kinematik yanal ivme ~1.1 g), rampali; klavye ya da telefon egimi
     // Hiza gore sinir + kayma payi: arka kayarken (govde kayma acisi) karsi direksiyon icin tam aci acilir
-    const double slipAllow = std::min(0.45, std::fabs(P.sim().bodySlipAngle()) * 1.3);
-    const double maxSteer = std::clamp(P.sim().vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0) + slipAllow, 0.035, 0.50);
-    double target = (kL_ ? maxSteer : 0.0) - (kR_ ? maxSteer : 0.0);
+    double target = (kL_ ? RoadCar::steerLimit(P.sim(), v, 1.0) : 0.0) - (kR_ ? RoadCar::steerLimit(P.sim(), v, -1.0) : 0.0);
     if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer) {   // olu bolge %6
         // Kararli ve hiza duyarli egim: ek suzgec (~0.12 s); olu bolge %5; tepki egrisi hizla sertlesir (u^p, p 1 -> 1.8):
         // yuksek hizda kucuk egimler az direksiyon verir, telefon cok cevrilince tepki normale yaklasir (tam kilit ayni)
-        const double raw = std::clamp((app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0);
+        const double raw = std::clamp(1.3 * (app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0);
         tiltF_ += (raw - tiltF_) * std::min(1.0, dt / 0.12);
         const double dz = 0.08, t = tiltF_;                           // olu bolge %8 (el titremesi / sensor sapmasi cekmesin)
         const double u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);
-        const double p = 1.0 + 0.8 * std::clamp((v - 8.0) / 32.0, 0.0, 1.0);
-        target = std::copysign(std::pow(std::fabs(u), p), u) * maxSteer;
+        const double p = 1.0 + 0.45 * std::clamp((v - 14.0) / 26.0, 0.0, 1.0);
+        target = std::copysign(std::pow(std::fabs(u), p), u) * RoadCar::steerLimit(P.sim(), v, u);
     }
-    const double rate = (std::fabs(target) > std::fabs(steer_) ? 1.0 : 2.5) * dt;
+    const double rate = RoadCar::steerRate(v, std::fabs(target) > std::fabs(steer_)) * dt;
     steer_ += std::clamp(target - steer_, -rate, rate);
     // Karma: duz bolumde drag gorunumu (yandan kamera) ve arac seridi kendi tutar; virajli bolumde 3B surus
     const bool run = ses_->mode() == RoadSession::Mode::Marathon;

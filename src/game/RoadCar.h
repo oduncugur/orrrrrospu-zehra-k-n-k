@@ -29,6 +29,9 @@ public:
     // Yapay zeka: laneOffset'teki seride saf takip + ileriye bakan viraj hizi. pace: 0.6-1.0 (yanal g payi)
     RoadControls aiControls(double laneOffset, double pace, double speedCap = 1e9) const;
 
+    // Oyuncu direksiyon siniri (rad): hiza bagli (yavasta tam kilit, hizlandikca sertlesir); acik dunya + serbest yol
+    static double steerLimit(const VehicleSim& sim, double v, double dir = 0.0);   // dir: istenen yon (+ sol), 0 simetrik
+    static double steerRate(double v, bool increasing);   // rad/s: direksiyon cevirme hizi (birakma daha hizli)
     VehicleSim& sim() { return *sim_; }
     const VehicleSim& sim() const { return *sim_; }
     double s() const { return s_; }

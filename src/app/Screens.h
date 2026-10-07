@@ -69,6 +69,8 @@ public:
     DragScreen(App& app, int playerCar, int opponentCar, const Tune* playerTune, const Tune* opponentTune, bool career);
     void setAutopilot(bool on) { autopilot_ = on; race_->setPlayerAutopilot(on); }
     bool backLeaves() const override { return true; }
+    int shifter() const override;
+    int shifterGear() const override;
     bool landscape() const override { return true; }
     void update(double dt) override;
     void render(Renderer& r) override;
@@ -455,6 +457,8 @@ public:
     RoadScreen(App& app, int carId, const Tune* tune);
     bool landscape() const override { return land_; }
     bool backLeaves() const override { return true; }
+    int shifter() const override { return cockpit_.lever() == Cockpit::Lever::HPattern ? 1 : 2; }
+    int shifterGear() const override { return cockpit_.knobGear(); }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -530,6 +534,8 @@ public:
     ~WorldScreen() override;
     bool landscape() const override { return land_; }
     bool backLeaves() const override;
+    int shifter() const override;
+    int shifterGear() const override;
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;

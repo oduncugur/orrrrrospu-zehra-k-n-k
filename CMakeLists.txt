@@ -110,3 +110,6 @@ add_executable(zehra_curve tools/curve_dump.cpp)
 target_link_libraries(zehra_curve PRIVATE zk_sim)
 add_executable(zehra_handling tools/handling_report.cpp)
 target_link_libraries(zehra_handling PRIVATE zk_sim)
+
+add_executable(steer_probe tests/steer_probe.cpp)
+target_link_libraries(steer_probe PRIVATE zk_sim)

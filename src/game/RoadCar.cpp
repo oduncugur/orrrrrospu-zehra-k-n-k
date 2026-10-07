@@ -285,4 +285,24 @@ double RoadCar::tireSlipSpeed() const {
     return slip;
 }
 
+// Hiza duyarli direksiyon (hidrolik direksiyon gibi): yavasta hizli ve tam kilit, hizlandikca agirlasir
+double RoadCar::steerRate(double v, bool increasing) {
+    if (!increasing) return 2.5;                                          // birakinca hizli toplanir
+    return 1.8 - 0.9 * std::clamp((v - 8.0) / 20.0, 0.0, 1.0);            // 30 km/h alti 1.8 rad/s -> 100 km/h 0.9
+}
+
+// Direksiyon siniri: (1) tutus siniri ~1.1-1.6 g (sehir hizinda daha comert), (2) sehir tabani 0.6 / (1 + (v/12)^2):
+// 50 km/h ~0.26 rad (10 m yaricap: kavsak donusu), 100 km/h ~0.09, otobanda tutus siniri belirler. Kayarken karsi direksiyon payi.
+double RoadCar::steerLimit(const VehicleSim& sim, double v, double dir) {
+    // karsi direksiyon payi: yalniz gercek kaymada (> ~3.5 deg); normal viraj kaymasi ek kilit vermez (savrulma beslemesi yok)
+    // ve yalniz karsi direksiyon yonunde (istek isareti == govde kayma isareti): savrulan araca ayni yone ek kilit verilmez
+    const double beta = sim.bodySlipAngle();
+    const bool counter = dir == 0.0 || (dir > 0) == (beta > 0);
+    const double slipAllow = counter ? std::min(0.45, std::max(0.0, std::fabs(beta) - 0.06) * 1.5) : 0.0;
+    const double kmh = v * 3.6, gk = 1.1 + 0.5 * std::clamp((70.0 - kmh) / 40.0, 0.0, 1.0);
+    const double grip = sim.vehicleLoad().wheelbase * gk * 9.81 / std::max(v * v, 1.0);
+    const double city = 0.6 / (1.0 + (v / 12.0) * (v / 12.0));
+    return std::clamp(std::max(grip, city) + slipAllow, 0.035, 0.6);
+}
+
 } // namespace zk

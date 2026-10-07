@@ -36,6 +36,9 @@ public:
     virtual void key(Key, bool) {}
     // Geri tusu bu ekrandan ana menuye (garaja) cikariyorsa true: once 'emin misin' sorulur
     virtual bool backLeaves() const { return false; }
+    // Vites kolu (gamepad sag analog / yon tuslari): 0 yok, 1 H-desen, 2 otomatik / sirali (yukari-asagi)
+    virtual int shifter() const { return 0; }
+    virtual int shifterGear() const { return 0; }   // H: kolun vitesi (-1 R, 0 bos)
 };
 
 class App {
@@ -67,8 +70,12 @@ public:
     float tilt() const { return tilt_; }
     // Oyun kolu tetikleri (analog 0..1): platform yazar; gaz / fren pedali tetige oranli
     void setPadPedals(float thr, float brk) { padThr_ = thr; padBrk_ = brk; }
-    // Gamepad sag analog = H vites kolu: sol ust 1, sol alt 2, orta ust 3, orta alt 4, sag ust 5, sag alt 6.
-    // Cubuk birakilinca (merkez) vites kalir; bos: R1, geri: sag analoga basma (R3). y: asagi pozitif.
+    // Kapili H vites (gercek kol gibi): bosta sol / sag kanal secer (birakinca orta 3-4 kanalina yaylanir), yukari / asagi
+    // vitese takar; vitesteyken ters yone itmek bosa alir. 1: sol+yukari, 2: sol+asagi, 3: yukari, 4: asagi, 5: sag+yukari,
+    // R: 2 sol + asagi. Otomatik / sirali: yukari vites arttir, asagi azalt. dir: 0 yukari, 1 asagi, 2 sol, 3 sag.
+    // false: bu ekranda kol yok ya da hareket anlamsiz (cagiran eski tus anlamina duser).
+    bool gate(int dir);
+    // Sag analog: esigi gecen her itis bir gate() olayi (y: asagi pozitif); R3 geri vites ayrica
     void padStick(float x, float y);
     float padThrottle() const { return padThr_; }
     float padBrake() const { return padBrk_; }
@@ -167,13 +174,15 @@ public:
     void nitrousSound(bool on) { nos_ = on; }                     // nitro tislamasi
     void rainSound(bool on) { rain_ = on; }                       // yagmur ambiyansi (ekran degisince kapanir)
     void siren(float level) { siren_ = level; }                   // polis sireni 0..1 (mesafeyle; ekran degisince 0)
+    void applause() { applause_.fetch_add(1); }                   // kalabalik alkisi (~3.5 s)
 
 private:
     std::atomic<float> tilt_{0.0f}, padThr_{0.0f}, padBrk_{0.0f};
     std::atomic<float> engineVol_{1.0f}, tireVol_{1.0f};   // ses thread'i okur (ana ses x kanal)
     std::atomic<float> windSpeed_{0.0f};
     float windLp1_ = 0, windLp2_ = 0, windPh_ = 0; uint32_t windRng_ = 22222;   // yalniz ses thread'i
-    std::atomic<int> clunk_{0}; std::atomic<bool> nos_{false}, rain_{false};
+    std::atomic<int> clunk_{0}, applause_{0}; std::atomic<bool> nos_{false}, rain_{false};
+    float clapT_ = -1, clapEnv_ = 0, clapHp_ = 0, clapLp_ = 0, clapPrev_ = 0;
     std::atomic<float> siren_{0.0f}; float sirenPh_ = 0, sirenT_ = 0, sirenLv_ = 0;
     float clunkT_ = -1, nosEnv_ = 0, nosLp_ = 0, rainLp1_ = 0, rainLp2_ = 0, dripT_ = -1, dripF_ = 0; uint32_t fxRng_ = 777;
     struct Voice {
@@ -199,6 +208,8 @@ private:
     std::vector<std::string> toasts_; double toastT_ = 0;
     std::string hint_;
     bool confirmBack_ = false;   // 'ana menuye don?' onay penceresi
+    int gateCol_ = 1;            // bostaki kanal: -1 R, 0 (1-2), 1 (3-4), 2 (5-6)
+    int stickDir_ = -1;          // sag analog: son itis yonu (merkeze donunce -1)
     double fps_ = 0, updMs_ = 0, fpsAcc_ = 0; int fpsFrames_ = 0;
 };
 

@@ -12,7 +12,9 @@
 namespace zk {
 
 struct WorldCity { std::string name; double x, y, dirX, dirY, r; double fuelPrice; int style; double hu, hv; };   // hu / hv: yari boy (dogu-bati / kuzey-guney, m)   // style: sehir kimligi (sekil / su / doku)
-struct WorldBuilding { double cx, cy, hu, hv, ux, uy, h; int city; float tone; };   // yonlu kutu: merkez, yari boylar (u: sehir ekseni), yukseklik
+struct WorldBuilding { double cx, cy, hu, hv, ux, uy, h; int city; float tone;
+                       double gap = 7.0; float roadSide = 1.0f; };   // gap: yol tarafindaki cepheden asfalt kenarina (m); roadSide: yol yerel +v mi -v mi
+struct WorldTree { double x, y; float s; int city; };                // park / bos arsa agaci   // yonlu kutu: merkez, yari boylar (u: sehir ekseni), yukseklik
 enum WorldPoiType { WPoiRace = 0, WPoiMeet = 1, WPoiJunk = 2, WPoiGas = 3, WPoiGarage = 4 };
 struct WorldPoi { int type; double x, y, heading; int city; int ref; std::string name; };
 struct WorldNode { double x, y; std::vector<int> edges; };
@@ -46,6 +48,7 @@ public:
     std::vector<WorldNode> nodes;
     std::vector<WorldEdge> edges;
     std::vector<WorldBuilding> buildings;
+    std::vector<WorldTree> trees;
     std::vector<WorldPoi> pois;
     std::vector<WorldLandmark> landmarks;
     std::vector<WorldCamera> cameras;

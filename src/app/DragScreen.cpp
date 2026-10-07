@@ -192,6 +192,9 @@ void DragScreen::pointerUp(int id) {
     }
 }
 
+int DragScreen::shifter() const { return race_->lane(0).sim->gearboxType() == Gearbox::HPattern ? 1 : 2; }
+int DragScreen::shifterGear() const { return pendingGear_ >= 0 ? pendingGear_ : race_->lane(0).sim->powertrain().gear(); }
+
 void DragScreen::key(Key k, bool down) {
     switch (k) {
     case Key::Throttle: keyThr_ = down; break;

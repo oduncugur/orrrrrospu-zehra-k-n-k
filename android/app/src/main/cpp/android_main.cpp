@@ -298,10 +298,16 @@ bool padKey(zk::App& g, int32_t code, bool down) {
     case AKEYCODE_BUTTON_START: g.key(Key::Enter, down); return true;
     case AKEYCODE_BUTTON_SELECT: g.key(Key::Settings, down); return true;
     case AKEYCODE_BUTTON_B: if (!down) g.back(); return true;
-    case AKEYCODE_DPAD_LEFT: g.key(Key::Left, down); return true;
-    case AKEYCODE_DPAD_RIGHT: g.key(Key::Right, down); return true;
-    case AKEYCODE_DPAD_UP: g.key(Key::PageUp, down); return true;
-    case AKEYCODE_DPAD_DOWN: g.key(Key::PageDown, down); return true;
+    case AKEYCODE_DPAD_UP: case AKEYCODE_DPAD_DOWN: case AKEYCODE_DPAD_LEFT: case AKEYCODE_DPAD_RIGHT: {
+        // Yon tuslari: kolu olan ekranda kapili vites, digerlerinde menu
+        static bool used[4] = {};
+        const int gd = code == AKEYCODE_DPAD_UP ? 0 : code == AKEYCODE_DPAD_DOWN ? 1 : code == AKEYCODE_DPAD_LEFT ? 2 : 3;
+        if (down) used[gd] = g.gate(gd);
+        if (used[gd]) { if (!down) used[gd] = false; return true; }
+        static const Key fb[4] = {Key::PageUp, Key::PageDown, Key::Left, Key::Right};
+        g.key(fb[gd], down);
+        return true;
+    }
     default: return false;
     }
 }
@@ -311,7 +317,20 @@ void padAxes(zk::App& g, const AInputEvent* ev) {
     const float rt = std::max(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_RTRIGGER, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_GAS, 0));
     const float lt = std::max(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_LTRIGGER, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_BRAKE, 0));
     float x = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_X, 0);
-    const float hx = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_HAT_X, 0);
+    float hx = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_HAT_X, 0);
+    const float hy = AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_HAT_Y, 0);
+    {   // D-pad (hat ekseni): kolu olan ekranda kapili vites; kullanilan yon direksiyona / menuye gitmez
+        static int hxS = 0, hyS = 0; static bool hxUsed = false, hyUsed = false;
+        const int nx = hx > 0.5f ? 1 : hx < -0.5f ? -1 : 0, ny = hy > 0.5f ? 1 : hy < -0.5f ? -1 : 0;
+        if (nx != hxS) { hxUsed = nx != 0 && g.gate(nx < 0 ? 2 : 3); hxS = nx; }
+        if (ny != hyS) {
+            const bool was = hyUsed;
+            hyUsed = ny != 0 && g.gate(ny < 0 ? 0 : 1);
+            if (!hyUsed && ny != 0) { g.key(ny < 0 ? zk::Key::PageUp : zk::Key::PageDown, true); g.key(ny < 0 ? zk::Key::PageUp : zk::Key::PageDown, false); }
+            (void)was; hyS = ny;
+        }
+        if (hxUsed) hx = 0.0f;
+    }
     if (std::fabs(hx) > std::fabs(x)) x = hx;
     g.padStick(AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_Z, 0), AMotionEvent_getAxisValue(ev, AMOTION_EVENT_AXIS_RZ, 0));   // sag analog: H vites
     g.setPadPedals(std::clamp(rt, 0.0f, 1.0f), std::clamp(lt, 0.0f, 1.0f));   // analog pedal (surus); dipte tus olayi

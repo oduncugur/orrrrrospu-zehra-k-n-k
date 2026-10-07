@@ -54,22 +54,50 @@ void quadP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, const Proj&
     for (int i = 1; i + 1 < n; ++i) triP(r, out[0], out[i], out[i + 1], col);
 }
 struct Parked { double x, y, h; int carId; };
-// Site duvari: binalarin cogu 3 m bahceli, 1.8 m duvarla cevrili; sokak yonlerinde (v kenarlari) 6 m kapi boslugu.
+// Site duvari: binalarin cogu 5 m bahceli, 1.8 m duvarla cevrili; sokak yonlerinde (v kenarlari) 6 m kapi boslugu.
 // Parca: merkez, yon (heading), yari boy, yari kalinlik. Cizim ve carpisma ayni listeyi kullanir.
 struct WallSeg { double x, y, h, hl, ht; };
 float hashW(int k);
+// Trafik isigi: sehir ici 3+ kollu kavsak; dik yonler iki grup, 24 s dongu (10 yesil, 2 sari, 12 kirmizi)
+int lightState(const World& w, int ni, int ei, double T, double* dirX = nullptr, double* dirY = nullptr) {
+    const WorldNode& nd = w.nodes[ni];
+    if (nd.edges.size() < 3) return -1;
+    auto dirOf = [&](int e, double& dx, double& dy) {
+        const WorldEdge& E = w.edges[e];
+        if (E.highway || E.city < 0 || E.pts.size() < 2) return false;
+        const auto& q = E.a == ni ? E.pts[1] : E.pts[E.pts.size() - 2];
+        dx = q.first - nd.x; dy = q.second - nd.y; const double l = std::hypot(dx, dy);
+        if (l < 1.0) return false;
+        dx /= l; dy /= l; return true;
+    };
+    double dx, dy, d0x = 0, d0y = 0; bool any = false;
+    for (int e : nd.edges) if (dirOf(e, d0x, d0y)) { any = true; break; }
+    if (!any || !dirOf(ei, dx, dy)) return -1;
+    if (dirX) { *dirX = dx; *dirY = dy; }
+    const int grp = std::fabs(dx * d0y - dy * d0x) > 0.7 ? 1 : 0;
+    const double t = std::fmod(T + 24.0 * hashW(ni * 7) + (grp ? 12.0 : 0.0), 24.0);
+    return t < 10.0 ? 0 : t < 12.0 ? 1 : 2;
+}
+// Site bahcesi (yerel v araligi): yol tarafinda bordura ~2.8 m kalana kadar genis on bahce, arkada 4 m
+void siteBox(const WorldBuilding& b, double& U, double& v0, double& v1) {
+    const double front = std::clamp(b.gap - 2.8, 3.0, 40.0), back = 4.0;
+    U = b.hu + 3.5;
+    v0 = b.roadSide > 0 ? -(b.hv + back) : -(b.hv + front);
+    v1 = b.roadSide > 0 ? b.hv + front : b.hv + back;
+}
 int siteWalls(const WorldBuilding& b, int idx, WallSeg out[6]) {
-    if (hashW(idx * 23 + 5) < 0.3f) return 0;                           // %30 duvarsiz (acik bina onu)
-    const double m = 3.0, U = b.hu + m, V = b.hv + m, vx = -b.uy, vy = b.ux, hd = std::atan2(b.uy, b.ux);
+    if (hashW(idx * 23 + 5) < 0.2f) return 0;                           // %20 duvarsiz (acik bina onu)
+    double U, v0, v1; siteBox(b, U, v0, v1);
+    const double vx = -b.uy, vy = b.ux, hd = std::atan2(b.uy, b.ux), vm = 0.5 * (v0 + v1), vh = 0.5 * (v1 - v0);
     int n = 0;
-    for (double sg : {1.0, -1.0}) out[n++] = {b.cx + sg * U * b.ux, b.cy + sg * U * b.uy, hd + 1.5707963, V, 0.15};   // yan duvarlar (tam)
-    const double gate = 3.0, hl = (U - gate) * 0.5, off = (U + gate) * 0.5;
-    if (hl > 0.5)
-        for (double sv : {1.0, -1.0})
-            for (double su : {1.0, -1.0}) out[n++] = {b.cx + su * off * b.ux + sv * V * vx, b.cy + su * off * b.uy + sv * V * vy, hd, hl, 0.15};
+    for (double sg : {1.0, -1.0}) out[n++] = {b.cx + sg * U * b.ux + vm * vx, b.cy + sg * U * b.uy + vm * vy, hd + 1.5707963, vh, 0.15};   // yan duvarlar
+    const double vRoad = b.roadSide > 0 ? v1 : v0, vBack = b.roadSide > 0 ? v0 : v1;
+    out[n++] = {b.cx + vBack * vx, b.cy + vBack * vy, hd, U, 0.15};                                 // arka duvar (tam)
+    const double gate = 3.0, hl = (U - gate) * 0.5, off = (U + gate) * 0.5;                        // on duvar: ortada 6 m kapi
+    if (hl > 0.5) for (double su : {1.0, -1.0}) out[n++] = {b.cx + su * off * b.ux + vRoad * vx, b.cy + su * off * b.uy + vRoad * vy, hd, hl, 0.15};
     return n;
 }
-// Park etmis araclar: sokaklarin iki yaninda (13 m aralik, %40 dolu); her karede ayni (belirlenimci)
+// Park etmis araclar: sokaklarin iki yaninda (13 m aralik, %65 dolu); her karede ayni (belirlenimci)
 void parkedOn(const World& w, int e, std::vector<Parked>& out) {
     const WorldEdge& E = w.edges[e];
     if (E.highway || E.bridge || E.city < 0) return;
@@ -79,7 +107,7 @@ void parkedOn(const World& w, int e, std::vector<Parked>& out) {
     for (int side = 0; side < 2; ++side)
         for (int k = 0; 18.0 + k * 13.0 < p.length() - 18.0; ++k) {
             unsigned hsh = (unsigned)(e * 7919 + k * 31 + side * 17) * 2654435761u; hsh ^= hsh >> 15;
-            if ((hsh & 0xFF) < 150) continue;
+            if ((hsh & 0xFF) < 90) continue;                                 // %65 dolu (Turkiye: yarisi kaldirimda)
             const double s = 18.0 + k * 13.0;
             const RoadPoint q = p.at(s);
             const double lat = side ? (q.hw + 1.1) : -(q.hw + 1.1);
@@ -88,6 +116,30 @@ void parkedOn(const World& w, int e, std::vector<Parked>& out) {
 }
 float hashW(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 constexpr double kTau = 6.283185307179586;
+constexpr double kWalk = 1.6;   // kaldirim genisligi (dar: Turkiye usulu)
+// Yayalar: sehir sokaklarinin dar kaldiriminda (yol basina 8), zamana gore yuruyen; arac yaklasinca duvara siginir.
+// key: kalici kimlik (ezilen yaya bir sure yerde yatar, o sure yurumez)
+struct Ped { double x, y, h; float col; int key; };
+void pedsNear(const World& w, double T, double cx, double cy, double rad, double X, double Y, std::vector<Ped>& out) {
+    for (int e = 0; e < (int)w.edges.size(); ++e) {
+        const WorldEdge& E = w.edges[e];
+        if (E.highway || E.bridge || E.city < 0) continue;
+        if (cx < E.minX - rad || cx > E.maxX + rad || cy < E.minY - rad || cy > E.maxY + rad) continue;
+        const RoadPath& p = E.fwd();
+        for (int k = 0; k < 8; ++k) {
+            const float hh = hashW(e * 13 + k * 7);
+            const double dir = (k & 1) ? 1.0 : -1.0, L = p.length();
+            const double s = std::fmod(hh * L + dir * T * (1.0 + 0.6 * hashW(e + k)) + 100.0 * L, L);
+            const RoadPoint q = p.at(s);
+            double lat = (k & 1 ? 1.0 : -1.0) * (q.hw + 0.8);
+            const double qx = q.x - lat * std::sin(q.heading), qy = q.y + lat * std::cos(q.heading);
+            if (std::hypot(qx - X, qy - Y) < 5.0) lat += (lat > 0 ? 0.6 : -0.6);   // arac yaklasinca duvara yapisir (yer dar)
+            const double fx = q.x - lat * std::sin(q.heading), fy = q.y + lat * std::cos(q.heading);
+            if (std::hypot(fx - cx, fy - cy) > rad) continue;
+            out.push_back({fx, fy, q.heading + (dir > 0 ? 0.0 : 3.14159265), hashW(e * 5 + k * 3), e * 8 + k});
+        }
+    }
+}
 } // namespace
 
 struct WorldScreen::Impl {
@@ -102,6 +154,10 @@ struct WorldScreen::Impl {
     double steer = 0, tiltF = 0, camPsi = 0, envT = 0, spin = 0, shakeT = 0;
     bool kL = false, kR = false;
     std::string msg; double msgT = 0;
+    // Ezilen yayalar (yerde yatar, 25 s), alkis gosterisi, bordur (kaldirima cikinca 15 cm)
+    struct Down { double x, y, h, t; float col; int key; };
+    std::vector<Down> downs; double clapT = -1.0, curbH = 0.0; bool onCurb = false; int runOver = 0;
+    bool isDown(int key) const { for (const Down& d : downs) if (d.key == key) return true; return false; }
     int city = -2;
     // Trafik
     // bx/by/bh/bl: kavsak donusu (onceki yolun sonundaki poz -> yeni yolda bl metreye Bezier egrisi; isinlanma yok)
@@ -276,7 +332,9 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     M.flash("ACIK DUNYA: HARITADAN HEDEF SEC, SUR YA DA OTONOM", 3.0);
 }
 
-bool WorldScreen::backLeaves() const { return !m_->mapOpen; }   // harita aciksa geri = haritayi kapat
+bool WorldScreen::backLeaves() const { return !m_->mapOpen; }
+int WorldScreen::shifter() const { return m_->mapOpen ? 0 : m_->cockpit.lever() == Cockpit::Lever::HPattern ? 1 : 2; }
+int WorldScreen::shifterGear() const { return m_->cockpit.knobGear(); }   // harita aciksa geri = haritayi kapat
 
 WorldScreen::~WorldScreen() {
     Impl& M = *m_;
@@ -295,16 +353,15 @@ void WorldScreen::update(double dt) {
     M.cockpit.setPadPedals(app.padThrottle(), app.padBrake());
     if (M.cockpit.takeSeated()) app.haptic(18, 160);
     // Direksiyon (RoadScreen ile ayni): hiza gore sinir, klavye ya da egim
-    const double slipAllow = std::min(0.45, std::fabs(sim.bodySlipAngle()) * 1.3);
-    const double maxSteer = std::clamp(sim.vehicleLoad().wheelbase * 1.1 * 9.81 / std::max(v * v, 1.0) + slipAllow, 0.035, 0.55);
-    double target = (M.kL ? maxSteer : 0.0) - (M.kR ? maxSteer : 0.0);
+    // Hiza duyarli direksiyon (RoadCar::steerLimit): sehir hizinda genis kilit, hizlandikca sertlesir
+    double target = (M.kL ? RoadCar::steerLimit(sim, v, 1.0) : 0.0) - (M.kR ? RoadCar::steerLimit(sim, v, -1.0) : 0.0);
     if (!M.kL && !M.kR && app.tiltAvailable && app.settings.tiltSteer) {
-        const double raw = std::clamp((app.settings.tiltInvert ? -1.0 : 1.0) * app.tilt() * app.settings.tiltSens / 100.0, -1.0, 1.0);
+        const double raw = std::clamp(1.3 * (app.settings.tiltInvert ? -1.0 : 1.0) * app.tilt() * app.settings.tiltSens / 100.0, -1.0, 1.0);   // ~23 deg tam
         M.tiltF += (raw - M.tiltF) * std::min(1.0, dt / 0.12);
         const double dz = 0.08, t = M.tiltF, u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);
-        target = std::copysign(std::pow(std::fabs(u), 1.0 + 0.8 * std::clamp((v - 8.0) / 32.0, 0.0, 1.0)), u) * maxSteer;
+        target = std::copysign(std::pow(std::fabs(u), 1.0 + 0.45 * std::clamp((v - 14.0) / 26.0, 0.0, 1.0)), u) * RoadCar::steerLimit(sim, v, u);
     }
-    const double rate = (std::fabs(target) > std::fabs(M.steer) ? 1.0 : 2.5) * dt;
+    const double rate = RoadCar::steerRate(v, std::fabs(target) > std::fabs(M.steer)) * dt;
     M.steer += std::clamp(target - M.steer, -rate, rate);
     RoadControls c;
     c.steer = M.steer; c.throttle = M.cockpit.throttle(); c.brake = M.cockpit.brake();
@@ -341,6 +398,12 @@ void WorldScreen::update(double dt) {
                 const double turn = std::fabs(std::remainder(np.at(2.0).heading - cp.at(cp.length()).heading, kTau));
                 if (turn > 0.5) tgt = std::min(tgt, std::sqrt(5.0 * 5.0 + 2.0 * 3.5 * std::max(0.0, toEnd - 6.0)));   // donus 18 km/h
             }
+            {   // otonom: kirmizi isikta durma cizgisinde bekler
+                const WorldEdge& CE = M.w.edges[M.leg.edge];
+                const double toEnd = cp.length() - P.s(), stopAt = toEnd - (CE.hw + 5.0);
+                const int st = toEnd < 80.0 ? lightState(M.w, M.leg.rev ? CE.a : CE.b, M.leg.edge, M.envT) : -1;
+                if (stopAt > -2.0 && (st == 2 || (st == 1 && stopAt > v * v / 8.0))) tgt = std::min(tgt, std::max(0.0, stopAt) * 0.5);
+            }
             for (const auto& t : M.traffic)                                  // ACC
                 if (t.leg.edge == M.leg.edge && t.leg.rev == M.leg.rev && t.s > P.s() && t.s - P.s() < 40.0 && std::fabs(cp.laneOffset(t.s, false, t.lane) - P.lateral()) < 1.8)
                     tgt = std::min(tgt, t.v + (t.s - P.s() - 12.0) * 0.3);
@@ -365,6 +428,40 @@ void WorldScreen::update(double dt) {
     if (M.mapOpen) { c.throttle = 0; c.brake = std::max(c.brake, 0.5); }   // harita acikken arac durur
     P.update(dt, c);
     if (!M.autoDrive) M.pickLeg(false);
+    {   // Bordur: sehir sokaginda asfalttan kaldirima (15 cm) cikis / inis: sarsinti + hiz kaybi, arac kaldirimda yukarda
+        const WorldEdge& CE = M.w.edges[M.leg.edge];
+        const RoadPath& cp = M.path();
+        const double hw = cp.halfWidthAt(P.s()), alat = std::fabs(P.lateral());
+        const bool street = !CE.highway && !CE.bridge && CE.city >= 0 && P.s() > hw * 2 + 5 && P.s() < cp.length() - hw * 2 - 5;
+        const bool on = street && alat > hw + 0.1 && alat < hw + kWalk + 2.5;
+        if (on != M.onCurb && v > 1.0) {
+            M.shakeT = std::max(M.shakeT, on ? 0.22 : 0.14); app.haptic(on ? 90 : 60, on ? 230 : 160);
+            P.bump(on ? (v > 12.0 ? 0.9 : 0.96) : 0.98);                     // bordura carpma: hizli girince ciddi kayip
+            if (on && v > 14.0) M.flash("BORDURA VURDUN!", 1.0);
+        }
+        M.onCurb = on;
+        M.curbH += ((on ? 0.15 : 0.0) - M.curbH) * std::min(1.0, dt / 0.08);
+    }
+    {   // Yayalar: ezilince yere yigilir (25 s), kalabalik alkislar
+        std::vector<Ped> near;
+        pedsNear(M.w, M.envT, sim.posX(), sim.posY(), 8.0, sim.posX(), sim.posY(), near);
+        const double ch = std::cos(sim.heading()), sh = std::sin(sim.heading());
+        for (const Ped& pd : near) {
+            if (M.isDown(pd.key)) continue;
+            const double dx = pd.x - sim.posX(), dy = pd.y - sim.posY();
+            const double lon = dx * ch + dy * sh, lat2 = -dx * sh + dy * ch;
+            if (std::fabs(lon) < 2.4 && std::fabs(lat2) < 1.15 && v > 2.0) {
+                M.downs.push_back({pd.x + ch * 1.5, pd.y + sh * 1.5, sim.heading() + (lat2 > 0 ? 1.2 : -1.2), M.envT, pd.col, pd.key});
+                M.shakeT = std::max(M.shakeT, 0.3); app.haptic(120, 255);
+                P.bump(0.97);
+                ++M.runOver;
+                M.clapT = 0.0; app.applause();
+                M.flash(M.runOver > 1 ? "YINE MI? HALK COSTU, ALKISLAR!" : "YAYA EZILDI - ALKISLAR!", 2.6);
+            }
+        }
+        M.downs.erase(std::remove_if(M.downs.begin(), M.downs.end(), [&](const Impl::Down& d) { return M.envT - d.t > 25.0; }), M.downs.end());
+        if (M.clapT >= 0.0) { M.clapT += dt; if (M.clapT > 3.5) M.clapT = -1.0; }
+    }
     // Binalar: yonlu kutu, arac (2.2 x 0.9) carparsa itilir
     for (int bi = 0; bi < (int)M.w.buildings.size(); ++bi) {
         const WorldBuilding& b = M.w.buildings[bi];
@@ -528,12 +625,13 @@ void WorldScreen::update(double dt) {
             const RoadPoint q = M.w.path(t.leg).at(t.s); return std::hypot(q.x - px, q.y - py) > 750.0; }), M.traffic.end());
         int guard = 0;
         std::vector<int> nearE;                                          // yakindaki yollar (dogma adaylari)
-        if (M.traffic.size() < 24)
+        const size_t cap = M.city >= 0 ? 40 : 24;                        // sehir ici kalabalik
+        if (M.traffic.size() < cap)
             for (int e = 0; e < (int)M.w.edges.size(); ++e) {
                 const WorldEdge& E = M.w.edges[e];
                 if (!(px < E.minX - 650 || px > E.maxX + 650 || py < E.minY - 650 || py > E.maxY + 650)) nearE.push_back(e);
             }
-        while (!nearE.empty() && M.traffic.size() < 24 && guard++ < 40) {
+        while (!nearE.empty() && M.traffic.size() < cap && guard++ < 60) {
             const int e = nearE[(size_t)(M.rnd() * nearE.size()) % nearE.size()];
             const WorldEdge& E = M.w.edges[e];
             Impl::T t{};
@@ -553,16 +651,53 @@ void WorldScreen::update(double dt) {
             t.prevRel = 0;
             M.traffic.push_back(t);
         }
+        // Dunya uzayinda onu gorme: her aracin pozu + hiz vektoru (oyuncu sonda); kavsakta karsidan gelen / kesen araclar
+        struct Pose { double x, y, h, v; };
+        std::vector<Pose> poses; poses.reserve(M.traffic.size() + 1);
+        for (const auto& o : M.traffic) { double ox, oy, oh; M.tPose(o, ox, oy, oh); poses.push_back({ox, oy, oh, o.v}); }
+        poses.push_back({sim.posX(), sim.posY(), sim.heading() + sim.bodySlipAngle() + (sim.vx() < 0 ? 3.14159265 : 0.0), v});   // gidis yonu (geri dahil)
         for (auto& t : M.traffic) {
             const RoadPath& tp = M.w.path(t.leg);
             double gap = 1e9, lv = t.v0;
+            double brakeTo = 1e9;                                          // engel icin hedef hiz
+            {
+                const size_t me = (size_t)(&t - &M.traffic[0]);
+                const Pose& a = poses[me];
+                const double fx = std::cos(a.h), fy = std::sin(a.h);
+                const double look = 10.0 + a.v * 2.2;                      // ~2.2 s ileri
+                for (size_t j = 0; j < poses.size(); ++j) {
+                    if (j == me) continue;
+                    const Pose& b = poses[j];
+                    // simdiki ve 1 s sonraki konum (kesen arac): ikisinden en tehlikelisi
+                    for (double tp2 : {0.0, 1.0}) {
+                        const double bx = b.x + std::cos(b.h) * b.v * tp2 - (a.x + fx * a.v * tp2);
+                        const double by = b.y + std::sin(b.h) * b.v * tp2 - (a.y + fy * a.v * tp2);
+                        const double lon = bx * fx + by * fy, lat = -bx * fy + by * fx;
+                        if (lon < 1.5 || lon > look || std::fabs(lat) > 2.3) continue;
+                        const double along = b.v * std::cos(b.h - a.h);        // onumdekinin benim yonumdeki hizi
+                        const double free = lon + (tp2 > 0 ? a.v * tp2 : 0.0) - 7.0;
+                        brakeTo = std::min(brakeTo, std::max(0.0, std::max(0.0, along) + free * 0.45));
+                    }
+                }
+            }
             for (const auto& o : M.traffic)
                 if (&o != &t && o.leg.edge == t.leg.edge && o.leg.rev == t.leg.rev && o.lane == t.lane && o.s > t.s && o.s - t.s < gap) { gap = o.s - t.s; lv = o.v; }
             if (M.leg.edge == t.leg.edge && M.leg.rev == t.leg.rev && P.s() > t.s && P.s() - t.s < gap && std::fabs(P.lateral() - tp.laneOffset(P.s(), false, t.lane)) < 2.0) { gap = P.s() - t.s; lv = v; }
             const bool nearEnd = tp.length() - t.s < 25.0 && !M.w.edges[t.leg.edge].highway;   // kavsakta yavasla
-            const double want = gap < 1e8 ? std::min(t.v0, lv + (gap - 10.0) * 0.4) : t.v0;
+            double want = gap < 1e8 ? std::min(t.v0, lv + (gap - 10.0) * 0.4) : t.v0;
+            {   // trafik isigi: kirmizida (sarida durabiliyorsa) durma cizgisinde (kavsaktan ~hw+5 m once) bekler
+                const WorldEdge& TE = M.w.edges[t.leg.edge];
+                const int endNode = t.leg.rev ? TE.a : TE.b;
+                const double toEnd = tp.length() - t.s;
+                if (toEnd < 60.0 && t.role != 2) {                       // serseri isik dinlemez
+                    const int st = lightState(M.w, endNode, t.leg.edge, M.envT);
+                    const double stopAt = toEnd - (TE.hw + 5.0);
+                    if (st == 2 || (st == 1 && stopAt > t.v * t.v / 8.0)) want = std::min(want, std::max(0.0, stopAt) * 0.5);
+                }
+            }
             const double tg = nearEnd ? std::min(want, 7.0) : want;
-            t.v += std::clamp(tg - t.v, -6.0 * dt, 1.6 * dt);
+            const double tg2 = std::min(tg, brakeTo);
+            t.v += std::clamp(tg2 - t.v, (brakeTo < t.v - 3.0 ? -9.0 : -6.0) * dt, 1.6 * dt);   // engelde sert fren
             t.v = std::max(0.0, t.v);
             t.s += t.v * dt;
             if (t.s > tp.length()) {
@@ -682,7 +817,7 @@ void WorldScreen::render(Renderer& r) {
                         if (surf == 2) continue;                              // yesil: cim zemini kalir
                         const Proj q0 = Q(ua, va);
                         const float wv = 0.04f * std::sin((float)(M.envT * 1.3 + ua * 0.05 + va * 0.03));   // su parlamasi
-                        quadP(r, q0, Q(ub, va), Q(ub, vb), Q(ua, vb), fog(surf == 1 ? Color{0.16f + wv, 0.38f + wv, 0.62f + wv} : Color{0.62f, 0.62f, 0.60f}, q0.w));
+                        quadP(r, q0, Q(ub, va), Q(ub, vb), Q(ua, vb), fog(surf == 1 ? Color{0.16f + wv, 0.38f + wv, 0.62f + wv} : Color{0.44f, 0.46f, 0.36f}, q0.w));
                     }
             }
     }
@@ -714,7 +849,7 @@ void WorldScreen::render(Renderer& r) {
                     const Color top = fog({0.70f, 0.69f, 0.66f}, aL.ok ? aL.w : (float)da), face = fog({0.82f, 0.82f, 0.80f}, aL.ok ? aL.w : (float)da);
                     for (double sg : {1.0, -1.0}) {
                         quadP(r, edge(a, sg * a.hw, 0.0), edge(b, sg * b.hw, 0.0), edge(b, sg * b.hw, 0.15), edge(a, sg * a.hw, 0.15), face);
-                        quadP(r, edge(a, sg * a.hw, 0.15), edge(b, sg * b.hw, 0.15), edge(b, sg * (b.hw + 2.8), 0.15), edge(a, sg * (a.hw + 2.8), 0.15), top);
+                        quadP(r, edge(a, sg * a.hw, 0.15), edge(b, sg * b.hw, 0.15), edge(b, sg * (b.hw + kWalk), 0.15), edge(a, sg * (a.hw + kWalk), 0.15), top);
                     }
                 }
             }
@@ -764,44 +899,62 @@ void WorldScreen::render(Renderer& r) {
         if (d < (l.type == LmMountain ? 25000.0 : 9000.0) && (l.type == LmMountain || front(l.x, l.y, 9000.0))) items.push_back({d, 2, i});
     }
     // Yayalar: sokak kaldirimlarinda yuruyen insanlar (belirlenimci, zamana gore), yakinda
-    struct Ped { double x, y; float col; };
-    std::vector<Ped> peds;
+    std::vector<Ped> peds, pedsAll;
+    pedsNear(w, M.envT, ex, ey, 200.0, X, Y, pedsAll);
+    for (const Ped& pd : pedsAll) if (!M.isDown(pd.key) && front(pd.x, pd.y, 200.0)) peds.push_back(pd);
+    for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
+    for (int i = 0; i < (int)M.downs.size(); ++i) if (front(M.downs[i].x, M.downs[i].y, 300.0)) items.push_back({std::hypot(M.downs[i].x - ex, M.downs[i].y - ey) + 0.3, 9, i});
+    // Sokak lambalari (her 35 m, bordur ucunda) ve bahce agaclari (duvarli binalarin bahce koselerinde)
+    struct Prop { double x, y; int type; float v; };                      // type 0 lamba, 1 agac
+    std::vector<Prop> props;
     for (int e = 0; e < (int)w.edges.size(); ++e) {
         const WorldEdge& E = w.edges[e];
         if (E.highway || E.bridge || E.city < 0) continue;
-        if (ex < E.minX - 170 || ex > E.maxX + 170 || ey < E.minY - 170 || ey > E.maxY + 170) continue;
+        if (ex < E.minX - 300 || ex > E.maxX + 300 || ey < E.minY - 300 || ey > E.maxY + 300) continue;
         const RoadPath& p = E.fwd();
-        for (int k = 0; k < 4; ++k) {
-            const float hh = hashW(e * 13 + k * 7);
-            const double dir = (k & 1) ? 1.0 : -1.0, L = p.length();
-            const double s = std::fmod(hh * L + dir * M.envT * (1.0 + 0.6 * hashW(e + k)) + 100.0 * L, L);
-            const RoadPoint q = p.at(s);
-            double lat = (k & 1 ? 1.0 : -1.0) * (q.hw + 2.6);
-            const double qx = q.x - lat * std::sin(q.heading), qy = q.y + lat * std::cos(q.heading);
-            if (std::hypot(qx - X, qy - Y) < 4.0) lat += (lat > 0 ? 2.5 : -2.5);   // arac yaklasinca kenara kacar
-            const double fx2 = q.x - lat * std::sin(q.heading), fy2 = q.y + lat * std::cos(q.heading);
-            if (!front(fx2, fy2, 170.0)) continue;
-            peds.push_back({fx2, fy2, hashW(e * 5 + k * 3)});
+        for (int k = 0; 12.0 + k * 35.0 < p.length() - 12.0; ++k) {
+            const RoadPoint q = p.at(12.0 + k * 35.0);
+            const double lat = ((k + e) & 1 ? 1.0 : -1.0) * (q.hw + 0.25);
+            const double lx = q.x - lat * std::sin(q.heading), ly = q.y + lat * std::cos(q.heading);
+            if (front(lx, ly, 300.0)) props.push_back({lx, ly, 0, 0.0f});
         }
     }
-    for (int i = 0; i < (int)peds.size(); ++i) items.push_back({std::hypot(peds[i].x - ex, peds[i].y - ey), 3, i});
+    for (int i = 0; i < (int)w.buildings.size(); ++i) {                  // site bahceleri: on bahcede sira sira, yanlarda tek tuk
+        const WorldBuilding& b = w.buildings[i];
+        if (std::fabs(b.cx - ex) > 260 || std::fabs(b.cy - ey) > 260) continue;
+        const double vx = -b.uy, vy = b.ux;
+        double U, v0, v1; siteBox(b, U, v0, v1);
+        const double fa = b.roadSide > 0 ? b.hv + 1.5 : v0 + 1.5, fb = b.roadSide > 0 ? v1 - 1.5 : -(b.hv + 1.5);   // on bahce bandi
+        int k = 0;
+        for (double v = fa; v <= fb; v += 5.5)
+            for (double u = -U + 2.0; u <= U - 2.0; u += 5.5, ++k) {
+                if (std::fabs(u) < 3.5 && std::fabs(v - (b.roadSide > 0 ? fb : fa)) < 3.0) continue;   // kapi onu bos
+                const float hv2 = hashW(i * 97 + k);
+                if (hv2 < 0.25f) continue;
+                const double uu = u + (hashW(i * 89 + k) - 0.5) * 2.0, vv = v + (hv2 - 0.5) * 2.0;
+                const double tx = b.cx + uu * b.ux + vv * vx, ty = b.cy + uu * b.uy + vv * vy;
+                if (front(tx, ty, 260.0)) props.push_back({tx, ty, 1, hv2});
+            }
+        for (double su : {1.0, -1.0}) {                                    // yan bahce
+            const double tx = b.cx + su * (b.hu + 1.8) * b.ux, ty = b.cy + su * (b.hu + 1.8) * b.uy;
+            if (front(tx, ty, 260.0)) props.push_back({tx, ty, 1, hashW(i * 43 + (su > 0))});
+        }
+    }
+    for (const WorldTree& t : w.trees) {                                  // parklar / bos arsalar
+        if (std::fabs(t.x - ex) > 320 || std::fabs(t.y - ey) > 320) continue;
+        if (front(t.x, t.y, 320.0)) props.push_back({t.x, t.y, 1, t.s});
+    }
+    for (int i = 0; i < (int)props.size(); ++i) items.push_back({std::hypot(props[i].x - ex, props[i].y - ey), 10, i});
     struct Light { double x, y; int state; };                            // state 0 yesil, 1 sari, 2 kirmizi
     std::vector<Light> lights;
     for (int ni = 0; ni < (int)w.nodes.size(); ++ni) {
         const WorldNode& nd = w.nodes[ni];
         if (nd.edges.size() < 3 || std::fabs(nd.x - X) > 400.0 || std::fabs(nd.y - Y) > 400.0) continue;
-        double d0x = 0, d0y = 0; bool first = true;
         for (int ei : nd.edges) {
             const WorldEdge& E = w.edges[ei];
-            if (E.highway || E.city < 0 || E.pts.size() < 2) { first = first && true; continue; }
-            const auto& q = E.a == ni ? E.pts[1] : E.pts[E.pts.size() - 2];
-            double dx = q.first - nd.x, dy = q.second - nd.y; const double l = std::hypot(dx, dy);
-            if (l < 1.0) continue;
-            dx /= l; dy /= l;
-            if (first) { d0x = dx; d0y = dy; first = false; }
-            const int grp = std::fabs(dx * d0y - dy * d0x) > 0.7 ? 1 : 0;
-            const double t = std::fmod(M.envT + 24.0 * hashW(ni * 7) + (grp ? 12.0 : 0.0), 24.0);
-            const int st = t < 10.0 ? 0 : t < 12.0 ? 1 : 2;
+            double dx, dy;
+            const int st = lightState(w, ni, ei, M.envT, &dx, &dy);
+            if (st < 0) continue;
             const double o = E.hw + 3.0;
             const double lx = nd.x + dx * o + dy * (E.hw + 1.6), ly = nd.y + dy * o - dx * (E.hw + 1.6);
             if (front(lx, ly, 400.0)) lights.push_back({lx, ly, st});
@@ -900,6 +1053,37 @@ void WorldScreen::render(Renderer& r) {
                                   r.rect(b0.x - 0.1f * sc, b1.y, b0.x + 0.1f * sc, b0.y, fog({0.5f, 0.5f, 0.52f}, b0.w));
                                   r.rect(b1.x - 0.5f * sc, b1.y - 0.6f * sc, b1.x + 0.5f * sc, b1.y + 0.2f * sc, fog({0.9f, 0.75f, 0.1f}, b0.w));
                                   r.circle(b1.x, b1.y - 0.2f * sc, std::max(1.0f, 0.18f * sc), 8, {0.1f, 0.1f, 0.12f}); }
+        } else if (it.kind == 9) {                                        // ezilen yaya: yerde boylu boyunca
+            const Impl::Down& dn = M.downs[it.idx];
+            const double cx = std::cos(dn.h), cy = std::sin(dn.h), px = -cy, py = cx;
+            static const Color shirtD[6] = {{0.85f, 0.2f, 0.2f}, {0.2f, 0.4f, 0.85f}, {0.95f, 0.85f, 0.3f}, {0.25f, 0.6f, 0.3f}, {0.9f, 0.9f, 0.9f}, {0.3f, 0.3f, 0.35f}};
+            auto flat = [&](double a0, double a1, double hw2, Color c) {
+                quadP(r, P3(dn.x + a0 * cx - hw2 * px, dn.y + a0 * cy - hw2 * py, 0.05), P3(dn.x + a1 * cx - hw2 * px, dn.y + a1 * cy - hw2 * py, 0.05),
+                      P3(dn.x + a1 * cx + hw2 * px, dn.y + a1 * cy + hw2 * py, 0.05), P3(dn.x + a0 * cx + hw2 * px, dn.y + a0 * cy + hw2 * py, 0.05), fog(c, (float)it.d));
+            };
+            flat(-0.9, -0.05, 0.22, {0.18f, 0.2f, 0.3f});                 // bacaklar
+            flat(-0.05, 0.6, 0.26, shirtD[(int)(dn.col * 6) % 6]);         // govde
+            flat(0.62, 0.85, 0.12, {0.85f, 0.68f, 0.52f});                // bas
+        } else if (it.kind == 10) {                                       // sokak lambasi / bahce agaci
+            const Prop& pr = props[it.idx];
+            if (pr.type == 0) {
+                const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, 6.0);
+                if (!b0.ok || !b1.ok) continue;
+                r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                r.rect(b0.x - 0.07f * sc, b1.y, b0.x + 0.07f * sc, b0.y, fog({0.32f, 0.34f, 0.36f}, b0.w));
+                r.rect(b1.x - 0.45f * sc, b1.y - 0.12f * sc, b1.x + 0.45f * sc, b1.y + 0.1f * sc, fog({0.25f, 0.26f, 0.28f}, b0.w));
+                r.rect(b1.x - 0.3f * sc, b1.y + 0.1f * sc, b1.x + 0.3f * sc, b1.y + 0.18f * sc, fog({1.0f, 0.92f, 0.65f}, b0.w));
+            } else {
+                const double hgt = 4.5 + 3.0 * pr.v;
+                const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, hgt);
+                if (!b0.ok || !b1.ok) continue;
+                r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
+                r.rect(b0.x - 0.15f * sc, b1.y + 1.2f * sc, b0.x + 0.15f * sc, b0.y, fog({0.4f, 0.28f, 0.18f}, b0.w));
+                const Color leaf = fog({0.18f + 0.1f * pr.v, 0.45f + 0.12f * pr.v, 0.18f}, b0.w);
+                r.circle(b1.x, b1.y + 0.6f * sc, std::max(1.5f, (1.6f + 0.6f * pr.v) * sc), 12, leaf);
+                r.circle(b1.x - 0.8f * sc, b1.y + 1.2f * sc, std::max(1.0f, 1.1f * sc), 10, leaf);
+                r.circle(b1.x + 0.8f * sc, b1.y + 1.1f * sc, std::max(1.0f, 1.1f * sc), 10, leaf);
+            }
         } else if (it.kind == 3) {                                        // yaya: bacak + govde + kol + bas
             const Ped& pd = peds[it.idx];
             const Proj f0 = P3(pd.x, pd.y, 0.0), f1 = P3(pd.x, pd.y, 1.75);
@@ -1119,7 +1303,7 @@ void WorldScreen::render(Renderer& r) {
     {   // oyuncu
         Renderer::CarLook L = lookOf(M.app.career.car());
         r.setCarLook(L);
-        const Mat4 pm = matMul(matTranslate((float)X, 0.0f, (float)-Y), matRotY((float)sim.heading()));
+        const Mat4 pm = matMul(matTranslate((float)X, (float)M.curbH, (float)-Y), matRotY((float)sim.heading()));
         r.drawCar(M.carId, 0, 0, W, H, proj, view, pm, (float)M.spin, (float)M.steer);
     }
     r.endWorldDepth();
@@ -1182,6 +1366,15 @@ void WorldScreen::render(Renderer& r) {
             M.buyBtn = {M.poiBtn.x0, M.poiBtn.y0 - 36, M.poiBtn.x1, M.poiBtn.y0 - 4};
             button(r, M.buyBtn, "MARKET: RADAR DEDEKTORU $1,500", {0.25f, 0.3f, 0.5f}, 1);
         } else M.buyBtn = {0, 0, 0, 0};
+    }
+    if (M.clapT >= 0.0) {                                                 // alkis: iki el carpar, kalabalik yazisi
+        const float k = (float)std::min(1.0, std::min(M.clapT / 0.2, (3.5 - M.clapT) / 0.5));
+        const float cxh = W * 0.5f, cyh = H * 0.5f - 40, gap = 6.0f + 22.0f * (float)std::fabs(std::sin(M.clapT * 9.0));
+        const Color skin{0.95f, 0.78f, 0.6f, k};
+        r.rect(cxh - gap - 26, cyh - 34, cxh - gap, cyh + 30, skin); r.rect(cxh + gap, cyh - 34, cxh + gap + 26, cyh + 30, skin);
+        for (int f = 0; f < 4; ++f) { r.rect(cxh - gap - 26 + f * 6.5f, cyh - 46, cxh - gap - 21 + f * 6.5f, cyh - 34, skin); r.rect(cxh + gap + f * 6.5f, cyh - 46, cxh + gap + 5 + f * 6.5f, cyh - 34, skin); }
+        if (gap < 10.0f) r.textCentered(cxh, cyh - 70, "* SAK *", 2, {1.0f, 1.0f, 1.0f, k});
+        r.textCentered(cxh, cyh + 42, "ALKIS! ALKIS! ALKIS!", 2, {1.0f, 0.85f, 0.2f, k});
     }
     if (M.msgT > 0) { r.rect(0, H * 0.3f, W, H * 0.3f + 26, {0.02f, 0.02f, 0.04f, 0.75f}); r.textCentered(W / 2.0f, H * 0.3f + 7, M.msg, 2, kUiGold); }
     M.cockpit.render(r, g, P.grinding());

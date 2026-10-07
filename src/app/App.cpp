@@ -307,14 +307,34 @@ void App::pointerMove(int id, float px, float py) {
     screen_->pointerMove(id, x, y);
 }
 void App::pointerUp(int id) { screen_->pointerUp(id); }
+bool App::gate(int dir) {
+    if (!hint_.empty() || confirmBack_) return false;
+    const int type = screen_->shifter();
+    auto tap = [&](Key k) { screen_->key(k, true); screen_->key(k, false); };
+    if (type == 2) {                                              // otomatik / sirali: duz yukari-asagi
+        if (dir == 0) { tap(Key::ShiftUp); return true; }
+        if (dir == 1) { tap(Key::ShiftDown); return true; }
+        return false;
+    }
+    if (type != 1) return false;
+    const int g = screen_->shifterGear();
+    if (g != 0) {                                                 // vitesteyken: yalniz ters yone itis bosa alir
+        const bool top = g > 0 && (g % 2) == 1;
+        if ((top && dir == 1) || (!top && dir == 0)) { tap(Key::Gear0); gateCol_ = 1; }   // bos: kol orta kanala yaylanir
+        return true;
+    }
+    if (dir == 2) { gateCol_ = std::max(-1, gateCol_ - 1); return true; }
+    if (dir == 3) { gateCol_ = std::min(2, gateCol_ + 1); return true; }
+    if (gateCol_ < 0) { tap(Key::GearR); return true; }           // R kanali: yukari ya da asagi
+    tap((Key)((int)Key::Gear0 + gateCol_ * 2 + (dir == 0 ? 1 : 2)));
+    return true;
+}
 void App::padStick(float x, float y) {
-    static int slot = -1;                                    // son yuva (tekrar gonderilmez)
-    if (std::fabs(y) < 0.6f) { if (std::fabs(y) < 0.3f) slot = -1; return; }   // kanalda degil: secim yok
-    const int col = x < -0.35f ? 0 : x > 0.35f ? 2 : 1;
-    const int g = col * 2 + (y < 0 ? 1 : 2);
-    if (g == slot) return;
-    slot = g;
-    key((Key)((int)Key::Gear0 + g), true); key((Key)((int)Key::Gear0 + g), false);
+    const float ax = std::fabs(x), ay = std::fabs(y), m = std::max(ax, ay);
+    if (m < 0.3f) { stickDir_ = -1; return; }                     // merkeze dondu: yeni itis beklenir
+    if (m < 0.65f || stickDir_ >= 0) return;
+    stickDir_ = ay >= ax ? (y < 0 ? 0 : 1) : (x < 0 ? 2 : 3);
+    gate(stickDir_);
 }
 void App::key(Key k, bool down) {
     if (!hint_.empty()) { if (down && (k == Key::Enter || k == Key::Back)) hint_.clear(); return; }
@@ -394,9 +414,10 @@ void App::renderAudio(float* out, int frames) {
     // Efektler: vites "tok"u (85 Hz sonumlu govde + 3 ms metal tik), nitro tislamasi (yuksek geciren gurultu),
     // yagmur (alcak geciren gurultu + seyrek damla tiklari)
     if (clunk_.exchange(0) > 0) clunkT_ = 0.0f;
+    if (applause_.exchange(0) > 0) clapT_ = 0.0f;
     const bool nosOn = nos_.load(), rainOn = rain_.load();
     const float sirenTarget = siren_.load();
-    if (clunkT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn || sirenTarget > 0.0f || sirenLv_ > 1e-4f) {
+    if (clunkT_ >= 0.0f || clapT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn || sirenTarget > 0.0f || sirenLv_ > 1e-4f) {
         const float dt = 1.0f / kSampleRate;
         const float aN = 1.0f - std::exp(-6.2831853f * 2500.0f * dt), aR = 1.0f - std::exp(-6.2831853f * 1100.0f * dt);
         for (int i = 0; i < frames; ++i) {
@@ -420,6 +441,15 @@ void App::renderAudio(float* out, int frames) {
                     o += 0.05f * std::sin(6.2831853f * dripF_ * dripT_) * std::exp(-dripT_ / 0.012f) * tireVol;
                     dripT_ += dt; if (dripT_ > 0.06f) dripT_ = -1.0f;
                 }
+            }
+            if (clapT_ >= 0.0f) {                                        // alkis: ~180 el/s rastgele carpma, 1-3 kHz bant gurultu
+                const float lv = std::min(1.0f, clapT_ / 0.25f) * std::clamp((3.5f - clapT_) / 1.2f, 0.0f, 1.0f);
+                if ((fxRng_ & 0xFFFF) < 65536u * 180u / kSampleRate) clapEnv_ = std::max(clapEnv_, 0.5f + 0.5f * (float)((fxRng_ >> 16) & 255) / 255.0f);
+                clapEnv_ *= 0.9965f;                                     // ~6 ms sonum
+                clapHp_ = n - clapPrev_; clapPrev_ = n;                  // yuksek geciren
+                clapLp_ += 0.45f * (clapHp_ - clapLp_);                  // ~4 kHz ustu kirpilir
+                o += 0.55f * lv * clapEnv_ * clapLp_ * tireVol + 0.04f * lv * n * tireVol;   // carpmalar + kalabalik ugultusu
+                clapT_ += dt; if (clapT_ > 3.5f) clapT_ = -1.0f;
             }
             sirenLv_ += (sirenTarget - sirenLv_) * 0.0005f;              // siren: "wail" 650-1350 Hz, 0.35 Hz tarama
             if (sirenLv_ > 1e-4f) {

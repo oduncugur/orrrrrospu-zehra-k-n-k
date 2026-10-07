@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
         static const struct { const char* n; Key k; } names[] = {
             {"Throttle", Key::Throttle}, {"Brake", Key::Brake}, {"Clutch", Key::Clutch}, {"ShiftUp", Key::ShiftUp},
             {"ShiftDown", Key::ShiftDown}, {"Gear0", Key::Gear0}, {"Gear1", Key::Gear1}, {"Gear2", Key::Gear2},
-            {"Gear3", Key::Gear3}, {"Gear4", Key::Gear4}, {"Gear5", Key::Gear5}, {"Gear6", Key::Gear6}, {"Enter", Key::Enter}, {"Left", Key::Left}, {"Right", Key::Right},
+            {"Gear3", Key::Gear3}, {"Gear4", Key::Gear4}, {"Gear5", Key::Gear5}, {"Gear6", Key::Gear6}, {"GearR", Key::GearR}, {"Enter", Key::Enter}, {"Left", Key::Left}, {"Right", Key::Right},
             {"Settings", Key::Settings}, {"Back", Key::Back}, {"PageUp", Key::PageUp}, {"PageDown", Key::PageDown}};
         std::string all = ks;
         size_t pos = 0;
@@ -177,6 +177,7 @@ int main(int argc, char** argv) {
     bool padThr = false, padBrk = false, padL = false, padR = false;
     auto padAxis = [&](bool& st, bool now, Key k) { if (now != st) { st = now; game.key(k, now); } };
     float padT = 0.0f, padB = 0.0f, padRX = 0.0f, padRY = 0.0f;
+    bool padGate[4] = {}, arrowGate[4] = {};   // yon tusu vites kolunca kullanildi (birakma da yutulur)
     while (!quit) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -203,6 +204,13 @@ int main(int argc, char** argv) {
                     if (down) { game.settings.fullscreen = !game.settings.fullscreen; game.saveSettings(); }
                     break;
                 }
+                {   // ok tuslari: kolu olan ekranda kapili vites (basildiginda bir itis); kullanilmazsa eski anlam
+                    const int gd = k == SDLK_UP ? 0 : k == SDLK_DOWN ? 1 : k == SDLK_LEFT ? 2 : k == SDLK_RIGHT ? 3 : -1;
+                    if (gd >= 0) {
+                        if (down && !e.key.repeat) arrowGate[gd] = game.gate(gd);
+                        if (arrowGate[gd]) { if (!down) arrowGate[gd] = false; break; }
+                    }
+                }
                 struct Map { SDL_Keycode sdl; Key key; };
                 static const Map map[] = {
                     {SDLK_W, Key::Throttle}, {SDLK_UP, Key::Throttle}, {SDLK_S, Key::Brake}, {SDLK_DOWN, Key::Brake},
@@ -228,10 +236,17 @@ int main(int argc, char** argv) {
                 case SDL_GAMEPAD_BUTTON_RIGHT_STICK: game.key(Key::GearR, down); break;          // sag analoga basma: geri vites
                 case SDL_GAMEPAD_BUTTON_START: game.key(Key::Enter, down); break;
                 case SDL_GAMEPAD_BUTTON_BACK: game.key(Key::Settings, down); break;
-                case SDL_GAMEPAD_BUTTON_DPAD_LEFT: game.key(Key::Left, down); break;
-                case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: game.key(Key::Right, down); break;
-                case SDL_GAMEPAD_BUTTON_DPAD_UP: game.key(Key::PageUp, down); break;
-                case SDL_GAMEPAD_BUTTON_DPAD_DOWN: game.key(Key::PageDown, down); break;
+                // Yon tuslari: kolu olan ekranda kapili vites, digerlerinde menu (sol / sag / sayfa)
+                case SDL_GAMEPAD_BUTTON_DPAD_UP: case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+                case SDL_GAMEPAD_BUTTON_DPAD_LEFT: case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: {
+                    const int b = e.gbutton.button;
+                    const int gd = b == SDL_GAMEPAD_BUTTON_DPAD_UP ? 0 : b == SDL_GAMEPAD_BUTTON_DPAD_DOWN ? 1 : b == SDL_GAMEPAD_BUTTON_DPAD_LEFT ? 2 : 3;
+                    if (down) padGate[gd] = game.gate(gd);
+                    if (padGate[gd]) { if (!down) padGate[gd] = false; break; }
+                    static const Key fb[4] = {Key::PageUp, Key::PageDown, Key::Left, Key::Right};
+                    game.key(fb[gd], down);
+                    break;
+                }
                 default: break;
                 }
                 break;

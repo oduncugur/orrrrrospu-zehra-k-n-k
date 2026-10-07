@@ -188,8 +188,9 @@ void World::build() {
             for (double v = -hV; v <= hV; v += bsp) {
                 const int key = c * 900001 + (int)((u + half) / bsp) * 997 + (int)((v + half) / bsp);
                 const double bu = u + (hashW(key) - 0.5) * bsp * 0.3, bv = v + (hashW(key * 3) - 0.5) * bsp * 0.3;
-                if (!land(bu, bv) || hashW(key * 7) < (style >= 6 && style <= 7 ? 0.45 : 0.18)) continue;
-                double best = 1e9, dirU = 1, dirV = 0, bw = 4;
+                if (!land(bu, bv)) continue;
+                const bool park = hashW(key * 7) < (style >= 6 && style <= 7 ? 0.45 : 0.18);   // bos arsa: agaclik / park
+                double best = 1e9, dirU = 1, dirV = 0, bw = 4, nu = bu, nv = bv;
                 const int h0 = hk(bu, bv);
                 for (int di = -1; di <= 1; ++di) for (int dj = -1; dj <= 1; ++dj) {
                     const int h = h0 + di * nh + dj;
@@ -199,17 +200,28 @@ void World::build() {
                         const double ex2 = sg[2] - sg[0], ey2 = sg[3] - sg[1], L2 = ex2 * ex2 + ey2 * ey2;
                         const double t = L2 > 0 ? std::clamp(((bu - sg[0]) * ex2 + (bv - sg[1]) * ey2) / L2, 0.0, 1.0) : 0.0;
                         const double d = std::hypot(bu - sg[0] - ex2 * t, bv - sg[1] - ey2 * t) - sg[4];
-                        if (d < best) { best = d; const double l = std::sqrt(L2) + 1e-9; dirU = ex2 / l; dirV = ey2 / l; bw = sg[4]; }
+                        if (d < best) { best = d; const double l = std::sqrt(L2) + 1e-9; dirU = ex2 / l; dirV = ey2 / l; bw = sg[4]; nu = sg[0] + ex2 * t; nv = sg[1] + ey2 * t; }
                     }
                 }
                 (void)bw;
                 const double hs = (style >= 6 && style <= 7 ? 7.0 : 9.0) + 7.0 * hashW(key * 11), hd = (style >= 6 && style <= 7 ? 6.0 : 8.0) + 6.0 * hashW(key * 13);
+                if (park) {                                               // agac kumesi (yola en az 6 m)
+                    if (best < 10.0 || best > 95.0) continue;
+                    const int nt = 4 + (int)(hashW(key * 29) * 5);
+                    for (int k = 0; k < nt; ++k) {
+                        const double a = hashW(key * 31 + k) * 6.2832, rr = 3.0 + std::min(best - 6.0, 16.0) * hashW(key * 37 + k);
+                        const auto q = P(bu + rr * std::cos(a), bv + rr * std::sin(a));
+                        trees.push_back({q.first, q.second, (float)hashW(key * 41 + k), c});
+                    }
+                    continue;
+                }
                 if (best < hd + 7.0 || best > 95.0) continue;
                 const double wx = dirU * dx + dirV * px, wy = dirU * dy + dirV * py;   // sokak yonu (dunya)
                 const auto q = P(bu, bv);
                 const double centre = std::max(0.0, 1.0 - std::hypot(bu / hU, bv / hV) / 1.2);
                 const double ht = 6.0 + (kTall[style] * centre * centre + 6.0) * (0.35 + 0.65 * hashW(key * 17));
-                buildings.push_back({q.first, q.second, hs, hd, wx, wy, ht, c, (float)hashW(key * 19)});
+                const double side = (nu - bu) * -dirV + (nv - bv) * dirU;   // yol, binanin yerel v ekseninde hangi yonde
+                buildings.push_back({q.first, q.second, hs, hd, wx, wy, ht, c, (float)hashW(key * 19), best - hd, side >= 0 ? 1.0f : -1.0f});
             }
         // Ozel noktalar: 2 bulusma, 6 benzinlik, 1 hurdalik (sokak kenarinda, karada)
         std::vector<int> streets;
