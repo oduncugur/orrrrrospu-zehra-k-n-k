@@ -11,6 +11,7 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 
 #include "BodyShapes.inc"
+#include "SideTables.inc"
 
 double smooth(double t) { t = std::clamp(t, 0.0, 1.0); return t * t * (3 - 2 * t); }
 
@@ -48,8 +49,11 @@ const CarProfile* profileFor(int id) {
 // Yan profil: x orani (on 0 .. arka 1) -> bel (kaput/bagaj/kapi ust kenari) ve tavan yuksekligi (H orani)
 struct Profile {
     ArchSpec a;
+    const SideTab* tab = nullptr;   // olculu yan cizgi (varsa parametrik egrinin yerine)
+    double tabH = 1.0;              // tablonun tavan yuksekligi (z / tabH = H orani)
     // Bel: kabin boyunca %18 yukari (cam / tavan bolgesi govdeye gore cok uzundu); uclarda yumusak gecis
     double belt(double s) const {
+        if (tab) return (cabin(s) ? tabLerp(tab->belt, 10, s) : tabLerp(tab->top, 24, s)) / tabH;
         const double b = beltRaw(s);
         if (a.open) return b;
         const double w = smooth((s - a.cowlX) / 0.06) * smooth((a.backX - s) / 0.06);
@@ -66,6 +70,7 @@ struct Profile {
     bool cabin(double s) const { return !a.open && s >= a.cowlX - 1e-9 && s <= a.backX + 1e-9; }
     double roof(double s) const {
         if (!cabin(s)) return belt(s);
+        if (tab) return std::max(tabLerp(tab->top, 24, s) / tabH, belt(s));
         const double b = belt(s);
         const double edge = 0.988;                                // tavan on / arka kenari (kubbe ortada 1.0)
         if (s < a.roofFX) {                                       // on cam: hafif kavis, tavan kenarinda biter (tavani asmaz)
@@ -179,6 +184,9 @@ static void addInterior(Builder& B, double xDash, double xBack, double hw, doubl
     const double len = xDash - xBack;
     if (len < 0.9 || hw < 0.3 || zR - zF < 0.45) return;
     B.panel(xDash, hw, zF, xBack, hw, zF, xBack, -hw, zF, xDash, -hw, zF, MatDark);                     // taban
+    for (double sg : {1.0, -1.0})                                                                       // kapi dosemeleri (yan camdan
+        B.panel(xDash, sg * (hw + 0.03), zF, xBack, sg * (hw + 0.03), zF,                              //  karsi kapinin boyali ici gorunmez)
+                xBack, sg * (hw + 0.03), zB - 0.01, xDash, sg * (hw + 0.03), zB - 0.01, MatTrim);
     B.box(xDash - 0.30, xDash, -hw, hw, zB - 0.24, zB + 0.02, MatDark);                                 // torpido
     B.box(xDash - 0.34, xDash - 0.20, hw * 0.5 - 0.20, hw * 0.5 + 0.20, zB + 0.02, zB + 0.08, MatDark);  // gosterge kabi
     const double xw = xDash - 0.48, yw = hw * 0.5, zw = zB - 0.02;                                       // direksiyon simidi
@@ -214,6 +222,13 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const CarProfile* cp = profileFor(v.id);
     Profile P{cp && cp->a.noseZ >= 0 ? cp->a : kArch[sh.arch]};
     if (cp && cp->a.noseZ >= 0) { P.a.open = kArch[sh.arch].open; P.a.bed = kArch[sh.arch].bed; }
+    if (const SideTab* st = sideTabFor(v.id)) {                                 // olculu yan cizgi: anahtar noktalar tablodan
+        P.tab = st;
+        for (int i = 0; i < 24; ++i) P.tabH = std::max(P.tabH, st->top[i][1]);
+        P.a.cowlX = st->cowl; P.a.roofFX = st->roofF; P.a.roofRX = st->roofR; P.a.backX = st->back;
+        P.a.noseZ = tabLerp(st->top, 24, 0.02) / P.tabH; P.a.tailZ = tabLerp(st->top, 24, 0.98) / P.tabH;
+        P.a.hoodZ = tabLerp(st->top, 24, st->cowl) / P.tabH; P.a.deckZ = tabLerp(st->top, 24, std::min(0.97, st->back + 0.05)) / P.tabH;
+    }
     const ArchSpec& A = P.a;
     const double L = v.lengthM, W = v.widthM * (v.widebody ? 1.04 : 1.0), H = v.heightM;
     const double ride = v.rideHeightM;
@@ -235,6 +250,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const int NS = 80;
     for (int i = 0; i <= NS; ++i) ss.push_back(0.5 - 0.5 * std::cos(kPi * i / NS));
     for (double k : {A.cowlX, A.roofFX, A.roofRX, A.backX, sFront, sRear}) ss.push_back(std::clamp(k, 0.0, 1.0));
+    if (P.tab) for (int i = 0; i < 24 && (i == 0 || P.tab->top[i][0] > P.tab->top[i - 1][0]); ++i) ss.push_back(P.tab->top[i][0]);   // tablo koseleri keskin
     if (!A.open) {                                                                // direk kenarlari (direk yuzeyde keskin dursun)
         const double sB = A.roofFX + (A.roofRX - A.roofFX) * (sh.doors == 4 ? 0.48 : 0.86), sC = A.roofRX - 0.01;
         for (double d : {-0.05, 0.05}) { ss.push_back(sB + d / L); if (sh.doors == 4) ss.push_back(sC + 1.6 * d / L); }
@@ -265,6 +281,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     // Yan profil yuvarlatma: kaput on kenari ve kuyruk ust kenari asagi kivrilir
     auto topZ = [&](double s) {
         double z = H * P.belt(s);
+        if (P.tab) return z;                                                      // olculu cizgi: uc yuvarlatmasi tabloda
         if (s < 0.035) z -= H * 0.05 * (1.0 - smooth(s / 0.035));
         if (s > 0.975) z -= H * 0.04 * smooth((s - 0.975) / 0.025);
         return z;
@@ -345,7 +362,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const bool cab = P.cabin(s0) && P.cabin(s1) && P.roof(sm) * H > topZ(sm) + 0.02 * H;
         const bool steep = cab && P.steep(s0, s1, L, H);
         const double rearLen = A.backX - A.roofRX;
-        const double sideEnd = cp && cp->sideEnd > 0 ? cp->sideEnd
+        const double sideEnd = P.tab && P.tab->sideEnd > 0 ? P.tab->sideEnd : cp && cp->sideEnd > 0 ? cp->sideEnd
                              : rearLen > 0.15 ? A.roofRX + 0.30 * rearLen : A.backX;      // fastback: C direk yelkeni
         const bool sideGlass = cab && sm <= sideEnd;
         const double bm = P.belt(sm), rm = P.roof(sm);
@@ -473,7 +490,8 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         switch (sh.grille) {
         case G_0: break;
         case G_1: B.box(xf - 0.01, xf + 0.012, -hwF * 0.32, hwF * 0.32, lampZ - 0.025, lampZ + 0.02, MatDark); break;
-        case G_2: B.box(xf - 0.01, xf + 0.012, -lampY + 0.12, lampY - 0.12, gz0, gz1, MatDark); break;
+        case G_2: B.box(xf - 0.01, xf + 0.012, -lampY + 0.12, lampY - 0.12, std::max(gz0, lampZ - 0.085), std::min(gz1, lampZ + 0.055), MatDark);   // far hizasinda
+                  B.box(xf - 0.008, xf + 0.016, -lampY + 0.12, lampY - 0.12, lampZ - 0.016, lampZ - 0.008, MatChrome); break;
         case G_3: B.box(xf - 0.01, xf + 0.015, -lampY + 0.08, lampY - 0.08, gz0 - 0.06, gz1, MatDark);
                   B.box(xf + 0.01, xf + 0.02, -lampY + 0.08, lampY - 0.08, (gz0 + gz1) * 0.5 - 0.01, (gz0 + gz1) * 0.5 + 0.01, MatChrome); break;
         case G_4: for (double sg : {-1.0, 1.0}) B.box(xf - 0.01, xf + 0.014, sg * 0.03, sg * 0.16, gz0 + 0.01, gz1, MatDark);
