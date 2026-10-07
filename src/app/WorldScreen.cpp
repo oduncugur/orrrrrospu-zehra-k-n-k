@@ -104,8 +104,28 @@ struct WorldScreen::Impl {
     std::string msg; double msgT = 0;
     int city = -2;
     // Trafik
-    struct T { WorldLeg leg; double s, v, v0; int lane, carId, role, uid; double prevRel; };
+    // bx/by/bh/bl: kavsak donusu (onceki yolun sonundaki poz -> yeni yolda bl metreye Bezier egrisi; isinlanma yok)
+    struct T { WorldLeg leg; double s, v, v0; int lane, carId, role, uid; double prevRel; double bx = 0, by = 0, bh = 0, bl = 0; };
     std::vector<T> traffic; int nextUid = 1; uint32_t rng = 0x9E3779B9u;
+    void lanePose(const T& t, double s, double& x, double& y, double& h) const {
+        const RoadPath& tp = w.path(t.leg);
+        const RoadPoint q = tp.at(s);
+        const double lo = tp.laneOffset(s, false, t.lane);
+        x = q.x - lo * std::sin(q.heading); y = q.y + lo * std::cos(q.heading); h = q.heading;
+    }
+    void tPose(const T& t, double& x, double& y, double& h) const {
+        if (t.bl <= 0.0 || t.s >= t.bl) { lanePose(t, t.s, x, y, h); return; }
+        double x2, y2, h2; lanePose(t, t.bl, x2, y2, h2);
+        const double k = 0.45 * std::hypot(x2 - t.bx, y2 - t.by);       // kontrol noktalari: giris / cikis yonunde
+        const double c1x = t.bx + k * std::cos(t.bh), c1y = t.by + k * std::sin(t.bh);
+        const double c2x = x2 - k * std::cos(h2), c2y = y2 - k * std::sin(h2);
+        const double u = std::max(0.0, t.s) / t.bl, m = 1.0 - u;
+        x = m * m * m * t.bx + 3 * m * m * u * c1x + 3 * m * u * u * c2x + u * u * u * x2;
+        y = m * m * m * t.by + 3 * m * m * u * c1y + 3 * m * u * u * c2y + u * u * u * y2;
+        const double dx = 3 * m * m * (c1x - t.bx) + 6 * m * u * (c2x - c1x) + 3 * u * u * (x2 - c2x);
+        const double dy = 3 * m * m * (c1y - t.by) + 6 * m * u * (c2y - c1y) + 3 * u * u * (y2 - c2y);
+        h = (std::fabs(dx) + std::fabs(dy) > 1e-6) ? std::atan2(dy, dx) : h2;
+    }
     double rnd() { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return (rng & 0xFFFFFF) / double(0x1000000); }
     // Harita / rota / otonom
     bool mapOpen = false; double mapCx = 0, mapCy = 0, mapScale = 30.0;   // m / piksel
@@ -548,13 +568,18 @@ void WorldScreen::update(double dt) {
             if (t.s > tp.length()) {
                 const auto ex = M.w.exits(t.leg);
                 if (ex.empty()) { t.s = tp.length(); t.v = 0; }
-                else { t.s -= tp.length(); t.leg = ex[(size_t)(M.rnd() * ex.size()) % ex.size()]; t.lane = std::min(t.lane, M.w.path(t.leg).lanesFwd(0.0) - 1); }
+                else {
+                    double ox, oy, oh; M.tPose(t, ox, oy, oh);                  // eski yolun sonundaki gercek poz
+                    t.s -= tp.length(); t.leg = ex[(size_t)(M.rnd() * ex.size()) % ex.size()]; t.lane = std::min(t.lane, M.w.path(t.leg).lanesFwd(0.0) - 1);
+                    double nx, ny, nh; M.lanePose(t, 0.0, nx, ny, nh);
+                    const double turn = std::fabs(std::remainder(nh - oh, 6.283185307179586));
+                    t.bx = ox; t.by = oy; t.bh = oh;
+                    t.bl = std::min(M.w.path(t.leg).length() * 0.6, std::clamp(6.0 + 14.0 * turn + 1.5 * std::hypot(nx - ox, ny - oy), 6.0, 30.0));
+                }
             }
             // Carpisma (oyuncu)
-            const RoadPath& tq = M.w.path(t.leg);
-            const RoadPoint q = tq.at(t.s);
-            const double lo = tq.laneOffset(t.s, false, t.lane);
-            const double tx = q.x - lo * std::sin(q.heading), ty = q.y + lo * std::cos(q.heading);
+            double tx, ty, th; M.tPose(t, tx, ty, th);
+            struct { double heading; } q{th};
             if (std::fabs(tx - sim.posX()) < 9 && std::fabs(ty - sim.posY()) < 9) {
                 double rel = 0;
                 const double nv = RoadSession::contact(P, tx, ty, q.heading, t.v, 1400.0, 2.2, 0.9, rel);
@@ -1049,10 +1074,8 @@ void WorldScreen::render(Renderer& r) {
     struct Obj { double d; int id; Mat4 model; int role; float spin; };
     std::vector<Obj> objs;
     for (const auto& t : M.traffic) {
-        const RoadPath& tp = w.path(t.leg);
-        const RoadPoint q = tp.at(t.s);
-        const double lo = tp.laneOffset(t.s, false, t.lane);
-        const double x = q.x - lo * std::sin(q.heading), y = q.y + lo * std::cos(q.heading);
+        double x, y, th; M.tPose(t, x, y, th);
+        struct { double heading; } q{th};
         if (!front(x, y, 700.0)) continue;
         objs.push_back({std::hypot(x - ex, y - ey), t.carId, matMul(matTranslate((float)x, 0.0f, (float)-y), matRotY((float)q.heading)), t.role, (float)(M.envT * t.v / 0.31)});
     }
