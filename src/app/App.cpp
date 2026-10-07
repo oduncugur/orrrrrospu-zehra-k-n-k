@@ -415,9 +415,10 @@ void App::renderAudio(float* out, int frames) {
     // yagmur (alcak geciren gurultu + seyrek damla tiklari)
     if (clunk_.exchange(0) > 0) clunkT_ = 0.0f;
     if (applause_.exchange(0) > 0) clapT_ = 0.0f;
+    if (horn_.exchange(0) > 0) { hornT_ = 0.0f; hornV_ = hornVol_.load(); }
     const bool nosOn = nos_.load(), rainOn = rain_.load();
     const float sirenTarget = siren_.load();
-    if (clunkT_ >= 0.0f || clapT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn || sirenTarget > 0.0f || sirenLv_ > 1e-4f) {
+    if (clunkT_ >= 0.0f || clapT_ >= 0.0f || hornT_ >= 0.0f || nosOn || nosEnv_ > 1e-4f || rainOn || sirenTarget > 0.0f || sirenLv_ > 1e-4f) {
         const float dt = 1.0f / kSampleRate;
         const float aN = 1.0f - std::exp(-6.2831853f * 2500.0f * dt), aR = 1.0f - std::exp(-6.2831853f * 1100.0f * dt);
         for (int i = 0; i < frames; ++i) {
@@ -441,6 +442,15 @@ void App::renderAudio(float* out, int frames) {
                     o += 0.05f * std::sin(6.2831853f * dripF_ * dripT_) * std::exp(-dripT_ / 0.012f) * tireVol;
                     dripT_ += dt; if (dripT_ > 0.06f) dripT_ = -1.0f;
                 }
+            }
+            if (hornT_ >= 0.0f) {                                        // korna: 415 + 520 Hz kare dalga (yumusatilmis), 0.5 s
+                hornPh1_ += 415.0f * dt; hornPh2_ += 520.0f * dt;
+                hornPh1_ -= std::floor(hornPh1_); hornPh2_ -= std::floor(hornPh2_);
+                const float sq = (hornPh1_ < 0.5f ? 1.0f : -1.0f) + (hornPh2_ < 0.5f ? 1.0f : -1.0f);
+                hornLp_ += 0.25f * (sq - hornLp_);
+                const float env = std::min(1.0f, hornT_ / 0.02f) * std::clamp((0.5f - hornT_) / 0.05f, 0.0f, 1.0f);
+                o += 0.09f * hornV_ * env * hornLp_ * tireVol;
+                hornT_ += dt; if (hornT_ > 0.5f) hornT_ = -1.0f;
             }
             if (clapT_ >= 0.0f) {                                        // alkis: ~180 el/s rastgele carpma, 1-3 kHz bant gurultu
                 const float lv = std::min(1.0f, clapT_ / 0.25f) * std::clamp((3.5f - clapT_) / 1.2f, 0.0f, 1.0f);

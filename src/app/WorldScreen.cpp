@@ -161,7 +161,7 @@ struct WorldScreen::Impl {
     int city = -2;
     // Trafik
     // bx/by/bh/bl: kavsak donusu (onceki yolun sonundaki poz -> yeni yolda bl metreye Bezier egrisi; isinlanma yok)
-    struct T { WorldLeg leg; double s, v, v0; int lane, carId, role, uid; double prevRel; double bx = 0, by = 0, bh = 0, bl = 0; };
+    struct T { WorldLeg leg; double s, v, v0; int lane, carId, role, uid; double prevRel; double bx = 0, by = 0, bh = 0, bl = 0; double honkT = 0; };
     std::vector<T> traffic; int nextUid = 1; uint32_t rng = 0x9E3779B9u;
     void lanePose(const T& t, double s, double& x, double& y, double& h) const {
         const RoadPath& tp = w.path(t.leg);
@@ -205,6 +205,10 @@ struct WorldScreen::Impl {
 
     Impl(App& a) : app(a) {}
     void flash(const std::string& m, double t = 1.8) { msg = m; msgT = t; }
+    double clock() const {                                                // oyun saati (0-24)
+        static const double start = std::getenv("ZK_HOUR") ? std::atof(std::getenv("ZK_HOUR")) : 14.0;
+        return std::fmod(start + envT / 60.0, 24.0);
+    }
     const RoadPath& path() const { return w.path(leg); }
     double speedLimit() const { return city >= 0 ? 50.0 / 3.6 : 110.0 / 3.6; }
     double fuelPrice() const { return w.fuelPriceAt(city >= 0 ? city : app.career.city, app.career.marketWeek() < 0 ? 0 : app.career.marketWeek()); }
@@ -679,7 +683,12 @@ void WorldScreen::update(double dt) {
                         if (lon < 1.5 || lon > look || std::fabs(lat) > 2.3) continue;
                         const double along = b.v * std::cos(b.h - a.h);        // onumdekinin benim yonumdeki hizi
                         const double free = lon + (tp2 > 0 ? a.v * tp2 : 0.0) - 7.0;
-                        brakeTo = std::min(brakeTo, std::max(0.0, std::max(0.0, along) + free * 0.45));
+                        const double bt = std::max(0.0, std::max(0.0, along) + free * 0.45);
+                        brakeTo = std::min(brakeTo, bt);
+                        if (j + 1 == poses.size() && bt < a.v - 4.0 && t.honkT <= 0.0 && lon < 25.0) {   // oyuncu onunu kesti: korna
+                            t.honkT = 6.0;
+                            app.horn((float)std::clamp(1.0 - std::hypot(bx, by) / 60.0, 0.15, 1.0));
+                        }
                     }
                 }
             }
@@ -699,6 +708,7 @@ void WorldScreen::update(double dt) {
                 }
             }
             const double tg = nearEnd ? std::min(want, 7.0) : want;
+            t.honkT -= dt;
             const double tg2 = std::min(tg, brakeTo);
             t.v += std::clamp(tg2 - t.v, (brakeTo < t.v - 3.0 ? -9.0 : -6.0) * dt, 1.6 * dt);   // engelde sert fren
             t.v = std::max(0.0, t.v);
@@ -781,13 +791,26 @@ void WorldScreen::render(Renderer& r) {
     double fx = tx - ex, fy = ty - ey; { const double l = std::hypot(fx, fy); fx /= l; fy /= l; }
     const Proj hz = P3(ex + 3000 * fx, ey + 3000 * fy, 0);
     const float horizon = hz.ok ? std::clamp(hz.y, 0.0f, (float)H) : H * 0.4f;
-    const Color skyLow{0.85f, 0.72f, 0.58f}, fogCol{0.82f, 0.72f, 0.62f};
+    // Gun / gece dongusu: oyun saati 14:00'ten baslar, 1 gercek dakika = 1 oyun saati (24 dk'lik gun)
+    const double hour = M.clock();
+    const double el = std::sin((hour - 6.0) / 12.0 * 3.14159265);         // gunes yuksekligi (-1..1)
+    const float dayL = (float)(0.22 + 0.78 * std::clamp((el + 0.12) / 0.4, 0.0, 1.0));   // 0.22 gece .. 1 gunduz
+    const float dusk = (float)std::clamp(1.0 - std::fabs(el) / 0.25, 0.0, 1.0);          // gun dogumu / batimi kizilligi
+    const bool nightW = dayL < 0.5f;
+    auto lit = [&](Color c) {                                             // isik + gece mavisi + alacakaranlik turuncusu
+        return Color{c.r * dayL + 0.02f * (1 - dayL) + 0.10f * dusk * c.r, c.g * dayL + 0.03f * (1 - dayL) + 0.03f * dusk * c.g,
+                     c.b * dayL + 0.08f * (1 - dayL), c.a};
+    };
+    const Color skyLow = lit(Color{0.85f, 0.72f, 0.58f}), fogCol = lit(Color{0.82f, 0.72f, 0.62f});
     auto fog = [&](Color c, float wd) {
+        c = lit(c);
         const float f = std::clamp((wd - 80.0f) / 1300.0f, 0.0f, 0.85f);
         return Color{c.r + (fogCol.r - c.r) * f, c.g + (fogCol.g - c.g) * f, c.b + (fogCol.b - c.b) * f, c.a};
     };
-    r.rect(0, horizon, W, H, {0.36f, 0.55f, 0.28f});
-    r.gradientV(0, 0, W, horizon, {0.30f, 0.45f, 0.85f}, skyLow);
+    r.rect(0, horizon, W, H, lit({0.36f, 0.55f, 0.28f}));
+    r.gradientV(0, 0, W, horizon, lit({0.30f, 0.45f, 0.85f}), Color{skyLow.r + 0.25f * dusk, skyLow.g + 0.08f * dusk, skyLow.b, 1.0f});
+    if (nightW) for (int k = 0; k < 90; ++k)                               // yildizlar
+        r.rect(hashW(k * 3) * W, hashW(k * 7 + 1) * horizon * 0.85f, hashW(k * 3) * W + 1.3f, hashW(k * 7 + 1) * horizon * 0.85f + 1.3f, {0.9f, 0.9f, 1.0f, (0.5f - dayL) * 2.0f});
     {   // Ufuk: iki kat tepe / dag silueti (bakis yonune gore doner, sonsuz uzakta: ufuk asla bos kalmaz)
         const double yaw = std::atan2(fy, fx), hfov = std::atan(std::tan(fov * 0.5) * (double)W / H);
         auto ridge = [&](double a, double f1, double f2, double ph) {
@@ -795,7 +818,7 @@ void WorldScreen::render(Renderer& r) {
         };
         for (int layer = 0; layer < 2; ++layer) {
             const float hMax = layer == 0 ? H * 0.11f : H * 0.06f;
-            const Color c = layer == 0 ? Color{0.55f, 0.6f, 0.72f} : Color{0.42f, 0.52f, 0.42f};
+            const Color c = lit(layer == 0 ? Color{0.55f, 0.6f, 0.72f} : Color{0.42f, 0.52f, 0.42f});
             for (int x = 0; x < W; x += 4) {
                 const double a = yaw - ((x + 2.0) / W - 0.5) * 2.0 * hfov;
                 const float hh = (float)(hMax * ridge(a, layer ? 5.0 : 3.0, layer ? 11.0 : 7.0, layer * 2.3));
@@ -803,7 +826,7 @@ void WorldScreen::render(Renderer& r) {
             }
         }
     }
-    r.setSceneLight(1.0f, 1.0f);
+    r.setSceneLight(dayL, 0.35f + 0.65f * dayL);
     auto front = [&](double x, double y, double maxD) {                   // gorus konisinde mi (kamera onunde)
         const double dx = x - ex, dy = y - ey;
         const double along = dx * fx + dy * fy;
@@ -886,6 +909,12 @@ void WorldScreen::render(Renderer& r) {
                 }
             }
         }
+    }
+    if (nightW) {                                                         // farlar: onde 30 m'lik isik konisi (yerde)
+        const double hd = sim.heading(), cx2 = std::cos(hd), sy2 = std::sin(hd), px2 = -sy2, py2 = cx2;
+        const double X0 = X + cx2 * 2.2, Y0 = Y + sy2 * 2.2;
+        quadP(r, P3(X0 + px2 * 0.8, Y0 + py2 * 0.8, 0.03), P3(X0 + cx2 * 32 + px2 * 7, Y0 + sy2 * 32 + py2 * 7, 0.03),
+              P3(X0 + cx2 * 32 - px2 * 7, Y0 + sy2 * 32 - py2 * 7, 0.03), P3(X0 - px2 * 0.8, Y0 - py2 * 0.8, 0.03), {1.0f, 0.95f, 0.75f, 0.16f});
     }
     // Rota (yerde mavi cizgi)
     if (!M.route.empty())
@@ -1023,7 +1052,8 @@ void WorldScreen::render(Renderer& r) {
                 if (a0.ok && a0.w < 260.0f)                                  // kat pencere bantlari
                     for (double z = 3.0; z < b.h - 1.0; z += 3.4) {
                         const Proj w0 = P3(cx[k], cy[k], z), w1 = P3(cx[k2], cy[k2], z), w2 = P3(cx[k2], cy[k2], z + 1.3), w3 = P3(cx[k], cy[k], z + 1.3);
-                        quadP(r, w0, w1, w2, w3, fog({0.20f, 0.26f, 0.34f}, a0.w));
+                        const bool on = nightW && hashW(it.idx * 131 + (int)z * 7 + k) > 0.45f;   // gece: katlarin yarisi isikli
+                        quadP(r, w0, w1, w2, w3, on ? Color{0.95f, 0.8f, 0.45f} : fog({0.20f, 0.26f, 0.34f}, a0.w));
                     }
             }
             quadP(r, P3(cx[0], cy[0], b.h), P3(cx[1], cy[1], b.h), P3(cx[2], cy[2], b.h), P3(cx[3], cy[3], b.h), fog({base.r * 0.7f, base.g * 0.7f, base.b * 0.7f}, (float)it.d));
@@ -1131,7 +1161,11 @@ void WorldScreen::render(Renderer& r) {
                 r.setDepthW(b0.w); const float sc = pxPerM / b0.w;
                 r.rect(b0.x - 0.07f * sc, b1.y, b0.x + 0.07f * sc, b0.y, fog({0.32f, 0.34f, 0.36f}, b0.w));
                 r.rect(b1.x - 0.45f * sc, b1.y - 0.12f * sc, b1.x + 0.45f * sc, b1.y + 0.1f * sc, fog({0.25f, 0.26f, 0.28f}, b0.w));
-                r.rect(b1.x - 0.3f * sc, b1.y + 0.1f * sc, b1.x + 0.3f * sc, b1.y + 0.18f * sc, fog({1.0f, 0.92f, 0.65f}, b0.w));
+                r.rect(b1.x - 0.3f * sc, b1.y + 0.1f * sc, b1.x + 0.3f * sc, b1.y + 0.18f * sc, nightW ? Color{1.0f, 0.9f, 0.55f} : fog({1.0f, 0.92f, 0.65f}, b0.w));
+                if (nightW) {                                                // isik havuzu (yerde) + hale
+                    r.circle(b1.x, b1.y + 0.15f * sc, std::max(2.0f, 0.9f * sc), 12, {1.0f, 0.85f, 0.45f, 0.18f});
+                    r.circle(b0.x, b0.y, std::max(2.0f, 3.5f * sc), 16, {1.0f, 0.85f, 0.5f, 0.10f});
+                }
             } else {
                 const double hgt = 4.5 + 3.0 * pr.v;
                 const Proj b0 = P3(pr.x, pr.y, 0), b1 = P3(pr.x, pr.y, hgt);
@@ -1254,7 +1288,7 @@ void WorldScreen::render(Renderer& r) {
             }
             if (it.d < 600.0 && l.type != LmFairy && l.type != LmBalloon) {   // ad
                 const Proj t0 = P3(x, y, l.h + 6.0);
-                if (t0.ok) { r.setDepthW(t0.w); r.textCentered(t0.x, t0.y - 8, l.name, 1, {1.0f, 0.95f, 0.75f}); }
+                if (t0.ok && t0.y > 46.0f) { r.setDepthW(t0.w); r.textCentered(t0.x, t0.y - 8, l.name, 1, {1.0f, 0.95f, 0.75f}); }
             }
         } else {
             const WorldPoi& q = w.pois[it.idx];
@@ -1375,7 +1409,7 @@ void WorldScreen::render(Renderer& r) {
     r.text(122, 7, g == 0 ? "N" : std::to_string(g), 2, {1.0f, 0.62f, 0.05f});
     std::snprintf(b, sizeof b, "%s  YAKIT %.1f/%.0f L", M.city >= 0 ? w.cities[M.city].name.c_str() : "OTOBAN", sim.fuelLiters(), sim.tankLiters());
     r.text(150, 4, b, 1, sim.fuelLiters() < 5.0 ? Color{1.0f, 0.35f, 0.3f} : Color{0.75f, 0.85f, 1.0f});
-    std::snprintf(b, sizeof b, "SINIR %.0f  %s", M.speedLimit() * 3.6, money(M.app.career.money).c_str());
+    std::snprintf(b, sizeof b, "SINIR %.0f  %s  %02d:%02d", M.speedLimit() * 3.6, money(M.app.career.money).c_str(), (int)M.clock(), (int)(std::fmod(M.clock(), 1.0) * 60.0));
     r.text(150, 16, b, 1, {0.8f, 0.8f, 0.85f});
     {   // kadran: satin alinan (yoksa temel analog); yatayda alt orta, dikeyde pedallarin ustu
         GaugeData gd;

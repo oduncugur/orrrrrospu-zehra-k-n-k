@@ -175,6 +175,7 @@ public:
     void rainSound(bool on) { rain_ = on; }                       // yagmur ambiyansi (ekran degisince kapanir)
     void siren(float level) { siren_ = level; }                   // polis sireni 0..1 (mesafeyle; ekran degisince 0)
     void applause() { applause_.fetch_add(1); }                   // kalabalik alkisi (~3.5 s)
+    void horn(float vol) { hornVol_ = vol; horn_.fetch_add(1); }  // trafik kornasi (iki ton, ~0.5 s), vol mesafeyle
 
 private:
     std::atomic<float> tilt_{0.0f}, padThr_{0.0f}, padBrk_{0.0f};
@@ -183,6 +184,7 @@ private:
     float windLp1_ = 0, windLp2_ = 0, windPh_ = 0; uint32_t windRng_ = 22222;   // yalniz ses thread'i
     std::atomic<int> clunk_{0}, applause_{0}; std::atomic<bool> nos_{false}, rain_{false};
     float clapT_ = -1, clapEnv_ = 0, clapHp_ = 0, clapLp_ = 0, clapPrev_ = 0;
+    std::atomic<int> horn_{0}; std::atomic<float> hornVol_{0.0f}; float hornT_ = -1, hornV_ = 0, hornPh1_ = 0, hornPh2_ = 0, hornLp_ = 0;
     std::atomic<float> siren_{0.0f}; float sirenPh_ = 0, sirenT_ = 0, sirenLv_ = 0;
     float clunkT_ = -1, nosEnv_ = 0, nosLp_ = 0, rainLp1_ = 0, rainLp2_ = 0, dripT_ = -1, dripF_ = 0; uint32_t fxRng_ = 777;
     struct Voice {
