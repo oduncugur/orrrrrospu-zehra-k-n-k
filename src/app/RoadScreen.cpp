@@ -19,17 +19,37 @@ namespace zk {
 namespace {
 constexpr double kCurveK = 1.0 / 350.0;          // bu egrilikten dar yer "viraj" (otomatik debriyajda vites kilidi)
 
-struct Proj { float x, y, w; bool ok; };
+// Proj: ekran + kirpma uzayi (cx, cy, cw): kismen kameranin arkasina tasan ucgen atlanmaz, yakin duzlemde kirpilir
+struct Proj { float x, y, w; bool ok; float cx = 0, cy = 0, cw = 0; };
+constexpr float kNearW = 0.4f;
+int gVw = 640, gVh = 360;
+Proj fromClip(float cx, float cy, float cw) { return {(cx / cw * 0.5f + 0.5f) * gVw, (1.0f - (cy / cw * 0.5f + 0.5f)) * gVh, cw, true, cx, cy, cw}; }
 // Dunya: sim (X ileri, Y sol) -> 3B (x = X, y = yukari, z = -Y)
 Proj project(const Mat4& vp, double X, double Y, double h, int vw, int vh) {
+    gVw = vw; gVh = vh;
     const float x = (float)X, y = (float)h, z = (float)-Y;
     const float cx = vp.m[0] * x + vp.m[4] * y + vp.m[8] * z + vp.m[12];
     const float cy = vp.m[1] * x + vp.m[5] * y + vp.m[9] * z + vp.m[13];
     const float cw = vp.m[3] * x + vp.m[7] * y + vp.m[11] * z + vp.m[15];
-    if (cw < 0.4f) return {0, 0, cw, false};
-    return {(cx / cw * 0.5f + 0.5f) * vw, (1.0f - (cy / cw * 0.5f + 0.5f)) * vh, cw, true};
+    if (cw < kNearW) return {0, 0, cw, false, cx, cy, cw};
+    return fromClip(cx, cy, cw);
 }
-void triP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, Color col) { r.triZ(a.x, a.y, a.w, b.x, b.y, b.w, c.x, c.y, c.w, col); }
+void triP(Renderer& r, const Proj& a, const Proj& b, const Proj& c, Color col) {
+    if (a.ok && b.ok && c.ok) { r.triZ(a.x, a.y, a.w, b.x, b.y, b.w, c.x, c.y, c.w, col); return; }
+    if (!a.ok && !b.ok && !c.ok) return;
+    if (a.cw == 0.0f && b.cw == 0.0f && c.cw == 0.0f) return;           // kirpma verisi yok
+    const Proj* in[3] = {&a, &b, &c};
+    Proj out[6]; int n = 0;
+    for (int i = 0; i < 3; ++i) {                                         // Sutherland-Hodgman: w >= yakin duzlem
+        const Proj& p = *in[i]; const Proj& q = *in[(i + 1) % 3];
+        if (p.ok) out[n++] = p;
+        if (p.ok != q.ok) {
+            const float t = (kNearW + 0.001f - p.cw) / (q.cw - p.cw);
+            out[n++] = fromClip(p.cx + (q.cx - p.cx) * t, p.cy + (q.cy - p.cy) * t, kNearW + 0.001f);
+        }
+    }
+    for (int i = 1; i + 1 < n; ++i) r.triZ(out[0].x, out[0].y, out[0].w, out[i].x, out[i].y, out[i].w, out[i + 1].x, out[i + 1].y, out[i + 1].w, col);
+}
 float hashf(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 std::string secStr(double t) { char b[16]; std::snprintf(b, sizeof b, "%.1f S", t); return t > 0 ? b : "BITIREMEDI"; }
 } // namespace
@@ -646,7 +666,7 @@ void RoadScreen::drawWorld(Renderer& r) {
     for (int i = i1; i >= i0; --i) {
         const int j = i + 1;
         const Proj aL = edgeW(i, 1, -1.0), aR = edgeW(i, -1, -1.0), bL = edgeW(j, 1, -1.0), bR = edgeW(j, -1, -1.0);
-        if (!aL.ok || !aR.ok || !bL.ok || !bR.ok) continue;
+        if (!aL.ok && !aR.ok && !bL.ok && !bR.ok) continue;               // tamami arkada; kismen arkadaysa kirpilarak cizilir
         const bool band = ((i / 3) & 1) != 0;
         const int zone = zoneAt(P[i].s);                                    // 0 kir, 1 sehir, 2 tunel
         // Isik: ortam + oyuncunun farlari (onunde 75 m) + sokak lambasi havuzlari (sehir / gece)
