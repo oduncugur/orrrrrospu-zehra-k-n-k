@@ -346,7 +346,7 @@ void App::renderAudio(float* out, int frames) {
     if (const float ws = windSpeed_.load(); ws > 8.0f && tireVol > 0.0f) {
         const float u = std::min(1.0f, (ws - 8.0f) / 55.0f);
         const float a = 1.0f - std::exp(-6.2831853f * (450.0f + 26.0f * ws) / kSampleRate);
-        const float amp = u * u * 0.55f * tireVol;
+        const float amp = u * u * 0.32f * tireVol;
         for (int i = 0; i < frames; ++i) {
             windRng_ = windRng_ * 1664525u + 1013904223u;
             const float n = (float)(windRng_ >> 8) / 8388608.0f - 1.0f;

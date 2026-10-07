@@ -17,7 +17,7 @@ namespace {
 // buyuk YARIS dugmesi, iki sira ikonlu kutucuk. Devir testi: 3B gorunumde GAZ dugmesi (basili tut).
 const Rect kPrev{4, 140, 42, 214}, kNext{318, 140, 356, 214};
 const Rect kSettingsG{316, 64, 354, 100}, kSellG{316, 106, 354, 132}, kRestoreG{6, 64, 118, 88}, kCashG{6, 260, 58, 286};
-const Rect kGas{282, 246, 354, 288};
+const Rect kGas{64, 246, 354, 288};   // analog gaz seridi: soldan saga (sol = 0, sag = tam gaz)
 const Rect kRace{8, 386, 352, 436};
 Rect tileR(int i) { return {8 + (i % 4) * 87.0f, 444 + (i / 4) * 92.0f, 8 + (i % 4) * 87.0f + 82, 444 + (i / 4) * 92.0f + 86}; }
 enum GTile { TParts, TSetup, TGauge, TPaint, TDyno, TRoad, TGallery, TStreet, TCount };
@@ -111,10 +111,12 @@ void GarageScreen::render(Renderer& r) {
     if (!v.streetLegal) r.textCentered(180, 80, "YARIS ARACI - ROMORK", 1, {1.0f, 0.3f, 0.3f});
     // Devir testi: GAZ dugmesi + devir + ince serit (kesici cizgisi)
     const float rpm = (float)pt_->rpm(), red = (float)pt_->engine().redlineRpm;
-    button(r, kGas, "GAZ", throttle_ > 0.05f ? Color{0.9f, 0.5f, 0.1f} : Color{0.3f, 0.22f, 0.12f, 0.9f}, 2);
+    r.rect(kGas.x0, kGas.y0, kGas.x1, kGas.y1, {0.2f, 0.15f, 0.1f, 0.9f});
+    r.rect(kGas.x0, kGas.y0, kGas.x0 + (kGas.x1 - kGas.x0) * throttle_, kGas.y1, {0.9f, 0.5f, 0.1f, 0.95f});
+    r.text(kGas.x1 - 40, 252, "GAZ", 1, {1, 1, 1});
     std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
-    r.text(66, 266, b, 2, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
-    if (pt_->vtecActive()) r.text(196, 266, "VTEC", 2, {1.0f, 0.2f, 0.2f});
+    r.text(70, 262, b, 2, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
+    if (pt_->vtecActive()) r.text(200, 262, "VTEC", 2, {1.0f, 0.2f, 0.2f});
     const float fill = std::clamp(rpm / (red * 1.08f), 0.0f, 1.0f);
     r.rect(0, 290, 360, 294, {0.15f, 0.15f, 0.18f});
     r.rect(0, 290, 360 * fill, 294, rpm > red * 0.9f ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
@@ -217,7 +219,7 @@ void GarageScreen::pointerDown(int id, float x, float y) {
         msg_ = "TEST: +$10,000"; msgT_ = 1.2;
         return;
     }
-    if (kGas.hit(x, y)) { throttlePtr_ = id; throttle_ = 1.0f; return; }   // basili tut: devir
+    if (kGas.hit(x, y)) { throttlePtr_ = id; throttle_ = std::clamp((x - kGas.x0) / (kGas.x1 - kGas.x0), 0.0f, 1.0f); return; }   // analog
     if (c.cars.size() > 1 && kPrev.hit(x, y)) { select(c.current - 1); cancelArm_ = false; return; }
     if (c.cars.size() > 1 && kNext.hit(x, y)) { select(c.current + 1); cancelArm_ = false; return; }
     if (kRace.hit(x, y)) { raceOrRepair(); return; }
@@ -263,7 +265,9 @@ bool GarageScreen::worn() const {
     return false;
 }
 
-void GarageScreen::pointerMove(int, float, float) {}
+void GarageScreen::pointerMove(int id, float x, float) {
+    if (id == throttlePtr_) throttle_ = std::clamp((x - kGas.x0) / (kGas.x1 - kGas.x0), 0.0f, 1.0f);
+}
 void GarageScreen::pointerUp(int id) { if (id == throttlePtr_) throttlePtr_ = -1; }
 
 void GarageScreen::key(Key k, bool down) {

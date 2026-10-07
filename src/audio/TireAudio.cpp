@@ -71,8 +71,8 @@ void TireAudio::render(float* out, int n, double slip, float gain, double lockSp
             ph_ += f / fs_; ph_ -= std::floor(ph_);
             const double s = std::sin(2 * kPi * ph_) + 0.28 * std::sin(4 * kPi * ph_ + 0.7) + 0.10 * std::sin(6 * kPi * ph_ + 1.9);
             const double am = std::clamp(0.75 + 3.0 * trem_, 0.25, 1.25);
-            const double breath = toneBand_.run(x) * 0.9;           // tonun bandinda hisirti
-            o += 0.42 * tone * am * (s + breath) * (1.0 - 0.4 * burn_);   // burnoutta ton %40 geri, hisirti one
+            const double breath = toneBand_.run(x) * 0.3;            // az hisirti: ruzgar ugultusu gibi degil, net ciglik           // tonun bandinda hisirti
+            o += 0.5 * tone * am * (s + breath) * (1.0 - 0.4 * burn_);   // burnoutta ton %40 geri, hisirti one
         }
         // ---- burnout kavurmasi
         if (burn_ > 1e-4) {
@@ -85,7 +85,7 @@ void TireAudio::render(float* out, int n, double slip, float gain, double lockSp
             if (rnd() > 1.0 - 2.0 * 220.0 / fs_) crackEnv_ = 0.5 + 0.5 * std::fabs(rnd());       // citirti (~220/s)
             const double crack = crackHp_.run(crackEnv_ * rnd()); crackEnv_ *= crackDecay;
             if (chirpEnv_ < 0.02 && rnd() > 1.0 - 2.0 * 2.5 / fs_) { chirpEnv_ = 0.7 + 0.3 * std::fabs(rnd()); chirp_ = rnd(); }   // ara ciglik
-            o += burn_ * (0.75 * hiss * std::clamp(block, 0.2, 1.6) + 1.3 * rumble * std::clamp(block, 0.3, 1.5) + 0.2 * crack);
+            o += burn_ * (0.6 * hiss * std::clamp(block, 0.2, 1.6) + 0.55 * rumble * std::clamp(block, 0.3, 1.5) + 0.2 * crack);
         }
         chirpEnv_ *= chirpDecay;
         out[i] += (float)(o * gain);

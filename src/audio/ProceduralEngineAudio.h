@@ -73,6 +73,9 @@ private:
     // emme "vuuh"u (gaz acilisi), kesici bas vurusu, ust tiz kisma
     Biquad body_, v8a_, v8b_, v8sub_, vtecBp_, intakeBp_;
     double hfLp_ = 0.0, thumpT_ = -1.0, tipT_ = -1.0, tremPh_ = 0.0;
+    // Egzoz patlamasi: susturucuyu atlayan yakin katman (arka egzoz dinleyiciye yakin): keskin 'kelesh' catlamasi
+    double popT_ = -1.0, popA_ = 0.0, popHp_ = 0.0, popPrev_ = 0.0, popBody_ = 0.0, ordPh_ = 0.0;
+    Biquad popBp_;
     bool prevCut_ = false; double tipPrev_ = 0.0;
     uint32_t rng_;
     EngineAudioInput in_;

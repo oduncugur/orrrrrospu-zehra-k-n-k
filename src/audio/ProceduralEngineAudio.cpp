@@ -88,6 +88,7 @@ ProceduralEngineAudio::ProceduralEngineAudio(const VehicleDef& v, int sampleRate
     v8a_.setBandpass(80.0, 4.0, fs_); v8b_.setBandpass(160.0, 4.0, fs_); v8sub_.setBandpass(70.0, 0.9, fs_);
     vtecBp_.setBandpass(1350.0, 0.9, fs_);
     intakeBp_.setBandpass(520.0, 1.2, fs_);
+    popBp_.setBandpass(2800.0, 0.7, fs_);   // patlama catlamasi: 1.5-5 kHz (cirtlak)
 }
 
 void ProceduralEngineAudio::Biquad::setBandpass(double f, double q, double fs) {
@@ -116,7 +117,9 @@ void ProceduralEngineAudio::render(float* out, int n) {
     const bool turbo = turboKit_ || e_.induction == Induction::Turbo || e_.induction == Induction::TwinTurbo;
     const bool sc = e_.induction == Induction::Supercharger;
     const bool dogbox = gearboxTable()[v_.gearbox].type == Gearbox::Dogbox;
-    const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.12 : v_.exhaust == Exhaust::Sport ? 0.06 : 0.03;   // stokta da hafif patirti
+    // Patlama olasiligi: yalnizca duz boru (pop & bang) bol patlatir; spor seyrek, stok neredeyse hic
+    const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.10 : v_.exhaust == Exhaust::Sport ? 0.012 : 0.002;
+    const double cutPop  = v_.exhaust == Exhaust::StraightPipe ? 0.30 : v_.exhaust == Exhaust::Sport ? 0.06 : 0.01;
     // Yanma ayrisma (combustion crack) payi: yuksek sikistirma / yaris motoru daha sert
     const double crack = raceCam ? 0.45 : 0.3;
 
@@ -156,13 +159,14 @@ void ProceduralEngineAudio::render(float* out, int n) {
             bool pop = false;
             if (in_.fuelCut) {
                 amp = 0.06;                                                     // yakitsiz: sadece pompalama
-                if (noise() > 0.7) { amp = 1.8; pop = true; }                  // kesicide yanmamis yakit patlar
+                if ((noise() * 0.5 + 0.5) < cutPop) { amp = 1.8; pop = true; } // kesicide yanmamis yakit patlar
             } else if (thr < 0.05 && rpm > 2800) {
-                amp = 0.14;
+                amp = 0.34;                                                     // motor freni: pompalama + hafif yanma (ses kaybolmaz)
                 const double p = in_.antiLag ? 0.5 : popProb;
                 if ((noise() * 0.5 + 0.5) < p) { amp = 2.0; pop = true; }
             }
             firePulse(tEv + ev.delay + jitter, ev.bank, amp, pulseTau_ * (pop ? 2.2 : 1.0), pop, false);
+            if (pop && popT_ < 0.0) { popT_ = 0.0; popA_ = 0.7 + 0.3 * (noise() * 0.5 + 0.5); }   // yakin catlama
             // Yanma blogu uyarir (mekanik vuruntu/tikirti), yukle artar
             firePulse(tEv, 0, crack * amp * (pop ? 0.4 : 1.0), 0.00018, false, true);
         }
@@ -256,6 +260,22 @@ void ProceduralEngineAudio::render(float* out, int n) {
             sig += 0.012 * (0.3 + thr) * (rpm / e_.redline) * std::sin(2 * kPi * gwPhase_) * (0.8 + 0.2 * nLp_);
         }
         prevThr_ = thr;
+        // ---- motor karakteri (atesleme harmonikleri, gercek kayit spektrumlarina gore) ----
+        //  I4 (Civic/E30): 2. derece (fFire) baskin + 'vizilti' 2x;  I6 (Supra/E46 M3): puruzsuz 3. derece, ust harmonik ipeksi;
+        //  V8 crossplane (Mustang): yarim derece homurtu;  flat-plane/V10/V12: tiz ciglik 2x-3x;  boxer: 0.5x esitsiz gurultu
+        {
+            ordPh_ += fFire * dt; if (ordPh_ > 1e6) ordPh_ -= 1e6;
+            const double ph = 2 * kPi * ordPh_, rr = std::min(1.0, rpm / e_.redline), g = 0.035 * (0.35 + 0.65 * load);
+            double h = 0.0;
+            const int cyl = e_.cylinders;
+            if (e_.layout == Layout::V8Cross)            h = 0.9 * std::sin(0.5 * ph) + 0.6 * std::sin(ph) + 0.15 * std::sin(2 * ph);
+            else if (e_.unequalHeaders)                  h = 0.7 * std::sin(0.5 * ph + 0.3 * std::sin(0.25 * ph)) + 0.5 * std::sin(ph);
+            else if (cyl >= 8)                           h = 0.5 * std::sin(ph) + 0.45 * std::sin(2 * ph) * rr + 0.25 * std::sin(3 * ph) * rr;
+            else if (cyl == 6)                           h = 0.7 * std::sin(ph) + 0.3 * std::sin(2 * ph + 0.4) + 0.12 * std::sin(3 * ph) * rr;
+            else if (cyl == 4)                           h = 0.8 * std::sin(ph) + 0.35 * std::sin(2 * ph) * (0.4 + rr) + 0.15 * std::tanh(4 * std::sin(ph)) * rr;
+            else                                         h = 0.8 * std::sin(ph) + 0.5 * std::sin(0.5 * ph);
+            if (!rotary) sig += g * h * (0.8 + 0.2 * nLp_);
+        }
 
         // ---- v6 ton dengesi ----
         {
@@ -293,10 +313,21 @@ void ProceduralEngineAudio::render(float* out, int n) {
             hfLp_ += (sig - hfLp_) * ah;
             sig = hfLp_ + (sig - hfLp_) * 0.45;
         }
+        // ---- egzoz patlamasi (yakin): <0.3 ms yukselis, cirtlak bant gurultu + 90 Hz govde, sert kirpma ----
+        if (popT_ >= 0.0) {
+            popT_ += dt;
+            const double n = noise();
+            popHp_ = n - popPrev_; popPrev_ = n;
+            const double env = popA_ * std::min(1.0, popT_ / 0.0003) * std::exp(-popT_ / 0.011);
+            const double crackS = popBp_.run(popHp_) * 3.2 + popHp_ * 0.5;
+            popBody_ = std::sin(2 * kPi * 90.0 * popT_) * std::exp(-popT_ / 0.03);
+            sig += 0.9 * std::tanh(3.0 * env * crackS) + 0.35 * popA_ * popBody_;
+            if (popT_ > 0.12) popT_ = -1.0;
+        }
         // ---- DC engelleme + son alcak gecis (~9 kHz) + yumusak sinirlama ----
         const double hp = sig - dcIn_ + 0.995 * dc_;
         dcIn_ = sig; dc_ = hp;
-        outLp_ += (hp - outLp_) * 0.72;
+        outLp_ += (hp - outLp_) * (popT_ >= 0.0 ? 0.95 : 0.72);   // patlamada tiz acik
         out[i] = (float)std::tanh(outLp_ * 1.25);
         t_ += dt;
     }
