@@ -288,7 +288,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     r = std::min(r, H * 0.36);
     const bool rearEngine = sh.arch == P911 || sh.arch == BEETLE || sh.arch == MID_ENGINE || sh.arch == WEDGE || sh.arch == ROADSTER_MID;
     const double overhang = std::max(L - v.wheelbaseM, 2.2 * r);
-    const double overhangF = overhang * (rearEngine ? 0.46 : v.frontWeight > 0.55 ? 0.56 : 0.48);
+    const double overhangF = overhang * (rearEngine ? 0.46 : v.frontWeight > 0.55 ? 0.52 : 0.47);   // gercek on / arka cikinti orani
     const double xFront = L * 0.5 - overhangF, xRear = xFront - v.wheelbaseM;
     const double sFront = (L * 0.5 - xFront) / L, sRear = (L * 0.5 - xRear) / L;
 
@@ -420,7 +420,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const bool rearGlass = cab && sm > A.roofRX && glassHigh;
         (void)steep;
         bool pillarHere = false;                                                  // B / C direk: yuzeyin parcasi (ayri panel yok)
-        for (double sp : pillarS) if (std::fabs(sm - sp) * L < (sp == pillarS[0] ? 0.05 : 0.08)) pillarHere = true;
+        for (double sp : pillarS) if (std::fabs(sm - sp) * L < (sp == pillarS[0] ? 0.035 : 0.06)) pillarHere = true;
         for (int i = 0; i < R; ++i) {
             const int j = (i + 1) % R;
             const int si = i < RH2 ? i : R - 2 - i;
@@ -428,9 +428,9 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             int mat = MatPaint;
             if (i == R - 1) mat = MatDark;                                        // taban
             else if ((i == RH2 - 1 || side == 10) && (windshield || rearGlass)) mat = MatGlass;   // on / arka cam (kenara kadar)
-            else if (side == 9 && (windshield || rearGlass)) mat = modern ? MatDark : MatPaint;   // A / C direk
+            else if (side == 9 && (windshield || rearGlass)) mat = MatDark;                        // A / C direk: koyu fitil (ince gorunur)
             else if (sideGlass && side >= 7 && side <= 9)                        // yan camlar; direk ve ust cerceve govdeden
-                mat = pillarHere || si == 19 ? (modern ? MatDark : MatPaint) : MatGlass;
+                mat = pillarHere || si == 19 ? (v.year >= 1980 ? MatDark : MatPaint) : MatGlass;   // 80 sonrasi siyah direk / cerceve
             if (bedOpen && side >= 7) mat = MatDark;                              // kamyonet kasasi ici
             if (A.open && side >= 8 && sm > A.roofFX + 0.01 && sm < A.backX - 0.02) continue;   // ustu acik: kokpit deligi (ic mekan gorunur)
             B.quad(a[i], b[i], b[j], a[j], mat);
@@ -482,7 +482,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         const double cx1 = L * (0.5 - cs1);
         const double zc = H * P.belt(0.5 * (cs0 + cs1));
         const double cwid = halfW(0.5 * (cs0 + cs1)) * A.beltW - 0.04;
-        addInterior(B, x0 - 0.05, cx1, cwid, ride + 0.28, zc, H * 1.05);
+        addInterior(B, x0 - 0.05, cx1, cwid, ride + 0.28, zc, std::min(H * 1.05, zc + 0.42));   // basliklar on cam ustunu gecmesin
         const double seatX = std::max(cx1 + 0.25, x0 - 0.05 - 1.05);
         if (sh.arch == ROADSTER_MID || v.year >= 1998)                                              // roll hoop
             for (double sg : {-1.0, 1.0}) B.box(seatX - 0.20, seatX - 0.14, sg * cwid * 0.5 - 0.2, sg * cwid * 0.5 + 0.2, zc + 0.30, zc + 0.36, MatTrim);
@@ -589,12 +589,42 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double lampY = hwF * 0.66;
     const FaceSpec* fs = faceSpecFor(v.id);
     // ---- arac basina yuz: parcalar on / arka yuzun egrisine oturur (bombe + kose donusu) ----
-    auto faceX = [&](bool front, double y) {
-        const double sg = front ? 1.0 : -1.0, hwE = halfW(front ? 0.03 : 0.97);
-        const double t = std::min(1.0, std::fabs(y) / hwE), bul = std::clamp(0.010 * L, 0.025, 0.05);
-        double x = (front ? L * 0.5 : -L * 0.5) + sg * bul * (1.0 - t * t) * 0.85;
-        if (t > 0.70) x -= sg * 0.20 * hwE * std::pow((t - 0.70) / 0.30, 2);
-        return x + sg * 0.010;
+    // Gercek govde yuzeyi: istasyon kesitlerinde (y, z) noktasinin ilk icerde kaldigi yer (onden / arkadan tarama).
+    // Yari kesitin z yuksekligindeki dis siniri (y); kesit o yuksekligi kapsamiyorsa -1
+    auto extentAt = [&](size_t k, double z) {
+        const auto& h = subs[k];
+        double best = -1.0;
+        for (int i = 0; i + 1 < RH2; ++i) {
+            const double z0 = h[i][1], z1 = h[i + 1][1];
+            if ((z - z0) * (z - z1) > 0.0) continue;
+            const double t = std::fabs(z1 - z0) < 1e-9 ? 0.0 : (z - z0) / (z1 - z0);
+            best = std::max(best, h[i][0] + (h[i + 1][0] - h[i][0]) * t);
+        }
+        return best;
+    };
+    auto faceX = [&](bool front, double y, double z) {
+        const double sg = front ? 1.0 : -1.0, ay = std::fabs(y);
+        const int n = (int)ss.size();
+        double prevE = -1.0;
+        for (int q = 0; q < n; ++q) {
+            const size_t k = front ? q : n - 1 - q;
+            const double e = extentAt(k, z);
+            if (e >= ay) {
+                const double xk = L * (0.5 - ss[k]);
+                if (q == 0) {                                                    // uc kapak: bombeli seritler (cap ile ayni formul)
+                    float czr = 0; for (int i : (front ? rings.front() : rings.back())) czr += m.verts[i].z; czr /= R;
+                    const double bul = std::clamp(0.010 * L, 0.025, 0.05), w = 1.0 - std::min(1.0, ay / std::max(e, 1e-3));
+                    const double hz = 1.0 - std::min(1.0, std::fabs(z - czr) / 0.6);
+                    return xk + sg * (bul * hz * (0.55 + 0.45 * w) + 0.004);
+                }
+                const size_t kp = front ? k - 1 : k + 1;
+                const double e0 = std::max(prevE, 0.0), f = std::clamp((ay - e0) / std::max(e - e0, 1e-4), 0.0, 1.0);
+                const double xp = L * (0.5 - ss[kp]);
+                return xp + (xk - xp) * f + sg * 0.004;
+            }
+            prevE = e;
+        }
+        return (front ? L * 0.5 : -L * 0.5);
     };
     using Poly = std::vector<std::pair<double, double>>;                          // (y, z)
     auto facePoly = [&](bool front, const Poly& pts, int mat, double off) {
@@ -602,9 +632,25 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         for (const auto& p : pts) { cy += p.first; cz += p.second; }
         cy /= pts.size(); cz /= pts.size();
         const double sg = front ? 1.0 : -1.0;
-        const int c = B.v(faceX(front, cy) + sg * off, cy, cz);
+        // Parca tek duzlemde: merkezdeki yuzey + egim (yan / dikey); hicbir kose govdeye gomulmesin diye disa kaydirilir
+        const double d = 0.035, xc = faceX(front, cy, cz);
+        const double gy = (faceX(front, cy + d, cz) - faceX(front, cy - d, cz)) / (2 * d);
+        const double gz = (faceX(front, cy, cz + d) - faceX(front, cy, cz - d)) / (2 * d);
+        const double gy2 = std::clamp(gy, -1.2, 1.2), gz2 = std::clamp(gz, -1.2, 1.2);   // asiri egimli burunda tasma olmasin
+        auto plane = [&](double y, double z) {
+            const double x = xc + gy2 * (y - cy) + gz2 * (z - cz);
+            return std::clamp(x, -L * 0.5 - 0.04, L * 0.5 + 0.04);
+        };
+        double lift = 0.0;
+        for (const auto& p : pts) lift = std::max(lift, sg * (faceX(front, p.first, p.second) - plane(p.first, p.second)));
+        for (int k = 0; k < 12; ++k) {                                            // ic ice katmanlar ayni duzlemi paylassin
+            const double a = 2 * kPi * k / 12, y = cy + 0.13 * std::cos(a), z = cz + 0.13 * std::sin(a);
+            lift = std::max(lift, sg * (faceX(front, y, z) - plane(y, z)));
+        }
+        lift = std::min(lift, 0.03);
+        const int c = B.v(plane(cy, cz) + sg * (off + lift), cy, cz);
         std::vector<int> id;
-        for (const auto& p : pts) id.push_back(B.v(faceX(front, p.first) + sg * off, p.first, p.second));
+        for (const auto& p : pts) id.push_back(B.v(plane(p.first, p.second) + sg * (off + lift), p.first, p.second));
         for (size_t i = 0; i < id.size(); ++i) {
             const size_t j = (i + 1) % id.size();
             B.tri(c, id[i], id[j], mat); B.tri(c, id[j], id[i], mat);              // iki yuzlu (egri yuzeyde yon degisir)
@@ -846,6 +892,23 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         }
     }
 
+    // ---- esik (marspiyel) seridi: tekerler arasi alt kenar koyu; klasikte bel hizasinda krom serit (yan duvar tek parca durmasin) ----
+    {
+        const double s0 = sFront + 0.07, s1 = sRear - 0.07;
+        const int ns = 10;
+        for (double sg : {1.0, -1.0})
+            for (int k = 0; k < ns; ++k) {
+                const double a = s0 + (s1 - s0) * k / ns, b = s0 + (s1 - s0) * (k + 1) / ns;
+                const double ya = sg * (halfW(a) * 0.985 + 0.006), yb = sg * (halfW(b) * 0.985 + 0.006);
+                const double z0 = ride + 0.05, z1 = ride + 0.12;
+                B.panel(L * (0.5 - a), ya, z0, L * (0.5 - b), yb, z0, L * (0.5 - b), yb, z1, L * (0.5 - a), ya, z1, MatTrim);
+                if (classic && !A.open) {                                         // krom bel seridi
+                    const double za = H * P.belt(a) - 0.05, zb = H * P.belt(b) - 0.05;
+                    const double ya2 = sg * (halfW(a) * 0.99 + 0.008), yb2 = sg * (halfW(b) * 0.99 + 0.008);
+                    B.panel(L * (0.5 - a), ya2, za, L * (0.5 - b), yb2, zb, L * (0.5 - b), yb2, zb + 0.014, L * (0.5 - a), ya2, za + 0.014, MatChrome);
+                }
+            }
+    }
     // ---- panel bosluklari: kaput ve bagaj kapagi cevresinde ince koyu cizgi (tek parca oyuncak hissi olmasin) ----
     {
         auto seamAlong = [&](double s0, double s1, double yf, int n) {           // s0..s1 boyunca y = yf * halfW(s) cizgisi
