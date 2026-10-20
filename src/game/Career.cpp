@@ -439,7 +439,7 @@ Opponent pickOpponent(int playerCarId, const Tune& playerTune, uint32_t seed) {
     for (int i = 0; i < kOpponentPresets; ++i) presets[i] = opponentPreset(i);
     std::vector<Opponent> all;
     for (const auto& v : vehicleCatalog()) {
-        if (v.id == playerCarId || !v.streetLegal) continue;
+        if (v.id == playerCarId || !v.streetLegal || !carActive(v.id)) continue;
         for (const Tune& t : presets) all.push_back({v.id, t, performanceIndex(v, t)});
     }
     std::vector<const Opponent*> pool;
@@ -661,7 +661,7 @@ Career::JobOffer Career::jobOffer(int k) const {
     // Bugunun teklifleri: ucuz sokak araclari; hedef fabrika gucunun %25-%60 ustu; odeme beygir basina ~45 $ + iscilik
     static std::vector<int> pool;
     if (pool.empty())
-        for (const auto& v : vehicleCatalog()) if (v.streetLegal && carPrice(v) <= 30000) pool.push_back(v.id);
+        for (const auto& v : vehicleCatalog()) if (v.streetLegal && carActive(v.id) && carPrice(v) <= 30000) pool.push_back(v.id);
     const uint32_t x = mix32((uint32_t)jobSeq[std::clamp(k, 0, 2)] * 2654435761u + (uint32_t)k * 40503u + 17u);   // kabul edilince yenilenir
     const int id = pool[x % pool.size()];
     const VehicleDef& v = *findVehicle(id);
@@ -1549,7 +1549,7 @@ std::vector<JunkCar> junkyardOffers(uint32_t seed) {
     const auto& cat = vehicleCatalog();
     while (out.size() < 6) {
         const VehicleDef& v = cat[(size_t)(rnd() * cat.size())];
-        if (!v.streetLegal || Career::isExclusive(v.id)) continue;       // koleksiyon araclari hurdalikta cikmaz
+        if (!v.streetLegal || !carActive(v.id) || Career::isExclusive(v.id)) continue;       // koleksiyon araclari hurdalikta cikmaz
         bool dup = false;
         for (const JunkCar& j : out) dup |= j.carId == v.id;
         if (dup) continue;

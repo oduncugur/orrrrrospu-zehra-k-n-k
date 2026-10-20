@@ -261,3 +261,16 @@ double peakPowerHp(const VehicleDef& v) {
 }
 
 } // namespace zk
+
+namespace zk {
+// Aktif kadro: lig rakipleri + gizli ahir + sahne araclari (44) + karakterli 20 arac
+bool carActive(int id) {
+    static const int kActive[] = {
+        2, 5, 8, 12, 17, 19, 20, 24, 27, 34, 46, 50, 52, 53, 59, 75, 78, 88, 100, 102, 118, 122, 123, 152, 164, 167, 171,
+        177, 184, 213, 214, 216, 217, 218, 219, 227, 272, 282, 290, 291, 302, 308, 313, 315,
+        11, 33, 55, 57, 64, 85, 87, 120, 133, 151, 166, 185, 195, 220, 222, 231, 232, 250, 264, 284};
+    static_assert(sizeof kActive / sizeof *kActive == 64, "aktif kadro 64 arac");
+    for (int a : kActive) if (a == id) return true;
+    return false;
+}
+} // namespace zk

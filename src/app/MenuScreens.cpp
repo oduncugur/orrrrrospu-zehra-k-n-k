@@ -55,6 +55,16 @@ const Rect kJunk{252, 64, 352, 92};
 const Rect kLTab[4] = {{8, 440, 88, 464}, {94, 440, 174, 464}, {186, 440, 266, 464}, {272, 440, 352, 464}};   // SIFIR / ILAN 1-3                                    // 3B gorunumun sag ustu
 } // namespace
 
+// Galeride aktif kadroda gezinme: |step| aktif arac ileri / geri (dongusel)
+static int stepActive(int id, int step) {
+    const int n = (int)vehicleCatalog().size(), d = step > 0 ? 1 : -1;
+    for (int k = 0; k < std::abs(step); ++k) {
+        int g = 0;
+        do { id = ((id - 1 + d) % n + n) % n + 1; } while (!carActive(id) && ++g < n);
+    }
+    return id;
+}
+
 GalleryScreen::GalleryScreen(App& app) : app_(app), carId_(app.career.car().carId) {
     if (const char* c = std::getenv("ZK_GALLERY_CAR")) if (findVehicle(std::atoi(c))) carId_ = std::atoi(c);   // test: model goruntusu
     pickCar(carId_);
@@ -243,9 +253,8 @@ void GalleryScreen::pointerDown(int, float x, float y) {
         return;
     }
     if (kJunk.hit(x, y)) { app_.goJunkyard(); return; }
-    const int n = (int)vehicleCatalog().size();
     for (int i = 0; i < 4; ++i)
-        if (kGNav[i].hit(x, y)) { pickCar(((carId_ - 1 + kGStep[i]) % n + n) % n + 1); return; }
+        if (kGNav[i].hit(x, y)) { pickCar(stepActive(carId_, kGStep[i])); return; }
     for (int k = 0; k < 4; ++k)
         if (kLTab[k].hit(x, y)) { if (k > 0 || soldNew(*findVehicle(carId_))) listing_ = k - 1; return; }
     if (kBuy.hit(x, y)) {
@@ -278,9 +287,8 @@ void GalleryScreen::key(Key k, bool down) {
         else if (k == Key::Back) confirm_ = Confirm::None;
         return;
     }
-    const int n = (int)vehicleCatalog().size();
-    if (k == Key::Left) pickCar(((carId_ - 2) % n + n) % n + 1);
-    else if (k == Key::Right) pickCar(carId_ % n + 1);
+    if (k == Key::Left) pickCar(stepActive(carId_, -1));
+    else if (k == Key::Right) pickCar(stepActive(carId_, 1));
     else if (k == Key::Back) app_.goGarage();
 }
 

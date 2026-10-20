@@ -102,7 +102,7 @@ void parkedOn(const World& w, int e, std::vector<Parked>& out) {
     const WorldEdge& E = w.edges[e];
     if (E.highway || E.bridge || E.city < 0) return;
     static std::vector<int> legal;
-    if (legal.empty()) for (const VehicleDef& d : vehicleCatalog()) if (d.streetLegal) legal.push_back(d.id);
+    if (legal.empty()) for (const VehicleDef& d : vehicleCatalog()) if (d.streetLegal && carActive(d.id)) legal.push_back(d.id);
     const RoadPath& p = E.fwd();
     for (int side = 0; side < 2; ++side)
         for (int k = 0; 18.0 + k * 13.0 < p.length() - 18.0; ++k) {
@@ -654,7 +654,7 @@ void WorldScreen::update(double dt) {
             static const int kHool[8] = {2, 12, 59, 24, 34, 100, 50, 78};
             if (r < 0.03) { t.role = 1; t.carId = 217; }
             else if (r < 0.04) { t.role = 2; t.carId = kHool[t.uid % 8]; t.v0 *= 1.2; }
-            else { const auto& cat = vehicleCatalog(); do { t.carId = 1 + (int)(M.rnd() * cat.size()); } while (!cat[t.carId - 1].streetLegal); }
+            else { const auto& cat = vehicleCatalog(); do { t.carId = 1 + (int)(M.rnd() * cat.size()); } while (!cat[t.carId - 1].streetLegal || !carActive(t.carId)); }
             t.prevRel = 0;
             M.traffic.push_back(t);
         }

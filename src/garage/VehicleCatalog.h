@@ -72,6 +72,9 @@ const std::vector<EngineDef>&  engineTable();
 const std::vector<GearboxDef>& gearboxTable();
 const std::vector<VehicleDef>& vehicleCatalog();   // >= 250 arac, id sirali (1..N)
 const VehicleDef* findVehicle(int id);       // kTruckId0.. : trafik tir / kamyon (katalogda yok)
+// Aktif kadro (ilk asama 64 arac): galeri, hurdalik, rakip / trafik / is havuzlari yalniz bunlari kullanir.
+// Pasif araclar silinmez (kayit uyumu, sahip olunan arac, lig rakibi tablosu): findVehicle ile erisilir.
+bool carActive(int id);
 constexpr int kTruckId0 = 9001;
 inline bool isTruckId(int id) { return id >= kTruckId0 && id < kTruckId0 + 2; }
 int findEngine(const char* code);

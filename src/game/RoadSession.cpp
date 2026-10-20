@@ -56,7 +56,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         const auto& cat = vehicleCatalog();
         for (int i = 0; i < 19; ++i) {
             int id;
-            do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
+            do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal || !carActive(id));
             f.push_back({id, Tune{}, (int)(rnd() * StyleCount) % StyleCount});
         }
         setRunField(f, runRealKm);
@@ -80,7 +80,7 @@ RoadSession::RoadSession(Mode mode, int playerCar, const Tune* playerTune, int r
         TrafficCar t{};
         int id;
         if (rnd() < truckShare) id = rnd() < 0.6 ? kTruckId0 : kTruckId0 + 1;
-        else do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal);
+        else do { id = 1 + (int)(rnd() * cat.size()); } while (!cat[id - 1].streetLegal || !carActive(id));
         t.carId = id;
         spawnTraffic(t, startS_ + 150.0 + i * spacing);
         traffic_.push_back(t);
