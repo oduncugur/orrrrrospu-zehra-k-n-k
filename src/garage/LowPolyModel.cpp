@@ -846,6 +846,32 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         }
     }
 
+    // ---- panel bosluklari: kaput ve bagaj kapagi cevresinde ince koyu cizgi (tek parca oyuncak hissi olmasin) ----
+    {
+        auto seamAlong = [&](double s0, double s1, double yf, int n) {           // s0..s1 boyunca y = yf * halfW(s) cizgisi
+            for (int k = 0; k < n; ++k) {
+                const double a = s0 + (s1 - s0) * k / n, b = s0 + (s1 - s0) * (k + 1) / n;
+                const double ya = yf * halfW(a), yb = yf * halfW(b), za = topZ(a) + 0.006, zb = topZ(b) + 0.006;
+                B.panel(L * (0.5 - a), ya - 0.005, za, L * (0.5 - b), yb - 0.005, zb, L * (0.5 - b), yb + 0.005, zb, L * (0.5 - a), ya + 0.005, za, MatDark);
+            }
+        };
+        auto seamAcross = [&](double s, double yf) {                             // s'de enine cizgi (-yf..yf)
+            const int n = 6; const double x = L * (0.5 - s);
+            for (int k = 0; k < n; ++k) {
+                const double ya = -yf * halfW(s) + 2 * yf * halfW(s) * k / n, yb = -yf * halfW(s) + 2 * yf * halfW(s) * (k + 1) / n;
+                const double z = topZ(s) + 0.007;
+                B.panel(x + 0.005, ya, z, x + 0.005, yb, z, x - 0.005, yb, z, x - 0.005, ya, z, MatDark);
+            }
+        };
+        if (!rearEngine && A.cowlX > 0.15) {                                     // on motor: kaput kenarlari + on cam dibi
+            for (double sg : {-1.0, 1.0}) seamAlong(0.02, A.cowlX - 0.02, sg * 0.80, 8);
+            seamAcross(A.cowlX - 0.02, 0.80);
+        }
+        if (A.backX < 0.93 && !A.bed) {                                          // bagaj kapagi (sedan / kupe)
+            for (double sg : {-1.0, 1.0}) seamAlong(A.backX + 0.015, 0.975, sg * 0.82, 4);
+            seamAcross(A.backX + 0.015, 0.82);
+        }
+    }
     // ---- aynalar ----
     {
         const double sm = std::min(A.cowlX + 0.03, A.roofFX), xm = L * (0.5 - sm);
