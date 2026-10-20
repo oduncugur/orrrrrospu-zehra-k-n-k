@@ -12,6 +12,7 @@ constexpr double kPi = 3.14159265358979323846;
 
 #include "BodyShapes.inc"
 #include "SideTables.inc"
+#include "FaceTables.inc"
 
 double smooth(double t) { t = std::clamp(t, 0.0, 1.0); return t * t * (3 - 2 * t); }
 
@@ -389,14 +390,31 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
             B.quad(a[i], b[i], b[j], a[j], mat);
         }
     }
-    auto cap = [&](const std::array<int, R>& ring, bool front) {                  // uc kapak: merkezden yelpaze
+    auto cap = [&](const std::array<int, R>& ring, bool front) {                  // uc kapak: bombeli (iki kademe), duz plaka degil
         float cx = 0, cy = 0, cz = 0;
         for (int i : ring) { cx += m.verts[i].x; cy += m.verts[i].y; cz += m.verts[i].z; }
-        const int c = B.v(cx / R, cy / R, cz / R);
-        for (int i = 0; i < R; ++i) {
-            const int j = (i + 1) % R;
-            if (front) B.tri(c, ring[j], ring[i], MatPaint); else B.tri(c, ring[i], ring[j], MatPaint);
+        (void)cy;
+        // Yatay seritler: sol nokta i ile aynasi R-1-i arasina orta (bombeli) ve ceyrek kolonlar; yelpaze "X" golgesi yok
+        const float bulge = (front ? 1.0f : -1.0f) * (float)std::clamp(0.010 * L, 0.025, 0.05);
+        int prev[5] = {-1, -1, -1, -1, -1};
+        for (int i = 0; i < RH2; ++i) {
+            const Vertex a = m.verts[ring[i]], b = m.verts[ring[R - 1 - i]];
+            const float zt = (a.z - cz);
+            const float hz = 1.0f - std::min(1.0f, std::fabs(zt) / 0.6f);           // ust / alt kenarda bombe sifira iner
+            int cur[5];
+            cur[0] = ring[i]; cur[4] = ring[R - 1 - i];
+            for (int k = 1; k < 4; ++k) {
+                const float f = k / 4.0f, w = 1.0f - std::fabs(2.0f * f - 1.0f);   // ortada en fazla
+                cur[k] = B.v(a.x + (b.x - a.x) * f + bulge * hz * (0.55f + 0.45f * w), a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f);
+            }
+            if (prev[0] >= 0)
+                for (int k = 0; k < 4; ++k) {
+                    if (front) B.quad(prev[k], cur[k], cur[k + 1], prev[k + 1], MatPaint);
+                    else B.quad(prev[k + 1], cur[k + 1], cur[k], prev[k], MatPaint);
+                }
+            for (int k = 0; k < 5; ++k) prev[k] = cur[k];
         }
+        (void)cx;
     };
     cap(rings.front(), true); cap(rings.back(), false);
 
@@ -477,15 +495,175 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double xf = L * 0.5;
     const double zNose = H * A.noseZ;
     const double hwF = halfW(0.02);
-    const double bumperZ0 = ride + 0.07, bumperZ1 = std::min(ride + 0.22, zNose - 0.12);
+    // Tampon farin hemen altinda (aradaki bos duz duvar yok); yukseklik doneme gore: klasik ince krom, modern kalin
+    const double lampZ0 = zNose - 0.075;
+    const double bumperZ1 = std::max(ride + 0.20, std::min(lampZ0 - 0.10, zNose - 0.12));
+    const double bumperZ0 = std::max(ride + 0.06, bumperZ1 - (classic ? 0.11 : modern ? 0.24 : 0.17));
     const int bumperMat = classic ? MatChrome : modern ? MatPaint : MatTrim;
-    B.box(xf - 0.06, xf + 0.03, -hwF * 0.97, hwF * 0.97, bumperZ0, bumperZ1, bumperMat);
+    // Saran tampon: on / arka yuzden kose yayi ile yanlara ~0.3 m doner; ortasi hafif disari bombeli. Modern: govde
+    // rengi + altta koyu dudak; klasik: krom; 80-90'lar: siyah plastik.
+    auto wrapBumper = [&](bool front, double z0, double z1, int mat) {
+        const double sg = front ? 1.0 : -1.0, xe = front ? L * 0.5 : -L * 0.5;
+        const double hwE = halfW(front ? 0.03 : 0.97) * 1.01, rc = std::min(0.24, hwE * 0.3), back = 0.30;
+        std::vector<std::pair<double, double>> pl;                                // plan konturu (x, y): bir yan -> on -> diger yan
+        pl.push_back({xe - sg * back, -hwE});
+        for (int k = 0; k <= 5; ++k) { const double a = kPi * 0.5 * k / 5.0; pl.push_back({xe - sg * rc * (1.0 - std::sin(a)), -(hwE - rc * (1.0 - std::cos(a)))}); }
+        for (int k = 5; k >= 0; --k) { const double a = kPi * 0.5 * k / 5.0; pl.push_back({xe - sg * rc * (1.0 - std::sin(a)), hwE - rc * (1.0 - std::cos(a))}); }
+        pl.push_back({xe - sg * back, hwE});
+        const double zs[3] = {z0, 0.5 * (z0 + z1), z1}, push[3] = {0.0, 0.018, 0.004};
+        std::vector<std::array<int, 3>> col;
+        for (size_t k = 0; k < pl.size(); ++k) {
+            const double ny = pl[k].second > 0 ? 1.0 : -1.0;
+            const double side = std::fabs(pl[k].second) > hwE - rc * 0.3 ? 1.0 : 0.0;
+            std::array<int, 3> c3{};
+            for (int r2 = 0; r2 < 3; ++r2)
+                c3[r2] = B.v(pl[k].first + sg * push[r2] * (1.0 - side), pl[k].second + ny * push[r2] * side, zs[r2]);
+            col.push_back(c3);
+        }
+        for (size_t k = 0; k + 1 < col.size(); ++k)
+            for (int r2 = 0; r2 < 2; ++r2) {
+                if (front) B.quad(col[k][r2], col[k + 1][r2], col[k + 1][r2 + 1], col[k][r2 + 1], mat);
+                else B.quad(col[k + 1][r2], col[k][r2], col[k][r2 + 1], col[k + 1][r2 + 1], mat);
+            }
+        for (size_t k = 0; k + 1 < col.size(); ++k) {                             // ust kenar kapagi (govdeye doner)
+            const Vertex a = m.verts[col[k][2]], b = m.verts[col[k + 1][2]];
+            const int a2 = B.v(a.x - sg * 0.04, a.y * 0.98, a.z), b2 = B.v(b.x - sg * 0.04, b.y * 0.98, b.z);
+            if (front) B.quad(col[k][2], col[k + 1][2], b2, a2, mat); else B.quad(col[k + 1][2], col[k][2], a2, b2, mat);
+        }
+        if (modern) {                                                             // alt dudak / splitter (koyu)
+            const double zl = z0 - 0.015;
+            B.panel(xe + sg * 0.025, hwE * 0.88, zl, xe - sg * 0.05, hwE * 0.9, zl, xe - sg * 0.05, -hwE * 0.9, zl, xe + sg * 0.025, -hwE * 0.88, zl, MatDark);
+            B.panel(xe + sg * 0.025, -hwE * 0.88, zl, xe - sg * 0.05, -hwE * 0.9, zl, xe - sg * 0.05, hwE * 0.9, zl, xe + sg * 0.025, hwE * 0.88, zl, MatDark);
+        }
+    };
+    wrapBumper(true, bumperZ0, bumperZ1, bumperMat);
     if (modern) B.box(xf - 0.02, xf + 0.035, -hwF * 0.55, hwF * 0.55, bumperZ0 + 0.01, bumperZ0 + 0.09, MatDark);   // alt hava girisi
     B.box(xf + 0.03, xf + 0.04, -0.26, 0.26, bumperZ0 + 0.015, bumperZ0 + 0.125, MatPlate);
-    const double lampZ = std::max(bumperZ1 + 0.06, zNose - 0.075);
+    const double lampZ = std::max(bumperZ1 + 0.06, lampZ0);
     const double lampY = hwF * 0.66;
+    const FaceSpec* fs = faceSpecFor(v.id);
+    // ---- arac basina yuz: parcalar on / arka yuzun egrisine oturur (bombe + kose donusu) ----
+    auto faceX = [&](bool front, double y) {
+        const double sg = front ? 1.0 : -1.0, hwE = halfW(front ? 0.03 : 0.97);
+        const double t = std::min(1.0, std::fabs(y) / hwE), bul = std::clamp(0.010 * L, 0.025, 0.05);
+        double x = (front ? L * 0.5 : -L * 0.5) + sg * bul * (1.0 - t * t) * 0.85;
+        if (t > 0.70) x -= sg * 0.20 * hwE * std::pow((t - 0.70) / 0.30, 2);
+        return x + sg * 0.010;
+    };
+    using Poly = std::vector<std::pair<double, double>>;                          // (y, z)
+    auto facePoly = [&](bool front, const Poly& pts, int mat, double off) {
+        double cy = 0, cz = 0;
+        for (const auto& p : pts) { cy += p.first; cz += p.second; }
+        cy /= pts.size(); cz /= pts.size();
+        const double sg = front ? 1.0 : -1.0;
+        const int c = B.v(faceX(front, cy) + sg * off, cy, cz);
+        std::vector<int> id;
+        for (const auto& p : pts) id.push_back(B.v(faceX(front, p.first) + sg * off, p.first, p.second));
+        for (size_t i = 0; i < id.size(); ++i) {
+            const size_t j = (i + 1) % id.size();
+            B.tri(c, id[i], id[j], mat); B.tri(c, id[j], id[i], mat);              // iki yuzlu (egri yuzeyde yon degisir)
+        }
+    };
+    auto ellipse = [](double cy, double cz, double ry, double rz, int n) {
+        Poly p; for (int k = 0; k < n; ++k) { const double a = 2 * kPi * k / n; p.push_back({cy + ry * std::cos(a), cz + rz * std::sin(a)}); } return p;
+    };
+    auto rrect = [](double cy, double cz, double w, double h, double r) {          // yuvarlak koseli dikdortgen
+        Poly p; r = std::min(r, std::min(w, h) * 0.5);
+        const double cs[4][2] = {{w / 2 - r, h / 2 - r}, {-w / 2 + r, h / 2 - r}, {-w / 2 + r, -h / 2 + r}, {w / 2 - r, -h / 2 + r}};
+        for (int q = 0; q < 4; ++q)
+            for (int k = 0; k <= 3; ++k) { const double a = kPi * 0.5 * (q + k / 3.0); p.push_back({cy + cs[q][0] + r * std::cos(a), cz + cs[q][1] + r * std::sin(a)}); }
+        return p;
+    };
+    auto scaleP = [](const Poly& p, double s) {
+        double cy = 0, cz = 0; for (const auto& q : p) { cy += q.first; cz += q.second; } cy /= p.size(); cz /= p.size();
+        Poly o; for (const auto& q : p) o.push_back({cy + (q.first - cy) * s, cz + (q.second - cz) * s}); return o;
+    };
+    // Far sekli (yan: sg; dis kenar sg yonunde)
+    auto lampShape = [&](FaceLamp k, double cy, double cz, double w, double h, double sg) {
+        const double yi = cy - sg * w / 2, yo = cy + sg * w / 2;
+        switch (k) {
+        case FL_SWEPT: return Poly{{yi, cz - h * 0.30}, {yo, cz - h * 0.50}, {yo + sg * 0.01, cz + h * 0.10}, {yo - sg * w * 0.10, cz + h * 0.55}, {yi, cz + h * 0.30}};
+        case FL_SQUINT: return Poly{{yi - sg * 0.02, cz - h * 0.45}, {yo, cz - h * 0.25}, {yo, cz + h * 0.50}, {yi + sg * w * 0.15, cz + h * 0.50}, {yi - sg * 0.02, cz + h * 0.05}};
+        case FL_OVAL: return ellipse(cy, cz, w / 2, h / 2, 16);
+        case FL_ROUND: return ellipse(cy, cz, w / 2, w / 2, 16);
+        default: return rrect(cy, cz, w, h, std::min(w, h) * 0.18);
+        }
+    };
+    if (fs) {
+        const double zl = lampZ;
+        // Izgara (farlardan once: tam genislik izgarada farlar ustunde durur)
+        const double gzc = zl - 0.01;
+        switch (fs->grille) {
+        case FG_NONE: break;
+        case FG_SLOT: facePoly(true, rrect(0, gzc, fs->gw, fs->gh, 0.02), MatDark, 0.004); break;
+        case FG_WIDE: {
+            const double gw = std::max(0.2, 2.0 * (fs->y * hwF - fs->w / 2) - 0.06);
+            facePoly(true, rrect(0, gzc, gw, fs->gh, 0.02), MatDark, 0.004);
+            for (int k = -1; k <= 1; ++k) facePoly(true, rrect(0, gzc + k * fs->gh * 0.28, gw - 0.02, 0.008, 0.002), bumperMat == MatChrome ? MatChrome : MatTrim, 0.008);
+        } break;
+        case FG_FULL: {
+            const double gw = fs->w > 0 ? 2.0 * (fs->y * hwF + fs->w / 2 + 0.02) : 2.0 * hwF * 0.92;   // gizli farda tum yuz
+            facePoly(true, rrect(0, gzc, std::min(gw, 2 * hwF * 0.94), fs->gh, 0.02), MatDark, 0.004);
+            facePoly(true, rrect(0, gzc - fs->gh * 0.5 - 0.01, std::min(gw, 2 * hwF * 0.94), 0.012, 0.004), MatChrome, 0.008);
+        } break;
+        case FG_KIDNEY:
+            for (double sg : {-1.0, 1.0}) {
+                facePoly(true, rrect(sg * (0.04 + fs->gw / 4), gzc, fs->gw / 2 - 0.02, fs->gh, 0.035), MatChrome, 0.004);
+                facePoly(true, rrect(sg * (0.04 + fs->gw / 4), gzc, fs->gw / 2 - 0.045, fs->gh - 0.025, 0.03), MatDark, 0.008);
+            }
+            break;
+        case FG_MOUTH: {
+            const double mz = 0.5 * (bumperZ0 + bumperZ1);
+            facePoly(true, Poly{{-fs->gw / 2, mz + fs->gh / 2}, {fs->gw / 2, mz + fs->gh / 2}, {fs->gw / 2 * 0.92, mz - fs->gh / 2}, {-fs->gw / 2 * 0.92, mz - fs->gh / 2}}, MatDark, 0.03);
+            facePoly(true, rrect(0, gzc, fs->gw * 0.42, 0.045, 0.015), MatDark, 0.004);   // ust ince giris
+        } break;
+        case FG_HEX: {
+            const double top = gzc + 0.03, bot = std::max(bumperZ0 + 0.02, top - fs->gh);
+            facePoly(true, Poly{{-fs->gw * 0.40, top}, {fs->gw * 0.40, top}, {fs->gw / 2, (top + bot) * 0.5}, {fs->gw * 0.42, bot}, {-fs->gw * 0.42, bot}, {-fs->gw / 2, (top + bot) * 0.5}}, MatDark, 0.03);
+            for (int k = 1; k < 4; ++k) { const double z = bot + (top - bot) * k / 4.0; facePoly(true, rrect(0, z, fs->gw * 0.78, 0.006, 0.002), MatTrim, 0.034); }
+        } break;
+        }
+        // Farlar
+        for (double sg : {-1.0, 1.0}) {
+            const double cy = sg * fs->y * hwF;
+            switch (fs->lamp) {
+            case FL_POP: if (fs->w > 0) {                                            // kapali acilir far: kaput ustunde ince ayrim
+                const double zt = H * P.belt(0.05) + 0.006, x0 = L * 0.5 - 0.04 * L, x1 = L * 0.5 - 0.11 * L;
+                B.panel(x0, cy + fs->w / 2, zt, x1, cy + fs->w / 2, zt + 0.012, x1, cy - fs->w / 2, zt + 0.012, x0, cy - fs->w / 2, zt, MatDark);
+                facePoly(true, rrect(cy, bumperZ1 + 0.03, fs->w * 0.7, 0.035, 0.01), MatLight, 0.006);   // tampon ustu park lambasi
+            } break;
+            case FL_FENDER: {                                                         // camurluk ustunde dik yuvarlak far (911)
+                const double sF2 = 0.06, xF2 = L * (0.5 - sF2) + 0.02, zF2 = H * P.belt(sF2) - 0.03, yF = sg * halfW(sF2) * 0.62;
+                B.diskX(xF2, yF, zF2, fs->w / 2 + 0.015, fs->w / 2 + 0.015, 16, MatChrome);
+                B.diskX(xF2 + 0.006, yF, zF2, fs->w / 2, fs->w / 2, 16, MatLight);
+                B.diskX(xF2 + 0.009, yF, zF2, fs->w / 4, fs->w / 4, 12, MatChrome);
+            } break;
+            case FL_TWIN: {
+                const double d = std::min(fs->w / 2, fs->h);
+                facePoly(true, rrect(cy, zl, fs->w + 0.02, d + 0.02, 0.02), MatDark, 0.002);
+                for (double o : {-1.0, 1.0}) {
+                    facePoly(true, ellipse(cy + o * fs->w / 4, zl, d / 2, d / 2, 14), MatChrome, 0.006);
+                    facePoly(true, ellipse(cy + o * fs->w / 4, zl, d / 3, d / 3, 12), MatLight, 0.010);
+                }
+            } break;
+            default: {
+                const Poly sh = lampShape(fs->lamp, cy, zl, fs->w, fs->h, sg);
+                facePoly(true, scaleP(sh, 1.12), MatDark, 0.002);                      // cerceve / golge
+                facePoly(true, sh, MatChrome, 0.006);                                  // yansitici
+                if (fs->lamp == FL_ROUND) facePoly(true, ellipse(cy, zl, fs->w * 0.30, fs->w * 0.30, 14), MatLight, 0.010);
+                else {
+                    const double py = cy - sg * fs->w * 0.18;                          // ic tarafta projektor + dis tarafta ikinci
+                    facePoly(true, ellipse(py, zl, std::min(fs->h, fs->w) * 0.30, std::min(fs->h, fs->w) * 0.30, 12), MatLight, 0.010);
+                    facePoly(true, ellipse(cy + sg * fs->w * 0.20, zl, std::min(fs->h, fs->w) * 0.24, std::min(fs->h, fs->w) * 0.24, 12), MatLight, 0.010);
+                    if (modern) facePoly(true, rrect(cy, zl - fs->h * 0.38, fs->w * 0.7, 0.012, 0.004), MatLight, 0.010);   // gunduz seridi
+                }
+            } break;
+            }
+            facePoly(true, rrect(sg * hwF * 0.86, bumperZ0 + 0.045, 0.07, 0.03, 0.008), MatIndicator, 0.03);   // sinyal
+        }
+    }
     // Izgara
-    {
+    if (!fs) {
         const double gz0 = bumperZ1 + 0.015, gz1 = std::max(gz0 + 0.04, zNose - 0.03);
         switch (sh.grille) {
         case G_0: break;
@@ -502,7 +680,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
         }
     }
     // Farlar
-    if (v.streetLegal || sh.lamp == L_O || sh.lamp == L_Q) {
+    if (!fs && (v.streetLegal || sh.lamp == L_O || sh.lamp == L_Q)) {
         for (double sg : {-1.0, 1.0}) {
             const double y = sg * lampY;
             switch (sh.lamp) {
@@ -551,10 +729,49 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     const double xr = -L * 0.5;
     const double zTail = H * A.tailZ;
     const double hwR = halfW(0.98);
-    B.box(xr - 0.03, xr + 0.06, -hwR * 0.97, hwR * 0.97, bumperZ0, bumperZ1, bumperMat);
+    wrapBumper(false, bumperZ0, bumperZ1, bumperMat);
     if (modern) B.box(xr - 0.035, xr + 0.02, -hwR * 0.6, hwR * 0.6, bumperZ0 - 0.01, bumperZ0 + 0.05, MatDark);   // difuzor
     B.box(xr - 0.04, xr - 0.03, -0.26, 0.26, bumperZ1 + 0.02, bumperZ1 + 0.13, MatPlate);
-    {
+    if (fs) {                                                                     // arac basina stoplar (kuyruk egrisine oturur)
+        const double zt = std::max(bumperZ1 + 0.10, zTail - 0.10);
+        auto tailLamp = [&](const Poly& p) {
+            facePoly(false, scaleP(p, 1.10), MatDark, 0.002);
+            facePoly(false, p, MatTail, 0.006);
+        };
+        switch (fs->tail) {
+        case FT_BAR: {                                                            // tam genislik serit (ortasi koyu)
+            tailLamp(rrect(0, zt, 2 * hwR * 0.88, fs->th, 0.02));
+            facePoly(false, rrect(0, zt, 0.40, fs->th * 0.6, 0.01), MatDark, 0.010);
+        } break;
+        case FT_TWINR:
+            for (double sg : {-1.0, 1.0}) {
+                const double c0 = sg * fs->ty * hwR;
+                for (double o : {-0.55, 0.55}) {
+                    tailLamp(ellipse(c0 + o * fs->tw, zt, fs->tw / 2, fs->th / 2, 16));
+                    facePoly(false, ellipse(c0 + o * fs->tw, zt, fs->tw / 5, fs->th / 5, 10), MatDark, 0.010);
+                }
+            }
+            break;
+        default:
+            for (double sg : {-1.0, 1.0}) {
+                const double cy = sg * fs->ty * hwR;
+                switch (fs->tail) {
+                case FT_ROUND: tailLamp(ellipse(cy, zt, fs->tw / 2, fs->th / 2, 16)); break;
+                case FT_VERT:
+                    if (fs->tw < 0.15) tailLamp(rrect(cy, zt + 0.02, fs->tw, fs->th, 0.015));
+                    else for (int k = -1; k <= 1; ++k) tailLamp(rrect(cy + k * fs->tw / 3, zt, fs->tw / 3 - 0.02, fs->th, 0.01));   // uclu dikey
+                    break;
+                case FT_SLIM: tailLamp(Poly{{cy - sg * fs->tw / 2, zt}, {cy + sg * fs->tw / 2, zt + fs->th * 0.3}, {cy + sg * fs->tw / 2, zt + fs->th}, {cy - sg * fs->tw / 2, zt + fs->th * 0.5}}); break;
+                default: {
+                    tailLamp(rrect(cy, zt, fs->tw, fs->th, 0.02));
+                    facePoly(false, rrect(cy - sg * fs->tw * 0.30, zt, fs->tw * 0.22, fs->th * 0.5, 0.01), MatIndicator, 0.010);
+                    facePoly(false, rrect(cy + sg * fs->tw * 0.05, zt - fs->th * 0.25, fs->tw * 0.25, fs->th * 0.25, 0.005), MatLight, 0.010);   // geri vites
+                } break;
+                }
+            }
+            break;
+        }
+    } else {
         const double zt = std::max(bumperZ1 + 0.09, zTail - 0.09);
         const double ty = hwR * 0.70;
         for (double sg : {-1.0, 1.0}) {
