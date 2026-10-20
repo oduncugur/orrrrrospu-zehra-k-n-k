@@ -54,7 +54,10 @@ struct Profile {
     double tabH = 1.0;              // tablonun tavan yuksekligi (z / tabH = H orani)
     // Bel: kabin boyunca %18 yukari (cam / tavan bolgesi govdeye gore cok uzundu); uclarda yumusak gecis
     double belt(double s) const {
-        if (tab) return (cabin(s) ? tabLerp(tab->belt, 10, s) : tabLerp(tab->top, 24, s)) / tabH;
+        if (tab) {                                                       // kabin (ustu acikta kokpit) boyunca cam alti cizgisi
+            const bool cock = cabin(s) || (a.open && s >= a.cowlX && s <= a.backX);
+            return (cock ? tabLerp(tab->belt, 10, s) : tabLerp(tab->top, 24, s)) / tabH;
+        }
         const double b = beltRaw(s);
         if (a.open) return b;
         const double w = smooth((s - a.cowlX) / 0.06) * smooth((a.backX - s) / 0.06);
@@ -71,7 +74,7 @@ struct Profile {
     bool cabin(double s) const { return !a.open && s >= a.cowlX - 1e-9 && s <= a.backX + 1e-9; }
     double roof(double s) const {
         if (!cabin(s)) return belt(s);
-        if (tab) return std::max(tabLerp(tab->top, 24, s) / tabH, belt(s));
+        if (tab) return a.open ? belt(s) : std::max(tabLerp(tab->top, 24, s) / tabH, belt(s));   // ustu acik: on cam ayri cizilir
         const double b = belt(s);
         const double edge = 0.988;                                // tavan on / arka kenari (kubbe ortada 1.0)
         if (s < a.roofFX) {                                       // on cam: hafif kavis, tavan kenarinda biter (tavani asmaz)
