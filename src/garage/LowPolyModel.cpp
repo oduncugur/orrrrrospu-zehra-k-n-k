@@ -132,7 +132,7 @@ struct Builder {
     }
     // Teker: 16 kenarli lastik (sirt, yanak, omuz) + jant deseni
     void wheel(double cx, double cy, double cz, double r, double w, Rim rim) {
-        const int N = 16;
+        const int N = 24;
         int o0[N], o1[N], s1[N], rr[N], ri[N];
         const double side = cy > 0 ? 1.0 : -1.0;
         const double yIn = cy - side * w / 2, yOut = cy + side * w / 2;
@@ -152,17 +152,60 @@ struct Builder {
             quad(s1[i], s1[j], rr[j], rr[i], MatTire);
             quad(rr[i], rr[j], ri[j], ri[i], MatChrome);
         }
-        const int hub = v(cx, yOut - side * 0.03, cz);
-        for (int i = 0; i < N; ++i) {
-            const int j = (i + 1) % N;
-            int mat = MatRim;
-            if (rim == W_5) mat = (i % 3 == 2) ? MatDark : MatRim;      // 5 kol + bosluk (16/3 ~ 5)
-            else if (rim == W_M) mat = (i % 2) ? MatDark : MatRim;      // cok kollu
-            else if (rim == W_T) mat = (i % 4 == 0) ? MatDark : MatRim; // disk / turbofan
-            else mat = MatRim;                                          // celik canak
-            tri(hub, ri[i], ri[j], mat);
+        // Jant yuzu: gercek kollar (geometri), aralarda iceride fren diski + kaliper gorunur
+        const double rimIn = rimR * 0.88 * r, hubR = rimIn * 0.24;
+        const double yFace = yOut - side * 0.006, yDeep = yOut - side * 0.085, yHub = yOut + side * 0.004;
+        {   // fren diski (iceride, gri; teker ile doner)
+            const int dc = v(cx, yDeep, cz);
+            const int M2 = 20; int d0 = -1, dp = -1;
+            for (int i = 0; i <= M2; ++i) {
+                const double a = 2 * kPi * i / M2;
+                const int p = i == M2 ? d0 : v(cx + rimIn * 0.82 * std::cos(a), yDeep, cz + rimIn * 0.82 * std::sin(a));
+                if (i == 0) d0 = p; else tri(dc, dp, p, MatRim);
+                dp = p;
+            }
         }
-        if (rim == W_0) { const int c2 = v(cx, yOut + side * 0.012, cz); for (int i = 0; i < N; i += 2) tri(c2, ri[i], ri[(i + 2) % N], MatChrome); }
+        auto spokeAt = [&](double a) -> bool {                           // bu acida kol var mi
+            const double d = a / (2 * kPi);
+            switch (rim) {
+            case W_5: { const double f = d * 5 - std::floor(d * 5); return f < 0.24 || f > 0.92; }
+            case W_M: { const double f = d * 10 - std::floor(d * 10); return f < 0.42; }
+            case W_T: { const double f = d * 12 - std::floor(d * 12); return f > 0.25; }   // turbofan: dar yariklar
+            default:  { const double f = d * 6 - std::floor(d * 6); return f > 0.30; }     // celik: yuvarlak delikli disk
+            }
+        };
+        const int NS = 40;                                               // jant yuzu ince acisal dilimler (kol kenarlari keskin)
+        const int hub = v(cx, yHub, cz);
+        std::vector<int> hubRing(NS), rimRing(NS), rimDeep(NS), hubDeep(NS);
+        for (int i = 0; i < NS; ++i) {
+            const double a = 2 * kPi * i / NS, c = std::cos(a), s = std::sin(a);
+            hubRing[i] = v(cx + hubR * c, yFace, cz + hubR * s);
+            rimRing[i] = v(cx + rimIn * c, yFace, cz + rimIn * s);
+            rimDeep[i] = v(cx + rimIn * c, yDeep + side * 0.01, cz + rimIn * s);
+            hubDeep[i] = v(cx + hubR * c, yDeep + side * 0.01, cz + hubR * s);
+        }
+        for (int i = 0; i < NS; ++i) {
+            const int j = (i + 1) % NS;
+            tri(hub, hubRing[i], hubRing[j], MatRim);                    // gobek
+            const double am = 2 * kPi * (i + 0.5) / NS;
+            if (spokeAt(am)) quad(hubRing[i], rimRing[i], rimRing[j], hubRing[j], MatRim);   // kol yuzu
+            else {
+                quad(hubRing[i], hubDeep[i], hubDeep[j], hubRing[j], MatRim);                 // kol yan duvarlari (derinlik)
+                quad(rimRing[i], rimRing[j], rimDeep[j], rimDeep[i], MatRim);
+                const double ap = 2 * kPi * (i - 0.5) / NS, an = 2 * kPi * (i + 1.5) / NS;
+                if (spokeAt(ap)) quad(hubRing[i], rimRing[i], rimDeep[i], hubDeep[i], MatRim);
+                if (spokeAt(an)) quad(hubRing[j], hubDeep[j], rimDeep[j], rimRing[j], MatRim);
+            }
+        }
+        for (int i = 0; i < NS; ++i) {                                   // jant dudagi -> yuz arasi (dudak ici)
+            const int j = (i + 1) % NS;
+            const double a0 = 2 * kPi * i / NS, a1 = 2 * kPi * j / NS;
+            const int l0 = v(cx + rimR * 0.88 * r * std::cos(a0), yOut - side * 0.004, cz + rimR * 0.88 * r * std::sin(a0));
+            const int l1 = v(cx + rimR * 0.88 * r * std::cos(a1), yOut - side * 0.004, cz + rimR * 0.88 * r * std::sin(a1));
+            quad(l0, l1, rimRing[j], rimRing[i], MatChrome);
+        }
+        if (rim == W_0) { const int c2 = v(cx, yOut + side * 0.014, cz);  // celik: kucuk krom gobek kapagi
+            for (int i = 0; i < NS; i += 4) tri(c2, hubRing[i], hubRing[(i + 4) % NS], MatChrome); }
     }
 };
 
@@ -804,9 +847,34 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     {
         const double sm = std::min(A.cowlX + 0.03, A.roofFX), xm = L * (0.5 - sm);
         const double zm = H * P.belt(sm) + 0.07, ym = halfW(sm) * A.beltW;
+        // Ayna: ayak (kapiya baglanir) + one dogru incelen yuvarlak govde + arka yuzde cam. Klasik krom, 80-90 siyah, modern boya
+        const int hm = v.year < 1978 ? MatChrome : v.year < 1995 ? MatTrim : MatPaint;
         for (double sg : {-1.0, 1.0}) {
-            B.box(xm - 0.05, xm + 0.05, sg * (ym + 0.02), sg * (ym + 0.15), zm - 0.045, zm + 0.045, modern ? MatPaint : MatChrome);
-            B.box(xm - 0.052, xm - 0.048, sg * (ym + 0.03), sg * (ym + 0.14), zm - 0.035, zm + 0.035, MatGlass);
+            const double y0 = sg * (ym + 0.015), y1 = sg * (ym + 0.17), xb = xm - 0.05, xfm = xm + 0.06;
+            B.box(xm - 0.03, xm + 0.03, std::min(sg * (ym - 0.01), y0), std::max(sg * (ym - 0.01), y0), zm - 0.06, zm - 0.035, MatTrim);   // ayak
+            const int NA = 10;                                                    // elips kesitli govde: arka buyuk, on kucuk
+            std::vector<int> back(NA), frontR(NA);
+            const double yc = 0.5 * (y0 + y1), ry = std::fabs(y1 - y0) * 0.5, rz = 0.05;
+            for (int k = 0; k < NA; ++k) {
+                const double a = 2 * kPi * k / NA, cy2 = std::cos(a), sz = std::sin(a);
+                back[k] = B.v(xb, yc + ry * cy2, zm + rz * sz);
+                frontR[k] = B.v(xfm, yc + ry * 0.55 * cy2 + sg * ry * 0.25, zm + rz * 0.55 * sz - 0.005);
+            }
+            const int tip = B.v(xfm + 0.02, yc + sg * ry * 0.3, zm - 0.005);
+            for (int k = 0; k < NA; ++k) {
+                const int j = (k + 1) % NA;
+                B.quad(back[k], frontR[k], frontR[j], back[j], hm);
+                B.tri(tip, frontR[j], frontR[k], hm);
+            }
+            const int gc = B.v(xb - 0.004, yc, zm);                               // arka yuz: cam (ince cerceveli)
+            for (int k = 0; k < NA; ++k) {
+                const int j = (k + 1) % NA;
+                const double a0 = 2 * kPi * k / NA, a1 = 2 * kPi * j / NA;
+                const int g0 = B.v(xb - 0.004, yc + ry * 0.86 * std::cos(a0), zm + rz * 0.82 * std::sin(a0));
+                const int g1 = B.v(xb - 0.004, yc + ry * 0.86 * std::cos(a1), zm + rz * 0.82 * std::sin(a1));
+                B.tri(gc, g0, g1, MatGlass); B.tri(gc, g1, g0, MatGlass);
+                B.quad(back[k], back[j], g1, g0, hm);
+            }
         }
     }
 
