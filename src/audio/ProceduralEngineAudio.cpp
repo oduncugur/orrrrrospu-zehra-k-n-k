@@ -118,8 +118,8 @@ void ProceduralEngineAudio::render(float* out, int n) {
     const bool sc = e_.induction == Induction::Supercharger;
     const bool dogbox = gearboxTable()[v_.gearbox].type == Gearbox::Dogbox;
     // Patlama olasiligi: yalnizca duz boru (pop & bang) bol patlatir; spor seyrek, stok neredeyse hic
-    const double popProb = v_.exhaust == Exhaust::StraightPipe ? 0.10 : v_.exhaust == Exhaust::Sport ? 0.012 : 0.002;
-    const double cutPop  = v_.exhaust == Exhaust::StraightPipe ? 0.30 : v_.exhaust == Exhaust::Sport ? 0.06 : 0.01;
+    const double popProb = 0.0;                                          // egzoz patlamasi kapali (kullanici istegi)
+    const double cutPop  = 0.0;
     // Yanma ayrisma (combustion crack) payi: yuksek sikistirma / yaris motoru daha sert
     const double crack = raceCam ? 0.45 : 0.3;
 
@@ -162,7 +162,7 @@ void ProceduralEngineAudio::render(float* out, int n) {
                 if ((noise() * 0.5 + 0.5) < cutPop) { amp = 1.8; pop = true; } // kesicide yanmamis yakit patlar
             } else if (thr < 0.05 && rpm > 2800) {
                 amp = 0.34;                                                     // motor freni: pompalama + hafif yanma (ses kaybolmaz)
-                const double p = in_.antiLag ? 0.5 : popProb;
+                const double p = popProb;
                 if ((noise() * 0.5 + 0.5) < p) { amp = 2.0; pop = true; }
             }
             firePulse(tEv + ev.delay + jitter, ev.bank, amp, pulseTau_ * (pop ? 2.2 : 1.0), pop, false);
