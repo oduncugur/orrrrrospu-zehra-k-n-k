@@ -46,7 +46,7 @@ private:
 class IntroScreen : public Screen {
 public:
     explicit IntroScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return true; }   // sinematik: yatay
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -438,7 +438,7 @@ public:
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
-    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, MenuView, Master, Engine, Tire,
+    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, MenuView, Pad, Master, Engine, Tire,
                       Haptics, Tilt, TiltSens, Assist, Esp, Gears, Speed, Tree };
 private:
     struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi

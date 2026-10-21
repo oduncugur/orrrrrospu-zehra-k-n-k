@@ -30,6 +30,7 @@ const char* label(It it) {
     case It::Tire: return "LASTIK SESI";
     case It::Haptics: return "TITRESIM";
     case It::Tilt: return "EGIM DIREKSIYON";
+    case It::Pad: return "GAMEPAD";
     case It::TiltSens: return "EGIM HASSASIYET";
     case It::Assist: return "CEKIS KONT.";
     case It::Esp: return "ESP";
@@ -54,6 +55,7 @@ const char* help(It it) {
     case It::Engine: return "MOTOR, EGZOZ, TURBO SESI";
     case It::Tire: return "LASTIK CIGLIGI VE BURNOUT SESI";
     case It::Haptics: return "TITRESIM GUCU. 0 = KAPALI";
+    case It::Pad: return "GAMEPAD ILE OYNUYORSAN AC: JIROSKOP (EGIM) DIREKSIYONU KAPANIR";
     case It::Tilt: return "TELEFONU EGEREK DIREKSIYON; TERS: YON CEVRILIR";
     case It::TiltSens: return "YUKSEK: DAHA AZ EGIMLE TAM DIREKSIYON";
     case It::Assist: return "TC/ESP: YALNIZ ARACTA VARSA (YOKSA ECU + ELEKTRONIK PARCASI). YOLDA DA DEGISIR";
@@ -87,7 +89,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
         {0, It::IntScale}, {0, It::Graphics}, {0, It::RoadView}, {0, It::MenuView},
         {1, It::Master}, {1, It::Engine}, {1, It::Tire},
 #ifdef __ANDROID__
-        {2, It::Haptics}, {2, It::Tilt}, {2, It::TiltSens},
+        {2, It::Haptics}, {2, It::Pad}, {2, It::Tilt}, {2, It::TiltSens},
 #endif
         {2, It::Assist}, {2, It::Esp}, {2, It::Gears},
         {3, It::Speed}, {3, It::Tree}};
@@ -123,6 +125,7 @@ std::string SettingsScreen::value(It it) const {
     case It::Engine: return pct(s.engineVol);
     case It::Tire: return pct(s.tireVol);
     case It::Haptics: return s.haptics > 0 ? pct(s.haptics) : "KAPALI";
+    case It::Pad: return s.gamepadMode ? "ACIK (EGIM KAPALI)" : "KAPALI";
     case It::Tilt: return !s.tiltSteer ? onOff(false) : s.tiltInvert ? std::string("TERS") : onOff(true);
     case It::TiltSens: return pct(s.tiltSens);
     case It::Assist: return onOff(s.assist);
@@ -167,6 +170,7 @@ void SettingsScreen::change(It it, int dir) {
         s.haptics = list(Settings::hapticOptions(), s.haptics);
         app_.haptic(40, 200);                                  // yeni gucu hissettir
         break;
+    case It::Pad: s.gamepadMode = !s.gamepadMode; break;
     case It::Tilt:                                   // KAPALI -> ACIK -> TERS (yon) -> KAPALI
         if (!s.tiltSteer) { s.tiltSteer = true; s.tiltInvert = false; } else if (!s.tiltInvert) s.tiltInvert = true; else { s.tiltSteer = false; s.tiltInvert = false; }
         break;

@@ -99,7 +99,7 @@ bool App::initGraphics() { return renderer_.init(); }
 void App::shutdownGraphics() { renderer_.shutdown(); }
 
 void App::setScreen(std::unique_ptr<Screen> s) {
-    if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(screen_->landscape()); return; }
+    if (!screen_) { screen_ = std::move(s); if (onOrientation) onOrientation(landscape()); return; }
     pending_ = std::move(s);   // bir sonraki karede gecis (ekran kendi metodunun icindeyken silinmesin)
     windSpeed_ = 0.0f; nos_ = false; rain_ = false; siren_ = 0.0f;
     for (Voice& v : voices_) { v.slip = 0.0f; v.lock = 0.0f; }      // yaris bitince lastik sesi menuye tasinmasin
@@ -236,7 +236,7 @@ void App::update(double dt) {
     if (!toasts_.empty() && (toastT_ += dt) > 2.6) { toasts_.erase(toasts_.begin()); toastT_ = 0; }
     if (pending_) {
         screen_ = std::move(pending_);
-        if (onOrientation) onOrientation(screen_->landscape());
+        if (onOrientation) onOrientation(landscape());
         fade_ = 1.0f;                                         // ekran gecisi: karartmadan acilir
     }
     fade_ = std::max(0.0f, fade_ - (float)std::min(dt, 0.05) / 0.22f);
@@ -250,7 +250,9 @@ void App::update(double dt) {
 
 void App::render() {
     if (!renderer_.ready()) return;
+    renderer_.fold = settings.menuLandscape;                      // her sey yatay: dikey ekranlar iki sutuna katlanir
     screen_->render(renderer_);
+    renderer_.unfold();                                           // bildirim / onay penceresi duz yatay
     if (fade_ > 0.0f) renderer_.rect(0, 0, (float)renderer_.vw(), (float)renderer_.vh(), {0.02f, 0.02f, 0.03f, fade_ * fade_});
     if (!toasts_.empty()) {                                       // ust bildirim: kayarak iner, 2.6 s
         const float W = (float)renderer_.vw(), k = (float)std::min({1.0, toastT_ / 0.25, (2.6 - toastT_) / 0.25});
@@ -295,7 +297,8 @@ void App::pointerDown(int id, float px, float py) {
     if (!hint_.empty()) { hint_.clear(); return; }               // ipucu karti: dokunus kapatir (ekrana gecmez)
     float x, y; renderer_.toVirtual(sw_, sh_, px, py, x, y);
     if (confirmBack_) {                                           // onay: EVET sol, HAYIR sag (disari dokunus = hayir)
-        const float W = (float)renderer_.vw(), H = (float)renderer_.vh(), x0 = (W - 300) * 0.5f, y0 = (H - 130) * 0.5f;
+        renderer_.toVirtual(sw_, sh_, px, py, x, y, true);        // pencere katlanmadan cizilir
+        const float W = (float)renderer_.pw(), H = (float)renderer_.ph(), x0 = (W - 300) * 0.5f, y0 = (H - 130) * 0.5f;
         confirmBack_ = false;
         if (x >= x0 + 16 && x <= x0 + 140 && y >= y0 + 70 && y <= y0 + 114) screen_->key(Key::Back, true);
         return;
@@ -479,7 +482,7 @@ void App::renderAudio(float* out, int frames) {
 bool App::readPixelsRGB(std::vector<unsigned char>& rgb, int& w, int& h) {
     // ZK_SHOT_FBO: ic cozunurlukteki sanal tampondan (renderScale x 640x360 / 360x640) - pencere boyutundan bagimsiz
     const bool fbo = std::getenv("ZK_SHOT_FBO") != nullptr;
-    w = fbo ? renderer_.vw() * renderer_.renderScale() : sw_; h = fbo ? renderer_.vh() * renderer_.renderScale() : sh_;
+    w = fbo ? renderer_.pw() * renderer_.renderScale() : sw_; h = fbo ? renderer_.ph() * renderer_.renderScale() : sh_;
     std::vector<unsigned char> rgba((size_t)w * h * 4);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     if (fbo) renderer_.bindTarget();

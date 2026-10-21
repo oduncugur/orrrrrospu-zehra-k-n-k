@@ -104,7 +104,7 @@ public:
     // Performans olcumu (ekranda kucuk gosterge): kare hizi ve kare basina guncelleme (fizik) suresi
     double fps() const { return fps_; }
     double updateMs() const { return updMs_; }
-    bool landscape() const { return screen_ && screen_->landscape(); }
+    bool landscape() const { return screen_ && (screen_->landscape() || settings.menuLandscape); }   // her sey yatay: dikey ekranlar katlanir
 
     // Ekranlar icin
     void goGarage();

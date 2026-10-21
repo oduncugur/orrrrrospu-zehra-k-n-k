@@ -1,4 +1,4 @@
-// ZEHRA KINIK - Acilis sinematigi (dikey 360x640): gece, yagmur, islak asfalt (ters yansima), dort cekim.
+// ZEHRA KINIK - Acilis sinematigi (yatay 640x360): gece, yagmur, islak asfalt (ters yansima), dort cekim.
 // Ilk acilis: vitrin araci (E46) tam surum (~7 s). Sonraki acilislar: oyuncunun araci, kisa kahraman cekimi (~3.5 s).
 // Dokun / tus: atla. Sonunda garaja (ana menu) gecer.
 #include "app/Screens.h"
@@ -12,7 +12,7 @@
 namespace zk {
 
 namespace {
-constexpr int kW = 360, kH = 640;
+constexpr int kW = 640, kH = 360;
 constexpr int kShowcaseCar = 122;                 // BMW M3 E46 (en iyi model)
 float hashI(int i) { unsigned x = (unsigned)i * 2654435761u; x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xFFFF) / 65535.0f; }
 float ease(float x) { x = std::clamp(x, 0.0f, 1.0f); return x * x * (3.0f - 2.0f * x); }
@@ -74,10 +74,10 @@ void IntroScreen::render(Renderer& r) {
     r.begin(kW, kH, {0.01f, 0.01f, 0.02f});
     const float t = (float)t_;
     // ---- gokyuzu: gece, mor-lacivert; uzak sehir silueti (pencereler) ----
-    const float horizon = 330.0f;
+    const float horizon = 205.0f;
     r.gradientV(0, 0, kW, horizon, {0.02f, 0.02f, 0.06f}, {0.16f, 0.08f, 0.20f});
-    for (int k = 0; k < 46; ++k) {
-        const float bw = 10 + 22 * hashI(k * 3), bh = 50 + 190 * hashI(k * 7) * hashI(k * 5 + 1);
+    for (int k = 0; k < 80; ++k) {
+        const float bw = 10 + 22 * hashI(k * 3), bh = 35 + 120 * hashI(k * 7) * hashI(k * 5 + 1);
         const float x = std::fmod(k * 17.3f - t * 4.0f + 1000.0f, (float)kW + 40.0f) - 20.0f;
         r.rect(x, horizon - bh, x + bw, horizon, {0.05f, 0.04f, 0.09f});
         for (int w = 0; w < 8; ++w) if (hashI(k * 31 + w) > 0.62f) {
@@ -88,7 +88,7 @@ void IntroScreen::render(Renderer& r) {
     // ---- islak asfalt: koyu, ufukta isik yansimasi (dikey cizgiler) ----
     r.gradientV(0, horizon, kW, kH, {0.06f, 0.05f, 0.09f}, {0.015f, 0.015f, 0.025f});
     r.gradientV(0, horizon - 26, kW, horizon + 18, {0.30f, 0.16f, 0.32f, 0.0f}, {0.30f, 0.16f, 0.32f, 0.35f});   // ufuk sisi
-    for (int k = 0; k < 14; ++k) {                                         // sehir isiklarinin islak asfaltta uzayan yansimasi
+    for (int k = 0; k < 24; ++k) {                                         // sehir isiklarinin islak asfaltta uzayan yansimasi
         const float x = std::fmod(k * 47.3f - t * 4.0f + 1000.0f, (float)kW);
         const Color c = hashI(k) > 0.5f ? Color{1.0f, 0.62f, 0.3f, 0.0f} : Color{0.45f, 0.55f, 1.0f, 0.0f};
         const float len = 50 + 90 * hashI(k * 13), wv = 1.5f + 1.2f * std::sin(t * 3.0f + k);
@@ -100,7 +100,7 @@ void IntroScreen::render(Renderer& r) {
     }
     // Sokak lambalari (ufukta): turuncu isik + koni
     for (int k = 0; k < 6; ++k) {
-        const float x = std::fmod(k * 131.0f - t * 9.0f + 2000.0f, (float)kW + 80) - 40, top = horizon - 110;
+        const float x = std::fmod(k * 131.0f - t * 9.0f + 2000.0f, (float)kW + 80) - 40, top = horizon - 80;
         r.rect(x - 1, top, x + 1, horizon, {0.08f, 0.07f, 0.1f});
         r.circle(x, top, 14, 14, {1.0f, 0.65f, 0.3f, 0.10f});
         r.circle(x, top, 3, 8, {1.0f, 0.85f, 0.6f, 0.9f});
@@ -158,21 +158,21 @@ void IntroScreen::render(Renderer& r) {
         r.tri(x, y, x + 1.2f, y, x - 3.0f, y + 14.0f, {0.75f, 0.8f, 0.95f, 0.22f});
     }
     // ---- vinyet ----
-    r.gradientV(0, 60, kW, 170, {0, 0, 0, 0.55f}, {0, 0, 0, 0.0f});
-    r.gradientV(0, kH - 170, kW, kH - 60, {0, 0, 0, 0.0f}, {0, 0, 0, 0.6f});
-    for (int i = 0; i < 10; ++i) { const float w = 6.0f * (10 - i); r.rect(0, 60, w * 0.6f, kH - 60, {0, 0, 0, 0.06f}); r.rect(kW - w * 0.6f, 60, kW, kH - 60, {0, 0, 0, 0.06f}); }
+    r.gradientV(0, 30, kW, 100, {0, 0, 0, 0.55f}, {0, 0, 0, 0.0f});
+    r.gradientV(0, kH - 100, kW, kH - 30, {0, 0, 0, 0.0f}, {0, 0, 0, 0.6f});
+    for (int i = 0; i < 10; ++i) { const float w = 6.0f * (10 - i); r.rect(0, 30, w * 0.6f, kH - 30, {0, 0, 0, 0.06f}); r.rect(kW - w * 0.6f, 30, kW, kH - 30, {0, 0, 0, 0.06f}); }
     // ---- sinematik bantlar + logo ----
-    r.rect(0, 0, kW, 60, {0, 0, 0, 1}); r.rect(0, kH - 60, kW, kH, {0, 0, 0, 1});
+    r.rect(0, 0, kW, 30, {0, 0, 0, 1}); r.rect(0, kH - 30, kW, kH, {0, 0, 0, 1});
     const float lt = t - 5.0f;
     if (lt > 0) {
         if (lt < 0.25f) r.rect(0, 0, kW, kH, {1, 1, 1, 0.8f * (1.0f - lt / 0.25f)});   // flas
         const float s = 4.0f + 2.5f * std::max(0.0f, 0.15f - lt) / 0.15f;               // carpma: buyukten oturur
         const float a = ease(lt / 0.15f);
-        r.textCentered(kW * 0.5f + 3, 150 + 3, "ZEHRA KINIK", s, {0, 0, 0, 0.6f * a});
-        r.textCentered(kW * 0.5f, 150, "ZEHRA KINIK", s, {1.0f, 0.78f, 0.15f, a});
-        if (lt > 0.5f) r.textCentered(kW * 0.5f, 196, "SOKAKLAR SENIN", 2, {1, 1, 1, ease((lt - 0.5f) / 0.4f) * 0.9f});
+        r.textCentered(kW * 0.5f + 3, 80 + 3, "ZEHRA KINIK", s, {0, 0, 0, 0.6f * a});
+        r.textCentered(kW * 0.5f, 80, "ZEHRA KINIK", s, {1.0f, 0.78f, 0.15f, a});
+        if (lt > 0.5f) r.textCentered(kW * 0.5f, 126, "SOKAKLAR SENIN", 2, {1, 1, 1, ease((lt - 0.5f) / 0.4f) * 0.9f});
     }
-    if (t > 0.6f) r.text(kW - 92, kH - 40, "DOKUN: GEC", 1, {1, 1, 1, 0.45f});
+    if (t > 0.6f) r.text(kW - 92, kH - 22, "DOKUN: GEC", 1, {1, 1, 1, 0.45f});
     // ---- giris / cikis karartma ----
     if (t_ < 0.5 && full_) r.rect(0, 0, kW, kH, {0, 0, 0, 1.0f - ease(t / 0.5f)});
     if (t_ > dur_ - 0.45) r.rect(0, 0, kW, kH, {0, 0, 0, ease((float)(t_ - (dur_ - 0.45)) / 0.45f)});

@@ -30,7 +30,8 @@ struct Settings {
     bool  esp = true;                // ESP (yaw kontrolu) acik yolda her aracta
     int   tiltSens = 100;            // egim hassasiyeti (%), 50..200
     int   dragDist = 0;              // drag mesafesi: 0 = 1/4 mil, 1 = 1/2 mil, 2 = 1 mil
-    bool  tiltInvert = false;        // egim yonu ters (telefon / tutus farki)
+    bool  tiltInvert = false;
+    bool  gamepadMode = false;       // gamepad ile oynayan: egim (jiroskop) direksiyonu tamamen kapali        // egim yonu ters (telefon / tutus farki)
     bool  assist = true;             // acik yol surus yardimi (ESP + otomatik debriyaj) varsayilani
     bool  manualGears = false;       // (eski) acik yolda manuel vites varsayilani; artik vites kolu sanziman tipinden
     // H-desen manuelde debriyaj: false = oyuncu (analog pedal), true = otomatik. Otomatigin bedeli (denge):

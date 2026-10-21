@@ -62,6 +62,7 @@ std::string Settings::serialize() const {
     o << "engine_volume=" << engineVol << "\n";
     o << "tire_volume=" << tireVol << "\n";
     o << "haptics=" << haptics << "\n";
+    o << "gamepad_mode=" << (gamepadMode ? 1 : 0) << "\n";
     o << "tilt_steer=" << (tiltSteer ? 1 : 0) << "\n";
     o << "esp=" << (esp ? 1 : 0) << "\n";
     o << "tilt_sensitivity=" << tiltSens << "\n";
@@ -105,6 +106,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "engine_volume") s.engineVol = snap(volumeOptions(), v);
         else if (k == "tire_volume") s.tireVol = snap(volumeOptions(), v);
         else if (k == "haptics") s.haptics = snap(hapticOptions(), v);
+        else if (k == "gamepad_mode") s.gamepadMode = v != 0;
         else if (k == "tilt_steer") s.tiltSteer = v != 0;
         else if (k == "esp") s.esp = v != 0;
         else if (k == "tilt_sensitivity") s.tiltSens = snap(tiltSensOptions(), v);

@@ -28,7 +28,7 @@ inline bool zkLoadGL(void* (*)(const char*)) { return true; }
     X(PFNGLGENVERTEXARRAYSPROC, glGenVertexArrays) X(PFNGLBINDVERTEXARRAYPROC, glBindVertexArray)              \
     X(PFNGLGENBUFFERSPROC, glGenBuffers) X(PFNGLBINDBUFFERPROC, glBindBuffer)                                  \
     X(PFNGLBUFFERDATAPROC, glBufferData) X(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray)        \
-    X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer) X(PFNGLVIEWPORTPROC, glViewport)                    \
+    X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer) X(PFNGLVIEWPORTPROC, glViewport) X(PFNGLSCISSORPROC, glScissor)                    \
     X(PFNGLCLEARCOLORPROC, glClearColor) X(PFNGLCLEARPROC, glClear) X(PFNGLENABLEPROC, glEnable)               \
     X(PFNGLDISABLEPROC, glDisable) X(PFNGLDRAWARRAYSPROC, glDrawArrays) X(PFNGLACTIVETEXTUREPROC, glActiveTexture) \
     X(PFNGLREADPIXELSPROC, glReadPixels) X(PFNGLPIXELSTOREIPROC, glPixelStorei)                             \
@@ -71,6 +71,7 @@ ZK_GL_FUNCS(ZK_GL_DECLARE)
 #define glEnableVertexAttribArray zk_glEnableVertexAttribArray
 #define glVertexAttribPointer zk_glVertexAttribPointer
 #define glViewport zk_glViewport
+#define glScissor zk_glScissor
 #define glClearColor zk_glClearColor
 #define glClear zk_glClear
 #define glEnable zk_glEnable

@@ -362,7 +362,7 @@ void WorldScreen::update(double dt) {
     // Direksiyon (RoadScreen ile ayni): hiza gore sinir, klavye ya da egim
     // Hiza duyarli direksiyon (RoadCar::steerLimit): sehir hizinda genis kilit, hizlandikca sertlesir
     double target = (M.kL ? RoadCar::steerLimit(sim, v, 1.0) : 0.0) - (M.kR ? RoadCar::steerLimit(sim, v, -1.0) : 0.0);
-    if (!M.kL && !M.kR && app.tiltAvailable && app.settings.tiltSteer) {
+    if (!M.kL && !M.kR && app.tiltAvailable && app.settings.tiltSteer && !app.settings.gamepadMode) {
         const double raw = std::clamp(1.3 * (app.settings.tiltInvert ? -1.0 : 1.0) * app.tilt() * app.settings.tiltSens / 100.0, -1.0, 1.0);   // ~23 deg tam
         M.tiltF += (raw - M.tiltF) * std::min(1.0, dt / 0.12);
         const double dz = 0.08, t = M.tiltF, u = std::fabs(t) < dz ? 0.0 : (t - std::copysign(dz, t)) / (1.0 - dz);

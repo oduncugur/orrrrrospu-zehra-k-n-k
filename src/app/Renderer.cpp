@@ -355,10 +355,12 @@ void Renderer::bindTarget() { glBindFramebuffer(GL_FRAMEBUFFER, fbo_); }
 
 void Renderer::begin(int vw, int vh, Color c) {
     vw_ = std::min(vw, kFbo); vh_ = std::min(vh, kFbo);
+    foldFrame_ = folding_ = fold && vw_ == 360 && vh_ == 640;
+    pw_ = foldFrame_ ? 640 : vw_; ph_ = foldFrame_ ? 360 : vh_;
     sun_ = amb_ = 1.0f;
     ensureTarget();
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    glViewport(0, 0, vw_ * scale_, vh_ * scale_);
+    glViewport(0, 0, pw_ * scale_, ph_ * scale_);
     glClearColor(c.r, c.g, c.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     batch_.clear();
@@ -371,12 +373,12 @@ void Renderer::present(int sw, int sh) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     float sx, sy; scaleXY(sw, sh, sx, sy);
-    const int w = (int)(vw_ * sx), h = (int)(vh_ * sy);
+    const int w = (int)(pw_ * sx), h = (int)(ph_ * sy);
     glViewport((sw - w) / 2, (sh - h) / 2, w, h);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glUseProgram(pBlit_);
-    glUniform2f(uUv_, (float)(vw_ * scale_) / texSize_, (float)(vh_ * scale_) / texSize_);
+    glUniform2f(uUv_, (float)(pw_ * scale_) / texSize_, (float)(ph_ * scale_) / texSize_);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, tex_);
     glBindVertexArray(vaoQ_);
@@ -384,23 +386,48 @@ void Renderer::present(int sw, int sh) {
 }
 
 float Renderer::scaleFor(int sw, int sh) const {
-    const float sc = std::min((float)sw / vw_, (float)sh / vh_);
+    const float sc = std::min((float)sw / pw_, (float)sh / ph_);
     return integerScale && sc >= 1.0f ? std::floor(sc) : sc;   // pencere sanal tampondan kucukse kesirli kalir
 }
 
 void Renderer::scaleXY(int sw, int sh, float& sx, float& sy) const {
     sx = sy = scaleFor(sw, sh);
     if (!fillScreen || integerScale) return;
-    sx = (float)sw / vw_; sy = (float)sh / vh_;                         // gerilerek doldur
+    sx = (float)sw / pw_; sy = (float)sh / ph_;                         // gerilerek doldur
     const float kMax = 1.35f;                                           // asiri en-boy farkinda yine bant
     if (sx > sy * kMax) sx = sy * kMax;
     if (sy > sx * kMax) sy = sx * kMax;
 }
 
-void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y) const {
+void Renderer::toVirtual(int sw, int sh, float px, float py, float& x, float& y, bool raw) const {
     float sx, sy; scaleXY(sw, sh, sx, sy);
-    const float w = vw_ * sx, h = vh_ * sy;
+    const float w = pw_ * sx, h = ph_ * sy;
     x = (px - (sw - w) * 0.5f) / sx; y = (py - (sh - h) * 0.5f) / sy;
+    if (!foldFrame_ || raw) return;
+    const bool right = x >= 320.0f;                                     // katlanmis: yatay -> dikey
+    x = (x - (right ? 320.0f : 0.0f)) / kFoldK;
+    y = (y - kFoldOy) / kFoldK + (right ? 320.0f : 0.0f);
+}
+
+void Renderer::unfold() {
+    if (!folding_) return;
+    flush2D();
+    folding_ = false; vw_ = pw_; vh_ = ph_;
+}
+
+// Dikey (x, y, w, h) dikdortgenini iki katlanmis yariya cizer: her yari icin viewport + makas
+template <class F> void Renderer::foldPasses(float x, float y, float w, float h, F draw) {
+    const int S = scale_;
+    if (!folding_) { draw((int)(x * S), (ph_ - (int)(y + h)) * S, (int)(w * S), (int)(h * S)); return; }
+    glEnable(GL_SCISSOR_TEST);
+    for (int p = 0; p < 2; ++p) {
+        if (p == 0 ? y >= 320.0f : y + h <= 320.0f) continue;          // bu yarida yok
+        const float ox = p ? 320.0f : 0.0f, oy = kFoldOy - (p ? 320.0f * kFoldK : 0.0f);
+        const float X = ox + x * kFoldK, Yt = oy + y * kFoldK, W = w * kFoldK, H = h * kFoldK;
+        glScissor((int)(ox * S), (int)((ph_ - kFoldOy - 320.0f * kFoldK) * S), (int)(320 * S), (int)(320.0f * kFoldK * S) + 1);
+        draw((int)(X * S), (int)((ph_ - (Yt + H)) * S), (int)(W * S), (int)(H * S));
+    }
+    glDisable(GL_SCISSOR_TEST);
 }
 
 void Renderer::tri(float ax, float ay, float bx, float by, float cx, float cy, Color c) {
@@ -493,13 +520,16 @@ void Renderer::flush2D() {
     else glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, vw_ * scale_, vh_ * scale_);
     glUseProgram(p2d_);
     glUniform2f(uSize_, (float)vw_, (float)vh_);
     glBindVertexArray(vao2d_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo2d_);
     glBufferData(GL_ARRAY_BUFFER, batch_.size() * sizeof(float), batch_.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(batch_.size() / 7));
+    foldPasses(0, 0, (float)vw_, (float)vh_, [&](int vx, int vy, int vwid, int vhei) {
+        glViewport(vx, vy, vwid, vhei);
+        glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(batch_.size() / 7));
+    });
+    glViewport(0, 0, pw_ * scale_, ph_ * scale_);
     glDisable(GL_BLEND);
     if (worldDepth_) { glDepthFunc(GL_LESS); glDisable(GL_DEPTH_TEST); }
     batch_.clear();
@@ -673,7 +703,9 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     glEnable(GL_DEPTH_TEST);
     if (!worldDepth_) glClear(GL_DEPTH_BUFFER_BIT);                     // dunya derinligi varsa araclar binalarin arkasinda kalir
     const int S = scale_;
-    glViewport((int)(x * S), (vh_ - (int)(y + h)) * S, (int)(w * S), (int)(h * S));
+    foldPasses(x, y, w, h, [&](int vpx, int vpy, int vpw, int vph) {
+    glViewport(vpx, vpy, vpw, vph);
+    if (folding_ && !worldDepth_) glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(p3d_);
     // Kamera konumu (gorunum matrisinin tersinden): yansima ve parlama icin
     const float* V = view.m;
@@ -751,7 +783,8 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
     }
     if (look.alpha < 1.0f) { glDisable(GL_BLEND); glUniform1f(uAlpha_, 1.0f); }
     glDisable(GL_DEPTH_TEST);
-    glViewport(0, 0, vw_ * S, vh_ * S);
+    });
+    glViewport(0, 0, pw_ * S, ph_ * S);
 }
 
 } // namespace zk

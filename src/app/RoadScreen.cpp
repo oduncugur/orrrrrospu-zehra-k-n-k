@@ -307,7 +307,7 @@ void RoadScreen::update(double dt) {
     // Direksiyon: hiza gore sinirli (kinematik yanal ivme ~1.1 g), rampali; klavye ya da telefon egimi
     // Hiza gore sinir + kayma payi: arka kayarken (govde kayma acisi) karsi direksiyon icin tam aci acilir
     double target = (kL_ ? RoadCar::steerLimit(P.sim(), v, 1.0) : 0.0) - (kR_ ? RoadCar::steerLimit(P.sim(), v, -1.0) : 0.0);
-    if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer) {   // olu bolge %6
+    if (!kL_ && !kR_ && app_.tiltAvailable && app_.settings.tiltSteer && !app_.settings.gamepadMode) {   // olu bolge %6
         // Kararli ve hiza duyarli egim: ek suzgec (~0.12 s); olu bolge %5; tepki egrisi hizla sertlesir (u^p, p 1 -> 1.8):
         // yuksek hizda kucuk egimler az direksiyon verir, telefon cok cevrilince tepki normale yaklasir (tam kilit ayni)
         const double raw = std::clamp(1.3 * (app_.settings.tiltInvert ? -1.0 : 1.0) * app_.tilt() * app_.settings.tiltSens / 100.0, -1.0, 1.0);

@@ -31,7 +31,7 @@ public:
     // Kare: sanal cozunurlukte cizime basla / ekrana olcekle
     void begin(int vw, int vh, Color clear);
     void present(int screenW, int screenH);
-    void toVirtual(int screenW, int screenH, float px, float py, float& x, float& y) const;
+    void toVirtual(int screenW, int screenH, float px, float py, float& x, float& y, bool raw = false) const;
     int  vw() const { return vw_; }
     int  vh() const { return vh_; }
     bool integerScale = false;         // ekrana tam sayi katla olcekle (piksel-keskin; kenarlarda bant kalabilir)
@@ -40,6 +40,13 @@ public:
     void setRenderScale(int s) { scale_ = s < 1 ? 1 : s > 3 ? 3 : s; }
     int  renderScale() const { return scale_; }
     void bindTarget();                 // sanal tamponu bagla (test ekran goruntusu okumasi)
+    // Katlama (her sey yatay): dikey 360x640 ekran 640x360 tampona iki sutun olarak cizilir; ust yari (y < 320)
+    // solda, alt yari sagda (%89 olcek). Ekran kodu dikey koordinatlarla calismaya devam eder; dokunus geri cevrilir.
+    bool fold = false;
+    void unfold();                     // kalan cizim (bildirim, onay penceresi) duz yatay koordinatla
+    int  pw() const { return pw_; }    // fiziksel (tampon) boyut
+    int  ph() const { return ph_; }
+    bool folded() const { return foldFrame_; }
 
     // 2D (sanal piksel, sol ust orijin). flush2D cagrilana kadar biriktirilir.
     void rect(float x0, float y0, float x1, float y1, Color c);
@@ -110,7 +117,10 @@ private:
     int scale_ = 2, texSize_ = 0;
     float sun_ = 1.0f, amb_ = 1.0f;
     int uLight_ = -1;
-    int vw_ = 360, vh_ = 640;
+    int vw_ = 360, vh_ = 640, pw_ = 360, ph_ = 640;
+    bool foldFrame_ = false, folding_ = false;
+    static constexpr float kFoldK = 320.0f / 360.0f, kFoldOy = (360.0f - 320.0f * kFoldK) * 0.5f;
+    template <class F> void foldPasses(float x, float y, float w, float h, F draw);   // dikey dikdortgen -> iki yari
     bool ready_ = false;
 };
 
