@@ -137,7 +137,7 @@ public:
     bool takeCrash() { const bool c = crashEv_; crashEv_ = false; return c; }
     void setRivalPace(double p) { rivalPace_ = p; }   // YZ viraj temposu (yanal g payi; varsayilan 0.55)
     // Yagmur: tum araclarin tutusu %72, rakip temkinli (tempo x0.85)
-    void setRain(bool on) { rain_ = on; const double g = on ? 0.72 : 1.0; player_->gripMul = g; if (rival_) rival_->gripMul = g; }
+    void setRain(bool on) { rain_ = on; const double g = on ? 0.86 : 1.0; player_->gripMul = g; if (rival_) rival_->gripMul = g; }
     bool rain() const { return rain_; }
 
 private:

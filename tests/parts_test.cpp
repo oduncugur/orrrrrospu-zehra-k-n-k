@@ -89,7 +89,7 @@ int main() {
         VehicleSimConfig c2; c2.car = &sahin; c2.tune = &camEcu; const VehicleSim sc(c2);
         CHECK(sc.engineSpec().redlineRpm > sa.engineSpec().redlineRpm + 1400 && sc.engineSpec().redlineRpm < sc.valveSafeRpm(),
               "ECU devri acar; kam + supap varken guvenli sinirin altinda");
-        CHECK(peakHpRpm(sc) > peakHpRpm(sa) + 500, "kam + ECU devri: guc tepesi yukari tasinir");
+        CHECK(peakHpRpm(sc) < peakHpRpm(sa) + 500, "8 supap (Sahin): kam + ECU guc tepesini ust devire kacirmaz");
         Tune swap;                                                               // en guclu motor (liste sonu yeni eklenenler)
         for (int k = 0; k < (int)swapEngines().size(); ++k)
             if (swap.engineSwap == 0 || engineTable()[swapEngines()[k]].powerHp > engineTable()[swapEngines()[swap.engineSwap - 1]].powerHp) swap.engineSwap = k + 1;

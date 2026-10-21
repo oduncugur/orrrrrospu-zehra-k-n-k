@@ -20,6 +20,7 @@ struct Settings {
     bool  integerScale = false;      // piksel-keskin tam sayi olcek (kenarlarda siyah bant olabilir)
     bool  fillScreen = true;         // ekrani doldur: en-boy farki %35'e kadar gerilir (uzun telefonda siyah bant yok)
     int   renderScale = 2;           // ic cozunurluk carpani: 1 retro (piksel), 2 normal, 3 yuksek
+    bool  menuLandscape = false;     // ana menu (garaj): false dikey (360x640), true yatay (640x360)
     bool  roadPortrait = false;      // acik yol ekrani: false yatay (640x360), true dikey (360x640)
     // Ses (yuzde, 0..100)
     int   masterVol = 100, engineVol = 100, tireVol = 100;

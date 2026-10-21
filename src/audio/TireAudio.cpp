@@ -49,13 +49,14 @@ void TireAudio::render(float* out, int n, double slip, float gain, double lockSp
     const double f0 = locked ? 300.0 + 500.0 * std::clamp(lockSpeed / 30.0, 0.0, 1.0)      // kilit: hizla 800 -> 300 Hz
                              : (450.0 + 30.0 * std::min(slip, 11.0)) * (1.0 - 0.15 * burnT);   // daha kalin ciglik (tizlik azaltildi)
     if (std::fabs(f0 - lastF_) > 3.0) { lastF_ = f0; toneBand_.bandpass(f0, 4.0, fs_); }
+    const double kSpd = 3.0;   // dalgalanma/oynatma hizi (3x: titreme, puruz, citirti daha sik)
     const double kEnv = 1.0 - std::exp(-1.0 / (0.025 * fs_)), kBurn = 1.0 - std::exp(-1.0 / (0.10 * fs_));
-    const double kW = 1.0 - std::exp(-1.0 / (0.25 * fs_));     // yavas perde gezinmesi (~0.6 Hz)
-    const double kW2 = 1.0 - std::exp(-1.0 / (0.012 * fs_));   // hizli duzensiz titreme (~13 Hz)
-    const double kT = 1.0 - std::exp(-1.0 / (0.06 * fs_));     // siddet dalgalanmasi
-    const double kR = 1.0 - std::exp(-1.0 / (0.004 * fs_));    // kukreme puruzu
-    const double chirpDecay = std::exp(-1.0 / (0.09 * fs_)), crackDecay = std::exp(-1.0 / (0.0008 * fs_));
-    const double roughHz = 25.0 + 2.5 * std::min(slip, 18.0);  // lastik / dis blogu frekansi
+    const double kW = 1.0 - std::exp(-1.0 / (0.25 / kSpd * fs_));     // yavas perde gezinmesi (~0.6 Hz)
+    const double kW2 = 1.0 - std::exp(-1.0 / (0.012 / kSpd * fs_));   // hizli duzensiz titreme (~13 Hz)
+    const double kT = 1.0 - std::exp(-1.0 / (0.06 / kSpd * fs_));     // siddet dalgalanmasi
+    const double kR = 1.0 - std::exp(-1.0 / (0.004 / kSpd * fs_));    // kukreme puruzu
+    const double chirpDecay = std::exp(-1.0 / (0.09 / kSpd * fs_)), crackDecay = std::exp(-1.0 / (0.0008 / kSpd * fs_));
+    const double roughHz = kSpd * (25.0 + 2.5 * std::min(slip, 18.0));  // lastik / dis blogu frekansi
     for (int i = 0; i < n; ++i) {
         env_ += (sq - env_) * kEnv;
         burn_ += (burnT - burn_) * kBurn;
@@ -82,9 +83,9 @@ void TireAudio::render(float* out, int n, double slip, float gain, double lockSp
             hissOne_ += (hissLp_.run(hissBp_.run(x)) - hissOne_) * 0.35;   // 3. kutup: ust tiz kirpilir
             const double hiss = hissOne_ * 2.1;
             const double rumble = rumbleHp_.run(rumbleLp_.run(x));
-            if (rnd() > 1.0 - 2.0 * 220.0 / fs_) crackEnv_ = 0.5 + 0.5 * std::fabs(rnd());       // citirti (~220/s)
+            if (rnd() > 1.0 - 2.0 * 220.0 * kSpd / fs_) crackEnv_ = 0.5 + 0.5 * std::fabs(rnd());       // citirti (~220/s)
             const double crack = crackHp_.run(crackEnv_ * rnd()); crackEnv_ *= crackDecay;
-            if (chirpEnv_ < 0.02 && rnd() > 1.0 - 2.0 * 2.5 / fs_) { chirpEnv_ = 0.7 + 0.3 * std::fabs(rnd()); chirp_ = rnd(); }   // ara ciglik
+            if (chirpEnv_ < 0.02 && rnd() > 1.0 - 2.0 * 2.5 * kSpd / fs_) { chirpEnv_ = 0.7 + 0.3 * std::fabs(rnd()); chirp_ = rnd(); }   // ara ciglik
             o += burn_ * (0.6 * hiss * std::clamp(block, 0.2, 1.6) + 0.55 * rumble * std::clamp(block, 0.3, 1.5) + 0.2 * crack);
         }
         chirpEnv_ *= chirpDecay;

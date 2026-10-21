@@ -17,11 +17,24 @@ namespace {
 bool cheat() { static const bool on = std::getenv("ZK_CHEAT") != nullptr; return on; }   // magaza surumunde para hilesi yok
 // Yerlesim (v2, kullanici dostu): ust serit (para / un), 3B arac (iki yanda ok, sag ustte ayar), bilgi kartlari,
 // buyuk YARIS dugmesi, iki sira ikonlu kutucuk. Devir testi: 3B gorunumde GAZ dugmesi (basili tut).
+// Yatay surum (ayar: MENU EKRANI = YATAY, 640x360): solda 3B arac + gaz seridi + bilgi, sagda kartlar, YARIS, kutucuklar.
 const Rect kPrev{4, 140, 42, 214}, kNext{318, 140, 356, 214};
-const Rect kSettingsG{316, 64, 354, 100}, kSellG{316, 106, 354, 132}, kRestoreG{6, 64, 118, 88}, kCashG{6, 260, 58, 286};
-const Rect kGas{64, 246, 354, 288};   // analog gaz seridi: soldan saga (sol = 0, sag = tam gaz)
-const Rect kRace{8, 386, 352, 436};
-Rect tileR(int i) { return {8 + (i % 4) * 87.0f, 444 + (i / 4) * 92.0f, 8 + (i % 4) * 87.0f + 82, 444 + (i / 4) * 92.0f + 86}; }
+const Rect kSettingsG{316, 64, 354, 100}, kSellG{316, 106, 354, 132}, kRestoreG{6, 64, 118, 88};
+Rect kCashG{6, 260, 58, 286};
+Rect kGas{64, 246, 354, 288};   // analog gaz seridi: soldan saga (sol = 0, sag = tam gaz)
+Rect kRace{8, 386, 352, 436};
+bool gLand = false;
+const Rect kLDlgYes{170, 236, 314, 280}, kLDlgNo{326, 236, 470, 280};   // yatay satis onayi
+void layout(bool land) {
+    gLand = land;
+    kCashG = land ? Rect{6, 268, 58, 294} : Rect{6, 260, 58, 286};
+    kGas = land ? Rect{64, 266, 354, 300} : Rect{64, 246, 354, 288};
+    kRace = land ? Rect{364, 110, 632, 160} : Rect{8, 386, 352, 436};
+}
+Rect tileR(int i) {
+    if (gLand) return {364 + (i % 4) * 68.0f, 168 + (i / 4) * 92.0f, 364 + (i % 4) * 68.0f + 64, 168 + (i / 4) * 92.0f + 86};
+    return {8 + (i % 4) * 87.0f, 444 + (i / 4) * 92.0f, 8 + (i % 4) * 87.0f + 82, 444 + (i / 4) * 92.0f + 86};
+}
 enum GTile { TParts, TSetup, TGauge, TPaint, TDyno, TRoad, TGallery, TStreet, TCount };
 #ifdef ZK_OPENWORLD
 const char* const kTileName[TCount] = {"PARCA", "KURULUM", "KADRAN", "BOYA", "DYNO", "ACIK DUNYA", "GALERI", "SOKAK"};   // acik dunya surumu
@@ -91,14 +104,18 @@ void GarageScreen::render(Renderer& r) {
     const VehicleDef& v = *findVehicle(oc.carId);
     const EngineDef& e = engineTable()[effectiveEngine(v, &oc.tune)];   // motor swap
     char b[128];
-    r.begin(360, 640, kUiBg);
+    const bool land = landscape();
+    layout(land);
+    const float W = land ? 640.0f : 360.0f;
+    r.begin((int)W, land ? 360 : 640, kUiBg);
     // ---- 3B arac (studyo) ----
-    studio(r, 58, 294, 230);
+    const float carH = land ? 204.0f : 236.0f;
+    studio(r, 58, 58 + carH, land ? 210 : 230);
     const float L = (float)v.lengthM;
-    const Mat4 proj = matPerspective(0.75f, 360.0f / 236.0f, 0.1f, 50.0f);
+    const Mat4 proj = matPerspective(0.75f, 360.0f / carH, 0.1f, 50.0f);
     const Mat4 view = matLookAt(0.0f, 1.1f + 0.2f * L, 1.35f * L + 1.2f, 0.0f, 0.55f, 0.0f);
     r.setCarLook(lookOf(oc));
-    r.drawCar(v.id, 0, 58, 360, 236, proj, view, matRotY(spin_));
+    r.drawCar(v.id, 0, 58, 360, carH, proj, view, matRotY(spin_));
     if (c.cars.size() > 1) {                                            // arac degistir: iki yanda buyuk ok
         button(r, kPrev, "<", {0.15f, 0.16f, 0.2f, 0.75f}, 3);
         button(r, kNext, ">", {0.15f, 0.16f, 0.2f, 0.75f}, 3);
@@ -115,28 +132,29 @@ void GarageScreen::render(Renderer& r) {
     const float rpm = (float)pt_->rpm(), red = (float)pt_->engine().redlineRpm;
     r.rect(kGas.x0, kGas.y0, kGas.x1, kGas.y1, {0.2f, 0.15f, 0.1f, 0.9f});
     r.rect(kGas.x0, kGas.y0, kGas.x0 + (kGas.x1 - kGas.x0) * throttle_, kGas.y1, {0.9f, 0.5f, 0.1f, 0.95f});
-    r.text(kGas.x1 - 40, 252, "GAZ", 1, {1, 1, 1});
+    r.text(kGas.x1 - 40, kGas.y0 + 6, "GAZ", 1, {1, 1, 1});
     std::snprintf(b, sizeof b, "%5.0f RPM", rpm);
-    r.text(70, 262, b, 2, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
-    if (pt_->vtecActive()) r.text(200, 262, "VTEC", 2, {1.0f, 0.2f, 0.2f});
-    const float fill = std::clamp(rpm / (red * 1.08f), 0.0f, 1.0f);
-    r.rect(0, 290, 360, 294, {0.15f, 0.15f, 0.18f});
-    r.rect(0, 290, 360 * fill, 294, rpm > red * 0.9f ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
-    r.rect(360 / 1.08f, 288, 360 / 1.08f + 2, 296, {1, 0.2f, 0.2f});
+    r.text(70, kGas.y0 + 16, b, 2, pt_->limiterHit() ? Color{1.0f, 0.5f, 0.1f} : Color{1, 1, 1});
+    if (pt_->vtecActive()) r.text(200, kGas.y0 + 16, "VTEC", 2, {1.0f, 0.2f, 0.2f});
+    const float fill = std::clamp(rpm / (red * 1.08f), 0.0f, 1.0f), barY = land ? 304.0f : 290.0f;
+    r.rect(0, barY, 360, barY + 4, {0.15f, 0.15f, 0.18f});
+    r.rect(0, barY, 360 * fill, barY + 4, rpm > red * 0.9f ? Color{0.95f, 0.2f, 0.3f} : Color{0.2f, 0.85f, 0.3f});
+    r.rect(360 / 1.08f, barY - 2, 360 / 1.08f + 2, barY + 6, {1, 0.2f, 0.2f});
     // ---- ust serit ----
-    r.rect(0, 0, 360, 58, kUiPanel);
+    r.rect(0, 0, W, 58, kUiPanel);
     r.text(8, 7, upper(v.brand), 1, kUiGold);
     r.textFit(8, 22, upper(v.model), 2, 200, {1, 1, 1});
     std::snprintf(b, sizeof b, "%d %s %s  %.0f KM", v.year, bodyName(v.body), driveName(v.drive), app_.career.car().odo());
     r.text(8, 42, upper(b), 1, kUiDim);
     const std::string m = money(c.money);
-    r.text(352 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
+    r.text(W - 8 - r.textWidth(m, 2), 8, m, 2, {0.4f, 1.0f, 0.5f});
     std::snprintf(b, sizeof b, "UN %d   GALIBIYET %d", c.rep, c.wins);
-    r.text(352 - r.textWidth(b, 1), 30, b, 1, kUiDim);
-    if (app_.settings.showFps) { std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps()); r.text(352 - r.textWidth(b, 1), 42, b, 1, {0.45f, 0.5f, 0.45f}); }
+    r.text(W - 8 - r.textWidth(b, 1), 30, b, 1, kUiDim);
+    if (app_.settings.showFps) { std::snprintf(b, sizeof b, "%2.0f FPS", app_.fps()); r.text(W - 8 - r.textWidth(b, 1), 42, b, 1, {0.45f, 0.5f, 0.45f}); }
     // ---- bilgi kartlari ----
     std::snprintf(b, sizeof b, "%s  %.0f KG  KESICI %.0f", engineDisplayName(e).c_str(), v.massKg - oc.tune.totalWeightKg(), pt_->engine().redlineRpm);
-    r.textFit(8, 302, upper(b), 1, 344, kUiText);
+    const float infoY = land ? 316.0f : 302.0f, statY = land ? 336.0f : 366.0f;
+    r.textFit(8, infoY, upper(b), 1, 344, kUiText);
     struct Chip { const char* label; std::string val; Color col; };
     char hp[24], tq[24], ix[24], et[24];
     std::snprintf(hp, sizeof hp, "%.0f", tunedHp_); std::snprintf(tq, sizeof tq, "%.0f", torqueNm_); std::snprintf(ix, sizeof ix, "%.0f", index_);
@@ -144,23 +162,23 @@ void GarageScreen::render(Renderer& r) {
     const Chip chips[4] = {{"GUC HP", hp, tunedHp_ > stockHp_ + 0.5 ? Color{0.4f, 1.0f, 0.5f} : Color{1, 1, 1}}, {"TORK NM", tq, {1, 1, 1}},
                            {"ENDEKS", ix, kUiGold}, {oc.bestEt > 0 ? "EN IYI 1/4" : "TAHMINI 1/4", et, {0.55f, 0.8f, 1.0f}}};
     for (int i = 0; i < 4; ++i) {
-        const float x0 = 8 + i * 87.0f;
-        r.rect(x0, 316, x0 + 82, 356, kUiPanel);
-        r.rect(x0, 316, x0 + 82, 318, chips[i].col);
-        r.textCentered(x0 + 41, 322, chips[i].label, 1, kUiDim);
-        r.textFit(x0 + 41, 335, chips[i].val, 2, 76, chips[i].col, true);
+        const float x0 = land ? 364 + i * 68.0f : 8 + i * 87.0f, cw = land ? 64.0f : 82.0f, y0 = land ? 64.0f : 316.0f;
+        r.rect(x0, y0, x0 + cw, y0 + 40, kUiPanel);
+        r.rect(x0, y0, x0 + cw, y0 + 2, chips[i].col);
+        r.textFit(x0 + cw * 0.5f, y0 + 6, chips[i].label, 1, cw - 4, kUiDim, true);
+        r.textFit(x0 + cw * 0.5f, y0 + 19, chips[i].val, 2, cw - 6, chips[i].col, true);
     }
     // Durum satiri: hasar / musteri / parca ozeti
     if (oc.jobHp > 0) {
         std::snprintf(b, sizeof b, "MUSTERI: %.0f / %d HP  ODEME %s", tunedHp_, oc.jobHp, money(oc.jobReward).c_str());
-        r.textFit(8, 366, b, 1, 344, tunedHp_ + 0.5 >= oc.jobHp ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
+        r.textFit(8, statY, b, 1, 344, tunedHp_ + 0.5 >= oc.jobHp ? Color{0.4f, 1.0f, 0.5f} : kUiGold);
     } else if (!oc.raceable()) {
         std::string d = "HASAR:";
         if (oc.axleBroken) d += " AKS KIRIK";
         if (oc.gearboxBroken) d += " SANZIMAN KIRIK";
         if (oc.engineWear > 0.02) { char e2[32]; std::snprintf(e2, sizeof e2, " MOTOR %%%d", (int)(oc.engineWear * 100 + 0.5)); d += e2; }
-        r.textFit(8, 366, d, 1, 344, {1.0f, 0.35f, 0.3f});
-    } else r.textFit(8, 366, tuneSummary(oc.tune), 1, 344, kUiGold);
+        r.textFit(8, statY, d, 1, 344, {1.0f, 0.35f, 0.3f});
+    } else r.textFit(8, statY, tuneSummary(oc.tune), 1, 344, kUiGold);
     // ---- buyuk YARIS dugmesi ----
     if (oc.jobHp > 0) {
         const bool ok = tunedHp_ + 0.5 >= oc.jobHp;
@@ -182,6 +200,7 @@ void GarageScreen::render(Renderer& r) {
         tile(r, tileR(i), kTileIcon[i], kTileName[i], kTileCol[i], badge);
     }
 #ifndef __ANDROID__
+    if (!land)
 #ifdef ZK_OPENWORLD
     r.textCentered(180, 630, "<> ARAC  ENTER YARIS  PGUP ACIK DUNYA  W GAZ  O AYAR", 1, {0.45f, 0.6f, 0.85f});
 #else
@@ -189,10 +208,19 @@ void GarageScreen::render(Renderer& r) {
 #endif
 #endif
     if (msgT_ > 0) {
-        r.rect(0, 240, 360, 270, {0.02f, 0.02f, 0.04f, 0.88f});
-        r.textFit(180, 248, msg_, 2, 344, kUiGold, true);
+        r.rect(0, 240, W, 270, {0.02f, 0.02f, 0.04f, 0.88f});
+        r.textFit(W * 0.5f, 248, msg_, 2, W - 16, kUiGold, true);
     }
-    if (selling_) drawSaleDialog(r, c.car());
+    if (selling_ && land) {                                             // yatay: kisa satis onayi
+        r.rect(0, 0, W, 360, {0, 0, 0, 0.6f});
+        r.rect(150, 80, 490, 296, {0.10f, 0.11f, 0.16f});
+        r.rect(150, 80, 490, 84, kUiRed);
+        r.textCentered(320, 102, "ARAC SATILSIN MI?", 2, {1, 1, 1});
+        r.textFit(320, 132, upper(v.fullName()), 1, 320, kUiText, true);
+        r.textCentered(320, 170, money(sellPrice(c.car())), 3, {0.4f, 1.0f, 0.5f});
+        button(r, kLDlgYes, "SAT", kUiRed, 2);
+        button(r, kLDlgNo, "VAZGEC", kUiBtn, 2);
+    } else if (selling_) drawSaleDialog(r, c.car());
 }
 
 void GarageScreen::sellConfirmed() {
@@ -206,9 +234,10 @@ void GarageScreen::sellConfirmed() {
 }
 
 void GarageScreen::pointerDown(int id, float x, float y) {
+    layout(landscape());
     if (selling_) {                                              // modal onay
-        if (kDlgYes.hit(x, y)) sellConfirmed();
-        else if (kDlgNo.hit(x, y)) selling_ = false;
+        if ((gLand ? kLDlgYes : kDlgYes).hit(x, y)) sellConfirmed();
+        else if ((gLand ? kLDlgNo : kDlgNo).hit(x, y)) selling_ = false;
         return;
     }
     Career& c = app_.career;

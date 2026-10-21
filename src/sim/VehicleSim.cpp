@@ -77,6 +77,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         const bool forced = ed && (ed->induction == Induction::Turbo || ed->induction == Induction::TwinTurbo ||
                                    ed->induction == Induction::Supercharger);
         const double hp0 = peakHp(eng_), red0 = eng_.redlineRpm;
+        const EngineSpec stock = eng_;   // modifiye oncesi egri (8 supap karakteri / atmosferik sinir icin)
         const IntakeOpt& IT = row(intakeTable(), tune->intake);
         const ShapeOpt& EX = row(exhaustTable(), tune->exhaust);
         bool knockSensor = true;
@@ -177,7 +178,8 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         valveSafeRpm_ = std::max(eng_.idleRpm + 2500.0, red0 + redAdd - EC.redline + 250.0 + potential);
         // Kam / kafa nefesi guc tepesini yukari tasir (egri tepe ustu gerilir); ECU devri acinca bu bolge kullanilir
         // ECU devri de tepeyi tasir (harita / avans ust devire gore): acilan devrin %60'i; kam / kafa ustune ekler
-        const double breathe = 1.2 * ((tune->cam > 0 ? C.redline : 0.0) + HD.redline) + 0.6 * std::max(0.0, EC.redline);
+        const double breathe = (ed && ed->valvesPerCyl > 0 && ed->valvesPerCyl <= 2 ? 0.35 : 1.0) *   // 8 supap: tepe yukari kacmaz
+                               (1.2 * ((tune->cam > 0 ? C.redline : 0.0) + HD.redline) + 0.6 * std::max(0.0, EC.redline));
         if (breathe > 0.0) {
             const double piv = 0.45 * red0, k = (red0 + breathe - piv) / (red0 - piv);
             for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) if (pr.first > piv) pr.first = piv + (pr.first - piv) * k;
@@ -199,6 +201,34 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
         if (tune->wearEngine > 0 || tune->wearElec > 0) {
             double w = (1.0 - 0.40 * std::clamp(tune->wearEngine, 0.0, 1.0)) * (1.0 - 0.10 * std::clamp(tune->wearElec, 0.0, 1.0));
             scaleCurves(eng_, constMul, &w);
+        }
+        if (ed && ed->valvesPerCyl > 0 && ed->valvesPerCyl <= 2 && !forced && tune->turbo == 0 && tune->superch == 0) {
+            // 8 supap (silindir basina 2): kafa ust devirde nefes alamaz; modifiye kazanci alt/orta devire gider.
+            // Stok egriye gore kazanc: ust devirde %40'a kisilir, alt devirde %25 buyutulur.
+            auto at = [](const TorqueCurve& c, double x) {
+                if (x <= c.front().first) return c.front().second;
+                for (size_t i = 1; i < c.size(); ++i)
+                    if (x <= c[i].first) return c[i-1].second + (x - c[i-1].first) / (c[i].first - c[i-1].first) * (c[i].second - c[i-1].second);
+                return c.back().second;
+            };
+            for (int k = 0; k < 2; ++k) {
+                TorqueCurve& c = k ? eng_.highCam : eng_.lowCam;
+                const TorqueCurve& s0 = k ? stock.highCam : stock.lowCam;
+                if (s0.empty()) continue;
+                for (auto& pr : c) {
+                    const double base = at(s0, pr.first);
+                    if (base <= 1.0) continue;
+                    const double g = pr.second / base - 1.0;
+                    const double t = std::clamp((pr.first / red0 - 0.40) / 0.30, 0.0, 1.0);   // 0: alt devir, 1: ust devir
+                    const double kG = g > 0.0 ? 1.25 + (0.40 - 1.25) * t : 1.0;
+                    pr.second = base * (1.0 + g * kG);
+                }
+            }
+        }
+        if (ed && !forced && tune->turbo == 0 && tune->superch == 0 && ed->displacementL > 0.3 && ed->valvesPerCyl > 0) {   // rotari haric
+            // Atmosferik sinir: hacim basina ~125 Nm/L (yaris motorlari ~120); buyuk krank hacmi buyutur
+            const double capNm = 125.0 * ed->displacementL * disp;
+            for (auto* c : {&eng_.lowCam, &eng_.highCam}) for (auto& pr : *c) pr.second = std::min(pr.second, capNm);
         }
         // Yakit sistemi siniri: fabrika gucunun cap katini asan tork kirpilir (buyuk turbo / kompresor yakit ister).
         // v1 turbo kitleri yakit yukseltmesini icerir.

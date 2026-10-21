@@ -17,7 +17,7 @@ namespace zk {
 class GarageScreen : public Screen {
 public:
     explicit GarageScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     bool modal() const { return selling_; }      // onay penceresi acik (Android geri tusu kapatir)
     void update(double dt) override;
     void render(Renderer& r) override;
@@ -438,7 +438,7 @@ public:
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
-    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, Master, Engine, Tire,
+    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, MenuView, Master, Engine, Tire,
                       Haptics, Tilt, TiltSens, Assist, Esp, Gears, Speed, Tree };
 private:
     struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi

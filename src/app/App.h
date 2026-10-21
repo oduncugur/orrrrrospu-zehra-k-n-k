@@ -67,7 +67,10 @@ public:
     void haptic(int ms, int amplitude);           // ayarlardaki titresim gucuyle olceklenir (0 = kapali)
     // Egim (ivmeolcer) direksiyonu: platform yazar (-1 sag .. +1 sol); yoksa tiltAvailable=false
     void setTilt(float t) { tilt_ = t; tiltAvailable = true; }
-    float tilt() const { return tilt_; }
+    float tilt() const {   // olu bolge: elde hafif titreme / egik tutus direksiyonu oynatmaz
+        const float t = tilt_, dz = 0.07f, a = t < 0 ? -t : t;
+        return a <= dz ? 0.0f : (t < 0 ? -1.0f : 1.0f) * (a - dz) / (1.0f - dz);
+    }
     // Oyun kolu tetikleri (analog 0..1): platform yazar; gaz / fren pedali tetige oranli
     void setPadPedals(float thr, float brk) { padThr_ = thr; padBrk_ = brk; }
     // Kapili H vites (gercek kol gibi): bosta sol / sag kanal secer (birakinca orta 3-4 kanalina yaylanir), yukari / asagi

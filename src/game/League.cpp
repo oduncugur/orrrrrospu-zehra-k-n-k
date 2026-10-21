@@ -37,6 +37,11 @@ const char* bossLine(int rival, int kind) {
         {"GECE KUSU ASLI", {"GECE BENIM SAATIM. YETISEBILIRSEN.", "ISIKLARI SEN SONDURDUN. SAYGI.", "STOPLARIMI BILE GOREMEDIN."}},
         {"BASKAN", {"BU YOLLARIN KURALINI BEN KOYARIM.", "DEMEK KURALLAR DEGISTI.", "OYLAMA BITTI. KAYBETTIN."}},
         {"DAGIN HAYALETI", {"VIRAJLARI KIMSE BENIM GIBI BILMEZ.", "SISIN ICINDEN CIKTIN... KIMSIN SEN?", "HAYALETI YAKALAYAMAZSIN."}},
+        {"KORFEZIN SAHIBI ILKER", {"KORFEZDE BENI GECEN OLMADI.", "TERSANEDE ADIN KONUSULUR ARTIK.", "IZMIT SANA BUYUK GELDI."}},
+        {"PROFESOR NAZLI", {"DERS BASLIYOR. NOT ALMAYI UNUTMA.", "TEBRIKLER, SINIFI GECTIN.", "KALDIN. SEMESTIR TEKRARI."}},
+        {"OVANIN AGASI", {"BU OVADA DUZ YOL BENIMDIR.", "OVA SENI KABUL ETTI.", "TOZUMU YUTTUN, YAVRUM."}},
+        {"KAYA KARTALI", {"KALEYE CIKAN YOLU BEN ACTIM.", "KARTAL BUGUN YERE INDI.", "KAYALAR BENI TANIR, SENI DEGIL."}},
+        {"RIVIERA KONTU", {"SAHIL BENIM, GUNES BENIM.", "BU YAZ SENIN, KONTLUK DA.", "GUNESLENMEYE DEVAM ET."}},
         {"EFSANE", {"BUTUN O YOLLAR BURAYA CIKIYORDU.", "ARTIK EFSANE SENSIN.", "EFSANELER KOLAY OLMEZ."}},
     };
     for (const auto& k : kLines)
@@ -136,6 +141,10 @@ const std::vector<EventDef>& leagueEvents() {
         {"GECE PISTI KARMA", 4, M::Karma, 46, 16500, 66, false, 0}, {"LARA AKISI", 4, M::Flow, -1, 12500, 50, false, 95000},
         {"TOROS INISI", 4, M::Touge, -1, 15500, 64, false, 0}, {"ANTALYA MARATONU", 4, M::Marathon, -1, 21000, 82, false, 0},
         {"ANTALYA KACISI", 4, M::Chase, -1, 12500, 58, false, 0},
+        // Ikinci sehir patronlari (sona eklenir; her sehrin kendi patronu)
+        {"PATRON: KORFEZIN SAHIBI", 0, M::Road, 47, 2200, 42, false, 0}, {"PATRON: PROFESOR", 1, M::Karma, 48, 6500, 72, false, 0},
+        {"PATRON: OVANIN AGASI", 2, M::Drag, 49, 16000, 112, false, 0}, {"PATRON: KAYA KARTALI", 3, M::Touge, 50, 32000, 165, false, 0},
+        {"PATRON: RIVIERA KONTU", 4, M::Road, 51, 64000, 310, false, 0},
     };
     return e;
 }
