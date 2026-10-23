@@ -1,4 +1,4 @@
-// ZEHRA KINIK - Ekranlar
+﻿// ZEHRA KINIK - Ekranlar
 #pragma once
 #include "app/App.h"
 #include "app/Cockpit.h"
@@ -146,7 +146,7 @@ TuneStats tuneStats(const VehicleDef& v, const Tune& t);
 class PartsScreen : public Screen {
 public:
     PartsScreen(App& app, int cat = -1);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -176,7 +176,7 @@ private:
 class FabricateScreen : public Screen {
 public:
     FabricateScreen(App& app, int cat);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -211,7 +211,7 @@ void drawSaleDialog(Renderer& r, const OwnedCar& oc);
 class GalleryScreen : public Screen {
 public:
     explicit GalleryScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { spin_ += (float)dt * 0.6f; msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -234,7 +234,7 @@ private:
 class LeagueScreen : public Screen {
 public:
     explicit LeagueScreen(App& app, int tab = -1);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -255,7 +255,7 @@ private:
 class RegionMapScreen : public Screen {
 public:
     explicit RegionMapScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; t_ += dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -270,7 +270,7 @@ private:
 class SaveCodeScreen : public Screen {
 public:
     explicit SaveCodeScreen(App& app) : app_(app) {}
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -286,7 +286,7 @@ private:
 class EcuScreen : public Screen {
 public:
     explicit EcuScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -301,7 +301,7 @@ private:
 class SetupScreen : public Screen {
 public:
     explicit SetupScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -316,7 +316,7 @@ private:
 class StreetScreen : public Screen {
 public:
     explicit StreetScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -333,7 +333,7 @@ private:
 class GaugeShopScreen : public Screen {
 public:
     explicit GaugeShopScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; t_ += dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -350,7 +350,7 @@ private:
 class AchievementsScreen : public Screen {
 public:
     explicit AchievementsScreen(App& app) : app_(app) {}
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double) override {}
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -363,7 +363,7 @@ private:
 class BodyShopScreen : public Screen {
 public:
     explicit BodyShopScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; spin_ += (float)dt * 0.5f; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -381,7 +381,7 @@ private:
 class JunkyardScreen : public Screen {
 public:
     explicit JunkyardScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -398,7 +398,7 @@ private:
 class RestoreScreen : public Screen {
 public:
     explicit RestoreScreen(App& app) : app_(app) {}
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -412,7 +412,7 @@ private:
 class DynoScreen : public Screen {
 public:
     explicit DynoScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -433,7 +433,7 @@ private:
 class SettingsScreen : public Screen {
 public:
     explicit SettingsScreen(App& app);
-    bool landscape() const override { return false; }
+    bool landscape() const override { return app_.settings.menuLandscape; }
     void update(double dt) override { msgT_ -= dt; }
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -468,7 +468,7 @@ public:
 
 private:
     void leaveResults();
-    // Sehir turu (acik dunya): yol kenari noktalari, polis / serseri sataşmasi -> kovalamaca / kapisma -> geri donus
+    // Sehir turu (acik dunya): yol kenari noktalari, polis / serseri sataÅŸmasi -> kovalamaca / kapisma -> geri donus
     std::vector<Poi> cruisePois() const;
     void activatePoi(int k);
     bool cruiseRet_ = false, worldChase_ = false; double cruiseResume_ = 0; int forceRival_ = 0; Tune forceTune_{};

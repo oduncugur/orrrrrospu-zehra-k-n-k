@@ -53,7 +53,8 @@ add_library(zehra SHARED
     ${ZK_ROOT}/src/game/League.cpp
     ${ZK_ROOT}/src/game/Achievements.cpp
     ${ZK_ROOT}/src/audio/ProceduralEngineAudio.cpp
-    ${ZK_ROOT}/src/audio/TireAudio.cpp)
+    ${ZK_ROOT}/src/audio/TireAudio.cpp
+    ${ZK_ROOT}/src/audio/TireSkidSample.cpp)
 target_include_directories(zehra PRIVATE ${ZK_ROOT}/src)
 target_compile_features(zehra PRIVATE cxx_std_17)
 # Acik dunya surumu (gradle "world" cesidi): SERBEST YOL acik dunyaya gider

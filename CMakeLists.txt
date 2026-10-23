@@ -30,7 +30,8 @@ add_library(zk_sim STATIC
   src/game/League.cpp
   src/game/Achievements.cpp
   src/audio/ProceduralEngineAudio.cpp
-  src/audio/TireAudio.cpp)
+  src/audio/TireAudio.cpp
+  src/audio/TireSkidSample.cpp)
 target_include_directories(zk_sim PUBLIC src)
 if(NOT MSVC)
   target_compile_options(zk_sim PRIVATE -Wall -Wextra)

@@ -75,7 +75,8 @@ int main(int argc, char** argv) {
                 const double ts = k / 44100.0;
                 const double slip = ts < 3 ? 2.5 + 0.8 * std::sin(ts * 2.1) : ts < 5 ? 6.0 - 2.0 * (ts - 3) : ts < 5.5 ? 0.0
                                   : ts < 10.5 ? 20.0 + 3.0 * std::sin(ts * 1.3) : ts < 12.5 ? 4.0 - 2.0 * (ts - 10.5) : 0.0;
-                t.render(o.data() + k, (int)std::min<size_t>(256, o.size() - k), slip, 0.5f);
+                const double lock = (ts >= 10.5 && ts < 12.5) ? 20.0 * (12.5 - ts) / 2.0 : 0.0;
+                t.render(o.data() + k, (int)std::min<size_t>(256, o.size() - k), slip, 0.5f, lock);
             }
             writeWav16(a + 10, o, 44100);
             std::printf("Lastik sesi yazildi: %s\n", a + 10);

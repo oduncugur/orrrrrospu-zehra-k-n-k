@@ -1,16 +1,18 @@
-// ZEHRA KINIK - Ayarlar ekrani (dikey 360x640). Satir: etiket + "< deger >".
-// Dokunma: oklar azalt/artir, satirin geri kalani dongusel ileri. Klavye: W/S satir, A/D (<-/->) deger, ENTER ileri.
+﻿// ZEHRA KINIK - Ayarlar ekrani (dikey 360x640 ve yatay 640x360).
 #include "Screens.h"
 #include "Ui.h"
 
 #include <cstdio>
+#include <algorithm>
 
 namespace zk {
 
 namespace {
 using It = SettingsScreen::Item;
-const Rect kDefaults{8, 596, 104, 634}, kSaveCode{108, 596, 212, 634}, kBack{216, 596, 352, 634};
-float kRowH = 26;                       // satir yuksekligi: liste 62..546 arasina sigacak sekilde kurucuda ayarlanir
+const Rect kDefaultsP{8, 596, 104, 634}, kSaveCodeP{108, 596, 212, 634}, kBackP{216, 596, 352, 634};
+const Rect kDefaultsL{8, 314, 150, 352}, kSaveCodeL{156, 314, 300, 352}, kBackL{480, 314, 632, 352};
+
+float kRowH = 26;
 constexpr float kArrowL0 = 204, kArrowL1 = 248, kArrowR0 = 308, kArrowR1 = 352;
 const char* const kSections[] = {"GORUNTU", "SES", "KONTROL", "OYUN"};
 
@@ -29,8 +31,8 @@ const char* label(It it) {
     case It::Engine: return "MOTOR SESI";
     case It::Tire: return "LASTIK SESI";
     case It::Haptics: return "TITRESIM";
-    case It::Tilt: return "EGIM DIREKSIYON";
     case It::Pad: return "GAMEPAD";
+    case It::Tilt: return "EGIM DIREKSIYON";
     case It::TiltSens: return "EGIM HASSASIYET";
     case It::Assist: return "CEKIS KONT.";
     case It::Esp: return "ESP";
@@ -68,14 +70,13 @@ const char* help(It it) {
 }
 std::string pct(int v) { return "%" + std::to_string(v); }
 const char* onOff(bool b) { return b ? "ACIK" : "KAPALI"; }
-// Uzun yardim metnini iki satira bol (satir basina ~57 karakter)
-void wrap2(Renderer& r, float y, const std::string& s, Color c) {
-    constexpr size_t kMax = 57;
-    if (s.size() <= kMax) { r.text(8, y, s, 1, c); return; }
-    size_t cut = s.rfind(' ', kMax);
-    if (cut == std::string::npos) cut = kMax;
-    r.text(8, y, s.substr(0, cut), 1, c);
-    r.text(8, y + 11, s.substr(cut + 1), 1, c);
+
+void wrap2(Renderer& r, float x, float y, const std::string& s, Color c, size_t maxChars = 57) {
+    if (s.size() <= maxChars) { r.text(x, y, s, 1, c); return; }
+    size_t cut = s.rfind(' ', maxChars);
+    if (cut == std::string::npos) cut = maxChars;
+    r.text(x, y, s.substr(0, cut), 1, c);
+    r.text(x, y + 10, s.substr(cut + 1), 1, c);
 }
 } // namespace
 
@@ -113,7 +114,7 @@ std::string SettingsScreen::value(It it) const {
     case It::Language: return langName((Lang)s.language);
     case It::FpsCap: return s.fpsCap > 0 ? std::to_string(s.fpsCap) : "SINIRSIZ";
     case It::VSync:
-        if (s.vsync != VSync::Off && app_.vsyncUnavailable) return "YAZILIM";   // surucu reddetti: yazilimla sinir
+        if (s.vsync != VSync::Off && app_.vsyncUnavailable) return "YAZILIM";
         return s.vsync == VSync::Off ? "KAPALI" : s.vsync == VSync::On ? "ACIK" : "ADAPTIF";
     case It::ShowFps: return onOff(s.showFps);
     case It::Fullscreen: return onOff(s.fullscreen);
@@ -139,7 +140,6 @@ std::string SettingsScreen::value(It it) const {
 
 void SettingsScreen::change(It it, int dir) {
     Settings& s = app_.settings;
-    // Listede adim: dir 0 = ileri, sondaysa basa don
     auto list = [dir](const std::vector<int>& opts, int cur) {
         const int n = stepOption(opts, cur, dir == 0 ? +1 : dir);
         return dir == 0 && n == cur ? opts.front() : n;
@@ -154,7 +154,7 @@ void SettingsScreen::change(It it, int dir) {
     }
     case It::ShowFps: s.showFps = !s.showFps; break;
     case It::Fullscreen: s.fullscreen = !s.fullscreen; break;
-    case It::IntScale: {                                   // DOLDUR -> SIGDIR -> TAM SAYI -> DOLDUR
+    case It::IntScale: {
         const int m = s.integerScale ? 2 : s.fillScreen ? 0 : 1;
         const int n = (m + (dir < 0 ? 2 : 1)) % 3;
         s.fillScreen = n == 0; s.integerScale = n == 2;
@@ -168,10 +168,10 @@ void SettingsScreen::change(It it, int dir) {
     case It::Tire: s.tireVol = list(Settings::volumeOptions(), s.tireVol); break;
     case It::Haptics:
         s.haptics = list(Settings::hapticOptions(), s.haptics);
-        app_.haptic(40, 200);                                  // yeni gucu hissettir
+        app_.haptic(40, 200);
         break;
     case It::Pad: s.gamepadMode = !s.gamepadMode; break;
-    case It::Tilt:                                   // KAPALI -> ACIK -> TERS (yon) -> KAPALI
+    case It::Tilt:
         if (!s.tiltSteer) { s.tiltSteer = true; s.tiltInvert = false; } else if (!s.tiltInvert) s.tiltInvert = true; else { s.tiltSteer = false; s.tiltInvert = false; }
         break;
     case It::TiltSens: s.tiltSens = list(Settings::tiltSensOptions(), s.tiltSens); break;
@@ -186,61 +186,173 @@ void SettingsScreen::change(It it, int dir) {
 }
 
 void SettingsScreen::render(Renderer& r) {
-    r.begin(360, 640, kUiBg);
-    r.rect(0, 0, 360, 58, kUiPanel);
-    r.text(8, 10, "AYARLAR", 3, kUiGold);
-    r.text(8, 40, "DEGISIKLIK ANINDA UYGULANIR VE KAYDEDILIR", 1, kUiDim);
-    if (app_.settings.showFps) {
-        char b[32]; std::snprintf(b, sizeof b, "%3.0f FPS", app_.fps());
-        r.text(352 - r.textWidth(b, 2), 10, b, 2, {0.45f, 0.8f, 0.45f});
-    }
-    for (size_t i = 0; i < rows_.size(); ++i) {
-        const Row& row = rows_[i];
-        if (row.section >= 0) r.text(8, row.y - 13, kSections[row.section], 1, kUiGold);
-        const bool sel = (int)i == sel_;
-        r.rect(8, row.y, 352, row.y + kRowH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
-        if (sel) r.rect(8, row.y, 11, row.y + kRowH, kUiOrange);
-        r.textFit(16, row.y + (kRowH - 14) * 0.5f + 1, label(row.item), 2, kArrowL0 - 20, {1, 1, 1});
-        r.text(kArrowL0 + 2, row.y + (kRowH - 14) * 0.5f + 1, "<", 2, kUiDim);
-        r.text(kArrowR1 - 12, row.y + (kRowH - 14) * 0.5f + 1, ">", 2, kUiDim);
-        r.textFit((kArrowL0 + kArrowR1) / 2 + 2, row.y + (kRowH - 14) * 0.5f + 1, value(row.item), 2, kArrowR1 - kArrowL0 - 30, kUiGold, true);
-    }
-    if (sel_ >= 0 && sel_ < (int)rows_.size()) {
-        const It it = rows_[sel_].item;
-        if (it == It::VSync && app_.vsyncUnavailable && app_.settings.vsync != VSync::Off) {
-            char b[96];
-            std::snprintf(b, sizeof b, "EKRAN KARTI SURUCUSU ESITLEMEYI KAPATIYOR. OYUN YAZILIMLA %.0f FPS SINIRI UYGULUYOR", app_.displayHz);
-            wrap2(r, 556, b, kUiGold);
-        } else wrap2(r, 556, help(it), kUiText);
-    }
+    const bool land = app_.settings.menuLandscape;
+    r.begin(land ? 640 : 360, land ? 360 : 640, kUiBg);
+
+    if (land) {
+        // ==========================================
+        // YATAY 640x360 NATIVE TASARIM
+        // ==========================================
+        r.rect(0, 0, 640, 44, kUiPanel);
+        r.text(8, 8, "AYARLAR", 2, kUiGold);
+        r.text(8, 28, "DEGISIKLIK ANINDA UYGULANIR VE KAYDEDILIR", 1, kUiDim);
+        if (app_.settings.showFps) {
+            char b[32]; std::snprintf(b, sizeof b, "%3.0f FPS", app_.fps());
+            r.text(632 - r.textWidth(b, 2), 8, b, 2, {0.45f, 0.8f, 0.45f});
+        }
+
+        // Sol Sutun: GORUNTU (Section 0)
+        // Sag Sutun: SES (Sec 1), KONTROL (Sec 2), OYUN (Sec 3)
+        const float rH = 20.0f;
+        float yL = 48.0f, yR = 48.0f;
+        int lastSecL = -1, lastSecR = -1;
+
+        for (size_t i = 0; i < rows_.size(); ++i) {
+            const Row& row = rows_[i];
+            const bool isLeft = (row.item <= It::MenuView);
+            const float x0 = isLeft ? 8.0f : 324.0f;
+            const float x1 = isLeft ? 316.0f : 632.0f;
+            float& yCur = isLeft ? yL : yR;
+            int& lastSec = isLeft ? lastSecL : lastSecR;
+
+            int curSec = (row.item <= It::MenuView) ? 0 : (row.item <= It::Tire) ? 1 : (row.item <= It::Gears) ? 2 : 3;
+            if (curSec != lastSec) {
+                lastSec = curSec;
+                r.text(x0, yCur + 2, kSections[curSec], 1, kUiGold);
+                yCur += 14.0f;
+            }
+
+            const bool sel = (int)i == sel_;
+            r.rect(x0, yCur, x1, yCur + rH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
+            if (sel) r.rect(x0, yCur, x0 + 4, yCur + rH, kUiOrange);
+
+            const float aL0 = x1 - 105.0f;
+            const float aR1 = x1 - 4.0f;
+            r.textFit(x0 + 8, yCur + 3, label(row.item), 1, aL0 - x0 - 10, {1, 1, 1});
+            r.text(aL0, yCur + 3, "<", 1, kUiDim);
+            r.text(aR1 - 8, yCur + 3, ">", 1, kUiDim);
+            r.textFit((aL0 + aR1) * 0.5f, yCur + 3, value(row.item), 1, aR1 - aL0 - 18, kUiGold, true);
+
+            yCur += rH + 2.0f;
+        }
+
+        // Secili yardim metni (alt sol)
+        if (sel_ >= 0 && sel_ < (int)rows_.size()) {
+            const It it = rows_[sel_].item;
+            if (it == It::VSync && app_.vsyncUnavailable && app_.settings.vsync != VSync::Off) {
+                char b[96];
+                std::snprintf(b, sizeof b, "EKRAN KARTI SURUCUSU ESITLEMEYI KAPATIYOR. OYUN YAZILIMLA %.0f FPS SINIRI UYGULUYOR", app_.displayHz);
+                wrap2(r, 8, 282, b, kUiGold, 110);
+            } else {
+                wrap2(r, 8, 282, help(it), kUiText, 110);
+            }
+        }
+
+        // Alt butonlar
+        button(r, kDefaultsL, "VARSAYILAN", kUiBtn, 1);
+        button(r, kSaveCodeL, "KAYIT KODU", {0.15f, 0.35f, 0.55f}, 1);
 #ifndef __ANDROID__
-    r.text(8, 582, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, {0.55f, 0.75f, 1.0f});
+        r.text(310, 328, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, {0.55f, 0.75f, 1.0f});
 #endif
-    button(r, kDefaults, "VARSAYILAN", kUiBtn, 1);
-    button(r, kSaveCode, "KAYIT KODU", {0.15f, 0.35f, 0.55f}, 1);
-    button(r, kBack, "< GARAJ", kUiBtn, 2);
-    if (msgT_ > 0) {
-        r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.9f});
-        r.textCentered(180, 258, msg_, 2, kUiGold);
+        button(r, kBackL, "< GARAJ", kUiBtn, 2);
+
+        if (msgT_ > 0) {
+            r.rect(140, 160, 500, 200, {0.02f, 0.02f, 0.04f, 0.95f});
+            r.textCentered(320, 175, msg_, 2, kUiGold);
+        }
+    } else {
+        // ==========================================
+        // DIKEY 360x640 KLASIK TASARIM
+        // ==========================================
+        r.rect(0, 0, 360, 58, kUiPanel);
+        r.text(8, 10, "AYARLAR", 3, kUiGold);
+        r.text(8, 40, "DEGISIKLIK ANINDA UYGULANIR VE KAYDEDILIR", 1, kUiDim);
+        if (app_.settings.showFps) {
+            char b[32]; std::snprintf(b, sizeof b, "%3.0f FPS", app_.fps());
+            r.text(352 - r.textWidth(b, 2), 10, b, 2, {0.45f, 0.8f, 0.45f});
+        }
+        for (size_t i = 0; i < rows_.size(); ++i) {
+            const Row& row = rows_[i];
+            if (row.section >= 0) r.text(8, row.y - 13, kSections[row.section], 1, kUiGold);
+            const bool sel = (int)i == sel_;
+            r.rect(8, row.y, 352, row.y + kRowH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
+            if (sel) r.rect(8, row.y, 11, row.y + kRowH, kUiOrange);
+            r.textFit(16, row.y + (kRowH - 14) * 0.5f + 1, label(row.item), 2, kArrowL0 - 20, {1, 1, 1});
+            r.text(kArrowL0 + 2, row.y + (kRowH - 14) * 0.5f + 1, "<", 2, kUiDim);
+            r.text(kArrowR1 - 12, row.y + (kRowH - 14) * 0.5f + 1, ">", 2, kUiDim);
+            r.textFit((kArrowL0 + kArrowR1) / 2 + 2, row.y + (kRowH - 14) * 0.5f + 1, value(row.item), 2, kArrowR1 - kArrowL0 - 30, kUiGold, true);
+        }
+        if (sel_ >= 0 && sel_ < (int)rows_.size()) {
+            const It it = rows_[sel_].item;
+            if (it == It::VSync && app_.vsyncUnavailable && app_.settings.vsync != VSync::Off) {
+                char b[96];
+                std::snprintf(b, sizeof b, "EKRAN KARTI SURUCUSU ESITLEMEYI KAPATIYOR. OYUN YAZILIMLA %.0f FPS SINIRI UYGULUYOR", app_.displayHz);
+                wrap2(r, 8, 556, b, kUiGold);
+            } else wrap2(r, 8, 556, help(it), kUiText);
+        }
+#ifndef __ANDROID__
+        r.text(8, 582, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, {0.55f, 0.75f, 1.0f});
+#endif
+        button(r, kDefaultsP, "VARSAYILAN", kUiBtn, 1);
+        button(r, kSaveCodeP, "KAYIT KODU", {0.15f, 0.35f, 0.55f}, 1);
+        button(r, kBackP, "< GARAJ", kUiBtn, 2);
+        if (msgT_ > 0) {
+            r.rect(0, 250, 360, 280, {0.02f, 0.02f, 0.04f, 0.9f});
+            r.textCentered(180, 258, msg_, 2, kUiGold);
+        }
     }
 }
 
 void SettingsScreen::pointerDown(int, float x, float y) {
-    if (kBack.hit(x, y)) { app_.goGarage(); return; }
-    if (kSaveCode.hit(x, y)) { app_.goSaveCode(); return; }
-    if (kDefaults.hit(x, y)) {
+    const bool land = app_.settings.menuLandscape;
+    const Rect& defBtn = land ? kDefaultsL : kDefaultsP;
+    const Rect& saveBtn = land ? kSaveCodeL : kSaveCodeP;
+    const Rect& backBtn = land ? kBackL : kBackP;
+
+    if (backBtn.hit(x, y)) { app_.goGarage(); return; }
+    if (saveBtn.hit(x, y)) { app_.goSaveCode(); return; }
+    if (defBtn.hit(x, y)) {
         app_.settings = Settings{};
         app_.applySettings();
         app_.saveSettings();
         msg_ = "VARSAYILANLAR YUKLENDI"; msgT_ = 1.8;
         return;
     }
-    for (size_t i = 0; i < rows_.size(); ++i) {
-        const Row& row = rows_[i];
-        if (y < row.y || y > row.y + kRowH || x < 8 || x > 352) continue;
-        sel_ = (int)i;
-        change(row.item, x >= kArrowL0 && x <= kArrowL1 ? -1 : x >= kArrowR0 ? +1 : 0);
-        return;
+
+    if (land) {
+        const float rH = 20.0f;
+        float yL = 48.0f, yR = 48.0f;
+        int lastSecL = -1, lastSecR = -1;
+
+        for (size_t i = 0; i < rows_.size(); ++i) {
+            const Row& row = rows_[i];
+            const bool isLeft = (row.item <= It::MenuView);
+            const float x0 = isLeft ? 8.0f : 324.0f;
+            const float x1 = isLeft ? 316.0f : 632.0f;
+            float& yCur = isLeft ? yL : yR;
+            int& lastSec = isLeft ? lastSecL : lastSecR;
+
+            int curSec = (row.item <= It::MenuView) ? 0 : (row.item <= It::Tire) ? 1 : (row.item <= It::Gears) ? 2 : 3;
+            if (curSec != lastSec) { lastSec = curSec; yCur += 14.0f; }
+
+            if (y >= yCur && y <= yCur + rH && x >= x0 && x <= x1) {
+                sel_ = (int)i;
+                const float aL0 = x1 - 105.0f;
+                const float aL1 = x1 - 80.0f;
+                const float aR0 = x1 - 25.0f;
+                change(row.item, x >= aL0 && x <= aL1 ? -1 : x >= aR0 ? +1 : 0);
+                return;
+            }
+            yCur += rH + 2.0f;
+        }
+    } else {
+        for (size_t i = 0; i < rows_.size(); ++i) {
+            const Row& row = rows_[i];
+            if (y < row.y || y > row.y + kRowH || x < 8 || x > 352) continue;
+            sel_ = (int)i;
+            change(row.item, x >= kArrowL0 && x <= kArrowL1 ? -1 : x >= kArrowR0 ? +1 : 0);
+            return;
+        }
     }
 }
 

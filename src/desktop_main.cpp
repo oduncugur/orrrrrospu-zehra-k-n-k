@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
         if (n == "intro") game.goIntro();
         else if (n == "parts") game.goParts(); else if (n == "gallery") game.goGallery();
         else if (n == "dyno") game.goDyno(); else if (n == "race") game.goCareerRace();
-        else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings();
+        else if (n == "road") game.goRoad(); else if (n == "settings") game.goSettings(); else if (n == "savecode") game.goSaveCode();
         else if (n == "fabricate") game.goFabricate((int)PartCat::Turbo);
         else if (n == "junk") game.goJunkyard(); else if (n == "paint") game.goBodyShop(); else if (n == "ach") game.goAchievements(); else if (n == "ecu") game.goEcu(); else if (n == "setup") game.goSetup(); else if (n == "street") game.goStreet(); else if (n == "gauges") game.goGauges(); else if (n == "map") game.goMap(); else if (n == "league") game.goLeague(); else if (n == "restore") game.goRestore(); else if (n == "world") game.goWorld();
     }

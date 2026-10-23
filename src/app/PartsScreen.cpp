@@ -28,6 +28,15 @@ const Rect kYesP{8, 548, 176, 590}, kNoP{184, 548, 352, 590};
 const Rect kNewP{8, 548, 124, 590}, kUsedP{128, 548, 244, 590}, kNo3P{248, 548, 352, 590};   // yeni / ikinci el / vazgec
 constexpr float kListY0 = 132, kListY1 = 446, kRowH = 40;
 
+// Yatay (640x360)
+const Rect kBackPL{384, 308, 626, 348};
+const Rect kBackPGarageL{428, 308, 622, 348};
+const Rect kSoftPL{260, 8, 380, 36};
+const Rect kBuyPL{384, 258, 626, 302};
+const Rect kYesPL{384, 258, 500, 302}, kNoPL{510, 258, 626, 302};
+const Rect kNewPL{384, 258, 460, 302}, kUsedPL{466, 258, 546, 302}, kNo3PL{552, 258, 626, 302};
+constexpr float kListY0L = 48, kListY1L = 350, kRowHL = 38;
+
 std::vector<std::pair<double, double>> effCurve(const EngineSpec& e) {
     std::vector<std::pair<double, double>> out;
     for (size_t i = 0; i < e.lowCam.size(); ++i) {
@@ -122,34 +131,41 @@ void PartsScreen::drawStatsBar(Renderer& r) {
 }
 
 void PartsScreen::drawPreview(Renderer& r, float py) {
+    const bool land = app_.settings.menuLandscape;
+    const float rx0 = land ? 380.0f : 8.0f;
+    const float rx1 = land ? 630.0f : 360.0f;
+    const float col2 = rx0 + (land ? 124.0f : 172.0f);
+
     const auto& opts = partOptions((PartCat)cat_);
-    r.rect(8, py, 352, py + 94, {0.08f, 0.09f, 0.13f});
-    r.text(16, py + 5, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, prev_.fuelCapped ? 24 : 34), 1, kUiGold);
-    if (prev_.fuelCapped) r.text(344 - r.textWidth("YAKIT SINIRI!", 1), py + 5, "YAKIT SINIRI!", 1, {1.0f, 0.35f, 0.3f});   // pompa / enjektor al
+    r.rect(rx0, py, rx1, py + (land ? 170.0f : 94.0f), {0.08f, 0.09f, 0.13f});
+    r.text(rx0 + 8, py + 5, ("ONIZLEME: " + std::string(opts[sel_].name)).substr(0, prev_.fuelCapped ? 24 : 34), 1, kUiGold);
+    if (prev_.fuelCapped) r.text(rx1 - 8 - r.textWidth("YAKIT SINIRI!", 1), py + 5, "YAKIT SINIRI!", 1, {1.0f, 0.35f, 0.3f});
     const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
     auto line = [&](float y, float x, const char* name, double a, double bnew, const char* fmt, bool higherBetter) {
         char t[64]; std::snprintf(t, sizeof t, fmt, a, bnew);
         const double d = bnew - a;
         const bool same = std::fabs(d) < 1e-6 * std::max(1.0, std::fabs(a));
         r.text(x, y, name, 1, kUiText);
-        r.text(x + 56, y, t, 1, same ? kUiDim : (d > 0) == higherBetter ? up : down);
+        r.text(x + 50, y, t, 1, same ? kUiDim : (d > 0) == higherBetter ? up : down);
     };
-    line(py + 19, 16, "GUC", now_.hp, prev_.hp, "%.0f > %.0f", true);
-    line(py + 31, 16, "TORK", now_.nm, prev_.nm, "%.0f > %.0f", true);
-    line(py + 43, 16, "ENDEKS", now_.idx, prev_.idx, "%.0f > %.0f", true);
-    line(py + 55, 16, "AGIRLIK", now_.mass, prev_.mass, "%.0f > %.0f", false);
-    line(py + 19, 180, "MOTOR", now_.engineLoad * 100, prev_.engineLoad * 100, "%%%.0f > %%%.0f", false);
-    line(py + 31, 180, "SANZIMAN", now_.gearboxLoad * 100, prev_.gearboxLoad * 100, "%%%.0f > %%%.0f", false);
-    line(py + 43, 180, "ISI", now_.heatLoad * 100, prev_.heatLoad * 100, "%%%.0f > %%%.0f", false);
-    line(py + 55, 180, "AKS", now_.axleRisk * 100, prev_.axleRisk * 100, "%%%.0f > %%%.0f", false);
-    line(py + 67, 16, "DEVIR", now_.redline, prev_.redline, "%.0f > %.0f", true);         // devir siniri (kesici)
-    {   // guvenli (max) devir: supap / kam / kafa ile artar; ECU kesiciyi bunun ustune acarsa supap zorlanir
-        char t[32]; std::snprintf(t, sizeof t, "%.0f > %.0f", now_.valveSafe, prev_.valveSafe);
-        r.text(180, py + 67, "MAX DEV", 1, kUiText);
-        r.text(236, py + 67, t, 1, prev_.redline > prev_.valveSafe ? down : prev_.valveSafe > now_.valveSafe + 1 ? up : kUiDim);
+    line(py + 19, rx0 + 8, "GUC", now_.hp, prev_.hp, "%.0f>%.0f", true);
+    line(py + 31, rx0 + 8, "TORK", now_.nm, prev_.nm, "%.0f>%.0f", true);
+    line(py + 43, rx0 + 8, "ENDEKS", now_.idx, prev_.idx, "%.0f>%.0f", true);
+    line(py + 55, rx0 + 8, "AGIRLIK", now_.mass, prev_.mass, "%.0f>%.0f", false);
+    line(py + 67, rx0 + 8, "DEVIR", now_.redline, prev_.redline, "%.0f>%.0f", true);
+
+    line(py + 19, col2, "MOTOR", now_.engineLoad * 100, prev_.engineLoad * 100, "%%%.0f>%%%.0f", false);
+    line(py + 31, col2, "SANZ.", now_.gearboxLoad * 100, prev_.gearboxLoad * 100, "%%%.0f>%%%.0f", false);
+    line(py + 43, col2, "ISI", now_.heatLoad * 100, prev_.heatLoad * 100, "%%%.0f>%%%.0f", false);
+    line(py + 55, col2, "AKS", now_.axleRisk * 100, prev_.axleRisk * 100, "%%%.0f>%%%.0f", false);
+    {
+        char t[32]; std::snprintf(t, sizeof t, "%.0f>%.0f", now_.valveSafe, prev_.valveSafe);
+        r.text(col2, py + 67, "MAX DEV", 1, kUiText);
+        r.text(col2 + 50, py + 67, t, 1, prev_.redline > prev_.valveSafe ? down : prev_.valveSafe > now_.valveSafe + 1 ? up : kUiDim);
     }
-    r.text(16, py + 81, "1/4 MIL", 1, kUiText);
-    if (!et_ || !et_->done) r.text(72, py + 81, "HESAPLANIYOR...", 1, kUiDim);
+    const float yMil = py + (land ? 85.0f : 81.0f);
+    r.text(rx0 + 8, yMil, "1/4 MIL", 1, kUiText);
+    if (!et_ || !et_->done) r.text(rx0 + 64, yMil, "HESAPLANIYOR...", 1, kUiDim);
     else {
         auto str = [](const QuarterEstimate& e) {
             if (e.broke) return std::string("AKS!");
@@ -158,119 +174,236 @@ void PartsScreen::drawPreview(Renderer& r, float py) {
         };
         const bool ok = et_->cur.quarter > 0 && et_->nxt.quarter > 0;
         const double d = ok ? et_->nxt.quarter - et_->cur.quarter : 0.0;
-        r.text(72, py + 81, str(et_->cur) + " > " + str(et_->nxt) + " S", 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
+        r.text(rx0 + 64, yMil, str(et_->cur) + ">" + str(et_->nxt) + "S", 1, et_->nxt.broke ? down : !ok || std::fabs(d) < 0.005 ? kUiDim : d < 0 ? up : down);
     }
     const PartCat pc = (PartCat)cat_;
     const bool breathing = pc == PartCat::Intake || pc == PartCat::Throttle || pc == PartCat::IntakeMani || pc == PartCat::Header ||
                            pc == PartCat::Catalyst || pc == PartCat::Exhaust;
     const Tune& ct = app_.career.car().tune;
     const int stage = ecuNewSystem(ct) ? ct.swMap : (ct.ecu > 0 ? 1 : 0);
-    if (breathing && stage == 0) r.text(180, py + 81, "ECU HARITASI YOK: KAZANC 0", 1, down);   // emme / egzoz harita ister
-    else if (prev_.engineLoad > 1.0) r.text(180, py + 81, "MOTOR DAYANMAZ!", 1, down);
-    else if (prev_.gearboxLoad > 1.0) r.text(180, py + 81, "SANZIMAN DAYANMAZ!", 1, down);
-    else if (prev_.octaneReq > prev_.octane) r.text(180, py + 81, "VURUNTU! OKTAN", 1, down);
-    else if (prev_.heatLoad > 1.15) r.text(180, py + 81, "SOGUTMA YETMEZ", 1, kUiGold);
-    else {   // oktan: yakit / istenen (sicak motorda istenen ~3 artar)
+    const float yNote = py + (land ? 100.0f : 81.0f);
+    const float xNote = land ? (rx0 + 8) : col2;
+    if (breathing && stage == 0) r.text(xNote, yNote, "ECU HARITASI YOK: KAZANC 0", 1, down);
+    else if (prev_.engineLoad > 1.0) r.text(xNote, yNote, "MOTOR DAYANMAZ!", 1, down);
+    else if (prev_.gearboxLoad > 1.0) r.text(xNote, yNote, "SANZIMAN DAYANMAZ!", 1, down);
+    else if (prev_.octaneReq > prev_.octane) r.text(xNote, yNote, "VURUNTU! OKTAN", 1, down);
+    else if (prev_.heatLoad > 1.15) r.text(xNote, yNote, "SOGUTMA YETMEZ", 1, kUiGold);
+    else {
         char t[48]; std::snprintf(t, sizeof t, "OKTAN %.0f / %.0f", prev_.octane, prev_.octaneReq);
-        r.text(180, py + 81, t, 1, prev_.octaneReq > prev_.octane - 3 ? kUiGold : kUiDim);
+        r.text(xNote, yNote, t, 1, prev_.octaneReq > prev_.octane - 3 ? kUiGold : kUiDim);
     }
-
 }
 
 void PartsScreen::render(Renderer& r) {
+    const bool land = app_.settings.menuLandscape;
     const OwnedCar& oc = app_.career.car();
     const VehicleDef& v = *findVehicle(oc.carId);
-    r.begin(360, 640, kUiBg);
-    headerP(r, app_, "MODIFIYE");
-    drawStatsBar(r);
+    r.begin(land ? 640 : 360, land ? 360 : 640, kUiBg);
 
-    if (cat_ < 0) {
-        // Sekmeler + kategori listesi
-        for (int t = 0; t < kPartTabs; ++t) {
-            const float tw = 352.0f / kPartTabs;
-            const Rect tr{4.0f + t * tw, 102, 2.0f + (t + 1) * tw, 126};
-            r.rect(tr.x0, tr.y0, tr.x1, tr.y1, t == tab_ ? kUiOrange : kUiPanel);
-            r.textCentered(tr.cx(), tr.y0 + 9, partTabName(t), 1, {1, 1, 1});
+    if (land) {
+        // --- 640x360 YATAY MODIFIYE ---
+        r.rect(0, 0, 640, 42, kUiPanel);
+        r.text(12, 10, "MODIFIYE", 2, kUiGold);
+        r.text(120, 12, upper(v.fullName()).substr(0, 26), 1, kUiText);
+        const std::string m = money(app_.career.money);
+        r.text(628 - r.textWidth(m, 2), 10, m, 2, {0.4f, 1.0f, 0.5f});
+
+        if (cat_ < 0) {
+            // Sekmeler (x: 8..410)
+            const float tw = 404.0f / kPartTabs;
+            for (int t = 0; t < kPartTabs; ++t) {
+                const Rect tr{8.0f + t * tw, 46.0f, 6.0f + (t + 1) * tw, 68.0f};
+                r.rect(tr.x0, tr.y0, tr.x1, tr.y1, t == tab_ ? kUiOrange : kUiPanel);
+                r.textCentered(tr.cx(), tr.y0 + 6, partTabName(t), 1, {1, 1, 1});
+            }
+            // Kategoriler: 2 Sutun (Sol: 8..206, Sag: 212..410)
+            int rowIdx = 0;
+            for (int i = 0; i < (int)PartCat::Count; ++i) {
+                const PartCat c = (PartCat)i;
+                if (partTab(c) != tab_) continue;
+                const int col = rowIdx % 2;
+                const int row = rowIdx / 2;
+                const float x0 = 8.0f + col * 204.0f;
+                const float y0 = 72.0f + row * 39.0f;
+                const Rect cr{x0, y0, x0 + 198.0f, y0 + 36.0f};
+                r.rect(cr.x0, cr.y0, cr.x1, cr.y1, kUiPanel);
+                r.text(cr.x0 + 6, cr.y0 + 4, partCatName(c), 1, {1, 1, 1});
+                const int lvl = partLevel(oc.tune, c, v);
+                std::string cur = partOptions(c)[lvl].name;
+                if (c == PartCat::Electronics && lvl == 0) cur = v.abs ? (v.tc ? "ABS+TC" : "ABS") : "YOK";
+                if (c == PartCat::Adas && lvl <= adasFactory(v) && adasFactory(v) > 0) cur = std::string("FAB: ") + adasName(adasFactory(v));
+                r.text(cr.x0 + 6, cr.y0 + 19, cur.substr(0, 22), 1, lvl > 0 ? kUiGold : kUiDim);
+                if (customOption(c) >= 0) r.text(cr.x1 - 44, cr.y0 + 4, "ATOLYE", 1, {0.55f, 0.75f, 1.0f});
+                ++rowIdx;
+            }
+            // Sag Panel: Arac Durum Kartı & Garaj Butonu
+            r.rect(420, 46, 632, 350, {0.08f, 0.09f, 0.13f});
+            char b[96];
+            std::snprintf(b, sizeof b, "%.0f HP   %.0f NM", now_.hp, now_.nm);
+            r.text(430, 54, b, 2, {1, 1, 1});
+            std::snprintf(b, sizeof b, "ENDEKS %.0f   %.0f KG", now_.idx, now_.mass);
+            r.text(430, 76, b, 1, kUiGold);
+
+            auto bar = [&](float y, const char* name, double f) {
+                r.text(430, y, name, 1, kUiDim);
+                r.rect(500, y, 620, y + 8, {0.15f, 0.15f, 0.18f});
+                r.rect(500, y, 500 + 120 * (float)std::min(1.0, f), y + 8, loadColor(f));
+            };
+            bar(96, "MOTOR", now_.engineLoad);
+            bar(112, "SANZ.", now_.gearboxLoad);
+            bar(128, "ISI", now_.heatLoad);
+            bar(144, "AKS", now_.axleRisk);
+
+            std::snprintf(b, sizeof b, "KESICI %.0f / SUPAP %.0f", now_.redline, now_.valveSafe);
+            r.text(430, 164, b, 1, now_.redline > now_.valveSafe ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
+            std::snprintf(b, sizeof b, "OKTAN %.0f / ISTENEN %.0f", now_.octane, now_.octaneReq);
+            r.text(430, 180, b, 1, now_.octaneReq > now_.octane ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
+
+            button(r, kBackPGarageL, "< GARAJ", kUiBtn, 2);
+        } else {
+            // Kategori İçi: Sol Parça Listesi (x: 8..372), Sag Karşılaştırma & Satın Alma (x: 380..632)
+            const PartCat c = (PartCat)cat_;
+            r.text(12, 10, partCatName(c), 2, kUiGold);
+            const auto& opts = partOptions(c);
+            char b[48];
+            const int mk = (int)std::lround((marketMul(c, app_.career.marketWeek()) - 1.0) * 100.0);
+            if (mk) std::snprintf(b, sizeof b, "PAZAR %+d%%", mk);
+            else std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
+            if (c == PartCat::Ecu) button(r, kSoftPL, "YAZILIM >", {0.15f, 0.35f, 0.6f}, 1);
+            else r.text(260, 12, b, 1, kUiDim);
+
+            const int cur = partLevel(oc.tune, c, v);
+            const float listH = kListY1L - kListY0L;
+            const float maxScroll = std::max(0.0f, opts.size() * kRowHL - listH);
+            scroll_ = std::clamp(scroll_, 0.0f, maxScroll);
+
+            for (int i = 0; i < (int)opts.size(); ++i) {
+                const float y0 = kListY0L + i * kRowHL - scroll_;
+                if (y0 + kRowHL < kListY0L || y0 > kListY1L) continue;
+                if (y0 < kListY0L - 1 || y0 + kRowHL - 4 > kListY1L + 1) continue;
+                std::string why;
+                bool avail = partAvailable(c, i, v, &why, &oc.tune);
+                if (const int mkp = mapOnlyPart(c, i); mkp >= 0 && !((app_.career.foundParts >> mkp) & 1u)) { avail = false; why = "ACI K DUNYA"; }
+                const int price = app_.career.shopPrice(c, i);
+                const bool mine = i == cur, afford = app_.career.money >= price;
+                r.rect(8, y0, 364, y0 + kRowHL - 4, mine ? Color{0.12f, 0.3f, 0.16f} : i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
+                if (i == sel_) r.rect(8, y0, 12, y0 + kRowHL - 4, kUiOrange);
+                r.text(16, y0 + 4, std::string(opts[i].name).substr(0, 24), 1, {1, 1, 1});
+                std::string right = mine ? "TAKILI" : !avail ? why : price == 0 ? "UCRETSIZ" : money(price);
+                if (i == customOption(c) && !mine) right = "ATOLYE >";
+                r.text(356 - r.textWidth(right, 1), y0 + 18, right, 1,
+                       mine ? Color{0.4f, 1.0f, 0.5f} : i == customOption(c) ? Color{0.55f, 0.75f, 1.0f} : !avail ? Color{1.0f, 0.35f, 0.3f} : afford ? kUiGold : kUiDim);
+            }
+            if (maxScroll > 0) {
+                const float th = std::max(24.0f, listH * listH / (listH + maxScroll)), ty = kListY0L + (listH - th) * scroll_ / maxScroll;
+                r.rect(368, kListY0L, 372, kListY0L + listH, {0.15f, 0.15f, 0.18f});
+                r.rect(368, ty, 372, ty + th, kUiDim);
+            }
+
+            if (sel_ >= 0) drawPreview(r, 48);
+            if (confirm_ && sel_ >= 0) {
+                const int np = app_.career.shopPrice(c, sel_);
+                if (usedAvailable(c, sel_) && np > 0) {
+                    button(r, kNewPL, "YENI " + money(np), kUiGreen, 1);
+                    button(r, kUsedPL, "2. EL " + money(usedPrice(np)), {0.55f, 0.40f, 0.12f}, 1);
+                    button(r, kNo3PL, "VAZGEC", kUiRed, 1);
+                } else {
+                    button(r, kYesPL, "EVET " + money(np), kUiGreen, 2);
+                    button(r, kNoPL, "VAZGEC", kUiRed, 2);
+                }
+            } else if (sel_ >= 0) {
+                const int np = app_.career.shopPrice(c, sel_);
+                button(r, kBuyPL, "SATIN AL " + money(np), app_.career.money >= np ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
+            }
+            button(r, kBackPL, "< KATEGORILER", kUiBtn, 2);
         }
-        int row = 0;
-        for (int i = 0; i < (int)PartCat::Count; ++i) {
-            const PartCat c = (PartCat)i;
-            if (partTab(c) != tab_) continue;
-            const float rh = catRowH(tab_);
-            const Rect rr{8, 132.0f + row * rh, 352, 132.0f + row * rh + rh - 4};
-            r.rect(rr.x0, rr.y0, rr.x1, rr.y1, kUiPanel);
-            r.text(16, rr.y0 + (rh < 38 ? 3 : 6), partCatName(c), 2, {1, 1, 1});
-            const int lvl = partLevel(oc.tune, c, v);
-            std::string cur = partOptions(c)[lvl].name;
-            if (c == PartCat::Electronics && lvl == 0) cur = v.abs ? (v.tc ? "FABRIKA ABS+TC" : "FABRIKA ABS") : "YOK";
-            if (c == PartCat::Adas && lvl <= adasFactory(v) && adasFactory(v) > 0) cur = std::string("FABRIKA: ") + adasName(adasFactory(v));
-            char cnt[16]; std::snprintf(cnt, sizeof cnt, "%zu SECENEK", partOptions(c).size());
-            const float y2 = rr.y0 + (rh < 38 ? rh - 14 : 24);
-            r.text(16, y2, cnt, 1, kUiDim);
-            r.text(344 - r.textWidth(cur.substr(0, 26), 1), y2, cur.substr(0, 26), 1, lvl > 0 ? kUiGold : kUiDim);
-            if (customOption(c) >= 0) r.text(344 - r.textWidth("ATOLYE", 1), rr.y0 + 6, "ATOLYE", 1, {0.55f, 0.75f, 1.0f});
-            ++row;
-        }
-        button(r, kBackP, "< GARAJ", kUiBtn, 2);
+        if (msgT_ > 0) { r.rect(160, 316, 480, 346, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(320, 324, msg_, 2, kUiGold); }
     } else {
-        const PartCat c = (PartCat)cat_;
-        r.text(8, 104, partCatName(c), 2, kUiGold);
-        const auto& opts = partOptions(c);
-        char b[48];
-        const int mk = (int)std::lround((marketMul(c, app_.career.marketWeek()) - 1.0) * 100.0);
-        if (mk) std::snprintf(b, sizeof b, "PAZAR %+d%%  %zu SECENEK", mk, opts.size());   // haftalik fiyat
-        else std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
-        if (c == PartCat::Ecu) button(r, kSoftP, "YAZILIM >", {0.15f, 0.35f, 0.6f}, 1);
-        else r.text(352 - r.textWidth(b, 1), 110, b, 1, kUiDim);
-        const int cur = partLevel(oc.tune, c, v);
-        const float listH = (sel_ >= 0 ? kListY1 : 540.0f) - kListY0;
-        const float maxScroll = std::max(0.0f, opts.size() * kRowH - listH);
-        scroll_ = std::clamp(scroll_, 0.0f, maxScroll);
-        for (int i = 0; i < (int)opts.size(); ++i) {
-            const float y0 = kListY0 + i * kRowH - scroll_;
-            if (y0 + kRowH < kListY0 || y0 > kListY0 + listH) continue;
-            if (y0 < kListY0 - 1 || y0 + kRowH - 4 > kListY0 + listH + 1) continue;   // kismen gorunen satir cizilmez
-            std::string why;
-            bool avail = partAvailable(c, i, v, &why, &oc.tune);
-            if (const int mk = mapOnlyPart(c, i); mk >= 0 && !((app_.career.foundParts >> mk) & 1u)) { avail = false; why = "SADECE ACIK DUNYADA BULUNUR"; }
-            const int price = app_.career.shopPrice(c, i);
-            const bool mine = i == cur, afford = app_.career.money >= price;
-            r.rect(8, y0, 352, y0 + kRowH - 4, mine ? Color{0.12f, 0.3f, 0.16f} : i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
-            if (i == sel_) r.rect(8, y0, 12, y0 + kRowH - 4, kUiOrange);
-            r.text(16, y0 + 5, std::string(opts[i].name).substr(0, 30), 1, {1, 1, 1});
-            std::string right = mine ? "TAKILI" : !avail ? why : price == 0 ? "UCRETSIZ" : money(price);
-            if (i == customOption(c) && !mine) right = "ATOLYE: URET >";
-            r.text(344 - r.textWidth(right, 2), y0 + 17, right, 2,
-                   mine ? Color{0.4f, 1.0f, 0.5f} : i == customOption(c) ? Color{0.55f, 0.75f, 1.0f} : !avail ? Color{1.0f, 0.35f, 0.3f} : afford ? kUiGold : kUiDim);
-        }
-        if (maxScroll > 0) {                                                      // kaydirma cubugu
-            const float th = std::max(24.0f, listH * listH / (listH + maxScroll)), ty = kListY0 + (listH - th) * scroll_ / maxScroll;
-            r.rect(354, kListY0, 357, kListY0 + listH, {0.15f, 0.15f, 0.18f});
-            r.rect(354, ty, 357, ty + th, kUiDim);
-        }
-        if (sel_ >= 0) drawPreview(r, 450);
-        if (confirm_ && sel_ >= 0) {
-            r.rect(0, 540, 360, 596, {0.03f, 0.03f, 0.05f, 0.95f});
-            const int np = app_.career.shopPrice(c, sel_);
-            if (usedAvailable(c, sel_) && np > 0) {                       // yeni / ikinci el
-                button(r, kNewP, "YENI", kUiGreen, 2);
-                r.textCentered(kNewP.cx(), kNewP.y1 - 11, money(np), 1, {0.85f, 1.0f, 0.85f});
-                button(r, kUsedP, "2. EL", {0.55f, 0.40f, 0.12f}, 2);
-                r.textCentered(kUsedP.cx(), kUsedP.y1 - 11, money(usedPrice(np)) + " YIPRANMIS", 1, {1.0f, 0.9f, 0.7f});
-                button(r, kNo3P, "VAZGEC", kUiRed, 2);
-            } else {
-                button(r, kYesP, std::string("EVET ") + money(np), kUiGreen, 2);
-                button(r, kNoP, "VAZGEC", kUiRed, 2);
+        headerP(r, app_, "MODIFIYE");
+        drawStatsBar(r);
+
+        if (cat_ < 0) {
+            for (int t = 0; t < kPartTabs; ++t) {
+                const float tw = 352.0f / kPartTabs;
+                const Rect tr{4.0f + t * tw, 102, 2.0f + (t + 1) * tw, 126};
+                r.rect(tr.x0, tr.y0, tr.x1, tr.y1, t == tab_ ? kUiOrange : kUiPanel);
+                r.textCentered(tr.cx(), tr.y0 + 9, partTabName(t), 1, {1, 1, 1});
             }
-            const int old = partLevel(oc.tune, c, v);
-            if (old > 0 && old != customOption(c)) {
-                char t[64]; std::snprintf(t, sizeof t, "ESKI PARCA SATILIR: +%s", money((long)partPrice(c, old, v) * 35 / 100 / 10 * 10).c_str());
-                r.textCentered(180, 532, t, 1, {0.6f, 0.85f, 0.65f});
+            int row = 0;
+            for (int i = 0; i < (int)PartCat::Count; ++i) {
+                const PartCat c = (PartCat)i;
+                if (partTab(c) != tab_) continue;
+                const float rh = catRowH(tab_);
+                const Rect rr{8, 132.0f + row * rh, 352, 132.0f + row * rh + rh - 4};
+                r.rect(rr.x0, rr.y0, rr.x1, rr.y1, kUiPanel);
+                r.text(16, rr.y0 + (rh < 38 ? 3 : 6), partCatName(c), 2, {1, 1, 1});
+                const int lvl = partLevel(oc.tune, c, v);
+                std::string cur = partOptions(c)[lvl].name;
+                if (c == PartCat::Electronics && lvl == 0) cur = v.abs ? (v.tc ? "FABRIKA ABS+TC" : "FABRIKA ABS") : "YOK";
+                if (c == PartCat::Adas && lvl <= adasFactory(v) && adasFactory(v) > 0) cur = std::string("FABRIKA: ") + adasName(adasFactory(v));
+                char cnt[16]; std::snprintf(cnt, sizeof cnt, "%zu SECENEK", partOptions(c).size());
+                const float y2 = rr.y0 + (rh < 38 ? rh - 14 : 24);
+                r.text(16, y2, cnt, 1, kUiDim);
+                r.text(344 - r.textWidth(cur.substr(0, 26), 1), y2, cur.substr(0, 26), 1, lvl > 0 ? kUiGold : kUiDim);
+                if (customOption(c) >= 0) r.text(344 - r.textWidth("ATOLYE", 1), rr.y0 + 6, "ATOLYE", 1, {0.55f, 0.75f, 1.0f});
+                ++row;
             }
-        } else if (sel_ >= 0) r.textCentered(180, 566, "TEKRAR DOKUN: SATIN AL", 1, {0.7f, 0.75f, 0.9f});
-        button(r, kBackP, "< KATEGORILER", kUiBtn, 2);
+            button(r, kBackP, "< GARAJ", kUiBtn, 2);
+        } else {
+            const PartCat c = (PartCat)cat_;
+            r.text(8, 104, partCatName(c), 2, kUiGold);
+            const auto& opts = partOptions(c);
+            char b[48];
+            const int mk = (int)std::lround((marketMul(c, app_.career.marketWeek()) - 1.0) * 100.0);
+            if (mk) std::snprintf(b, sizeof b, "PAZAR %+d%%  %zu SECENEK", mk, opts.size());
+            else std::snprintf(b, sizeof b, "%zu SECENEK", opts.size());
+            if (c == PartCat::Ecu) button(r, kSoftP, "YAZILIM >", {0.15f, 0.35f, 0.6f}, 1);
+            else r.text(352 - r.textWidth(b, 1), 110, b, 1, kUiDim);
+            const int cur = partLevel(oc.tune, c, v);
+            const float listH = (sel_ >= 0 ? kListY1 : 540.0f) - kListY0;
+            const float maxScroll = std::max(0.0f, opts.size() * kRowH - listH);
+            scroll_ = std::clamp(scroll_, 0.0f, maxScroll);
+            for (int i = 0; i < (int)opts.size(); ++i) {
+                const float y0 = kListY0 + i * kRowH - scroll_;
+                if (y0 + kRowH < kListY0 || y0 > kListY0 + listH) continue;
+                if (y0 < kListY0 - 1 || y0 + kRowH - 4 > kListY0 + listH + 1) continue;
+                std::string why;
+                bool avail = partAvailable(c, i, v, &why, &oc.tune);
+                if (const int mkp = mapOnlyPart(c, i); mkp >= 0 && !((app_.career.foundParts >> mkp) & 1u)) { avail = false; why = "SADECE ACIK DUNYADA BULUNUR"; }
+                const int price = app_.career.shopPrice(c, i);
+                const bool mine = i == cur, afford = app_.career.money >= price;
+                r.rect(8, y0, 352, y0 + kRowH - 4, mine ? Color{0.12f, 0.3f, 0.16f} : i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
+                if (i == sel_) r.rect(8, y0, 12, y0 + kRowH - 4, kUiOrange);
+                r.text(16, y0 + 5, std::string(opts[i].name).substr(0, 30), 1, {1, 1, 1});
+                std::string right = mine ? "TAKILI" : !avail ? why : price == 0 ? "UCRETSIZ" : money(price);
+                if (i == customOption(c) && !mine) right = "ATOLYE: URET >";
+                r.text(344 - r.textWidth(right, 2), y0 + 17, right, 2,
+                       mine ? Color{0.4f, 1.0f, 0.5f} : i == customOption(c) ? Color{0.55f, 0.75f, 1.0f} : !avail ? Color{1.0f, 0.35f, 0.3f} : afford ? kUiGold : kUiDim);
+            }
+            if (maxScroll > 0) {
+                const float th = std::max(24.0f, listH * listH / (listH + maxScroll)), ty = kListY0 + (listH - th) * scroll_ / maxScroll;
+                r.rect(354, kListY0, 357, kListY0 + listH, {0.15f, 0.15f, 0.18f});
+                r.rect(354, ty, 357, ty + th, kUiDim);
+            }
+            if (sel_ >= 0) drawPreview(r, 450);
+            if (confirm_ && sel_ >= 0) {
+                r.rect(0, 540, 360, 596, {0.03f, 0.03f, 0.05f, 0.95f});
+                const int np = app_.career.shopPrice(c, sel_);
+                if (usedAvailable(c, sel_) && np > 0) {
+                    button(r, kNewP, "YENI", kUiGreen, 2);
+                    r.textCentered(kNewP.cx(), kNewP.y1 - 11, money(np), 1, {0.85f, 1.0f, 0.85f});
+                    button(r, kUsedP, "2. EL", {0.55f, 0.40f, 0.12f}, 2);
+                    r.textCentered(kUsedP.cx(), kUsedP.y1 - 11, money(usedPrice(np)) + " YIPRANMIS", 1, {1.0f, 0.9f, 0.7f});
+                    button(r, kNo3P, "VAZGEC", kUiRed, 2);
+                } else {
+                    button(r, kYesP, std::string("EVET ") + money(np), kUiGreen, 2);
+                    button(r, kNoP, "VAZGEC", kUiRed, 2);
+                }
+            } else if (sel_ >= 0) r.textCentered(180, 566, "TEKRAR DOKUN: SATIN AL", 1, {0.7f, 0.75f, 0.9f});
+            button(r, kBackP, "< KATEGORILER", kUiBtn, 2);
+        }
+        if (msgT_ > 0) { r.rect(0, 500, 360, 528, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 507, msg_, 2, kUiGold); }
     }
-    if (msgT_ > 0) { r.rect(0, 500, 360, 528, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 507, msg_, 2, kUiGold); }
 }
 
 void PartsScreen::buySelected(bool used) {
@@ -287,6 +420,75 @@ void PartsScreen::buySelected(bool used) {
 }
 
 void PartsScreen::tap(float x, float y) {
+    const bool land = app_.settings.menuLandscape;
+    if (land) {
+        if (cat_ >= 0 && confirm_ && sel_ >= 0) {
+            const OwnedCar& o = app_.career.car();
+            const bool usedOk = usedAvailable((PartCat)cat_, sel_) && partPrice((PartCat)cat_, sel_, *findVehicle(o.carId)) > 0;
+            if (usedOk) {
+                if (kNewPL.hit(x, y)) { buySelected(false); return; }
+                if (kUsedPL.hit(x, y)) { buySelected(true); return; }
+                if (kNo3PL.hit(x, y)) { confirm_ = false; return; }
+            } else {
+                if (kYesPL.hit(x, y)) { buySelected(false); return; }
+                if (kNoPL.hit(x, y)) { confirm_ = false; return; }
+            }
+        }
+        if (cat_ < 0) {
+            if (kBackPGarageL.hit(x, y)) { app_.goGarage(); return; }
+            const float tw = 404.0f / kPartTabs;
+            for (int t = 0; t < kPartTabs; ++t) {
+                if (Rect{8.0f + t * tw, 46.0f, 6.0f + (t + 1) * tw, 68.0f}.hit(x, y)) { tab_ = t; return; }
+            }
+            const OwnedCar& oc = app_.career.car();
+            const VehicleDef& v = *findVehicle(oc.carId);
+            int rowIdx = 0;
+            for (int i = 0; i < (int)PartCat::Count; ++i) {
+                if (partTab((PartCat)i) != tab_) continue;
+                const int col = rowIdx % 2;
+                const int row = rowIdx / 2;
+                const float x0 = 8.0f + col * 204.0f;
+                const float y0 = 72.0f + row * 39.0f;
+                if (Rect{x0, y0, x0 + 198.0f, y0 + 36.0f}.hit(x, y)) {
+                    cat_ = i; sel_ = -1; confirm_ = false; scroll_ = 0;
+                    const int cur = partLevel(oc.tune, (PartCat)i, v);
+                    scroll_ = std::max(0.0f, cur * kRowHL - 100.0f);
+                    return;
+                }
+                ++rowIdx;
+            }
+            return;
+        }
+        if (kBackPL.hit(x, y)) { cat_ = -1; sel_ = -1; confirm_ = false; return; }
+        if (cat_ == (int)PartCat::Ecu && kSoftPL.hit(x, y)) { app_.goEcu(); return; }
+        if (sel_ >= 0 && !confirm_ && kBuyPL.hit(x, y)) {
+            const PartCat c = (PartCat)cat_;
+            const int np = app_.career.shopPrice(c, sel_);
+            if (app_.career.money < (usedAvailable(c, sel_) ? usedPrice(np) : np)) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
+            confirm_ = true;
+            return;
+        }
+        const PartCat c = (PartCat)cat_;
+        if (x >= 8 && x <= 372 && y >= kListY0L && y <= kListY1L) {
+            const int i = (int)((y - kListY0L + scroll_) / kRowHL);
+            if (i >= 0 && i < (int)partOptions(c).size()) {
+                const OwnedCar& oc = app_.career.car();
+                const VehicleDef& v = *findVehicle(oc.carId);
+                if (i == customOption(c) && i != partLevel(oc.tune, c, v)) { app_.goFabricate(cat_); return; }
+                if (i == partLevel(oc.tune, c, v)) { msg_ = "ZATEN TAKILI"; msgT_ = 1.2; return; }
+                std::string why;
+                if (const int mk = mapOnlyPart(c, i); mk >= 0 && !((app_.career.foundParts >> mk) & 1u)) { msg_ = "SADECE ACIK DUNYADA BULUNUR"; msgT_ = 1.8; return; }
+                if (!partAvailable(c, i, v, &why, &oc.tune)) { msg_ = why; msgT_ = 1.8; return; }
+                if (sel_ != i) select(i);
+                else {
+                    const int np = app_.career.shopPrice(c, i);
+                    if (app_.career.money < (usedAvailable(c, i) ? usedPrice(np) : np)) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; return; }
+                    confirm_ = true;
+                }
+            }
+        }
+        return;
+    }
     if (cat_ >= 0 && confirm_ && sel_ >= 0) {
         const OwnedCar& o = app_.career.car();
         const bool usedOk = usedAvailable((PartCat)cat_, sel_) && partPrice((PartCat)cat_, sel_, *findVehicle(o.carId)) > 0;
@@ -313,7 +515,7 @@ void PartsScreen::tap(float x, float y) {
             const float rh = catRowH(tab_);
             if (Rect{8, 132.0f + row * rh, 352, 132.0f + row * rh + rh - 4}.hit(x, y)) {
                 cat_ = i; sel_ = -1; confirm_ = false; scroll_ = 0;
-                const int cur = partLevel(oc.tune, (PartCat)i, v);                 // takili parcayi gorunur yap
+                const int cur = partLevel(oc.tune, (PartCat)i, v);
                 scroll_ = std::max(0.0f, cur * kRowH - 120.0f);
                 return;
             }
@@ -326,7 +528,7 @@ void PartsScreen::tap(float x, float y) {
     if (y < kListY0 || y > kListY0 + listH) return;
     const int i = (int)((y - kListY0 + scroll_) / kRowH);
     if (i < 0 || i >= (int)partOptions(c).size()) return;
-    if (i == customOption(c) && i != partLevel(oc.tune, c, v)) { app_.goFabricate(cat_); return; }   // atolye
+    if (i == customOption(c) && i != partLevel(oc.tune, c, v)) { app_.goFabricate(cat_); return; }
     if (i == partLevel(oc.tune, c, v)) { msg_ = "ZATEN TAKILI"; msgT_ = 1.2; return; }
     std::string why;
     if (const int mk = mapOnlyPart(c, i); mk >= 0 && !((app_.career.foundParts >> mk) & 1u)) { msg_ = "SADECE ACIK DUNYADA BULUNUR"; msgT_ = 1.8; return; }
@@ -486,58 +688,105 @@ void FabricateScreen::nudge(int i, int dir) {
 }
 
 void FabricateScreen::render(Renderer& r) {
-    r.begin(360, 640, kUiBg);
-    headerP(r, app_, "OZEL URETIM ATOLYESI");
-    r.text(8, 64, partCatName((PartCat)cat_), 2, kUiGold);
-    const auto s = sliders();
-    char b[96];
-    for (size_t i = 0; i < s.size(); ++i) {
-        const float y = 92.0f + i * 50.0f;
-        r.text(8, y, s[i].name, 1, kUiText);
-        if ((PartCat)cat_ == PartCat::Gearbox && gearKmhPerRatio_ > 0 && vals_[i] > 0.05) {   // bu vitesin son hizi (kesicide)
-            std::snprintf(b, sizeof b, "SON HIZ %.0f KM/H", gearKmhPerRatio_ / vals_[i]);
-            r.text(130, y, b, 1, {0.55f, 0.85f, 1.0f});
+    const bool land = app_.settings.menuLandscape;
+    r.begin(land ? 640 : 360, land ? 360 : 640, kUiBg);
+
+    if (land) {
+        // --- 640x360 YATAY URETIM ATOLYESI ---
+        r.rect(0, 0, 640, 42, kUiPanel);
+        r.text(12, 10, "OZEL URETIM ATOLYESI", 2, kUiGold);
+        r.text(260, 12, partCatName((PartCat)cat_), 1, {1, 1, 1});
+        const std::string m = money(app_.career.money);
+        r.text(628 - r.textWidth(m, 2), 10, m, 2, {0.4f, 1.0f, 0.5f});
+
+        const auto s = sliders();
+        char b[96];
+        // Sol Alan: Ayar Cubuklari (x: 8..362)
+        for (size_t i = 0; i < s.size(); ++i) {
+            const float y = 48.0f + i * 54.0f;
+            r.rect(8, y, 362, y + 48.0f, kUiPanel);
+            std::snprintf(b, sizeof b, s[i].fmt, vals_[i]);
+            r.text(14, y + 5, s[i].name, 1, {1, 1, 1});
+            r.text(356 - r.textWidth(b, 1), y + 5, b, 1, kUiGold);
+            button(r, Rect{14, y + 20, 48, y + 44}, "-", kUiBtn, 2);
+            button(r, Rect{322, y + 20, 356, y + 44}, "+", kUiBtn, 2);
+            r.rect(52, y + 30, 318, y + 34, {0.15f, 0.15f, 0.18f});
+            const float f = (float)((vals_[i] - s[i].lo) / (s[i].hi - s[i].lo));
+            r.rect(52, y + 30, 52 + 266 * f, y + 34, kUiOrange);
+            r.rect(52 + 266 * f - 4, y + 24, 52 + 266 * f + 4, y + 40, {1, 1, 1});
         }
-        std::snprintf(b, sizeof b, s[i].fmt, vals_[i]);
-        r.text(352 - r.textWidth(b, 2), y - 3, b, 2, {1, 1, 1});
-        const Rect minus{8, y + 14, 48, y + 44}, plus{312, y + 14, 352, y + 44};
-        button(r, minus, "-", kUiBtn, 3); button(r, plus, "+", kUiBtn, 3);
-        const float f = (float)((vals_[i] - s[i].lo) / (s[i].hi - s[i].lo));
-        r.rect(56, y + 26, 304, y + 32, {0.15f, 0.15f, 0.18f});
-        r.rect(56, y + 26, 56 + 248 * f, y + 32, kUiOrange);
-        r.rect(56 + 248 * f - 4, y + 18, 56 + 248 * f + 4, y + 40, {1, 1, 1});
+
+        // Sag Alan: Sonuc Paneli (x: 374..630)
+        r.rect(374, 48, 630, 244, {0.08f, 0.09f, 0.13f});
+        r.text(384, 54, "SONUC (TAKILIRSA)", 1, kUiGold);
+        const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
+        auto line = [&](int k, const char* n, double a, double c, const char* fmt, bool hb) {
+            std::snprintf(b, sizeof b, fmt, a, c);
+            const double d = c - a;
+            r.text(384, 72 + k * 18, n, 1, kUiText);
+            r.text(490, 72 + k * 18, b, 1, std::fabs(d) < 1e-6 ? kUiDim : (d > 0) == hb ? up : down);
+        };
+        line(0, "GUC", now_.hp, next_.hp, "%.0f > %.0f HP", true);
+        line(1, "TORK", now_.nm, next_.nm, "%.0f > %.0f NM", true);
+        line(2, "ENDEKS", now_.idx, next_.idx, "%.0f > %.0f", true);
+        line(3, "MOTOR YUKU", now_.engineLoad * 100, next_.engineLoad * 100, "%%%.0f > %%%.0f", false);
+        line(4, "SANZIMAN", now_.gearboxLoad * 100, next_.gearboxLoad * 100, "%%%.0f > %%%.0f", false);
+        line(5, "ISI YUKU", now_.heatLoad * 100, next_.heatLoad * 100, "%%%.0f > %%%.0f", false);
+        line(6, "DEVIR SINIRI", now_.redline, next_.redline, "%.0f > %.0f", true);
+
+        // Dugmeler
+        const int p = price();
+        if (confirm_) {
+            button(r, Rect{374, 256, 498, 298}, "URET " + money(p), kUiGreen, 2);
+            button(r, Rect{506, 256, 630, 298}, "VAZGEC", kUiRed, 2);
+        } else button(r, Rect{374, 256, 630, 298}, "URET VE TAK " + money(p), app_.career.money >= p ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
+        button(r, Rect{374, 306, 630, 346}, "< GERI", kUiBtn, 2);
+
+        if (msgT_ > 0) { r.rect(160, 314, 480, 344, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(320, 322, msg_, 2, kUiGold); }
+    } else {
+        headerP(r, app_, "OZEL URETIM ATOLYESI");
+        r.text(8, 64, partCatName((PartCat)cat_), 2, kUiGold);
+        const auto s = sliders();
+        char b[96];
+        for (size_t i = 0; i < s.size(); ++i) {
+            const float y = 92.0f + i * 50.0f;
+            r.rect(8, y, 352, y + 46, kUiPanel);
+            std::snprintf(b, sizeof b, s[i].fmt, vals_[i]);
+            r.text(16, y + 4, s[i].name, 1, {1, 1, 1});
+            r.text(344 - r.textWidth(b, 1), y + 4, b, 1, kUiGold);
+            button(r, Rect{8, y + 14, 48, y + 44}, "-", kUiBtn, 2);
+            button(r, Rect{312, y + 14, 352, y + 44}, "+", kUiBtn, 2);
+            r.rect(56, y + 26, 304, y + 32, {0.15f, 0.15f, 0.18f});
+            const float f = (float)((vals_[i] - s[i].lo) / (s[i].hi - s[i].lo));
+            r.rect(56, y + 26, 56 + 248 * f, y + 32, kUiOrange);
+            r.rect(56 + 248 * f - 4, y + 18, 56 + 248 * f + 4, y + 40, {1, 1, 1});
+        }
+        const float py = std::max(300.0f, 100.0f + s.size() * 50.0f);
+        r.rect(8, py, 352, py + 130, {0.08f, 0.09f, 0.13f});
+        r.text(16, py + 6, "SONUC (TAKILIRSA)", 1, kUiGold);
+        const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
+        auto line = [&](int k, const char* n, double a, double c, const char* fmt, bool hb) {
+            std::snprintf(b, sizeof b, fmt, a, c);
+            const double d = c - a;
+            r.text(16, py + 22 + k * 15, n, 1, kUiText);
+            r.text(110, py + 22 + k * 15, b, 1, std::fabs(d) < 1e-6 ? kUiDim : (d > 0) == hb ? up : down);
+        };
+        line(0, "GUC", now_.hp, next_.hp, "%.0f > %.0f HP", true);
+        line(1, "TORK", now_.nm, next_.nm, "%.0f > %.0f NM", true);
+        line(2, "ENDEKS", now_.idx, next_.idx, "%.0f > %.0f", true);
+        line(3, "MOTOR YUKU", now_.engineLoad * 100, next_.engineLoad * 100, "%%%.0f > %%%.0f", false);
+        line(4, "SANZIMAN YUKU", now_.gearboxLoad * 100, next_.gearboxLoad * 100, "%%%.0f > %%%.0f", false);
+        line(5, "ISI YUKU", now_.heatLoad * 100, next_.heatLoad * 100, "%%%.0f > %%%.0f", false);
+        line(6, "DEVIR SINIRI", now_.redline, next_.redline, "%.0f > %.0f", true);
+
+        const int p = price();
+        if (confirm_) {
+            button(r, kYesP, "URET " + money(p), kUiGreen, 2);
+            button(r, kNoP, "VAZGEC", kUiRed, 2);
+        } else button(r, kMake, "URET VE TAK " + money(p), app_.career.money >= p ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
+        button(r, kBackP, "< GERI", kUiBtn, 2);
+        if (msgT_ > 0) { r.rect(0, 500, 360, 528, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 507, msg_, 2, kUiGold); }
     }
-    // Sonuc paneli: simdiki > uretilen
-    const float py = std::max(300.0f, 100.0f + s.size() * 50.0f);
-    r.rect(8, py, 352, py + 130, {0.08f, 0.09f, 0.13f});
-    r.text(16, py + 6, "SONUC (TAKILIRSA)", 1, kUiGold);
-    const Color up{0.4f, 1.0f, 0.5f}, down{1.0f, 0.4f, 0.3f};
-    auto line = [&](int k, const char* n, double a, double c, const char* fmt, bool hb) {
-        std::snprintf(b, sizeof b, fmt, a, c);
-        const double d = c - a;
-        r.text(16, py + 22 + k * 15, n, 1, kUiText);
-        r.text(110, py + 22 + k * 15, b, 1, std::fabs(d) < 1e-6 ? kUiDim : (d > 0) == hb ? up : down);
-    };
-    line(0, "GUC", now_.hp, next_.hp, "%.0f > %.0f HP", true);
-    line(1, "TORK", now_.nm, next_.nm, "%.0f > %.0f NM", true);
-    line(2, "ENDEKS", now_.idx, next_.idx, "%.0f > %.0f", true);
-    line(3, "MOTOR YUKU", now_.engineLoad * 100, next_.engineLoad * 100, "%%%.0f > %%%.0f", false);
-    line(4, "SANZIMAN YUKU", now_.gearboxLoad * 100, next_.gearboxLoad * 100, "%%%.0f > %%%.0f", false);
-    line(5, "ISI YUKU", now_.heatLoad * 100, next_.heatLoad * 100, "%%%.0f > %%%.0f", false);
-    line(6, "DEVIR SINIRI", now_.redline, next_.redline, "%.0f > %.0f", true);
-    if ((PartCat)cat_ == PartCat::Turbo) {
-        const TurboOpt T = customTurbo(built());
-        std::snprintf(b, sizeof b, "BOOST +%.2f BAR, SPOOL %%%.0f-%%%.0f DEVIR", T.bar, T.spoolLo * 100, T.spoolHi * 100);
-        r.text(16, py + 132, b, 1, {0.55f, 0.75f, 1.0f});
-    }
-    // Uret / onay / geri
-    const int p = price();
-    if (confirm_) {
-        button(r, kYesP, "URET " + money(p), kUiGreen, 2);
-        button(r, kNoP, "VAZGEC", kUiRed, 2);
-    } else button(r, kMake, "URET VE TAK " + money(p), app_.career.money >= p ? kUiGreen : Color{0.25f, 0.25f, 0.28f}, 2);
-    button(r, kBackP, "< GERI", kUiBtn, 2);
-    if (msgT_ > 0) { r.rect(0, 500, 360, 528, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 507, msg_, 2, kUiGold); }
 }
 
 void FabricateScreen::make() {
@@ -554,6 +803,24 @@ void FabricateScreen::make() {
 }
 
 void FabricateScreen::pointerDown(int id, float x, float y) {
+    const bool land = app_.settings.menuLandscape;
+    if (land) {
+        if (confirm_) {
+            if (Rect{374, 256, 498, 298}.hit(x, y)) make();
+            else if (Rect{506, 256, 630, 298}.hit(x, y)) confirm_ = false;
+            return;
+        }
+        if (Rect{374, 306, 630, 346}.hit(x, y)) { app_.goParts(cat_); return; }
+        if (Rect{374, 256, 630, 298}.hit(x, y)) { confirm_ = true; return; }
+        const auto s = sliders();
+        for (size_t i = 0; i < s.size(); ++i) {
+            const float yy = 48.0f + i * 54.0f;
+            if (Rect{14, yy + 20, 48, yy + 44}.hit(x, y)) { nudge((int)i, -1); held_ = (int)i; heldDir_ = -1; holdT_ = 0; ptr_ = id; return; }
+            if (Rect{322, yy + 20, 356, yy + 44}.hit(x, y)) { nudge((int)i, +1); held_ = (int)i; heldDir_ = +1; holdT_ = 0; ptr_ = id; return; }
+            if (Rect{52, yy + 20, 318, yy + 44}.hit(x, y)) { dragSlider_ = (int)i; ptr_ = id; pointerMove(id, x, y); return; }
+        }
+        return;
+    }
     if (confirm_) {
         if (kYesP.hit(x, y)) make();
         else if (kNoP.hit(x, y)) confirm_ = false;
@@ -572,9 +839,11 @@ void FabricateScreen::pointerDown(int id, float x, float y) {
 void FabricateScreen::pointerMove(int id, float x, float) {
     if (id != ptr_ || dragSlider_ < 0) return;
     const auto s = sliders();
-    const SliderDef* unused = nullptr; (void)unused;
     const Slider& d = s[dragSlider_];
-    const double f = std::clamp((x - 56.0) / 248.0, 0.0, 1.0);
+    const bool land = app_.settings.menuLandscape;
+    const double trackX0 = land ? 52.0 : 56.0;
+    const double trackW = land ? 266.0 : 248.0;
+    const double f = std::clamp((x - trackX0) / trackW, 0.0, 1.0);
     vals_[dragSlider_] = std::clamp(std::round((d.lo + f * (d.hi - d.lo)) / d.step) * d.step, d.lo, d.hi);
     refresh();
 }
@@ -602,47 +871,124 @@ EcuScreen::EcuScreen(App& app) : app_(app) {
 }
 
 void EcuScreen::render(Renderer& r) {
+    const bool land = app_.settings.menuLandscape;
     const OwnedCar& oc = app_.career.car();
     const VehicleDef& v = *findVehicle(oc.carId);
     const Tune& t = oc.tune;
-    r.begin(360, 640, kUiBg);
-    headerP(r, app_, "ECU YAZILIM");
-    const EcuHwOpt& hw = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)];
-    char b[96];
-    std::snprintf(b, sizeof b, "%s   YUVA %d / %d", hw.name, ecuSlotsUsed(t), hw.slots);
-    r.text(8, 64, b, 2, kUiGold);
-    {   // supap siniri: devir siniri bunu asarsa supap atar
+    r.begin(land ? 640 : 360, land ? 360 : 640, kUiBg);
+
+    if (land) {
+        // --- 640x360 YATAY ECU YAZILIM ---
+        r.rect(0, 0, 640, 42, kUiPanel);
+        r.text(12, 10, "ECU YAZILIM", 2, kUiGold);
+        const EcuHwOpt& hw = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)];
+        char b[96];
+        std::snprintf(b, sizeof b, "%s   YUVA %d / %d", hw.name, ecuSlotsUsed(t), hw.slots);
+        r.text(150, 12, b, 1, kUiText);
+        const std::string m = money(app_.career.money);
+        r.text(628 - r.textWidth(m, 2), 10, m, 2, {0.4f, 1.0f, 0.5f});
+
         VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
         const VehicleSim sim(cfg);
         const bool over = sim.engineSpec().redlineRpm > sim.valveSafeRpm();
-        std::snprintf(b, sizeof b, "%.0f HP   KESICI %.0f   SUPAP %.0f", now_.hp, sim.engineSpec().redlineRpm, sim.valveSafeRpm());
-        r.text(8, 88, b, 1, over ? Color{1.0f, 0.4f, 0.3f} : kUiText);
-        if (over) r.text(8, 100, "SUPAP SINIRI ASILDI: SUPAP / KAM AL YA DA DEVRI DUSUR", 1, {1.0f, 0.4f, 0.3f});
-        std::snprintf(b, sizeof b, "OKTAN %.0f / ISTENEN %.0f%s", now_.octane, now_.octaneReq, hw.knockBuiltin || t.swKnock ? "" : "   VURUNTU KORUMASI YOK");
-        r.text(8, 112, b, 1, now_.octaneReq > now_.octane || !(hw.knockBuiltin || t.swKnock) ? Color{1.0f, 0.75f, 0.3f} : kUiDim);
+
+        // Sol Alan: Modüller (x: 8..410)
+        for (int i = 0; i < SwCount; ++i) {
+            const EcuSwDef& d = ecuSwDef(i);
+            const int lv = ecuSwLevel(t, i), mx = ecuSwMax(t, i);
+            const float y = 48.0f + i * 42.0f;
+            r.rect(8, y, 410, y + 38.0f, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
+            r.text(14, y + 4, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
+            if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
+            else std::snprintf(b, sizeof b, mx > 0 ? "SEV %d/%d" : "DESTEKLENMEZ", lv, mx);
+            r.text(14, y + 18, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
+            r.text(140, y + 4, std::string(d.desc).substr(0, 24), 1, kUiDim);
+
+            if (mx > 0) {
+                if (lv > 0) button(r, Rect{270, y + 6, 310, y + 32}, "-", kUiBtn, 2);
+                if (lv < mx) {
+                    const int p = ecuSwPrice(i, lv + 1, v);
+                    button(r, Rect{316, y + 6, 404, y + 32}, "+ " + money(p), app_.career.money >= p ? kUiGreen : Color{0.3f, 0.3f, 0.32f}, 1);
+                } else r.textCentered(360, y + 14, "MAKS", 1, kUiGold);
+            }
+        }
+
+        // Sag Alan: Durum ve Geri Butonu (x: 420..630)
+        r.rect(420, 48, 630, 298, {0.08f, 0.09f, 0.13f});
+        r.text(430, 56, "MOTOR GUCLER VE LIMITLER", 1, kUiGold);
+        std::snprintf(b, sizeof b, "GUC: %.0f HP   TORK: %.0f NM", now_.hp, now_.nm);
+        r.text(430, 78, b, 1, kUiText);
+        std::snprintf(b, sizeof b, "KESICI: %.0f RPM", sim.engineSpec().redlineRpm);
+        r.text(430, 98, b, 1, over ? Color{1.0f, 0.4f, 0.3f} : kUiText);
+        std::snprintf(b, sizeof b, "GUVENLI SUPAP: %.0f RPM", sim.valveSafeRpm());
+        r.text(430, 118, b, 1, over ? Color{1.0f, 0.4f, 0.3f} : kUiDim);
+        if (over) r.text(430, 138, "UYARI: SUPAP ATMA RISKI!", 1, {1.0f, 0.4f, 0.3f});
+
+        std::snprintf(b, sizeof b, "OKTAN: %.0f / GEREKEN: %.0f", now_.octane, now_.octaneReq);
+        r.text(430, 162, b, 1, now_.octaneReq > now_.octane ? Color{1.0f, 0.75f, 0.3f} : kUiText);
+        if (!(hw.knockBuiltin || t.swKnock)) r.text(430, 180, "VURUNTU KORUMASI YOK!", 1, {1.0f, 0.6f, 0.3f});
+
+        button(r, Rect{420, 306, 630, 346}, "< ECU", kUiBtn, 2);
+
+        if (msgT_ > 0) { r.rect(160, 314, 480, 344, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(320, 322, msg_, 2, kUiGold); }
+    } else {
+        headerP(r, app_, "ECU YAZILIM");
+        const EcuHwOpt& hw = ecuHwTable()[std::clamp(t.ecuHw, 0, 9)];
+        char b[96];
+        std::snprintf(b, sizeof b, "%s   YUVA %d / %d", hw.name, ecuSlotsUsed(t), hw.slots);
+        r.text(8, 64, b, 2, kUiGold);
+        {
+            VehicleSimConfig cfg; cfg.car = &v; cfg.tune = &t;
+            const VehicleSim sim(cfg);
+            const bool over = sim.engineSpec().redlineRpm > sim.valveSafeRpm();
+            std::snprintf(b, sizeof b, "%.0f HP   KESICI %.0f   SUPAP %.0f", now_.hp, sim.engineSpec().redlineRpm, sim.valveSafeRpm());
+            r.text(8, 88, b, 1, over ? Color{1.0f, 0.4f, 0.3f} : kUiText);
+            if (over) r.text(8, 100, "SUPAP SINIRI ASILDI: SUPAP / KAM AL YA DA DEVRI DUSUR", 1, {1.0f, 0.4f, 0.3f});
+            std::snprintf(b, sizeof b, "OKTAN %.0f / ISTENEN %.0f%s", now_.octane, now_.octaneReq, hw.knockBuiltin || t.swKnock ? "" : "   VURUNTU KORUMASI YOK");
+            r.text(8, 112, b, 1, now_.octaneReq > now_.octane || !(hw.knockBuiltin || t.swKnock) ? Color{1.0f, 0.75f, 0.3f} : kUiDim);
+        }
+        for (int i = 0; i < SwCount; ++i) {
+            const EcuSwDef& d = ecuSwDef(i);
+            const int lv = ecuSwLevel(t, i), mx = ecuSwMax(t, i);
+            const float y = kSwY0 + i * kSwH;
+            r.rect(8, y, 352, y + kSwH - 4, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
+            r.text(16, y + 5, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
+            if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
+            else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
+            r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
+            r.text(16, y + 31, std::string(d.desc).substr(0, 30), 1, kUiDim);
+            if (mx <= 0) continue;
+            if (lv > 0) button(r, swMinus(i), "-", kUiBtn, 2);
+            if (lv < mx) {
+                const int p = ecuSwPrice(i, lv + 1, v);
+                button(r, swPlus(i), "+ " + money(p), app_.career.money >= p ? kUiGreen : Color{0.3f, 0.3f, 0.32f}, 1);
+            } else r.textCentered(swPlus(i).cx(), swPlus(i).y0 + 10, "MAKS", 1, kUiGold);
+        }
+        button(r, kBackE, "< ECU", kUiBtn, 2);
+        if (msgT_ > 0) { r.rect(0, 560, 360, 590, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 568, msg_, 2, kUiGold); }
     }
-    for (int i = 0; i < SwCount; ++i) {
-        const EcuSwDef& d = ecuSwDef(i);
-        const int lv = ecuSwLevel(t, i), mx = ecuSwMax(t, i);
-        const float y = kSwY0 + i * kSwH;
-        r.rect(8, y, 352, y + kSwH - 4, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
-        r.text(16, y + 5, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
-        if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
-        else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
-        r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
-        r.text(16, y + 31, std::string(d.desc).substr(0, 30), 1, kUiDim);
-        if (mx <= 0) continue;
-        if (lv > 0) button(r, swMinus(i), "-", kUiBtn, 2);
-        if (lv < mx) {
-            const int p = ecuSwPrice(i, lv + 1, v);
-            button(r, swPlus(i), "+ " + money(p), app_.career.money >= p ? kUiGreen : Color{0.3f, 0.3f, 0.32f}, 1);
-        } else r.textCentered(swPlus(i).cx(), swPlus(i).y0 + 10, "MAKS", 1, kUiGold);
-    }
-    button(r, kBackE, "< ECU", kUiBtn, 2);
-    if (msgT_ > 0) { r.rect(0, 560, 360, 590, {0.02f, 0.02f, 0.04f, 0.92f}); r.textCentered(180, 568, msg_, 2, kUiGold); }
 }
 
 void EcuScreen::pointerDown(int, float x, float y) {
+    const bool land = app_.settings.menuLandscape;
+    if (land) {
+        if (Rect{420, 306, 630, 346}.hit(x, y)) { app_.goParts((int)PartCat::Ecu); return; }
+        for (int i = 0; i < SwCount; ++i) {
+            std::string why;
+            const float yy = 48.0f + i * 42.0f;
+            if (Rect{316, yy + 6, 404, yy + 32}.hit(x, y)) {
+                if (app_.career.buyEcuSoftware(i, &why)) { msg_ = std::string(ecuSwDef(i).name) + " YUKLENDI"; app_.saveCareer(); }
+                else msg_ = why;
+                msgT_ = 1.6;
+            } else if (Rect{270, yy + 6, 310, yy + 32}.hit(x, y) && ecuSwLevel(app_.career.car().tune, i) > 0) {
+                app_.career.dropEcuSoftware(i); app_.saveCareer();
+                msg_ = std::string(ecuSwDef(i).name) + " DUSURULDU"; msgT_ = 1.2;
+            } else continue;
+            now_ = tuneStats(*findVehicle(app_.career.car().carId), app_.career.car().tune);
+            return;
+        }
+        return;
+    }
     if (kBackE.hit(x, y)) { app_.goParts((int)PartCat::Ecu); return; }
     for (int i = 0; i < SwCount; ++i) {
         std::string why;
