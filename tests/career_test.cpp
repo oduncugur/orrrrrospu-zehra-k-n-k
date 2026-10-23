@@ -147,6 +147,11 @@ int main() {
         CHECK(prizeDifficulty(0.5) > 1.2 && prizeDifficulty(-0.5) < 0.8 && prizeDifficulty(5) == 1.8, "zor rakip daha cok odul");
     }
     std::printf("[L] Ligler: patron kilidi, lig acilmasi, pink slip, gunluk gorev, kayit\n");
+    {   // her etkinligin rakibi rakip tablosunda (tasma = cokme)
+        bool ok = true;
+        for (const auto& e : leagueEvents()) ok &= e.rival < (int)rivals().size();
+        CHECK(ok, "tum etkinlik rakipleri tabloda");
+    }
     {
         Career c = Career::newGame();
         c.money = 100000;

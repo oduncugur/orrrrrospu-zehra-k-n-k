@@ -977,7 +977,7 @@ LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
     if (cp && v.streetLegal && !v.widebody) wingType = std::max(cp->wing, v.wing && v.body != Body::Super ? (int)K3 : (int)K0);
     {
         const double sw = std::max(A.backX, 0.80);                                   // kanat bolgesi: bagaj / kuyruk
-        const double xw = -L * 0.44, zDeck = topZ(std::clamp(0.94, sw, 0.97));
+        const double xw = -L * 0.44, zDeck = topZ(std::min(std::max(0.94, sw), 0.97));
         const int wm = v.year >= 1990 ? MatPaint : MatTrim;
         switch (wingType) {
         case K0: break;

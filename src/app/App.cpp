@@ -140,7 +140,8 @@ void App::startTour() {
 }
 void App::startEvent(int idx) {
     const auto& ev = leagueEvents();
-    if (idx < 0 || idx >= (int)ev.size() || !career.eventAvailable(idx)) return;
+    const bool testRun = std::getenv("ZK_EVENT") != nullptr;           // test: kilit atlanir
+    if (idx < 0 || idx >= (int)ev.size() || (!testRun && !career.eventAvailable(idx))) return;
     const EventDef& e = ev[idx];
     const OwnedCar& oc = career.car();
     Opponent o;
@@ -155,7 +156,11 @@ void App::startEvent(int idx) {
     }
     lastOpp = o;
     activeEvent = idx;
-    if (e.mode == EventMode::Drag) setScreen(std::make_unique<DragScreen>(*this, oc.carId, o.carId, &oc.tune, &o.tune, true));
+    if (e.mode == EventMode::Drag) {
+        auto d = std::make_unique<DragScreen>(*this, oc.carId, o.carId, &oc.tune, &o.tune, true);
+        if (testRun && std::getenv("ZK_AUTOPILOT")) d->setAutopilot(true);
+        setScreen(std::move(d));
+    }
     else setScreen(std::make_unique<RoadScreen>(*this, oc.carId, &oc.tune));
 }
 void App::goDrag(int p, int o, bool autopilot) {

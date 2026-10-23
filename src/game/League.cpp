@@ -80,6 +80,10 @@ const std::vector<RivalDef>& rivals() {
         {"ALADAGLAR LALE", 3, 75, 1, 1.35, false}, {"KALE YOLU ARDA", 3, 17, 1, 1.35, false},
         // 44 ANTALYA
         {"SAHIL KRALI METE", 4, 272, 2, 1.25, false}, {"KONYAALTI SU", 4, 184, 2, 1.2, false}, {"GECE PISTI NIL", 4, 46, 1, 1.2, false},
+        // 47 ikinci sehirlerin patronlari (IZMIT, ESKISEHIR, KONYA, NIGDE, ANTALYA)
+        {"KORFEZIN SAHIBI ILKER", 0, 218, 2, 1.45, true}, {"PROFESOR NAZLI", 1, 12, 2, 1.3, true},
+        {"OVANIN AGASI", 2, 34, 2, 1.25, true}, {"KAYA KARTALI", 3, 19, 2, 1.2, true},
+        {"RIVIERA KONTU", 4, 177, 2, 1.1, true},
     };
     return r;
 }
