@@ -75,6 +75,7 @@ private:
     int hint_ = 0; double s_ = 0, lat_ = 0, lane_ = -1.8;
     double launchPedal_ = 1.0; bool launching_ = true;
     double shiftT_ = -1, sinceShift_ = 0; int target_ = 1;
+    bool kd1_ = false;                       // D %65-95 gaz: tek vites dusurme kullanildi
     void autoShift(int gear, double rpm, double thr);   // otomatik: gaza gore vites noktasi, kickdown, S / M
     double acc_ = 0, offT_ = 0;
     bool recovered_ = false, stalledEv_ = false;

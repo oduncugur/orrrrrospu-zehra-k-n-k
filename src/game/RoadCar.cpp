@@ -54,10 +54,14 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     const int cust = tcu > 0 ? (sport ? tune_.tcuShiftS : tune_.tcuShiftD) : 0;
     const double eff = std::max(idle + 1300.0, (0.40 + 0.04 * tcu) * red);   // yakit acisindan en verimli devir
     const double top = cust > 0 ? std::clamp((double)cust, idle + 1500.0, red - 100.0) : red - (sport ? 250.0 : 500.0 - 100.0 * tcu);
-    const double k = thr > 0.65 ? 1.0 : 0.0;
-    // D: gaz %65'e kadar verimli devirde atar; ustunde tam gaz noktasi. S: degismedi (hep yuksek devir)
-    const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : (thr <= 0.65 ? eff : top);
-    if (sinceShift_ < 0.8 - 0.2 * tcu && !(thr > 0.85 && sinceShift_ > 0.35)) return;
+    const bool wot = thr >= 0.95;
+    const double k = wot ? 1.0 : 0.0;
+    // D: gaz %65'e kadar verimli devirde atar; %65-95 arasi devir gaza gore kademeli yukselir (gerekirse tek vites
+    // duser); %95+ kesiciye / en hizli gecis devrine kadar cikar. S: degismedi (hep yuksek devir)
+    const double mid = std::clamp((thr - 0.65) / 0.30, 0.0, 1.0);
+    const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : wot ? top : eff + (top - eff) * mid;
+    if (thr < 0.6) kd1_ = false;                                         // ara bolge tek vites dusurme hakki yenilenir
+    if (sinceShift_ < 0.8 - 0.2 * tcu && !(wot && sinceShift_ > 0.35)) return;
     // Yukari: cikis devri (konvertor kaymasiz) vites noktasini gecti ya da motor kesiciye dayandi (kayma ile)
     // Tam gazda (ve S'de) en iyi vites noktasi: ust viteste tekere giden cekis (tork x oran) bu vitesi gectigi an
     if (cust <= 0 && (k > 0.8 || sport) && gear < pt.gearCount() && rpm > 0.55 * red) {   // ayarli devirde bu kural yok
@@ -70,7 +74,8 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     // Kickdown: alt viteste motor devri (patinaj / konvertor kaymasi dahil gercek devir) kesiciye 1500 kala sigmali;
     // arac hizindan hesaplanan devir patinajda dusuk kalir ve 1-2 arasinda gidip gelmeye yol aciyordu.
     const double rLowEng = std::max(rLow, pt.rpm() * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3));
-    if (thr > 0.85 && rLowEng < red - 1500.0 && pt.rpm() < top - 400.0 && sim_->speed() > 3.0) { shift(gear - 1); return; }   // kickdown
+    if (wot && rLowEng < red - 1500.0 && pt.rpm() < top - 400.0 && sim_->speed() > 3.0) { shift(gear - 1); return; }   // kickdown
+    if (!sport && !wot && thr > 0.65 && !kd1_ && rLowEng < up - 200.0 && sim_->speed() > 3.0) { kd1_ = true; shift(gear - 1); return; }   // ara: tek vites
     if (sinceShift_ > 1.0 && rLow < up * 0.80 && rpm < (sport ? 0.55 * red : std::max(idle + 700.0, eff * 0.72))) shift(gear - 1);
 }
 
@@ -283,7 +288,9 @@ double RoadCar::tireSlipSpeed() const {
     for (int i = 0; i < 4; ++i) {
         const WheelSimulation& w = sim_->wheel(i);
         if (w.Fz() < 100) continue;
-        slip = std::max({slip, std::fabs(w.omega() * w.rEff() - v) * f, std::fabs(w.slipAngle()) * v * 0.9 * f});
+        // Boyuna: normal cekis kaymasi (hizin ~%10'u + 0.6 m/s) sessiz; lastik ancak tutunma sinirini asinca cigliklar
+        const double lon = std::max(0.0, std::fabs(w.omega() * w.rEff() - v) - (0.6 + 0.10 * v));
+        slip = std::max({slip, lon * f, std::fabs(w.slipAngle()) * v * 0.9 * f});
     }
     return slip;
 }

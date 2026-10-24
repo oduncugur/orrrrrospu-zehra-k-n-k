@@ -428,6 +428,23 @@ int main() {
         CHECK(vmax * 3.6 < 180.0, "rakipler time attack temposundan yavas (gecilebilir)");
         CHECK(rs.raceLength() / (200.0 / 3.6) < rs.timeLimit() * 0.95, "200 km/h ortalama sureye rahat yetisir");
     }
+    std::printf("[F3] The Run: arkadan hizli gelen oyuncuya rakip saga kacip yol verir\n");
+    {
+        RoadSession rs(RoadSession::Mode::Marathon, 5, nullptr, 0, nullptr, 7u);
+        rs.clearTraffic();
+        const RunField& rf = rs.runField();
+        int idx = -1;
+        for (size_t i = 0; i < rf.runners().size(); ++i) if (rf.runners()[i].li > 0 && rs.road().lanesFwd(rf.runners()[i].s) >= 2) { idx = (int)i; break; }
+        if (idx >= 0) {
+            RunField f = rf;                                               // kopya: dogrudan surulur
+            Runner& R = f.runners()[idx];
+            const int li0 = R.li;
+            const double ps = R.s - 40.0, plat = R.lane, pv = R.v + 15.0;
+            for (int k = 0; k < 90; ++k) f.update(1.0 / 60.0, rs.road(), {}, 70.0, 2.0, rs.startS() + rs.raceLength(), k / 60.0, ps + pv * k / 60.0, plat, pv);
+            std::printf("    rakip serit %d -> %d, yanal kayma %.2f m\n", li0, f.runners()[idx].li, std::fabs(f.runners()[idx].lane - plat));
+            CHECK(f.runners()[idx].li < li0 && std::fabs(f.runners()[idx].lane - plat) > 2.0, "1.5 s icinde saga kacti (sol serit acildi)");
+        }
+    }
     std::printf("[B] Fren: hafif basista kilitlenmez, tam basista guclu yavaslar (ABS'siz Sahin)\n");
     {
         const RoadPath straight(7u, 20000.0, 4000.0);

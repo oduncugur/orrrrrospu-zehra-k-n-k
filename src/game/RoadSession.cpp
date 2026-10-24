@@ -479,8 +479,21 @@ void RoadSession::update(double dt, const RoadControls& in) {
         const int n = t.oncoming ? road_.lanesBack(t.s) : road_.lanesFwd(t.s);
         if (n == 0) { spawnTraffic(t, player_->s() + near + spread * rnd()); continue; }   // tek yona girdi
         t.li = std::min(t.li, n - 1);                                   // serit bitti: birles
+        bool yielding = false;
+        if (!t.oncoming && t.li > 0) {                                  // arkadan hizli gelen oyuncuya yol ver: saga kac
+            const double behind = t.s - player_->s(), closing = player_->sim().speed() - t.v;
+            if (behind > 0.0 && behind < 35.0 + 3.0 * std::max(0.0, closing) && closing > 1.5 &&
+                std::fabs(player_->lateral() - t.lane) < 2.0) {
+                const int to = t.li - 1;
+                bool free = true;
+                for (const TrafficCar& o : traffic_)
+                    if (&o != &t && !o.oncoming && o.li == to && std::fabs(o.s - t.s) < 14.0) { free = false; break; }
+                if (free) { t.li = to; yielding = true; }
+            }
+        }
         const double target = road_.laneOffset(t.s, t.oncoming, t.li);
-        t.lane += std::clamp(target - t.lane, -1.6 * dt, 1.6 * dt);
+        const double rate = yielding || std::fabs(target - t.lane) > 1.0 ? 3.6 : 1.6;   // yol verirken hizli serit degisimi
+        t.lane += std::clamp(target - t.lane, -rate * dt, rate * dt);
         const double ref = player_->s();
         if (t.s < ref - 250.0 || t.s > ref + far || t.s < 5.0 || t.s > road_.length() - 20.0) spawnTraffic(t, ref + near + spread * rnd());
     }

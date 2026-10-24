@@ -339,9 +339,11 @@ void RoadScreen::update(double dt) {
                             std::fabs(t.lane - lo) < 1.6 && (ahead < 10.0 || t.v < v - 0.5)) return true;
                     return false;
                 };
-                if (blocked(runLane_, 20.0 + 1.2 * v))
+                // Onundekiler arkadan gelene yol verir (saga kacar): oyuncu sol seritte kalir, yalniz yakinda kapaliysa gecer
+                if (blocked(runLane_, 10.0 + 0.45 * v)) {
                     for (int cand : {runLane_ + 1, runLane_ - 1})
-                        if (cand >= 0 && cand < nf && !blocked(cand, 8.0) && !blocked(cand, 20.0 + 1.2 * v)) { runLane_ = cand; laneCool_ = 1.0; break; }
+                        if (cand >= 0 && cand < nf && !blocked(cand, 8.0) && !blocked(cand, 10.0 + 0.45 * v)) { runLane_ = cand; laneCool_ = 2.0; break; }
+                } else if (runLane_ < nf - 1 && !blocked(nf - 1, 8.0) && !blocked(nf - 1, 25.0 + v)) { runLane_ = nf - 1; laneCool_ = 2.0; }   // sol serit bossa don
             }
             runLane_ = std::clamp(runLane_, 0, nf - 1);
             steer_ = P.aiControls(ses_->road().laneOffset(P.s(), false, runLane_), 0.6).steer;

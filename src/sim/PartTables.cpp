@@ -581,6 +581,14 @@ const std::vector<GearOpt>& gearTable() {
         // 39+: ozel yapim, yalniz acik dunyada bulunur (kilitli, bulununca bedava)
         {"OZEL 7 SIRALI DOGBOX (BULUNTU)", 14000, "ZKG1", 1600, 0.55}, {"OZEL 8 CIFT KAVRAMA (BULUNTU)", 12000, "ZKG2", 1400, 0.5},
         {"PERT 6 ILERI H GUCLU (BULUNTU)", 6000, "ZKG3", 1500, 1.0},
+        // 42+: butce secenekleri (kullanilmis / yenilenmis; dayanim dusuk, gecis biraz yavas). Yeniler sona eklenir.
+        {"KULLANILMIS DSG 6 (CIFT KAVRAMA)", 1600, "VW6D", 380, 1.3}, {"HURDA TC-SST 6 (CIFT KAVRAMA)", 1900, "MT6S", 450, 1.25},
+        {"YENILENMIS GETRAG 7 DCT (CIFT KAVRAMA)", 3300, "BM7D", 600, 1.05}, {"KULLANILMIS GR6 (CIFT KAVRAMA)", 4400, "NS6D", 700, 1.0},
+        {"KULLANILMIS ZF 6HP (OTOMATIK)", 1200, "ZF6H", 580, 1.25}, {"KULLANILMIS 6L80 (OTOMATIK)", 1700, "GM6A", 680, 1.15},
+        {"YENILENMIS ZF 8HP (OTOMATIK)", 2900, "ZF8H", 820, 0.85}, {"KULLANILMIS 722.6 (OTOMATIK)", 1000, "MB5A", 620, 1.35},
+        {"KULLANILMIS HONDA 5 ILERI", 500, "KZ5A", 300, 1.3}, {"KULLANILMIS NISSAN 5 ILERI", 700, "NS5F", 380, 1.25},
+        {"KULLANILMIS MAZDA 5 ILERI", 600, "MZ5M", 320, 1.25}, {"KULLANILMIS W58 5 ILERI", 1100, "TS5W", 400, 1.15},
+        {"KULLANILMIS SUBARU 6 ILERI", 1500, "SB6T", 480, 1.1}, {"KULLANILMIS GETRAG 6 ILERI", 2000, "BM6G", 560, 1.1},
     };
     return t;
 }

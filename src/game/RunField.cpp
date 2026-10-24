@@ -163,9 +163,21 @@ void RunField::update(double dt, const RoadPath& road, const std::vector<double>
         const double kgps = (pUse / 0.86 / 1000.0) * 0.26 * R.bsfcMul / 3600.0 + 0.00025;
         const double dl = kgps / 0.745 * dt * comp_;
         R.fuelL = std::max(0.0, R.fuelL - dl); R.usedL += dl;
+        // Arkadan hizli gelen oyuncuya yol ver: sag seride kac (hizli)
+        bool yielding = false;
+        if (R.li > 0 && R.pitS < 0) {
+            const double behind = R.s - playerS, closing = playerV - R.v;
+            if (behind > 0.0 && behind < 35.0 + 3.0 * std::max(0.0, closing) && closing > 1.5 && std::fabs(playerLat - R.lane) < 2.0) {
+                const int to = R.li - 1;
+                bool free = true;
+                for (size_t k = 0; k < r_.size(); ++k) if (k != i && r_[k].li == to && std::fabs(r_[k].s - R.s) < 14.0) { free = false; break; }
+                if (free) { R.li = to; yielding = true; }
+            }
+        }
         // Yanal: hedef seride yumusak gecis; gorsel direksiyon ve teker
         const double target = road.laneOffset(R.s, false, R.li);
-        const double dl2 = std::clamp(target - R.lane, -2.2 * dt, 2.2 * dt);
+        const double lr = yielding || std::fabs(target - R.lane) > 1.0 ? 3.8 : 2.2;
+        const double dl2 = std::clamp(target - R.lane, -lr * dt, lr * dt);
         R.lane += dl2;
         R.steer = (float)std::clamp(dl2 / std::max(dt, 1e-3) * 0.05 + here.curvature * 2.6, -0.5, 0.5);
         R.spin += std::min(R.v * dt / 0.31, 0.55);                        // gorsel donus (karede sinirli)
