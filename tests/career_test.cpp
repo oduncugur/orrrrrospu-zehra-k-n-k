@@ -504,6 +504,22 @@ int main() {
         if (bk) std::fclose(bk);
         std::remove((path + ".bozuk").c_str());
     }
+    std::printf("[S] Bos garajli kayit silinmez; kenara konmus ileri kayit geri yuklenir\n");
+    {
+        Career c = Career::newGame(); c.money = 12345; c.races = 40; c.earnings = 90000; c.cars.clear();
+        Career d;
+        CHECK(Career::parse(c.serialize(), d) && d.money == 12345 && d.races == 40 && d.cars.size() == 1,
+              "bos garaj: kayit acilir, para / ilerleme korunur, baslangic araci verilir");
+        const std::string path = "zk_test_kariyer.zks";
+        std::remove(path.c_str()); std::remove((path + ".bozuk").c_str()); std::remove((path + ".bozuk.geri").c_str()); std::remove((path + ".yedek").c_str());
+        Career::newGame().save(path);                                  // yeni oyun (eski surumun actigi)
+        { Career b = Career::newGame(); b.races = 40; b.earnings = 90000; b.money = 777; b.save(path + ".bozuk"); }   // kenara konan ileri kayit
+        const Career r = Career::loadOrNew(path);
+        CHECK(r.races == 40 && r.money == 777, "ilerideki .bozuk kayit otomatik geri yuklendi");
+        const Career r2 = Career::loadOrNew(path);
+        CHECK(r2.races == 40, "geri yuklenen kayit kalici (ikinci acilista da)");
+        std::remove(path.c_str()); std::remove((path + ".bozuk.geri").c_str()); std::remove((path + ".yedek").c_str());
+    }
     std::printf(failures ? "\nSONUC: %d test KALDI\n" : "\nSONUC: tum testler gecti\n", failures);
     return failures ? 1 : 0;
 }

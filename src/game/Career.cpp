@@ -1817,7 +1817,10 @@ bool Career::parse(const std::string& text, Career& out) {
             c.cars.push_back(oc);
         }
     }
-    if (c.cars.empty()) return false;
+    if (c.cars.empty()) {                                       // garaj bos (hepsi satildi / pink slip): kayit bozuk DEGIL
+        OwnedCar start; start.carId = 217;                      // ilerleme korunur, baslangic araci verilir
+        c.cars.push_back(start); c.current = 0;
+    }
     for (OwnedCar& oc : c.cars) migrateTune(oc.tune);              // eski yakit sistemi / ECU paketi -> yeni parcalar
     // Eski surum hatasi: hurda aracta motor swap'tan sonra eski motorun hasari kaliyordu (yeni motor hasarsiz)
     for (OwnedCar& oc : c.cars)
@@ -1843,16 +1846,34 @@ bool Career::save(const std::string& path) const {
     return std::rename(tmp.c_str(), path.c_str()) == 0;
 }
 
+static bool readCareer(const std::string& path, Career& out) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return false;
+    std::stringstream ss; ss << f.rdbuf();
+    return Career::parse(ss.str(), out);
+}
+
 Career Career::loadOrNew(const std::string& path, bool* corrupt) {
     if (corrupt) *corrupt = false;
+    Career cur, old;
+    const bool hasCur = readCareer(path, cur);
+    // Eski surum bos garajli kaydi "bozuk" sayip kenara koyuyordu: yaninda daha ilerideki bir .bozuk varsa geri yukle
+    // (simdiki kayit .yedek olarak saklanir)
+    if (readCareer(path + ".bozuk", old) && (!hasCur || old.races + old.earnings / 1000 > cur.races + cur.earnings / 1000)) {
+        if (hasCur) { std::remove((path + ".yedek").c_str()); std::rename(path.c_str(), (path + ".yedek").c_str()); }
+        std::remove((path + ".bozuk.geri").c_str());
+        std::rename((path + ".bozuk").c_str(), (path + ".bozuk.geri").c_str());   // tekrar tekrar geri yuklenmesin
+        old.save(path);
+        return old;
+    }
+    if (hasCur) return cur;
     {
         std::ifstream f(path, std::ios::binary);
         if (!f) return newGame();
-        std::stringstream ss; ss << f.rdbuf();
-        Career c;
-        if (parse(ss.str(), c)) return c;
     }
-    std::rename(path.c_str(), (path + ".bozuk").c_str());      // kullanici/destek icin sakla, uzerine yazilmasin
+    std::string keep = path + ".bozuk";                         // kullanici/destek icin sakla; oncekinin uzerine yazma
+    for (int i = 2; std::ifstream(keep).good() && i < 50; ++i) keep = path + ".bozuk" + std::to_string(i);
+    std::rename(path.c_str(), keep.c_str());
     if (corrupt) *corrupt = true;
     return newGame();
 }
