@@ -38,7 +38,7 @@ void AchievementsScreen::render(Renderer& r) {
 
         // 2 Kolon: Sol (0..10), Sag (11..20)
         const size_t half = (a.size() + 1) / 2;
-        const float rowH = 27.0f;
+        const float rowH = std::min(27.0f, 306.0f / (float)half);   // tum basarimlar ekrana sigar
         for (size_t i = 0; i < a.size(); ++i) {
             const bool rightCol = i >= half;
             const size_t row = rightCol ? i - half : i;

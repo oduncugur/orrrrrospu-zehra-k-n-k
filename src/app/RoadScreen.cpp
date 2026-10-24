@@ -1592,8 +1592,13 @@ void RoadScreen::drawHud(Renderer& r) {
     if (msgT_ > 0) {
         const float w = r.textWidth(msg_, 2) + 16;
         const float my = land_ ? 120 : 140;
-        r.rect(W / 2.0f - w / 2, my, W / 2.0f + w / 2, my + 22, {0.02f, 0.02f, 0.04f, 0.7f});
-        r.textCentered(W / 2.0f, my + 4, msg_, 2, {1.0f, 0.85f, 0.3f});
+        if (w <= W - 16) {
+            r.rect(W / 2.0f - w / 2, my, W / 2.0f + w / 2, my + 22, {0.02f, 0.02f, 0.04f, 0.7f});
+            r.textCentered(W / 2.0f, my + 4, msg_, 2, {1.0f, 0.85f, 0.3f});
+        } else {                                                           // uzun mesaj: ekrana sigacak sekilde iki satir
+            r.rect(8, my, W - 8, my + 40, {0.02f, 0.02f, 0.04f, 0.7f});
+            r.textWrap(16, my + 4, msg_, 2, W - 32, 2, {1.0f, 0.85f, 0.3f});
+        }
     }
     if (ses_->mode() == RoadSession::Mode::Karma) {
         // Drag agaci (Sportsman): stage isiklari, 3 amber .5 s arayla, yesil

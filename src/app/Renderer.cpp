@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace zk {
@@ -463,13 +464,22 @@ void Renderer::circle(float cx, float cy, float r, int seg, Color c) {
         tri(cx, cy, cx + r * std::cos(a0), cy + r * std::sin(a0), cx + r * std::cos(a1), cy + r * std::sin(a1), c);
     }
 }
-void Renderer::text(float x, float y, const std::string& src, float sc, Color c) { textRaw(x, y, translate(lang, src), sc, c); }
+void Renderer::text(float x, float y, const std::string& src, float sc, Color c) {
+    const std::string t = translate(lang, src);
+    const float w = rawWidth(t, sc), room = (float)vw_ - 2.0f - x;
+    static const bool check = std::getenv("ZK_UI_CHECK") != nullptr;
+    if (check && x < (float)vw_ && x + w > 0.0f && (w > room + 0.5f || y + 7.0f * sc > (float)vh_ + 1.0f || x < -1.0f))   // ekran disindaki tabela vb. sayilmaz
+        std::fprintf(stderr, "UI TASMA: \"%s\" x=%.0f y=%.0f w=%.0f alan=%.0f\n", t.c_str(), x, y, w, room);
+    textRaw(x, y, t, sc, c);
+}
 
 void Renderer::textFit(float x, float y, const std::string& src, float scale, float maxW, Color c, bool center) {
     std::string t = translate(lang, src);
     float sc = scale;
     if (rawWidth(t, sc) > maxW) sc = std::max(0.6f, sc * maxW / rawWidth(t, sc));   // oranli kucult (ic cozunurluk 2x: 0.6 okunur)
     if (rawWidth(t, sc) > maxW) {                                       // en kucuk olcekte de sigmiyor: kod noktasi kirp + "."
+        static const bool check = std::getenv("ZK_UI_CHECK") != nullptr;
+        if (check) std::fprintf(stderr, "UI KISALTMA: \"%s\" x=%.0f y=%.0f kutu=%.0f\n", t.c_str(), x, y, maxW);
         while (!t.empty() && rawWidth(t + ".", sc) > maxW) {
             size_t k = t.size() - 1;
             while (k > 0 && ((unsigned char)t[k] & 0xC0) == 0x80) --k;    // UTF-8 karakter sinirina kadar
