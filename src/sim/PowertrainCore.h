@@ -56,7 +56,7 @@ public:
     void setThrottle(double pedal)      { throttlePedal_ = pedal; }
     double throttle() const             { return throttlePedal_; }
     void setClutchPedal(double pedal)   { clutchPedal_ = pedal; } // 0 = birakili (kavrali), 1 = basili
-    void setGear(int g)                 { gear_ = g; }            // 0 = bos, 1..N
+    void setGear(int g)                 { if (g != gear_) lockAmt_ = 0.0; gear_ = g; }   // 0 = bos, 1..N (vites degisince TCC acilir)
     void setTwoStep(bool armed, double rpm) { twoStep_ = armed; twoStepRpm_ = rpm; }
     void setIgnitionKilled(bool k)      { killed_ = k; }          // motor kilitlendi vs.
     void restart() { stalled_ = false; omegaE_ = e_.idleRpm / 9.5493; }
@@ -70,6 +70,9 @@ public:
     // Pedal >= 0.99: bos (N). Ani kilitlenme olmaz: kalkista tork yumusak gelir.
     void setConverter(bool on, double stallRpm, double tr0 = 1.9);
     bool converter() const { return converter_; }
+    // Tork konvertoru kilidi (TCC): 2. vites ve ustu, kismi gaz, cikis hizi yeterli, kayma azken kavrama ~0.4 s'de
+    // kapanir (kayma biter, motor dogrudan surer: verim / motor freni); tam gaz, vites degisimi, dusuk hizda acilir
+    double lockup() const { return lockAmt_; }
     static constexpr double kConverterTr0 = 1.9;
 
     // Bir alt-adim: tekerlek hizlari ve yag basinci carpanindan aks torklarini uretir
@@ -111,7 +114,7 @@ private:
     bool   twoStep_ = false; double twoStepRpm_ = 4500.0;
     bool   killed_ = false, snappedL_ = false, snappedR_ = false;
     double torqueLimit_ = 1.0, torqueAdd_ = 0.0;
-    bool   converter_ = false; double convK_ = 0.0, convTr0_ = 1.9, convTiMax_ = 0.0;
+    bool   converter_ = false; double convK_ = 0.0, convTr0_ = 1.9, convTiMax_ = 0.0, lockAmt_ = 0.0;
     double omegaE_;
     double Te_ = 0.0, Tc_ = 0.0, TL_ = 0.0, TR_ = 0.0;
     double clutchTemp_ = 60.0, oilBar_ = 0.0;

@@ -438,15 +438,19 @@ public:
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
     void key(Key k, bool down) override;
-    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, MenuView, Pad, Master, Engine, Tire,
+    enum class Item { Language, FpsCap, VSync, ShowFps, Fullscreen, IntScale, Graphics, RoadView, MenuView, Pad, Slot, NewGame, Master, Engine, Tire,
                       Haptics, Tilt, TiltSens, Assist, Esp, Gears, Speed, Tree };
 private:
-    struct Row { int section; Item item; float y; };   // section >= 0: bu satirdan once bolum basligi
+    struct Row { int section; Item item; float y; int sec = 0; };   // section >= 0: bu satirdan once bolum basligi; sec: bolum
+    // Yatay yerlesim: sol sutun GORUNTU, sag sutun digerleri; satir yuksekligi sutuna sigacak sekilde (dinamik).
+    // headerY >= 0: bu satirdan once baslik
+    Rect landRow(size_t i, float* headerY) const;
     void change(Item it, int dir);                     // dir: +1 / -1; 0 = dongusel ileri
     std::string value(Item it) const;
     App& app_;
     std::vector<Row> rows_;
     int sel_ = 0;
+    bool newArm_ = false;                        // yeni oyun: ikinci basista onay
     std::string msg_; double msgT_ = 0;
 };
 

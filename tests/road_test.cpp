@@ -343,6 +343,28 @@ int main() {
             CHECK(vf > 10.0, "D'ye donunce ileri gider");
         }
     }
+    std::printf("[TCC] Tork konvertoru kilidi: kismi gazda seyirde kilitlenir, tam gazda acilir\n");
+    {
+        const RoadPath straight(7u, 20000.0, 4000.0);
+        const VehicleDef* at = nullptr;
+        for (const VehicleDef& d : vehicleCatalog()) {
+            VehicleSimConfig cf; cf.car = &d;
+            if (d.streetLegal && VehicleSim(cf).gearboxType() == Gearbox::TorqueConverter) { at = &d; break; }
+        }
+        if (at) {
+            RoadCar a(at, nullptr, straight, 0.0, -1.8);
+            a.manual = false; a.assist = false;
+            RoadControls k; k.throttle = 0.35;
+            double lockMax = 0;
+            for (double tt = 0; tt < 25.0; tt += 1.0 / 60.0) { a.update(1.0 / 60.0, k); if (tt > 15.0) lockMax = std::max(lockMax, a.sim().powertrain().lockup()); }
+            const int g = a.sim().powertrain().gear();
+            k.throttle = 1.0;
+            for (double tt = 0; tt < 0.6; tt += 1.0 / 60.0) a.update(1.0 / 60.0, k);
+            std::printf("    %s: %.0f km/h, vites %d, kilit %.2f -> tam gazda %.2f\n", at->model.c_str(), a.sim().speed() * 3.6, g, lockMax, a.sim().powertrain().lockup());
+            CHECK(lockMax > 0.9, "kismi gaz seyirde konvertor kilitli");
+            CHECK(a.sim().powertrain().lockup() < 0.2, "tam gazda kilit acilir (kickdown)");
+        }
+    }
     std::printf("[D] Duz yolda tam gaz: guclu arkadan itisli arac kopmaz\n");
     {
         const RoadPath straight(7u, 20000.0, 4000.0);                       // neredeyse duz yol

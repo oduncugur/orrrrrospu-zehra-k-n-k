@@ -148,6 +148,16 @@ void PowertrainCore::step(double dt, double wL, double wR, double oilFactor) {
                 Tout = Tc_;
             }
         }
+        // Kilit kavramasi (TCC): kosullar saglaninca yumusak kapanir, gaz / vites / hiz bozunca hemen acilir
+        const double wE = omegaE_, wT = std::max(0.0, wC);
+        const bool lockable = G != 0.0 && gear_ >= 2 && clutchPedal_ < 0.5 && throttlePedal_ < 0.88 &&
+                              wT * kRadToRpm > 1250.0 && wE > 1e-3 && wT / wE > 0.80;
+        lockAmt_ = std::clamp(lockAmt_ + dt * (lockable ? 2.5 : -8.0), 0.0, 1.0);
+        if (lockAmt_ > 0.0) {
+            const double Tlock = convTiMax_ * 1.15 * std::tanh(dW / 1.0);   // surtunmeli kavrama gibi (kapasite: tepe tork x 1.15)
+            Tc_ = (1.0 - lockAmt_) * Tc_ + lockAmt_ * Tlock;
+            Tout = (1.0 - lockAmt_) * Tout + lockAmt_ * Tlock;
+        }
         if (snappedL_ && snappedR_) Tc_ = Tout = 0.0;
     } else {
         Tc_ = (G != 0.0) ? Tcap * std::tanh(dW / 1.0) : 0.0;

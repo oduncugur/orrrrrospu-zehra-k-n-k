@@ -23,7 +23,8 @@ App::App(const std::string& saveDir) {
         settingsPath_ = savePath_ + "ayarlar.cfg";
         ghostPath_ = savePath_ + "hayalet.zkg";
         settings = Settings::load(settingsPath_);
-        savePath_ += "kariyer.zks";
+        saveDir_ = savePath_;
+        savePath_ = slotPath(settings.saveSlot);
         bool corrupt = false;
         career = Career::loadOrNew(savePath_, &corrupt);
         if (corrupt) startupMsg = "KAYIT BOZUK - YENI OYUN";
@@ -76,6 +77,24 @@ void App::saveCareer() {
     for (int i : career.checkAchievements())
         toast("BASARIM: " + std::string(achievements()[i].name) + "  +" + money(achievements()[i].reward));
     if (!savePath_.empty()) career.save(savePath_);
+}
+void App::switchSlot(int slot) {
+    slot = std::clamp(slot, 1, 3);
+    if (saveDir_.empty() || slot == settings.saveSlot) return;
+    saveCareer();
+    settings.saveSlot = slot; saveSettings();
+    savePath_ = slotPath(slot);
+    career = Career::loadOrNew(savePath_);
+    saveCareer();
+    treePro = career.treePro; selectedCar = career.car().carId;
+    toast("KAYIT YUVASI " + std::to_string(slot));
+}
+void App::newGameSlot() {
+    if (!saveDir_.empty()) { std::remove((savePath_ + ".yedek").c_str()); std::rename(savePath_.c_str(), (savePath_ + ".yedek").c_str()); }
+    career = Career::newGame();
+    saveCareer();
+    treePro = career.treePro; selectedCar = career.car().carId;
+    toast("YENI OYUN (ESKI KAYIT YEDEKLENDI)");
 }
 App::~App() = default;
 

@@ -164,6 +164,11 @@ public:
     void goSettings();
     Career career;
     void saveCareer();
+    // Kayit yuvalari: 1..3 ayri kariyer. switchSlot: mevcut kaydedilir, secilen yuva yuklenir (bossa yeni oyun).
+    // newGameSlot: secili yuvada yeni oyun (eski kayit .yedek olarak saklanir)
+    void switchSlot(int slot);
+    void newGameSlot();
+    std::string slotPath(int slot) const { return saveDir_.empty() ? std::string() : saveDir_ + (slot <= 1 ? "kariyer.zks" : "kariyer" + std::to_string(slot) + ".zks"); }
     int  selectedCar = 5;                       // serbest mod / test icin
     void setVoice(int i, const VehicleDef* v, bool turboKit = false);   // nullptr = sessiz
     void voice(int i, double rpm, double throttle, bool cut, bool inGear, float gain);
@@ -205,7 +210,7 @@ private:
     int sw_ = 1, sh_ = 1;
     std::mutex audioLock_;
     Voice voices_[2];
-    std::string savePath_, settingsPath_, ghostPath_;
+    std::string savePath_, settingsPath_, ghostPath_, saveDir_;
     void loadGhosts();
     uint32_t raceSeed_ = 1;
     std::vector<float> mix_;

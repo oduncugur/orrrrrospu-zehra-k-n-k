@@ -57,6 +57,7 @@ std::string Settings::serialize() const {
     o << "intro_seen=" << (introSeen ? 1 : 0) << "\n";
     o << "hints_seen=" << hintsSeen << "      # ilk giris ipuclari (0: hepsini yeniden goster)\n";
     o << "menu_landscape=" << (menuLandscape ? 1 : 0) << "    # ana menu: 0 dikey, 1 yatay\n";
+    o << "save_slot=" << saveSlot << "\n";
     o << "road_portrait=" << (roadPortrait ? 1 : 0) << "    # acik yol: 0 yatay, 1 dikey\n";
     o << "master_volume=" << masterVol << "\n";
     o << "engine_volume=" << engineVol << "\n";
@@ -101,6 +102,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "hints_seen") s.hintsSeen = std::max(0, v);
         else if (k == "intro_seen") s.introSeen = v != 0;
         else if (k == "menu_landscape") s.menuLandscape = v != 0;
+        else if (k == "save_slot") s.saveSlot = std::clamp(v, 1, 3);
         else if (k == "road_portrait") s.roadPortrait = v != 0;
         else if (k == "master_volume") s.masterVol = snap(volumeOptions(), v);
         else if (k == "engine_volume") s.engineVol = snap(volumeOptions(), v);

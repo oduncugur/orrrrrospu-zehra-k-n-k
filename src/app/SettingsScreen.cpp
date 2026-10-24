@@ -39,6 +39,8 @@ const char* label(It it) {
     case It::Gears: return "DEBRIYAJ (H)";
     case It::Speed: return "HIZ BIRIMI";
     case It::Tree: return "DRAG AGACI";
+    case It::Slot: return "KAYIT YUVASI";
+    case It::NewGame: return "YENI OYUN";
     }
     return "";
 }
@@ -65,6 +67,8 @@ const char* help(It it) {
     case It::Gears: return "H-DESEN MANUEL: OTOMATIKTE VIRAJDA VITES YOK, GEC KAVRAR, ODUL %75";
     case It::Speed: return "HIZ GOSTERGESI BIRIMI";
     case It::Tree: return "PRO: 3 SARI BIRDEN, 0.4 S. SPOR: SIRALI SARILAR, 0.5 S";
+    case It::Slot: return "3 AYRI KARIYER. DEGISINCE O YUVANIN KAYDI ACILIR (BOSSA YENI OYUN)";
+    case It::NewGame: return "SECILI YUVADA SIFIRDAN BASLA. IKI KEZ BAS; ESKI KAYIT YEDEKLENIR";
     }
     return "";
 }
@@ -93,7 +97,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
         {2, It::Haptics}, {2, It::Pad}, {2, It::Tilt}, {2, It::TiltSens},
 #endif
         {2, It::Assist}, {2, It::Esp}, {2, It::Gears},
-        {3, It::Speed}, {3, It::Tree}};
+        {3, It::Speed}, {3, It::Tree}, {3, It::Slot}, {3, It::NewGame}};
     {   int secs = 0, l = -1;
         for (const auto& [sec, it] : items) if (sec != l) { ++secs; l = sec; }
         kRowH = std::min(26.0f, (546.0f - 62.0f - secs * 16.0f) / (float)items.size() - 2.0f);
@@ -103,7 +107,7 @@ SettingsScreen::SettingsScreen(App& app) : app_(app) {
     for (const auto& [sec, it] : items) {
         int head = -1;
         if (sec != last) { head = sec; last = sec; y += 16; }
-        rows_.push_back({head, it, y});
+        rows_.push_back({head, it, y, sec});
         y += kRowH + 2;
     }
 }
@@ -134,8 +138,31 @@ std::string SettingsScreen::value(It it) const {
     case It::Gears: return s.autoClutch ? "OTOMATIK" : "OYUNCU";
     case It::Speed: return s.speedUnit();
     case It::Tree: return app_.treePro ? "PRO .4" : "SPOR .5";
+    case It::Slot: return "YUVA " + std::to_string(s.saveSlot) + " / 3";
+    case It::NewGame: return newArm_ ? std::string("EMIN MISIN? TEKRAR BAS") : std::string("BASLAT");
     }
     return "";
+}
+
+Rect SettingsScreen::landRow(size_t i, float* headerY) const {
+    // Sutun basina satir / baslik sayisi -> satir yuksekligi (yardim metni 274'ten baslar)
+    int n[2] = {0, 0}, h[2] = {0, 0}, last[2] = {-1, -1};
+    for (const Row& r : rows_) { const int c = r.sec == 0 ? 0 : 1; ++n[c]; if (r.sec != last[c]) { ++h[c]; last[c] = r.sec; } }
+    float rH[2];
+    for (int c = 0; c < 2; ++c) rH[c] = std::min(20.0f, (272.0f - 48.0f - h[c] * 14.0f) / std::max(1, n[c]) - 2.0f);
+    float yc[2] = {48.0f, 48.0f}; int ls[2] = {-1, -1};
+    for (size_t k = 0; k <= i && k < rows_.size(); ++k) {
+        const int c = rows_[k].sec == 0 ? 0 : 1;
+        float hy = -1.0f;
+        if (rows_[k].sec != ls[c]) { ls[c] = rows_[k].sec; hy = yc[c]; yc[c] += 14.0f; }
+        if (k == i) {
+            if (headerY) *headerY = hy;
+            const float x0 = c == 0 ? 8.0f : 324.0f, x1 = c == 0 ? 316.0f : 632.0f;
+            return {x0, yc[c], x1, yc[c] + rH[c]};
+        }
+        yc[c] += rH[c] + 2.0f;
+    }
+    return {0, 0, 0, 0};
 }
 
 void SettingsScreen::change(It it, int dir) {
@@ -180,6 +207,8 @@ void SettingsScreen::change(It it, int dir) {
     case It::Gears: s.autoClutch = !s.autoClutch; break;
     case It::Speed: s.mph = !s.mph; break;
     case It::Tree: app_.treePro = !app_.treePro; app_.saveCareer(); return;
+    case It::Slot: app_.switchSlot(dir < 0 ? (s.saveSlot + 1) % 3 + 1 : s.saveSlot % 3 + 1); newArm_ = false; return;
+    case It::NewGame: if (!newArm_) { newArm_ = true; return; } newArm_ = false; app_.newGameSlot(); return;
     }
     app_.applySettings();
     app_.saveSettings();
@@ -203,24 +232,12 @@ void SettingsScreen::render(Renderer& r) {
 
         // Sol Sutun: GORUNTU (Section 0)
         // Sag Sutun: SES (Sec 1), KONTROL (Sec 2), OYUN (Sec 3)
-        const float rH = 20.0f;
-        float yL = 48.0f, yR = 48.0f;
-        int lastSecL = -1, lastSecR = -1;
-
         for (size_t i = 0; i < rows_.size(); ++i) {
             const Row& row = rows_[i];
-            const bool isLeft = (row.item <= It::MenuView);
-            const float x0 = isLeft ? 8.0f : 324.0f;
-            const float x1 = isLeft ? 316.0f : 632.0f;
-            float& yCur = isLeft ? yL : yR;
-            int& lastSec = isLeft ? lastSecL : lastSecR;
-
-            int curSec = (row.item <= It::MenuView) ? 0 : (row.item <= It::Tire) ? 1 : (row.item <= It::Gears) ? 2 : 3;
-            if (curSec != lastSec) {
-                lastSec = curSec;
-                r.text(x0, yCur + 2, kSections[curSec], 1, kUiGold);
-                yCur += 14.0f;
-            }
+            float hy;
+            const Rect rr = landRow(i, &hy);
+            const float x0 = rr.x0, x1 = rr.x1, yCur = rr.y0, rH = rr.y1 - rr.y0;
+            if (hy >= 0.0f) r.text(x0, hy + 2, kSections[row.sec], 1, kUiGold);
 
             const bool sel = (int)i == sel_;
             r.rect(x0, yCur, x1, yCur + rH, sel ? Color{0.2f, 0.24f, 0.34f} : kUiPanel);
@@ -228,12 +245,10 @@ void SettingsScreen::render(Renderer& r) {
 
             const float aL0 = x1 - 105.0f;
             const float aR1 = x1 - 4.0f;
-            r.textFit(x0 + 8, yCur + 3, label(row.item), 1, aL0 - x0 - 10, {1, 1, 1});
-            r.text(aL0, yCur + 3, "<", 1, kUiDim);
-            r.text(aR1 - 8, yCur + 3, ">", 1, kUiDim);
-            r.textFit((aL0 + aR1) * 0.5f, yCur + 3, value(row.item), 1, aR1 - aL0 - 18, kUiGold, true);
-
-            yCur += rH + 2.0f;
+            r.textFit(x0 + 8, yCur + rH * 0.5f - 3.5f, label(row.item), 1, aL0 - x0 - 10, {1, 1, 1});
+            r.text(aL0, yCur + rH * 0.5f - 3.5f, "<", 1, kUiDim);
+            r.text(aR1 - 8, yCur + rH * 0.5f - 3.5f, ">", 1, kUiDim);
+            r.textFit((aL0 + aR1) * 0.5f, yCur + rH * 0.5f - 3.5f, value(row.item), 1, aR1 - aL0 - 18, kUiGold, true);
         }
 
         // Secili yardim metni (alt sol)
@@ -320,22 +335,11 @@ void SettingsScreen::pointerDown(int, float x, float y) {
     }
 
     if (land) {
-        const float rH = 20.0f;
-        float yL = 48.0f, yR = 48.0f;
-        int lastSecL = -1, lastSecR = -1;
-
         for (size_t i = 0; i < rows_.size(); ++i) {
             const Row& row = rows_[i];
-            const bool isLeft = (row.item <= It::MenuView);
-            const float x0 = isLeft ? 8.0f : 324.0f;
-            const float x1 = isLeft ? 316.0f : 632.0f;
-            float& yCur = isLeft ? yL : yR;
-            int& lastSec = isLeft ? lastSecL : lastSecR;
-
-            int curSec = (row.item <= It::MenuView) ? 0 : (row.item <= It::Tire) ? 1 : (row.item <= It::Gears) ? 2 : 3;
-            if (curSec != lastSec) { lastSec = curSec; yCur += 14.0f; }
-
-            if (y >= yCur && y <= yCur + rH && x >= x0 && x <= x1) {
+            const Rect rr = landRow(i, nullptr);
+            const float x0 = rr.x0, x1 = rr.x1;
+            if (rr.hit(x, y)) {
                 sel_ = (int)i;
                 const float aL0 = x1 - 105.0f;
                 const float aL1 = x1 - 80.0f;
@@ -343,7 +347,6 @@ void SettingsScreen::pointerDown(int, float x, float y) {
                 change(row.item, x >= aL0 && x <= aL1 ? -1 : x >= aR0 ? +1 : 0);
                 return;
             }
-            yCur += rH + 2.0f;
         }
     } else {
         for (size_t i = 0; i < rows_.size(); ++i) {

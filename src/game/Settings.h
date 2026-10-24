@@ -42,7 +42,8 @@ struct Settings {
     bool  mph = false;               // hiz birimi: km/h ya da mph
     int   language = 0;              // arayuz dili (app/Lang.h: 0 TR, 1 EN, ...)
     int   hintsSeen = 0;             // gosterilmis ilk-giris ipuclari (bit)
-    bool  introSeen = false;         // ilk acilis sinematigi izlendi (sonrakiler kisa, oyuncunun araciyla)
+    bool  introSeen = false;
+    int   saveSlot = 1;                // kayit yuvasi 1..3 (kariyer.zks / kariyer2.zks / kariyer3.zks)         // ilk acilis sinematigi izlendi (sonrakiler kisa, oyuncunun araciyla)
 
 #ifdef __ANDROID__
     static constexpr int kDefaultFpsCap = 60;    // pil ve isinma
