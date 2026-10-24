@@ -27,13 +27,16 @@ struct Runner {
     double pitS = -1, pitWait = 0; int pits = 0;   // durma noktasi (-1: yok), benzinlikte bekleme
     bool refueling = false, dry = false, finished = false;
     double finishT = 0, spin = 0, steer = 0;
+    double vCap = 0;                               // time attack: seyir hizi siniri (m/s; 0 = yok)
 };
 
 class RunField {
 public:
     // compression: surulen her metre yakitta bu kadar metre sayilir (etap gercek mesafesi / surulen)
     // playerSlot: gridde oyuncuya ayrilan sira (bos birakilir)
-    void init(const std::vector<RunEntrant>& field, const RoadPath& road, double startS, double compression, uint32_t seed, int playerSlot = -1);
+    // spreadLen > 0 (time attack): grid yok; rakipler startS + 250 .. startS + spreadLen - 1500 arasina dagilir, 125-175 km/h seyreder
+    void init(const std::vector<RunEntrant>& field, const RoadPath& road, double startS, double compression, uint32_t seed, int playerSlot = -1,
+              double spreadLen = 0.0);
     // Bir adim: playerS / playerLat / playerV: oyuncu (engel); stations: benzinlik baslangiclari
     void update(double dt, const RoadPath& road, const std::vector<double>& stations, double stationLen, double refuelLps,
                 double goalS, double raceT, double playerS, double playerLat, double playerV);

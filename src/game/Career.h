@@ -274,6 +274,8 @@ struct Career {
     long recordTour(bool won);             // donus: verilen odul (yalniz son tur galibiyetinde)
     // The Run etabi: siraya ve etap gercek mesafesine gore odul (ilk uc buyuk, digerleri katilim), un
     long recordRun(int position, int count, double realKm);
+    // THE RUN time attack: sure bittiyse odul yok; bitirdiyse ortalama hiza gore (185 km/h %35 .. 245 km/h %130)
+    long recordRunTime(bool finished, double avgKmh, double realKm);
     // ---- Sehirler (hikaye): her lig bir sehirde; sehirler arasi seyahat THE RUN etabiyla (her ara bir etap) ya da
     //      parali hizli gecisle. Lig etkinlikleri bulunulan sehirde oynanir.
     static constexpr int kCities = 10;          // her ligde iki sehir (lig = sehir / 2)

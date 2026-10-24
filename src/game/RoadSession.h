@@ -51,6 +51,12 @@ public:
     bool dragPart() const { return (mode_ == Mode::Karma || mode_ == Mode::Marathon) && player_ && !road_.curvyAt(player_->s()); }
     int runPosition() const { return run_.playerPosition(player_->s(), finishT_[0] > 0, finishT_[0]); }
     int runCount() const { return (int)run_.runners().size() + 1; }
+    // THE RUN (time attack): sure = surulen mesafe / 185 km/h ortalama; 200+ km/h ortalamayla rahat yetisir
+    static constexpr double kRunAvgKmh = 185.0;
+    double timeLimit() const { return raceLength() / (kRunAvgKmh / 3.6); }
+    double timeLeft() const { return std::max(0.0, timeLimit() - raceT_); }
+    bool timedOut() const { return timedOut_; }
+    double avgKmh() const { const double t = finishT_[0] > 0 ? finishT_[0] : raceT_; return t > 0.5 ? (player_->s() - startS_) / t * 3.6 : 0.0; }
     double realKm() const { return realKm_; }
     double compression() const { return realKm_ * 1000.0 / raceLength(); }
     static constexpr double kStationGap = 3000.0;    // benzinlik araligi (surulen m)
@@ -171,6 +177,7 @@ private:
     double countdown_ = 0, raceT_ = 0, startS_ = 0;
     double finishT_[2] = {0, 0};
     int winner_ = -1, collisions_ = 0;
+    bool timedOut_ = false;
     double rivalLane_ = -kLane;
     double rivalPace_ = 0.50;
     bool rain_ = false;

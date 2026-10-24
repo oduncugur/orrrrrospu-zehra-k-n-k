@@ -34,7 +34,8 @@ double RunField::tankFor(int carId) {
     return std::clamp(std::round(t / 5.0) * 5.0, 40.0, 90.0);
 }
 
-void RunField::init(const std::vector<RunEntrant>& field, const RoadPath& road, double startS, double compression, uint32_t seed, int playerSlot) {
+void RunField::init(const std::vector<RunEntrant>& field, const RoadPath& road, double startS, double compression, uint32_t seed, int playerSlot,
+                    double spreadLen) {
     comp_ = std::max(1.0, compression); startS_ = startS;
     r_.clear();
     const int lanes = road.lanesFwd(startS);
@@ -65,6 +66,13 @@ void RunField::init(const std::vector<RunEntrant>& field, const RoadPath& road, 
         const int row = slot / std::max(1, lanes), col = slot % std::max(1, lanes);
         R.s = startS - 12.0 - row * 9.0;
         R.li = col;
+        if (spreadLen > 0.0) {                                          // time attack: yol boyunca dagilmis, oyuncudan yavas
+            const double span = std::max(1000.0, spreadLen - 1750.0), n = (double)std::max<size_t>(1, field.size());
+            R.s = startS + 250.0 + span * (i + 0.15 + 0.7 * ((h >> 16) & 0xFF) / 255.0) / n;
+            R.vCap = (125.0 + 50.0 * ((h >> 4) & 0xFF) / 255.0) / 3.6;
+            R.v = R.vCap * 0.9;
+            R.li = (int)((h >> 12) % (uint32_t)std::max(1, road.lanesFwd(R.s)));
+        }
         R.lane = road.laneOffset(std::max(0.0, R.s), false, R.li);
         r_.push_back(R);
     }
@@ -98,6 +106,7 @@ void RunField::update(double dt, const RoadPath& road, const std::vector<double>
         // ---- hedef hiz: viraj (tutus), tarz seyri, onde engel ----
         double vT = R.vmax * R.cruise;
         if (R.style == StyleEco) vT = std::min(vT, 36.0);                // eko: ~130 km/h
+        if (R.vCap > 0.0) vT = std::min(vT, R.vCap);                     // time attack seyri
         const double aLat = R.mu * 9.81 * 0.68, aBrk = 5.0 * std::min(1.0, R.mu);   // insan payi: lastigin sinirinda surmez
         for (double d = 0; d < R.v * R.v / (2 * aBrk) + 40.0; d += 10.0) {
             const double kk = std::max(std::fabs(road.at(R.s + d).curvature), 1e-4);

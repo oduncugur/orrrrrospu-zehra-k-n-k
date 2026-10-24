@@ -737,6 +737,18 @@ long Career::recordRun(int position, int count, double realKm) {
     return p;
 }
 
+long Career::recordRunTime(bool finished, double avgKmh, double realKm) {
+    ++races;
+    if (!finished) return 0;
+    const double base = 30.0 * realKm * (1 + leagueUnlocked() * 0.5);
+    const double k = std::clamp(0.35 + (avgKmh - 185.0) / 60.0 * 0.95, 0.35, 1.3);
+    const long p = (long)std::lround(base * k / 50.0) * 50;
+    money += p; earnings += p;
+    if (avgKmh >= 220.0) { ++wins; rep += 4; dailyAdd(TaskType::WinRoad, 1); dailyAdd(TaskType::WinAny, 1); }
+    else rep += 2;
+    return p;
+}
+
 const char* Career::cityName(int c) {
     static const char* const n[kCities] = {"ISTANBUL", "IZMIT", "BURSA", "ESKISEHIR", "ANKARA", "KONYA", "KAPADOKYA", "NIGDE", "MERSIN", "ANTALYA"};
     return n[std::clamp(c, 0, kCities - 1)];

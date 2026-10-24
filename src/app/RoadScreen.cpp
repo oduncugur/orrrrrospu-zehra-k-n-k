@@ -177,7 +177,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
           : m == RoadSession::Mode::Flow ? "OTOBAN AKISI: YAKIN GEC, HIZLI GIT"
           : m == RoadSession::Mode::Karma ? "KARMA: DUZDE DRAG, VIRAJDA SURUS"
           : m == RoadSession::Mode::Chase ? "POLIS! 400 M ACIL VE TUT"
-          : m == RoadSession::Mode::Marathon ? "THE RUN: VERIMLI SUR, YAKIT AZALINCA BENZINLIGE GIR"
+          : m == RoadSession::Mode::Marathon ? "THE RUN: SURE BITMEDEN VAR (ORT 200+ KM/H), YAKIT AZALINCA BENZINLIGE GIR"
           : kind == RoadSession::Kind::Touge ? "DAG YOLU 3 KM" : "YOL YARISI 4 KM", 2.5);
 }
 
@@ -260,7 +260,7 @@ void RoadScreen::finishRace() {
     if (app_.activeEvent >= 0) {                                         // lig etkinligi
         int pink = 0;
         const long score = ses_->flow() ? ses_->flow()->score() : 0;
-        const bool won = ses_->mode() == RoadSession::Mode::Marathon ? ses_->runPosition() <= 3 : ses_->rival() ? ses_->playerWon() : false;   // etap: podyum
+        const bool won = ses_->mode() == RoadSession::Mode::Marathon ? !ses_->timedOut() : ses_->rival() ? ses_->playerWon() : false;   // etap: podyum
         prize_ = app_.career.recordEvent(app_.activeEvent, won, 0.0, score, &pink);
         if (pink > 0) app_.eventNote = std::string("PINK SLIP: ") + upper(findVehicle(pink)->model) + " SENIN!";
         else if (pink < 0) app_.eventNote = "PINK SLIP: ARABANI KAYBETTIN";
@@ -268,7 +268,7 @@ void RoadScreen::finishRace() {
     else if (ses_->mode() == RoadSession::Mode::Flow) prize_ = app_.career.recordFlow(ses_->flow()->score(), &record_);
     else if (ses_->mode() == RoadSession::Mode::Chase) prize_ = app_.career.recordChase(ses_->playerWon(), ses_->collisions());
     else if (ses_->mode() == RoadSession::Mode::Marathon) {
-        prize_ = app_.runPlan.active && app_.runPlan.solo ? 0 : app_.career.recordRun(ses_->runPosition(), ses_->runCount(), ses_->realKm());   // tek basina: odul yok
+        prize_ = app_.runPlan.active && app_.runPlan.solo ? 0 : app_.career.recordRunTime(!ses_->timedOut(), ses_->avgKmh(), ses_->realKm());   // tek basina: odul yok
         if (app_.runPlan.active) app_.nextTravelLeg(ses_->player().sim().fuelLiters());   // sehir ilerler; sonraki etap / varis
     }
     else if (ses_->rival()) app_.career.recordRace(*findVehicle(ses_->rivalCarId()), ses_->playerWon(), 0.0, &prize_,
@@ -502,7 +502,7 @@ void RoadScreen::drawMenu(Renderer& r) {
     button(r, touge_, "DAG YOLU 3 KM", Color{0.55f, 0.2f, 0.6f}, 2);
     button(r, karma_, land_ ? "KARMA" : "KARMA: DRAG + VIRAJ", Color{0.7f, 0.15f, 0.15f}, 2);
     button(r, chase_, "POLIS KACIS", Color{0.12f, 0.2f, 0.55f}, 2);
-    button(r, marathon_, "THE RUN: 300 KM ETAP, 20 ARAC", Color{0.45f, 0.35f, 0.08f}, 2);
+    button(r, marathon_, "THE RUN: 300 KM TIME ATTACK", Color{0.45f, 0.35f, 0.08f}, 2);
     r.textCentered(W / 2.0f, by + 18, "AKIS: YAKIN GECIS + HIZ + VIRAJ = SKOR", 1, {0.7f, 0.7f, 0.75f});
     r.textCentered(W / 2.0f, by + 30, "YARISLAR: RAKIP + TRAFIK, ODULLU", 1, {0.7f, 0.7f, 0.75f});
     if (app_.career.bestFlow > 0)
@@ -1554,9 +1554,11 @@ void RoadScreen::drawHud(Renderer& r) {
         }
         const double left = std::max(0.0, ses_->startS() + ses_->raceLength() - Pc.s());
         if (ses_->mode() == RoadSession::Mode::Marathon) {
-            std::snprintf(b, sizeof b, "SIRA %d / %d   KALAN %.0f KM   %d:%02d", ses_->runPosition(), ses_->runCount(),
-                          left * ses_->compression() / 1000.0, (int)ses_->raceTime() / 60, (int)ses_->raceTime() % 60);
-            r.text(x0, infoY, b, 1, ses_->runPosition() <= 3 ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.85f, 0.4f});
+            // Time attack: kalan sure, kalan yol, ortalama; kalan yol icin gereken ortalama kalan sureyi asiyorsa kirmizi
+            const double tl = ses_->timeLeft(), need = tl > 0.5 ? left / tl * 3.6 : 999.0;
+            std::snprintf(b, sizeof b, "SURE %d:%02d   KALAN %.0f KM   ORT %.0f KM/H", (int)tl / 60, (int)tl % 60,
+                          left * ses_->compression() / 1000.0, ses_->avgKmh());
+            r.text(x0, infoY, b, 1, need > 230.0 ? Color{1.0f, 0.35f, 0.3f} : need > 185.0 ? Color{1.0f, 0.85f, 0.4f} : Color{0.4f, 1.0f, 0.5f});
         } else {
         const double gap = ses_->gapMeters();
         std::snprintf(b, sizeof b, "%s  KALAN %.2f KM  %+.0f M   %.1f S", gap >= 0 ? "1." : "2.", left / 1000.0, gap, ses_->raceTime());
@@ -1637,22 +1639,20 @@ void RoadScreen::drawResults(Renderer& r) {
                       app_.settings.speedUnit(), st.oncomingTime, st.crashes);
         r.textCentered(W / 2.0f, 166 + oy, b, 1, {0.85f, 0.85f, 0.9f});
     } else if (ses_->mode() == RoadSession::Mode::Marathon) {
-        const int pos = ses_->runPosition();
-        std::snprintf(b, sizeof b, "%d. / %d", pos, ses_->runCount());
-        r.textCentered(W / 2.0f, 62 + oy, pos == 1 ? "ETAP BIRINCISI!" : pos <= 3 ? "PODYUM!" : "ETAP BITTI", 3, pos <= 3 ? Color{0.3f, 1.0f, 0.4f} : kUiGold);
+        const bool ok = !ses_->timedOut();
+        std::snprintf(b, sizeof b, "%.0f KM/H", ses_->avgKmh());
+        r.textCentered(W / 2.0f, 62 + oy, ok ? (ses_->avgKmh() >= 220.0 ? "MUHTESEM SURUS!" : "THE RUN TAMAM") : "SURE YETMEDI", 3,
+                       ok ? Color{0.3f, 1.0f, 0.4f} : Color{1.0f, 0.3f, 0.2f});
         r.textCentered(W / 2.0f, 92 + oy, b, 4, {1, 1, 1});
         const double drivenReal = std::max(0.1, ses_->raceLength() * ses_->compression() / 1000.0);
         std::snprintf(b, sizeof b, "SURE %d:%02d   %.0f KM   YAKIT %.0f L (%.0f L/100)", (int)ses_->playerTime() / 60, (int)ses_->playerTime() % 60,
                       drivenReal, usedRun_, usedRun_ / drivenReal * 100.0);
         r.textCentered(W / 2.0f, 136 + oy, b, 1, {0.85f, 0.85f, 0.9f});
-        // Ilk 3 (rakip isim + tarz)
-        std::vector<const Runner*> fin;
-        for (const Runner& Rn : ses_->runField().runners()) if (Rn.finished) fin.push_back(&Rn);
-        std::sort(fin.begin(), fin.end(), [](const Runner* a2, const Runner* b2) { return a2->finishT < b2->finishT; });
-        for (size_t k = 0; k < fin.size() && k < 3; ++k) {
-            std::snprintf(b, sizeof b, "%zu. %s (%s, %d MOLA)", k + 1 + (pos <= (int)k + 1 ? 1 : 0), fin[k]->name.c_str(), runStyleName(fin[k]->style), fin[k]->pits);
-            r.textCentered(W / 2.0f, 154 + oy + k * 12.0f, b, 1, kUiDim);
-        }
+        int passed = 0;
+        for (const Runner& Rn : ses_->runField().runners()) passed += Rn.s < ses_->player().s();
+        std::snprintf(b, sizeof b, "SURE SINIRI %d:%02d   GECILEN ARAC %d / %d", (int)ses_->timeLimit() / 60, (int)ses_->timeLimit() % 60,
+                      passed, ses_->runCount() - 1);
+        r.textCentered(W / 2.0f, 154 + oy, b, 1, kUiDim);
     } else if (ses_->mode() == RoadSession::Mode::Chase) {
         const bool esc = ses_->playerWon();
         r.textCentered(W / 2.0f, 66 + oy, esc ? "KACTIN!" : "YAKALANDIN!", 3, esc ? Color{0.3f, 1.0f, 0.4f} : Color{1.0f, 0.3f, 0.2f});

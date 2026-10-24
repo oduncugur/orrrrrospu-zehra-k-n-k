@@ -302,11 +302,9 @@ std::vector<double> RoadSession::stations() const {
 void RoadSession::setRunField(const std::vector<RunEntrant>& field, double realKm) {
     realKm_ = std::max(20.0, realKm);
     // Oyuncu gridin arka ucte birinde (gecerek ilerler); o sira bos birakilir; depo gercekci, ayni sikistirma
-    const int lanes = std::max(1, road_.lanesFwd(startS_)), n = (int)field.size();
-    const int slot = std::max(0, n * 2 / 3);
-    run_.init(field, road_, startS_, compression(), rng_, slot);
-    const double ps = startS_ - 12.0 - (slot / lanes) * 9.0;
-    player_->recoverAt(std::max(2.0, ps), road_.laneOffset(std::max(2.0, ps), false, slot % lanes));
+    // Time attack: grid yok (kalkista yigilma olmasin); oyuncu cizgide tek, rakipler yol boyunca dagilmis ve yavas
+    run_.init(field, road_, startS_, compression(), rng_, -1, raceLength());
+    player_->recoverAt(startS_, road_.laneOffset(startS_, false, 0));
     player_->sim().setFuelSystem(RunField::tankFor(playerCar_), compression());
 }
 double RoadSession::nextStation(double s) const {
@@ -512,6 +510,11 @@ void RoadSession::update(double dt, const RoadControls& in) {
         player_->takeStalled();
         const double goal = startS_ + raceLength();
         if (phase_ == Phase::Run) raceT_ += dt;
+        if (phase_ == Phase::Run && finishT_[0] <= 0 && raceT_ >= timeLimit()) {     // sure bitti
+            timedOut_ = true; finishT_[0] = raceT_; phase_ = Phase::Finished; winner_ = 1;
+            msgs_.push_back("SURE BITTI!");
+            return;
+        }
         run_.update(dt, road_, stations(), kStationLen, kRefuelLps, goal, raceT_, player_->s(), player_->lateral(), player_->sim().speed());
         // Oyuncu - rakip temasi (kutu): oyuncu savrulur / yavaslar, rakip yavaslar
         const double cx = player_->sim().posX(), cy = player_->sim().posY();
@@ -533,8 +536,8 @@ void RoadSession::update(double dt, const RoadControls& in) {
         collide(*player_, true);                                         // The Run'da da trafik araclarina carpilir
         if (finishT_[0] <= 0 && player_->s() >= goal) {
             finishT_[0] = raceT_; phase_ = Phase::Finished;
-            winner_ = runPosition() == 1 ? 0 : 1;
-            char m[48]; std::snprintf(m, sizeof m, "BITIS: %d. / %d", runPosition(), runCount()); msgs_.push_back(m);
+            winner_ = 0;
+            char m[64]; std::snprintf(m, sizeof m, "BITIS! ORT %.0f KM/H  KALAN %.0f S", avgKmh(), timeLeft()); msgs_.push_back(m);
         }
         return;
     }

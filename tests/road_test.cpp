@@ -394,6 +394,18 @@ int main() {
         CHECK(l100[StyleEco] < l100[StyleFlatOut], "eko surucu 100 km'de daha az yakar");
         CHECK(rs.runPosition() >= 1 && rs.runPosition() <= rs.runCount(), "siralama tutarli");
     }
+    std::printf("[F2] The Run time attack: rakipler yola dagilmis, sure 200 km/h ile yeter\n");
+    {
+        RoadSession rs(RoadSession::Mode::Marathon, 5, nullptr, 0, nullptr, 7u);
+        double nearest = 1e9, lo = 1e9, hi = -1e9, vmax = 0;
+        for (const Runner& R : rs.runField().runners()) {
+            nearest = std::min(nearest, R.s - rs.startS()); lo = std::min(lo, R.s); hi = std::max(hi, R.s); vmax = std::max(vmax, R.vCap);
+        }
+        CHECK(nearest > 200.0, "kalkista yigilma yok: en yakin rakip 200 m ileride");
+        CHECK(hi - lo > rs.raceLength() * 0.6, "rakipler yolun buyuk kismina dagilmis");
+        CHECK(vmax * 3.6 < 180.0, "rakipler time attack temposundan yavas (gecilebilir)");
+        CHECK(rs.raceLength() / (200.0 / 3.6) < rs.timeLimit() * 0.95, "200 km/h ortalama sureye rahat yetisir");
+    }
     std::printf("[B] Fren: hafif basista kilitlenmez, tam basista guclu yavaslar (ABS'siz Sahin)\n");
     {
         const RoadPath straight(7u, 20000.0, 4000.0);
