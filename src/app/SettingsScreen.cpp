@@ -252,7 +252,7 @@ void SettingsScreen::render(Renderer& r) {
         button(r, kDefaultsL, "VARSAYILAN", kUiBtn, 1);
         button(r, kSaveCodeL, "KAYIT KODU", {0.15f, 0.35f, 0.55f}, 1);
 #ifndef __ANDROID__
-        r.text(310, 328, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, {0.55f, 0.75f, 1.0f});
+        r.textWrap(306, 316, "W/S SATIR  <> DEGER  ENTER DEGISTIR  ESC GERI", 1, kBackL.x0 - 312, 2, {0.55f, 0.75f, 1.0f});
 #endif
         button(r, kBackL, "< GARAJ", kUiBtn, 2);
 

@@ -66,6 +66,9 @@ public:
     static float rawWidth(const std::string& s, float scale);   // UTF-8; CJK karakterler genis (16x16 glif, yarim piksel)
     // Genislige sigdir: once olcek kuculur (dikeyde ortalanir), olcek 1'de de sigmazsa kisaltilir ("."). center: x merkez
     void textFit(float x, float y, const std::string& s, float scale, float maxW, Color c, bool center = false);
+    // Kutuya sar: kelime kelime en fazla maxLines satir (satir arasi 9 x olcek); sigmazsa olcek kuculur (en az 0.6),
+    // yine sigmazsa son satir kisaltilir. Donus: kullanilan yukseklik
+    float textWrap(float x, float y, const std::string& s, float scale, float maxW, int maxLines, Color c);
     float textWidth(const std::string& s, float scale) const {      // UTF-8: kod noktasi sayisi
         return rawWidth(translate(lang, s), scale);
     }

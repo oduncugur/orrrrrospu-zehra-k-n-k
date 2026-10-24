@@ -68,11 +68,11 @@ void JunkyardScreen::render(Renderer& r) {
             r.rect(x, y, x + 210.0f, y + 90.0f, i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
             if (i == sel_) r.rect(x, y, x + 4.0f, y + 90.0f, kUiOrange);
 
-            r.textFit(x + 8.0f, y + 4.0f, upper(v.fullName()), 1, 130.0f, {1, 1, 1});
+            const std::string p = money(j.price);
+            r.textFit(x + 8.0f, y + 4.0f, upper(v.fullName()), 1, 190.0f - r.textWidth(p, 2), {1, 1, 1});   // fiyatla cakismaz
             std::snprintf(b, sizeof b, "%d  %s", v.year, money(carPrice(v)).c_str());
             r.text(x + 8.0f, y + 16.0f, b, 1, kUiDim);
 
-            const std::string p = money(j.price);
             r.text(x + 204.0f - r.textWidth(p, 2), y + 5.0f, p, 2, app_.career.money >= j.price ? kUiGold : kUiDim);
 
             // Ariza
@@ -136,7 +136,7 @@ void JunkyardScreen::render(Renderer& r) {
             const float y = 64.0f + i * 80.0f;
             r.rect(8, y, 352, y + 76, i == sel_ ? Color{0.2f, 0.24f, 0.36f} : kUiPanel);
             if (i == sel_) r.rect(8, y, 12, y + 76, kUiOrange);
-            r.text(16, y + 5, upper(v.fullName()).substr(0, 30), 1, {1, 1, 1});
+            r.textFit(16, y + 5, upper(v.fullName()), 1, 330.0f, {1, 1, 1});
             std::snprintf(b, sizeof b, "%d  DEGERI %s", v.year, money(carPrice(v)).c_str());
             r.text(16, y + 17, b, 1, kUiDim);
             const std::string p = money(j.price);
@@ -245,7 +245,7 @@ void RestoreScreen::render(Renderer& r) {
             const long cost = restoreStepCost(oc, k);
 
             r.rect(x, y, x + 308.0f, y + 50.0f, kUiPanel);
-            r.text(x + 10.0f, y + 5.0f, restoreName(k), 2, {1, 1, 1});
+            r.textFit(x + 10.0f, y + 5.0f, restoreName(k), 2, 176.0f, {1, 1, 1});
 
             // Hasar Cubugu
             r.rect(x + 10.0f, y + 26.0f, x + 180.0f, y + 34.0f, {0.15f, 0.15f, 0.18f});
@@ -290,7 +290,7 @@ void RestoreScreen::render(Renderer& r) {
             const double d = restoreDamage(oc, k);
             const long cost = restoreStepCost(oc, k);
             r.rect(8, y, 352, y + 58, kUiPanel);
-            r.text(16, y + 6, restoreName(k), 2, {1, 1, 1});
+            r.textFit(16, y + 6, restoreName(k), 2, 190.0f, {1, 1, 1});
             r.rect(16, y + 30, 200, y + 40, {0.15f, 0.15f, 0.18f});
             r.rect(16, y + 30, 16 + 184 * (float)std::min(1.0, d), y + 40, dmgColor(d));
             std::snprintf(b, sizeof b, "HASAR %%%.0f", d * 100);

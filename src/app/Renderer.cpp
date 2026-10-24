@@ -468,8 +468,8 @@ void Renderer::text(float x, float y, const std::string& src, float sc, Color c)
 void Renderer::textFit(float x, float y, const std::string& src, float scale, float maxW, Color c, bool center) {
     std::string t = translate(lang, src);
     float sc = scale;
-    while (sc > 1.0f && rawWidth(t, sc) > maxW) sc -= 1.0f;
-    if (rawWidth(t, sc) > maxW) {                                       // olcek 1'de de sigmiyor: kod noktasi kirp + "."
+    if (rawWidth(t, sc) > maxW) sc = std::max(0.6f, sc * maxW / rawWidth(t, sc));   // oranli kucult (ic cozunurluk 2x: 0.6 okunur)
+    if (rawWidth(t, sc) > maxW) {                                       // en kucuk olcekte de sigmiyor: kod noktasi kirp + "."
         while (!t.empty() && rawWidth(t + ".", sc) > maxW) {
             size_t k = t.size() - 1;
             while (k > 0 && ((unsigned char)t[k] & 0xC0) == 0x80) --k;    // UTF-8 karakter sinirina kadar
@@ -479,6 +479,35 @@ void Renderer::textFit(float x, float y, const std::string& src, float scale, fl
     }
     const float yy = y + 3.5f * (scale - sc);
     textRaw(center ? x - rawWidth(t, sc) * 0.5f : x, yy, t, sc, c);
+}
+
+float Renderer::textWrap(float x, float y, const std::string& src, float scale, float maxW, int maxLines, Color c) {
+    const std::string t = translate(lang, src);
+    std::vector<std::string> words;
+    for (size_t i = 0, j; i < t.size(); i = j + 1) {
+        j = t.find(' ', i); if (j == std::string::npos) j = t.size();
+        if (j > i) words.push_back(t.substr(i, j - i));
+    }
+    auto layout = [&](float sc) {
+        std::vector<std::string> lines; std::string cur;
+        for (const std::string& w : words) {
+            const std::string cand = cur.empty() ? w : cur + " " + w;
+            if (!cur.empty() && rawWidth(cand, sc) > maxW) { lines.push_back(cur); cur = w; } else cur = cand;
+        }
+        if (!cur.empty()) lines.push_back(cur);
+        return lines;
+    };
+    float sc = scale;
+    std::vector<std::string> lines = layout(sc);
+    auto fits = [&]() { if ((int)lines.size() > maxLines) return false; for (auto& l : lines) if (rawWidth(l, sc) > maxW) return false; return true; };
+    while (!fits() && sc > 0.6f) { sc = std::max(0.6f, sc - (sc > 1.0f ? 1.0f : 0.1f)); lines = layout(sc); }
+    if ((int)lines.size() > maxLines) {                                // en kucukte de sigmiyor: fazlasi son satira, kisaltilir
+        std::string last = lines[maxLines - 1];
+        for (size_t k = maxLines; k < lines.size(); ++k) last += " " + lines[k];
+        lines.resize(maxLines); lines.back() = last;
+    }
+    for (size_t k = 0; k < lines.size(); ++k) textFit(x, y + k * 9.0f * sc, lines[k], sc, maxW, c);
+    return lines.size() * 9.0f * sc;
 }
 
 float Renderer::rawWidth(const std::string& s, float scale) {

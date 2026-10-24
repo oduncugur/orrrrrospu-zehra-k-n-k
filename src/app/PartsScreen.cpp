@@ -896,13 +896,13 @@ void EcuScreen::render(Renderer& r) {
         for (int i = 0; i < SwCount; ++i) {
             const EcuSwDef& d = ecuSwDef(i);
             const int lv = ecuSwLevel(t, i), mx = ecuSwMax(t, i);
-            const float y = 48.0f + i * 42.0f;
-            r.rect(8, y, 410, y + 38.0f, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
+            const float kStep = std::min(42.0f, 306.0f / SwCount), y = 48.0f + i * kStep;   // tum moduller ekrana sigar
+            r.rect(8, y, 410, y + kStep - 4.0f, lv > 0 ? Color{0.12f, 0.24f, 0.16f} : kUiPanel);
             r.text(14, y + 4, d.name, 1, mx > 0 ? Color{1, 1, 1} : kUiDim);
             if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
             else std::snprintf(b, sizeof b, mx > 0 ? "SEV %d/%d" : "DESTEKLENMEZ", lv, mx);
             r.text(14, y + 18, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
-            r.text(140, y + 4, std::string(d.desc).substr(0, 24), 1, kUiDim);
+            r.textWrap(140, y + 4, d.desc, 1, 124, 3, kUiDim);
 
             if (mx > 0) {
                 if (lv > 0) button(r, Rect{270, y + 6, 310, y + 32}, "-", kUiBtn, 2);
@@ -956,7 +956,7 @@ void EcuScreen::render(Renderer& r) {
             if (i == SwRev) std::snprintf(b, sizeof b, "+%d RPM", lv * 50);
             else std::snprintf(b, sizeof b, mx > 0 ? "SEVIYE %d / %d" : "ECU DESTEKLEMIYOR", lv, mx);
             r.text(16, y + 19, b, 1, mx > 0 ? (lv > 0 ? kUiGold : kUiText) : Color{0.6f, 0.4f, 0.35f});
-            r.text(16, y + 31, std::string(d.desc).substr(0, 30), 1, kUiDim);
+            r.textFit(16, y + 31, d.desc, 1, 240, kUiDim);
             if (mx <= 0) continue;
             if (lv > 0) button(r, swMinus(i), "-", kUiBtn, 2);
             if (lv < mx) {
@@ -975,7 +975,7 @@ void EcuScreen::pointerDown(int, float x, float y) {
         if (Rect{420, 306, 630, 346}.hit(x, y)) { app_.goParts((int)PartCat::Ecu); return; }
         for (int i = 0; i < SwCount; ++i) {
             std::string why;
-            const float yy = 48.0f + i * 42.0f;
+            const float yy = 48.0f + i * std::min(42.0f, 306.0f / SwCount);
             if (Rect{316, yy + 6, 404, yy + 32}.hit(x, y)) {
                 if (app_.career.buyEcuSoftware(i, &why)) { msg_ = std::string(ecuSwDef(i).name) + " YUKLENDI"; app_.saveCareer(); }
                 else msg_ = why;
