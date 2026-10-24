@@ -1,4 +1,5 @@
 #include "DragRace.h"
+#include "sim/PartTables.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -123,7 +124,10 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
             // Tork konvertoru (PowertrainCore): frende beklerken N + devir stall'da (brake-torque karsiligi,
             // defaultLaunchRpm); fren birakilinca akiskan kavrama — ani kilitlenme/darbe yok
             clutch = holding ? 1.0 : 0.0;
-            const double up = pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // D erken, S kesiciye yakin
+            const Tune* tt = L.sim->config().tune;                        // TCU yazilimi: S / D tam gaz vites devri ayari
+            const int cust = tt && tt->swTcu > 0 ? (pc.autoMode == 0 ? tt->tcuShiftD : tt->tcuShiftS) : 0;
+            const double up = cust > 0 ? std::min((double)cust, L.sim->engineSpec().redlineRpm - 100.0)
+                                       : pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // D erken, S kesiciye yakin
             if (pc.autoMode != 2 && !holding && pt.gear() < pt.gearCount() && pt.rpm() > up && L.shiftT < 0) {
                 pt.setGear(pt.gear() + 1); L.shiftT = 0.0;
             }
@@ -132,7 +136,10 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
             if (holding) L.autoRelease = -1.0;
             else if (L.autoRelease < 0.0) L.autoRelease = clock_;
             clutch = holding ? 1.0 : std::max(0.0, 1.0 - (clock_ - L.autoRelease) / 0.15);
-            const double up = pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // DCT D / S: kendisi atar
+            const Tune* tt = L.sim->config().tune;                        // TCU yazilimi: S / D tam gaz vites devri ayari
+            const int cust = tt && tt->swTcu > 0 ? (pc.autoMode == 0 ? tt->tcuShiftD : tt->tcuShiftS) : 0;
+            const double up = cust > 0 ? std::min((double)cust, L.sim->engineSpec().redlineRpm - 100.0)
+                                       : pc.autoMode == 0 ? L.sim->shiftRpm() - 700.0 : L.sim->shiftRpm();   // DCT D / S: kendisi atar
             if (pc.autoMode != 2 && L.left && pt.gear() < pt.gearCount() && pt.rpm() > up && L.shiftT < 0) {
                 pt.setGear(pt.gear() + 1); L.shiftT = 0.0;
             }
@@ -164,7 +171,9 @@ void DragRace::playerDrive(LaneState& L, const PlayerControls& pc, VehicleInputs
         L.shiftT += kStep;
         if (L.shiftT > dur) L.shiftT = -1.0;
     }
-    pt.setTwoStep(pc.twoStep && beforeLeave && phase_ != RacePhase::Burnout, L.sim->defaultLaunchRpm());
+    const Tune* lt = L.sim->config().tune;
+    const bool hasLc = box == Gearbox::DCT || (lt && launchControlAvailable(*lt));   // LC yoksa devir sinirlayici yok
+    pt.setTwoStep(pc.twoStep && hasLc && beforeLeave && phase_ != RacePhase::Burnout, L.sim->defaultLaunchRpm());
     // Flat shift (ECU yazilimi): kalktiktan sonra debriyaj basili + gaz acikken devir basildigi anda tutulur
     // (gazdan ayak kalkmadan vites; motor kesiciye firlamaz)
     if (const Tune* tn = L.sim->config().tune; tn && tn->swFlat > 0 && !beforeLeave && box == Gearbox::HPattern) {

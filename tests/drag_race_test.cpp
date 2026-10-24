@@ -78,7 +78,8 @@ int main() {
     }
     std::printf("[2] Erken kalkis -> kirmizi isik\n");
     {
-        DragRace r(5, 5, TreeType::Sportsman, 42, false);
+        Tune lc; lc.ecu = 4;                                               // launch control (2-step) takili: devir sabit, erken kalkis net
+        DragRace r(5, 5, TreeType::Sportsman, 42, false, &lc, nullptr);
         ScriptedPlayer p; p.leaveOnLastAmber = true; p.launchDelay = 0.0;
         run(r, p);
         printSlip("SEN", r.lane(0).slip);

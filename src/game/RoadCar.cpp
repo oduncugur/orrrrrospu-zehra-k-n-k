@@ -50,14 +50,17 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
         return;
     }
     const bool sport = autoMode == 1;
-    const double eff = std::max(idle + 1300.0, (0.40 + 0.04 * tcu) * red);
-    const double top = red - (sport ? 250.0 : 500.0 - 100.0 * tcu);
-    const double k = std::clamp((thr - 0.15) / 0.70, 0.0, 1.0);
-    const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : eff + (top - eff) * std::pow(k, 1.3);
+    // TCU yazilimi takiliysa oyuncunun S / D tam gaz vites devri (0: fabrika)
+    const int cust = tcu > 0 ? (sport ? tune_.tcuShiftS : tune_.tcuShiftD) : 0;
+    const double eff = std::max(idle + 1300.0, (0.40 + 0.04 * tcu) * red);   // yakit acisindan en verimli devir
+    const double top = cust > 0 ? std::clamp((double)cust, idle + 1500.0, red - 100.0) : red - (sport ? 250.0 : 500.0 - 100.0 * tcu);
+    const double k = thr > 0.65 ? 1.0 : 0.0;
+    // D: gaz %65'e kadar verimli devirde atar; ustunde tam gaz noktasi. S: degismedi (hep yuksek devir)
+    const double up = sport ? (thr > 0.25 ? top : 0.72 * red) : (thr <= 0.65 ? eff : top);
     if (sinceShift_ < 0.8 - 0.2 * tcu && !(thr > 0.85 && sinceShift_ > 0.35)) return;
     // Yukari: cikis devri (konvertor kaymasiz) vites noktasini gecti ya da motor kesiciye dayandi (kayma ile)
     // Tam gazda (ve S'de) en iyi vites noktasi: ust viteste tekere giden cekis (tork x oran) bu vitesi gectigi an
-    if ((k > 0.8 || sport) && gear < pt.gearCount() && rpm > 0.55 * red) {
+    if (cust <= 0 && (k > 0.8 || sport) && gear < pt.gearCount() && rpm > 0.55 * red) {   // ayarli devirde bu kural yok
         const double g0 = pt.gearRatio(gear), g1 = pt.gearRatio(gear + 1);
         if (g0 > 0 && g1 > 0 && pt.wotTorqueAt(rpm) * g0 <= pt.wotTorqueAt(rpm * g1 / g0) * g1) { shift(gear + 1); return; }
     }

@@ -927,6 +927,17 @@ void EcuScreen::render(Renderer& r) {
         std::snprintf(b, sizeof b, "OKTAN: %.0f / GEREKEN: %.0f", now_.octane, now_.octaneReq);
         r.text(430, 162, b, 1, now_.octaneReq > now_.octane ? Color{1.0f, 0.75f, 0.3f} : kUiText);
         if (!(hw.knockBuiltin || t.swKnock)) r.text(430, 180, "VURUNTU KORUMASI YOK!", 1, {1.0f, 0.6f, 0.3f});
+        if (t.swTcu > 0 && (sim.gearboxType() == Gearbox::TorqueConverter || sim.gearboxType() == Gearbox::DCT)) {
+            r.text(430, 202, "TCU: TAM GAZ VITES DEVRI", 1, kUiGold);
+            for (int k = 0; k < 2; ++k) {                                  // 0: S, 1: D
+                const float yy = 216.0f + k * 38.0f;
+                const int val = k ? t.tcuShiftD : t.tcuShiftS;
+                button(r, Rect{430, yy, 462, yy + 30}, "-", kUiBtn, 2);
+                button(r, Rect{588, yy, 620, yy + 30}, "+", kUiBtn, 2);
+                std::snprintf(b, sizeof b, "%s  %s", k ? "D" : "S", val > 0 ? (std::to_string(val) + " RPM").c_str() : "FABRIKA");
+                r.textCentered(525, yy + 11, b, 1, val > 0 ? kUiGold : kUiText);
+            }
+        }
 
         button(r, Rect{420, 306, 630, 346}, "< ECU", kUiBtn, 2);
 
@@ -973,6 +984,24 @@ void EcuScreen::pointerDown(int, float x, float y) {
     const bool land = app_.settings.menuLandscape;
     if (land) {
         if (Rect{420, 306, 630, 346}.hit(x, y)) { app_.goParts((int)PartCat::Ecu); return; }
+        {   // TCU tam gaz vites devri (S / D): 250 rpm adim; fabrika (0) altina inince fabrikaya doner
+            Tune& t = app_.career.cars[app_.career.current].tune;
+            if (t.swTcu > 0)
+                for (int k = 0; k < 2; ++k) {
+                    const float yy = 216.0f + k * 38.0f;
+                    const int dir = Rect{430, yy, 462, yy + 30}.hit(x, y) ? -1 : Rect{588, yy, 620, yy + 30}.hit(x, y) ? 1 : 0;
+                    if (!dir) continue;
+                    VehicleSimConfig cfg; cfg.car = findVehicle(app_.career.car().carId); cfg.tune = &t;
+                    const VehicleSim sim(cfg);
+                    const int red = (int)sim.engineSpec().redlineRpm, lo = 2500;
+                    int& val = k ? t.tcuShiftD : t.tcuShiftS;
+                    int cur = val > 0 ? val : (int)(red - (k ? 500 : 250)) / 250 * 250;
+                    cur += dir * 250;
+                    val = cur < lo ? 0 : std::min(cur, red - 100);
+                    app_.saveCareer();
+                    return;
+                }
+        }
         for (int i = 0; i < SwCount; ++i) {
             std::string why;
             const float yy = 48.0f + i * std::min(42.0f, 306.0f / SwCount);

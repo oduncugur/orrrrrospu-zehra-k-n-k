@@ -1418,7 +1418,7 @@ const IntField kIntFields[] = {
     {"brg", &Tune::bearing, 9}, {"gsk", &Tune::gasket, 9}, {"trb", &Tune::turbine, 9}, {"wg", &Tune::wastegate, 9},
     {"bc", &Tune::boostCtl, 9}, {"gbs", &Tune::gbStrength, 9}, {"cool", &Tune::cooling, 9}, {"oil", &Tune::oil, 9},
     {"fuel", &Tune::fuelSel, 9}, {"elx", &Tune::elec, 9}, {"sus", &Tune::susp, 9}, {"brk", &Tune::brakes, 9}, {"aero", &Tune::aero, 9},
-    {"lrpm", &Tune::launchRpm, 12000}, {"rtir", &Tune::roadTire, 29}, {"adas", &Tune::adas, 4},
+    {"lrpm", &Tune::launchRpm, 12000}, {"tcs", &Tune::tcuShiftS, 12000}, {"tcd", &Tune::tcuShiftD, 12000}, {"rtir", &Tune::roadTire, 29}, {"adas", &Tune::adas, 4},
     {"fpmp", &Tune::fuelPump, 9}, {"inj", &Tune::injector, 9}, {"fln", &Tune::fuelLine, 9},
     {"ehw", &Tune::ecuHw, 9}, {"smap", &Tune::swMap, 3}, {"srv", &Tune::swRev, 80}, {"slc", &Tune::swLaunch, 1},
     {"sfs", &Tune::swFlat, 1}, {"sal", &Tune::swAntiLag, 1}, {"sflx", &Tune::swFlex, 1}, {"skn", &Tune::swKnock, 1}, {"stcu", &Tune::swTcu, 1},
