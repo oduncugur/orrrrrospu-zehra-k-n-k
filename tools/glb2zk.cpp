@@ -98,9 +98,10 @@ int main(int argc, char** argv) {
     const std::string in = argv[1], out = argv[2];
     const int id = std::atoi(argv[3]);
     const double L = std::atof(argv[4]), W = std::atof(argv[5]), H = std::atof(argv[6]);
-    bool flip = false; int budget = 9000; std::string credit, texavg; double wbase = 0;
+    bool flip = false; int budget = 9000; std::string credit, texavg; double wbase = 0; std::vector<std::string> asMap;
     for (int i = 7; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--flip")) flip = true;
+        else if (!std::strcmp(argv[i], "--as") && i + 1 < argc) asMap.push_back(argv[++i]);   // "adparcasi=sinif" (boya, cam, koyu ...)
         else if (!std::strcmp(argv[i], "--budget") && i + 1 < argc) budget = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--credit") && i + 1 < argc) credit = argv[++i];
         else if (!std::strcmp(argv[i], "--texavg") && i + 1 < argc) texavg = argv[++i];
@@ -269,6 +270,20 @@ int main(int argc, char** argv) {
             cls[si] = c;
         }
         for (auto& t : tris) if (auto it = cls.find(t.src); it != cls.end()) t.mat = it->second;
+    }
+    // ---- elle sinif: --as ad=sinif (malzeme adi parcasi), ardindan malzeme listesi (kontrol icin)
+    {
+        static const char* cn[] = {"boya", "cam", "lastik", "jant", "far", "stop", "trim", "koyu", "plaka", "krom", "sinyal"};
+        for (const std::string& a : asMap) {
+            const size_t e = a.find('='); if (e == std::string::npos) continue;
+            const std::string key = a.substr(0, e), val = a.substr(e + 1); int c = -1;
+            for (int q = 0; q < 11; ++q) if (val == cn[q]) c = q;
+            if (c < 0) continue;
+            for (auto& t : tris) if (smat[t.src].name.find(key) != std::string::npos) t.mat = c;
+        }
+        std::map<int, int> one; for (auto& t : tris) one[t.src] = t.mat;
+        for (auto& [si, c] : one) { const SrcMat& m = smat[si];
+            std::fprintf(stderr, "  mat %-32s alan %6.2f renk %.2f %.2f %.2f -> %s\n", m.name.c_str(), areaBy[si], m.r, m.g, m.b, cn[c]); }
     }
     // ---- on / arka: kabin (z en yuksek bolge) merkezi arkaya yakin; far / stop malzemeleriyle dogrula
     {

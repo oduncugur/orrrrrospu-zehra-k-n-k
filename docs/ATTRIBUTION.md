@@ -7,3 +7,4 @@ Lisans: https://creativecommons.org/licenses/by/4.0/
 | Oyun araci | Model | Yazar | Kaynak |
 |---|---|---|---|
 | BMW M3 E46 (#122, #123 CSL) | "BMW M3 E46" | Fratzica (@vasilebetivu62) | https://sketchfab.com/3d-models/bmw-m3-e46-325f74ef4f44457fad28f66fcbb7b32f |
+| Honda Civic Type R EK9 (#5) | "2000_honda_civic_type_r_ek9" | 007 (@tangwang920) | https://sketchfab.com/3d-models/2000-honda-civic-type-r-ek9-3c63ce3347a84af6a845c8e31a783bc7 |

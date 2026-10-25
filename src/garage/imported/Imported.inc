@@ -5,11 +5,13 @@ struct ImportedWheel { float x, y, z, r; size_t b, e; };
 struct ImportedModel { int id; const float (*v)[3]; size_t nv; const int (*t)[4]; size_t nt; const ImportedWheel* w; };
 // GENERATED-INCLUDES (glb2zk ciktilari asagiya eklenir)
 #include "car_122.inc"
+#include "car_5.inc"
 // GENERATED-INCLUDES-END
 static const ImportedModel kImported[] = {
 // GENERATED-TABLE
     {0, nullptr, 0, nullptr, 0, nullptr},
     {122, kImpV_122, sizeof kImpV_122 / sizeof *kImpV_122, kImpT_122, sizeof kImpT_122 / sizeof *kImpT_122, kImpW_122},
+    {5, kImpV_5, sizeof kImpV_5 / sizeof *kImpV_5, kImpT_5, sizeof kImpT_5 / sizeof *kImpT_5, kImpW_5},
 // GENERATED-TABLE-END
 };
 // Ikiz govdeler (ayni model): R34 GT-T -> GT-R, M3 CSL -> M3
