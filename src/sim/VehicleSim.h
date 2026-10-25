@@ -178,7 +178,7 @@ private:
     double nosHp_ = 0, nosLeft_ = 0, nosBottle_ = 0, dfK_ = 0, tcSlip_ = 0.10, absSlip_ = 0.12;
     bool nosActive_ = false;
     bool absAvail_ = false, tcAvail_ = false, tcOn_ = false;
-    double absF_[4] = {1.0, 1.0, 1.0, 1.0}, tcLim_ = 1.0;
+    double absF_[4] = {1.0, 1.0, 1.0, 1.0}, tcLim_ = 1.0, tcFloor_ = 0.35;
     VehicleSimConfig cfg_;
     EngineSpec eng_; GearboxSpec gbx_;
     Gearbox boxType_ = Gearbox::HPattern;

@@ -20,8 +20,8 @@ Suspansiyon: 1.60 Hz on / 1.76 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: dr
   t[s]    x[m]   km/h  G   RPM     wL     wR   kapL  VTEC yakit_g  LastL  LastR  tauL   yag
   0.00     0.0    0.0  1  6500    0.0    0.0  0.000    ON    33.6   63.5   63.9     0  4.96
   [  0.140 s] VTEC kapandi (dusuk kam @7489 rpm)
-  1.00     2.0   15.2  1  5498   37.0   37.0  1.544   off    38.6   65.1   65.6   212  4.34
-  2.00     9.0   36.4  1  5535   37.3   37.2  0.091   off    45.7   65.5   66.0   289  4.36
+  1.00     2.0   15.2  1  5498   37.0   37.0  1.544   off    38.6   65.1   65.6   211  4.34
+  2.00     9.0   36.4  1  5535   37.3   37.2  0.091   off    45.7   65.5   66.0   290  4.36
   [  2.132 s] VTEC KICKED IN YO! (yuksek kam @5800 rpm)
   [  2.822 s] VTEC kapandi (dusuk kam @8350 rpm)
   [  2.922 s] Vites 2 (8053 rpm)
@@ -29,30 +29,30 @@ Suspansiyon: 1.60 Hz on / 1.76 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: dr
   3.00    22.1   54.9  2  8124   52.2   52.3 -0.001    ON    56.8   64.6   65.1     0  5.50
   4.00    39.7   71.1  2  6831   70.5   70.5  0.047    ON    66.3   63.7   64.3   220  5.17
   [  4.952 s] VTEC kapandi (dusuk kam @8350 rpm)
-  5.00    61.9   87.4  2  8228   83.0   83.3 -0.001   off    81.0   62.2   62.8     6  5.50
+  5.00    61.9   87.4  2  8228   83.0   83.3 -0.001   off    81.0   62.2   62.8     5  5.50
   [  5.052 s] Vites 3 (8053 rpm)
   [  5.122 s] VTEC KICKED IN YO! (yuksek kam @8050 rpm)
   [  5.995 s] 0-100 km/h: 5.995 s
-  6.00    87.8  100.1  3  6742   97.7   97.7  0.032    ON    92.6   60.6   61.1   176  5.11
-  7.00   117.4  112.6  3  7578  109.8  109.8  0.028    ON   107.3   58.7   59.2   171  5.50
+  6.00    87.8  100.1  3  6742   97.7   97.7  0.032    ON    92.6   60.6   61.1   175  5.11
+  7.00   117.4  112.6  3  7578  109.8  109.8  0.028    ON   107.3   58.7   59.2   170  5.50
   8.00   150.3  124.3  3  8343  120.9  120.9  0.029    ON   123.3   56.8   57.2   159  5.50
   [  8.010 s] VTEC kapandi (dusuk kam @8350 rpm)
   [  8.110 s] Vites 4 (8053 rpm)
   [  8.180 s] VTEC KICKED IN YO! (yuksek kam @8050 rpm)
   9.00   185.8  132.4  4  6686  128.1  128.1  0.022    ON   134.5   54.8   55.2   135  5.08
  10.00   223.8  141.2  4  7126  136.6  136.6  0.024    ON   148.6   52.8   53.2   134  5.35
- 11.00   264.2  149.6  4  7551  144.7  144.7  0.025    ON   163.6   50.9   51.3   132  5.50
- 12.00   306.8  157.5  4  7945  152.3  152.3  0.022    ON   179.4   49.0   49.4   129  5.50
- 13.00   351.6  164.9  4  8307  159.2  159.2  0.025    ON   195.6   47.3   47.6   123  5.50
+ 11.00   264.2  149.6  4  7551  144.7  144.7  0.025    ON   163.6   50.9   51.3   133  5.50
+ 12.00   306.8  157.5  4  7945  152.3  152.3  0.022    ON   179.4   49.0   49.4   128  5.50
+ 13.00   351.6  164.9  4  8307  159.2  159.2  0.025    ON   195.6   47.3   47.6   121  5.50
   [ 13.123 s] VTEC kapandi (dusuk kam @8350 rpm)
   [ 13.223 s] Vites 5 (8053 rpm)
   [ 13.293 s] VTEC KICKED IN YO! (yuksek kam @8050 rpm)
- 14.00   398.0  169.9  5  6858  163.7  163.7  0.022    ON   207.6   45.6   45.9   111  5.19
+ 14.00   398.0  169.9  5  6858  163.7  163.7  0.022    ON   207.6   45.6   45.9   109  5.19
 
 === 400 m (1/4 mil) BITIS ===
   60 ft :  2.751 s | 100 m :  6.447 s | 201 m (1/8):  9.412 s | 1000 ft: 11.953 s
   0-100 km/h:  5.995 s | 400 m ET: 14.041 s | Trap: 170.2 km/h | Tepe ivme: 0.70 g
-  Kosuda yakilan yakit: 174.6 g (toplam 208.2 g) | Balata 65 C | En yuksek aks gerilmesi 793 MPa
+  Kosuda yakilan yakit: 174.6 g (toplam 208.2 g) | Balata 65 C | En yuksek aks gerilmesi 753 MPa
 
   [ 14.041 s] Parasut yok, ABS yok: frene asildi (%65 on / %35 arka)
   [ 14.041 s] VTEC kapandi (dusuk kam @6866 rpm)
@@ -80,5 +80,5 @@ Suspansiyon: 1.60 Hz on / 1.76 Hz arka, sonum 0.30 bump / 0.60 rebound | Yol: dr
   Suspansiyon: havalanma sayisi FL/FR/RL/RR = 0/0/0/0 | takoz = 0/0/0/0
   Tepe lastik yuku FL/FR/RL/RR = 5310/5137/3496/3553 N
   >> Telefon titresimi: flat-spot her turda 5% siddetle vuruyor
-  Akslar: sol saglam (burulma 0.1 deg), sag saglam (burulma 0.1 deg), tepe tau 793 MPa
+  Akslar: sol saglam (burulma 0.0 deg), sag saglam (burulma 0.0 deg), tepe tau 753 MPa
   Motor yataklari: hasar %0  | Motor: calisiyor

@@ -1,4 +1,4 @@
-#include "DrivetrainFailure.h"
+﻿#include "DrivetrainFailure.h"
 #include <algorithm>
 #include <cmath>
 
@@ -8,7 +8,11 @@ static constexpr double kPi = 3.14159265358979323846;
 
 void DrivetrainFailure::updateAxles(double dt, double TL, double TR) {
     const double d = axle_.diameterMm * 1e-3;
-    const double T[2] = {TL, TR};
+    // Aks burulma esnekligi + lastik kaymasi: tek adimlik sayisal tork sivrilikleri (debriyaj kavrama ani) aksa
+    // tam yansimaz; ~5 ms suzgec (gercek aks yay gibi davranir, darbe yayilir)
+    const double k = std::min(1.0, dt / 0.005);
+    Tf_[0] += (TL - Tf_[0]) * k; Tf_[1] += (TR - Tf_[1]) * k;
+    const double T[2] = {Tf_[0], Tf_[1]};
     const char* name[2] = {"SOL", "SAG"};
     for (int i = 0; i < 2; ++i) {
         if (snapped_[i]) { shear_[i] = 0.0; continue; }

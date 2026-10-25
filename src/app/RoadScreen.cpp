@@ -463,7 +463,8 @@ void RoadScreen::update(double dt) {
         app_.tire(1, 0.0);
     } else app_.tire(1, 0.0);
     if (std::getenv("ZK_ROAD_LOG")) { static double t = 0, nx = 0; t += dt; if (t >= nx) { nx += 0.5;
-        std::printf("t=%.1f v=%.1f g%d s=%.1f lat=%.2f gap=%.1f phase=%d\n", t, v, pt.gear(), P.s(), P.lateral(), ses_->gapMeters(), (int)ses_->phase()); } }
+        std::printf("t=%.1f %3.0f km/h g%d rpm %4.0f slip %4.1f beta %4.1f tc %.2f s=%.0f lat=%.2f T=%.0f thr=%.2f wot=%.0f Tc=%.0f ct=%.0f wr=%.1f G=%.2f br=%.2f\n", t, v * 3.6, pt.gear(), pt.rpm(), P.tireSlipSpeed(),
+                    P.sim().bodySlipAngle() * 57.3, pt.torqueLimit(), P.s(), P.lateral(), pt.engineTorque(), pt.throttle(), pt.wotTorqueAt(pt.rpm()), pt.clutchTorque(), pt.clutchTempC(), P.sim().wheel(2).omega() * P.sim().wheel(2).rEff() * 3.6, pt.totalRatio(), c.brake); std::fflush(stdout); } }
 }
 
 double RoadScreen::Pc0z() const { return ses_ ? ses_->player().elevation() : 0.0; }

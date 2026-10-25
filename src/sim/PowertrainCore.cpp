@@ -160,7 +160,12 @@ void PowertrainCore::step(double dt, double wL, double wR, double oilFactor) {
         }
         if (snappedL_ && snappedR_) Tc_ = Tout = 0.0;
     } else {
-        Tc_ = (G != 0.0) ? Tcap * std::tanh(dW / 1.0) : 0.0;
+        // Sert (yuksek kapasiteli) balata: kavrama egimi Tcap/w0 adim icin kararli kalmali (yoksa +/- Tcap titresimi
+        // enerji yiyip tam gazda araci yavaslatiyordu): w0 >= 2 * Tcap * dt / I
+        const double Iref = G != 0.0 ? 2.4 / (G * G) : 1e9;               // tahrik tekerleri (~1.2 kg m2) motora yansimis
+        const double Ieff = e_.inertia * Iref / (e_.inertia + Iref);
+        const double w0 = std::max(1.0, 2.0 * Tcap * dt / Ieff);
+        Tc_ = (G != 0.0) ? Tcap * std::tanh(dW / w0) : 0.0;
         if (snappedL_ && snappedR_) Tc_ = 0.0; // iki aks kopuk: sanziman cikisi bosta doner
         Tout = Tc_;
         clutchTemp_ += dt * (std::fabs(Tc_ * dW) * 0.9 - 8.0 * (clutchTemp_ - 40.0)) / c_.heatCap;

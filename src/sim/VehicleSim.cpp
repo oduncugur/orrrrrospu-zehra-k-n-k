@@ -1,7 +1,8 @@
-#include "VehicleSim.h"
+﻿#include "VehicleSim.h"
 #include "sim/PartTables.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace zk {
 
@@ -122,7 +123,23 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
             boostTot_ = baseBoost + add / ic;
             TurboCtx t{(1.0 + baseBoost + add) / (1.0 + baseBoost), eng_.redlineRpm * (T.spoolLo - EC.spool + TB.spool),
                        eng_.redlineRpm * (T.spoolHi - EC.spool + TB.spool)};
+            const EngineSpec na = eng_;
             scaleCurves(eng_, turboMul, &t);
+            // Kompresor debi siniri (choke): kucuk turbo ust devirde motorun istedigi havayi basamaz, boost sonar.
+            // Debi ~ lb/dk (T25 ~30, GT3076 ~70, GT47 ~120); 1 lb/dk ~ 10 HP. Sinir ustunde guc egrisi tavana yapisir ve
+            // devirle duser; atmosferik egrinin altina inmez. Cift turbo iki kompresor.
+            const bool twin = std::strstr(T.name, "CIFT") != nullptr;
+            const double lbMin = std::max(25.0, 30.0 + (T.spoolHi - 0.48) * 270.0) * (twin ? 1.8 : 1.0);
+            const double capHp = lbMin * 10.0 * std::max(1.0, ic);
+            for (int c = 0; c < 2; ++c) {
+                auto& cv = c ? eng_.highCam : eng_.lowCam; const auto& nv = c ? na.highCam : na.lowCam;
+                for (size_t i = 0; i < cv.size() && i < nv.size(); ++i) {
+                    const double r = std::max(cv[i].first, 1.0), hp = cv[i].second * r / 7120.9;
+                    if (hp <= capHp) continue;
+                    const double capped = capHp * 7120.9 / r * std::pow(capHp / hp, 0.6);   // tavanin ustunde devirle soner
+                    cv[i].second = std::max(nv[i].second, capped);
+                }
+            }
             spoolLo_ = t.spoolStart; spoolHi_ = t.spoolFull;
         } else if (ed && ed->boostBar > 0.0 && (tune->turbine || tune->wastegate || tune->boostCtl)) {
             // Fabrika turbosu: wastegate / boost kontrol / turbin fabrika boostunu yukseltir (spool fabrika egrisinde)
@@ -258,6 +275,7 @@ VehicleSim::VehicleSim(const VehicleSimConfig& cfg) : cfg_(cfg) {
     }
     double Tmax = curveMax(eng_);
     ClutchSpec clutch;
+    tcFloor_ = 0.35 * std::min(1.0, 450.0 / std::max(Tmax, 1.0));   // guclu motorda kalkis kesme tabani dusuk
     if (car) clutch.maxTorque = Tmax * 1.7;          // sokak baskisi: motor torkunun ~1.7 kati
     if (tune) clutch.maxTorque *= row(clutchTable(), tune->clutch).mul;
     // Dayanim ve sogutma: sinir ustu tork hasar biriktirir; isi modeli fabrika gucune gore boyutlu radyator
@@ -432,14 +450,14 @@ void VehicleSim::updateElectronics(double dt, double brake) {
         // oraya inince kesme durur ve tork hizla geri verilir (bogulma / stop yok). Kesme tabani kalkista %35.
         const double V = std::max(speed(), 2.0);
         // Hiz arttikca izin verilen patinaj azalir (otoyolda teker sarmasin): 0.8 m/s + %1.5 ust sinir
-        const double slipT = std::min(tcSlip_, 0.8 / V + 0.015);
+        const double slipT = std::min(tcSlip_, 0.8 / V + 0.05);   // ~%5: lastigin en iyi cekis kaymasina yakin (otoyolda gereksiz kesme yok)
         double s = 0.0;
         for (int i = 0; i < 4; ++i)
             if ((i < 2 && frontShare_ > 0.0) || (i >= 2 && frontShare_ < 1.0))
                 s = std::max(s, (w_[i].omega() * w_[i].rEff() - speed() - std::max(0.0, 2.5 - slipT * V)) / V);
         const double holdRpm = defaultLaunchRpm();                           // 2-step ayari ya da arac varsayilani
         const bool bogging = pt_->rpm() < holdRpm && speed() < 8.0;          // yalniz kalkis (~30 km/h alti)
-        const double floor = speed() < 15.0 ? 0.35 : 0.10;
+        const double floor = speed() < 15.0 ? std::max(0.10, tcFloor_) : 0.10;
         if (!tcOn_) tcLim_ = std::min(1.0, tcLim_ + dt * 4.0);
         else if (bogging) tcLim_ = std::min(1.0, tcLim_ + dt * 8.0);
         else tcLim_ = s > slipT ? std::max(floor, tcLim_ - dt * 25.0 * std::min(s - slipT, 1.0)) : std::min(1.0, tcLim_ + dt * 3.0);

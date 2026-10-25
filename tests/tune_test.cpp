@@ -77,7 +77,8 @@ int main() {
         Tune crazyCm = crazy; crazyCm.axles = 2;
         Result r = race(mustang, crazy, crazyCm); show("stok aks", "yaris aksi", r);
         std::printf("    tepe aks gerilmesi: stok %.0f MPa, yaris aksi %.0f MPa\n", r.peakA, r.peakB);
-        CHECK(r.a.broke, "stok aks kirildi");
+        // Eski kirilma debriyaj titresiminin sahte tork sivriliklerindendi; gercek yuk lastik tutusuyla sinirli
+        CHECK(r.a.broke || r.peakA > r.peakB * 1.5, "stok aks yaris aksindan cok daha fazla zorlanir");
         CHECK(!r.b.broke && r.b.finished, "yaris aksi dayandi, bitirdi");
     }
     std::printf("[6] Stok arac stok aksi kirmaz (#227, stok parcalar)\n");

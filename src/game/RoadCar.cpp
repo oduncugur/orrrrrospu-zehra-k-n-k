@@ -22,6 +22,14 @@ RoadCar::RoadCar(const VehicleDef* car, const Tune* tune, const RoadPath& road, 
     sim_->powertrain().setClutchPedal(1.0);
     hint_ = (int)(s0 / RoadPath::kStep);
     road_->project(sim_->posX(), sim_->posY(), hint_, s_, lat_);
+    {   // Guc bandi baslangici: tam gaz torkun tepe torkun %60'ina ulastigi devir (buyuk turboda yuksek; kalkis bunu bekler)
+        const PowertrainCore& pt = sim_->powertrain();
+        const double red = sim_->engineSpec().redlineRpm, idle = sim_->engineSpec().idleRpm;
+        double peak = 0; for (double r = idle; r < red; r += 100) peak = std::max(peak, pt.wotTorqueAt(r));
+        bandRpm_ = idle + 1500.0;
+        for (double r = idle; r < red; r += 100) if (pt.wotTorqueAt(r) >= 0.6 * peak) { bandRpm_ = r; break; }
+        bandRpm_ = std::clamp(bandRpm_, 2700.0, 0.75 * red);
+    }
 }
 
 void RoadCar::recover(double backM) {
@@ -44,7 +52,8 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     const PowertrainCore& pt = sim_->powertrain();
     const double red = sim_->engineSpec().redlineRpm, idle = sim_->engineSpec().idleRpm;
     const int tcu = hasTune_ ? std::clamp(tune_.swTcu, 0, 2) : 0;
-    auto shift = [&](int to) { shiftT_ = 0; target_ = to; sinceShift_ = 0; };
+    const bool wot = thr >= 0.95;
+    auto shift = [&](int to) { shiftT_ = 0; upWot_ = wot && to > gear; target_ = to; sinceShift_ = 0; };
     if (autoMode == 2) {
         if (gear > 1 && rpm < idle + 300.0 && sinceShift_ > 0.5) shift(gear - 1);
         return;
@@ -54,7 +63,6 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     const int cust = tcu > 0 ? (sport ? tune_.tcuShiftS : tune_.tcuShiftD) : 0;
     const double eff = std::max(idle + 1300.0, (0.40 + 0.04 * tcu) * red);   // yakit acisindan en verimli devir
     const double top = cust > 0 ? std::clamp((double)cust, idle + 1500.0, red - 100.0) : red - (sport ? 250.0 : 500.0 - 100.0 * tcu);
-    const bool wot = thr >= 0.95;
     const double k = wot ? 1.0 : 0.0;
     // D: gaz %65'e kadar verimli devirde atar; %65-95 arasi devir gaza gore kademeli yukselir (gerekirse tek vites
     // duser); %95+ kesiciye / en hizli gecis devrine kadar cikar. S: degismedi (hep yuksek devir)
@@ -74,6 +82,7 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
     // Kickdown: alt viteste motor devri (patinaj / konvertor kaymasi dahil gercek devir) kesiciye 1500 kala sigmali;
     // arac hizindan hesaplanan devir patinajda dusuk kalir ve 1-2 arasinda gidip gelmeye yol aciyordu.
     const double rLowEng = std::max(rLow, pt.rpm() * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3));
+    if (slipping_ || (upWot_ && sinceShift_ < 0.8)) return;                         // patinajda / yeni vitesten sonra asagi yok (salinim)
     if (wot && rLowEng < red - 1500.0 && pt.rpm() < top - 400.0 && sim_->speed() > 3.0) { shift(gear - 1); return; }   // kickdown
     if (!sport && !wot && thr > 0.65 && !kd1_ && rLowEng < up - 200.0 && sim_->speed() > 3.0) { kd1_ = true; shift(gear - 1); return; }   // ara: tek vites
     if (sinceShift_ > 1.0 && rLow < up * 0.80 && rpm < (sport ? 0.55 * red : std::max(idle + 700.0, eff * 0.72))) shift(gear - 1);
@@ -150,10 +159,12 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
         if (shiftT_ < 0.12 * k) thr = 0.0;
         if (shiftT_ > 0.08 * k && pt.gear() != target_) pt.setGear(target_);
         if (shiftT_ > 0.26 * k) shiftT_ = -1.0;
-    } else if (launchGear && v < 3.0 && (launching_ || thrIn < 0.05)) {
+    } else if (launchGear && (launching_ || thrIn < 0.05) &&
+               (v < 3.0 || (launching_ && pt.gear() <= 2 && v < 15.0 && thrIn > 0.3 &&   // yuksek viteste kaydirma yok                       // kalkis: kavrama devri guc bandina
+                            v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493 < 0.85 * (1500.0 + (bandRpm_ - 1500.0) * thrIn)))) {
         if (thrIn < 0.05 && v < 1.0) launchPedal_ = 1.0;                      // durus: debriyaj basili (stop etmez)
         else {   // kalkis: devir gaza gore 1500-2700'de tutulur, pedal isirma noktasindan devre gore birakilir
-            const double hold = launchRpm > 0.0 ? launchRpm : 1500.0 + 1200.0 * thrIn;
+            const double hold = launchRpm > 0.0 ? launchRpm : 1500.0 + (bandRpm_ - 1500.0) * thrIn;   // turbo: guc bandinda tut
             launchPedal_ = std::min(launchPedal_, 0.65);
             launchPedal_ = std::clamp(launchPedal_ + (pt.rpm() < hold ? 0.8 : -1.6) / k * dt, 0.0, 1.0);
         }
@@ -165,8 +176,10 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
         sinceShift_ += dt;
         // Vites karari: otomatikte (konvertor kayar) arac hizindan cikis devri (patinaj sisirmez), digerlerinde motor devri
         double shiftRpm = pt.rpm();
-        if (pt.converter())
-            shiftRpm = std::min(pt.rpm(), v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493);
+        const double lockedRpm = v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493;
+        if (pt.converter()) shiftRpm = std::min(pt.rpm(), lockedRpm);
+        slipping_ = tireSlipSpeed() > 2.5 && pt.rpm() > lockedRpm * 1.25 + 600.0;                       // tahrik tekerleri bosa donuyor
+        if (slipping_) shiftRpm = std::max(lockedRpm, std::min(pt.rpm(), sim_->engineSpec().redlineRpm - 50.0));
         if (!manual) autoShift(gear, shiftRpm, thrIn);
         if (!manual && gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
         if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && (manual ? gear >= 1 : gear == 1)) { launching_ = true; launchPedal_ = 0.6; }

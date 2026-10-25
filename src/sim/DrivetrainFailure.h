@@ -44,7 +44,7 @@ public:
 
 private:
     AxleSpec axle_; LubeSpec lube_;
-    double shear_[2] = {0, 0}, twist_[2] = {0, 0}, peak_ = 0.0;
+    double shear_[2] = {0, 0}, twist_[2] = {0, 0}, peak_ = 0.0, Tf_[2] = {0, 0};
     bool   snapped_[2] = {false, false};
     double oilFactor_ = 1.0, damage_ = 0.0, starvedFrac_ = 0.0;
     bool   uncovered_ = false, spun_ = false;
