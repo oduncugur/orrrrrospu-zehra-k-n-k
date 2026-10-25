@@ -8,7 +8,7 @@ Indirme: her linkten **glTF Binary (.glb)** -> `ref/<ID>.glb` (ornek `ref/122.gl
 |---|---|---|---|---|
 | 2 | Honda Civic EG6 SiR | - | | aday yok |
 | 5 | Honda Civic EK9 Type R | [2000 Honda Civic Type R (EK9)](https://sketchfab.com/3d-models/3c63ce3347a84af6a845c8e31a783bc7) | tangwang920 | 55k ucgen |
-| 8 | Honda Civic FD2 Type R | [2007 Honda Civic Type R FD2](https://sketchfab.com/3d-models/7da33a4102b848d5abe7f3bb7c445f46) | R1peer | stok (digeri "custom") |
+| 8 | Honda Civic FD2 Type R | - | | R1peer modeli denendi: 4.6k ucgen, camlar dokuda (elendi) |
 | 11 | Honda CR-X EF8 SiR | - | | adaylar low-poly / bozuk |
 | 12 | Honda Integra DC2 Type R | [1998 Honda Integra Type R (DC2)](https://sketchfab.com/3d-models/8d01854cdd6d47a3961d6fc671582a3f) | supercarmodels | |
 | 17 | Honda S2000 AP1 | [Honda S2000](https://sketchfab.com/3d-models/c8f87ba8790d4154929103e4012d1e66) | DRIVER-FIRE | toon elendi |

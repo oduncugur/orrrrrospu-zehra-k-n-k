@@ -19,6 +19,7 @@ struct LowPolyMesh {
     std::vector<Tri>    tris;
     std::vector<WheelPart> wheels;
     unsigned paintRGB = 0xC0C0C0;
+    bool outwardWinding = false;   // hazir model: ucgen kose sirasi (glTF CCW) disa bakan yonu verir
 };
 
 LowPolyMesh buildVehicleMesh(const VehicleDef& v);

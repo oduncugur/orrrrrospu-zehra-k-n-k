@@ -276,10 +276,25 @@ int main(int argc, char** argv) {
         static const char* cn[] = {"boya", "cam", "lastik", "jant", "far", "stop", "trim", "koyu", "plaka", "krom", "sinyal"};
         for (const std::string& a : asMap) {
             const size_t e = a.find('='); if (e == std::string::npos) continue;
-            const std::string key = a.substr(0, e), val = a.substr(e + 1); int c = -1;
+            const std::string key = a.substr(0, e); std::string val = a.substr(e + 1); int c = -1;
+            // "@dis": yalniz dis yan yuzey, kemer cizgisi alti (ornek benzin kapagi koyu kaporta parcasinin icinde)
+            const bool outer = val.size() > 4 && val.compare(val.size() - 4, 4, "@dis") == 0;
+            if (outer) val.resize(val.size() - 4);
             for (int q = 0; q < 11; ++q) if (val == cn[q]) c = q;
             if (c < 0) continue;
-            for (auto& t : tris) if (smat[t.src].name.find(key) != std::string::npos) t.mat = c;
+            double yMax = 0, zMax = 0;
+            for (auto& t : tris) for (auto& p : t.p) { yMax = std::max(yMax, std::fabs(p.y)); zMax = std::max(zMax, p.z); }
+            for (auto& t : tris) {
+                if (smat[t.src].name.find(key) == std::string::npos) continue;
+                if (outer) {
+                    const double cy = (t.p[0].y + t.p[1].y + t.p[2].y) / 3, cz = (t.p[0].z + t.p[1].z + t.p[2].z) / 3;
+                    const V3 u{t.p[1].x - t.p[0].x, t.p[1].y - t.p[0].y, t.p[1].z - t.p[0].z}, v{t.p[2].x - t.p[0].x, t.p[2].y - t.p[0].y, t.p[2].z - t.p[0].z};
+                    const double nx = u.y * v.z - u.z * v.y, ny = u.z * v.x - u.x * v.z, nz = u.x * v.y - u.y * v.x;
+                    const double nl = std::sqrt(nx * nx + ny * ny + nz * nz) + 1e-12;
+                    if (std::fabs(cy) < 0.88 * yMax || cz < 0.25 * zMax || cz > 0.68 * zMax || std::fabs(ny) / nl < 0.25) continue;
+                }
+                t.mat = c;
+            }
         }
         std::map<int, int> one; for (auto& t : tris) one[t.src] = t.mat;
         for (auto& [si, c] : one) { const SrcMat& m = smat[si];

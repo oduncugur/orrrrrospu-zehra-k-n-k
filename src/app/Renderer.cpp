@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "GLApi.h"
 #include "garage/LowPolyModel.h"
 #include "garage/VehicleCatalog.h"
@@ -596,7 +596,8 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
         const float ox = wheelPart ? 0.0f : cx * 0.5f, oz = (float)(wheelPart ? cz : v->heightM * 0.45);
         float dx = cx - ox, dy = wheelPart ? cy - (cy > 0 ? 1.0f : -1.0f) * (float)v->widthM * 0.3f : cy, dz = cz - oz;
         if (wheelPart) dx = 0.0f, dz = 0.0f;                                      // teker: yanak disa
-        if (nx * dx + ny * dy + nz * dz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        // Hazir modelde kose sirasi dogru yonu verir (icbukey tampon / camurluk ici merkez kuraliyla ters cikiyordu)
+        if (!m.outwardWinding && nx * dx + ny * dy + nz * dz < 0) { nx = -nx; ny = -ny; nz = -nz; }
         fn[i] = {nx, ny, nz};
     }
     std::vector<std::vector<int>> adj(m.verts.size());
@@ -612,7 +613,7 @@ const Renderer::Mesh& Renderer::mesh(int carId) {
     buf.reserve(nt * 30);
     float maxX = 0, maxY = 0;
     for (const Vertex& p : m.verts) { maxX = std::max(maxX, std::fabs(p.x)); maxY = std::max(maxY, std::fabs(p.y)); }
-    M.halfL = maxX; M.halfW = maxY; M.paint = m.paintRGB;
+    M.halfL = maxX; M.halfW = maxY; M.paint = m.paintRGB; M.cull = m.outwardWinding;
     {   // arka uc / bagaj ustu yuksekligi (kit ve kanat yerlesimi icin; GL: x ileri, y yukari)
         float rx = 0, fx = 0;
         for (const Vertex& p : m.verts) { rx = std::min(rx, p.x); fx = std::max(fx, p.x); }
@@ -791,6 +792,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
         if (K.count) { glBindVertexArray(K.vao); glDrawArrays(GL_TRIANGLES, 0, K.count); }
     }
     glBindVertexArray(M.vao);
+    if (M.cull) { glEnable(GL_CULL_FACE); }   // hazir model: ic kabuk / arka yuzler cizilmez (dis yuzle titresiyordu)
     if (M.wheels.size() == 4 && (wheelSpin != 0.0f || steer != 0.0f || look.drop != 0.0f || look.pitch != 0.0f || look.roll != 0.0f)) {
         glDrawArrays(GL_TRIANGLES, 0, M.bodyCount);
         for (size_t k = 0; k < 4; ++k) {
@@ -811,6 +813,7 @@ void Renderer::drawCar(int carId, float x, float y, float w, float h, const Mat4
             glDrawArrays(GL_TRIANGLES, M.wheels.back().first + M.wheels.back().count, rest);
         }
     } else glDrawArrays(GL_TRIANGLES, 0, M.glassFirst);
+    if (M.cull) glDisable(GL_CULL_FACE);
     if (M.glassCount > 0) {                                              // cam: yari saydam (ic mekan gorunur), derinlik yazmaz
         glUniformMatrix4fv(uMvp_, 1, GL_FALSE, mvp.m);
         glUniformMatrix4fv(uModel_, 1, GL_FALSE, body.m);
