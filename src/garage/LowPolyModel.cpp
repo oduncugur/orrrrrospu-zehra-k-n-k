@@ -259,8 +259,10 @@ static void addInterior(Builder& B, double xDash, double xBack, double hw, doubl
 }
 
 #include "HandModels.inc"
+#include "imported/Imported.inc"
 
 LowPolyMesh buildVehicleMesh(const VehicleDef& v) {
+    { LowPolyMesh im; if (buildImportedModel(v, im)) return im; }     // hazir 3D model (tools/glb2zk)
     { LowPolyMesh hm; if (buildHandModel(v, hm)) return hm; }
     LowPolyMesh m; m.paintRGB = v.paintRGB;
     Builder B{m};
