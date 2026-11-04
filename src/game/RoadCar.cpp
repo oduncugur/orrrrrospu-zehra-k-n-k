@@ -76,7 +76,8 @@ void RoadCar::autoShift(int gear, double rpm, double thr) {
         const double g0 = pt.gearRatio(gear), g1 = pt.gearRatio(gear + 1);
         if (g0 > 0 && g1 > 0 && pt.wotTorqueAt(rpm) * g0 <= pt.wotTorqueAt(rpm * g1 / g0) * g1) { shift(gear + 1); return; }
     }
-    if ((rpm > up || pt.rpm() > red - (pt.converter() ? 350.0 : 120.0)) && gear < pt.gearCount()) { shift(gear + 1); return; }   // konvertor kaymasi: motor tekerlekten once kesiciye varir
+    const bool limiter = pt.rpm() > red - (pt.converter() ? 350.0 : 120.0) && !(slipping_ && rpm < 0.6 * red);   // patinajda kesiciyi TC halleder
+    if ((rpm > up || limiter) && gear < pt.gearCount()) { shift(gear + 1); return; }   // konvertor kaymasi: motor tekerlekten once kesiciye varir
     if (gear <= 1) return;
     const double rLow = rpm * pt.gearRatio(gear - 1) / std::max(pt.gearRatio(gear), 1e-3);
     // Kickdown: alt viteste motor devri (patinaj / konvertor kaymasi dahil gercek devir) kesiciye 1500 kala sigmali;
@@ -179,7 +180,7 @@ void RoadCar::driverAssist(double dt, double thrIn, bool neutral) {
         const double lockedRpm = v / sim_->wheel(sim_->drivenLeft()).rEff() * pt.totalRatio() * 9.5493;
         if (pt.converter()) shiftRpm = std::min(pt.rpm(), lockedRpm);
         slipping_ = tireSlipSpeed() > 2.5 && pt.rpm() > lockedRpm * 1.25 + 600.0;                       // tahrik tekerleri bosa donuyor
-        if (slipping_) shiftRpm = std::max(lockedRpm, std::min(pt.rpm(), sim_->engineSpec().redlineRpm - 50.0));
+        if (slipping_) shiftRpm = lockedRpm;                                 // patinaj: karar tekerlek hizindan (bosa donen teker erken vites attirmasin)
         if (!manual) autoShift(gear, shiftRpm, thrIn);
         if (!manual && gear > 1 && v < 2.0) { shiftT_ = 0; target_ = 1; launching_ = true; launchPedal_ = 1.0; }
         if (pt.rpm() < sim_->engineSpec().idleRpm * 0.9 && (manual ? gear >= 1 : gear == 1)) { launching_ = true; launchPedal_ = 0.6; }

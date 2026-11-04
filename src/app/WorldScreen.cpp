@@ -426,7 +426,7 @@ void WorldScreen::update(double dt) {
                 P.recoverAt(ss, cp.laneOffset(ss, false, 0)); M.stuckT = 0; M.flash("OTONOM: YOLA ALINDI", 1.2);
             }
             if (c.brake > 0) c.throttle = 0;
-            P.manual = false; c.gear = -1; c.shift = 0; c.clutch = -1.0; c.neutral = false; c.reverse = false;
+            P.manual = false; c.gear = pt.gear() <= 0 ? 1 : -1; c.shift = 0;   // bosta / geride kaldiysa 1'e al (yoksa otonom hic kalkmiyordu) c.clutch = -1.0; c.neutral = false; c.reverse = false;
             if (c.autoMode >= 0) c.autoMode = 0;
             M.cockpit.setKnobGear(pt.gear());
             if (M.hasWp && M.routeIdx + 1 >= M.route.size() && toWp < 16.0 && v < 1.0) { M.autoDrive = false; M.hasWp = false; M.route.clear(); M.flash("HEDEFE VARILDI", 2.0); }

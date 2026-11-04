@@ -58,8 +58,8 @@ void drawAnalogTach(Renderer& r, float cx, float cy, float R, const GaugeData& d
             r.textCentered(cx + std::cos(a) * lr, cy - std::sin(a) * lr - 3.5f, std::to_string(k / 2), 1, {0.9f, 0.9f, 0.9f});
         }
     }
-    r.textRaw(cx - 10, cy + R * 0.30f, "X1000", 1, {0.55f, 0.55f, 0.6f});
-    r.textCentered(cx, cy + R * 0.48f, d.gear, txtScale(R) + (R >= 40 ? 1 : 0), d.gearCol);
+    r.textCentered(cx, cy + R * 0.70f, "X1000", 1, {0.55f, 0.55f, 0.6f});   // alt bosluk: olcek rakamlariyla cakismaz
+    r.textCentered(cx, cy + R * 0.24f, d.gear, txtScale(R) + (R >= 40 ? 1 : 0), d.gearCol);
     const bool shift = d.rpm > d.shiftRpm - 150 && std::fmod(d.t, 0.14) < 0.07;
     if (shift) r.circle(cx, cy - R * 0.36f, R * 0.08f, 10, {0.3f, 0.6f, 1.0f});   // vites isigi
     if (d.vtec) r.textCentered(cx, cy - R * 0.22f, "VTEC", 1, {1.0f, 0.15f, 0.12f});
@@ -80,8 +80,8 @@ void drawAnalogSpeedo(Renderer& r, float cx, float cy, float R, const GaugeData&
         }
     }
     char b[16]; std::snprintf(b, sizeof b, "%.0f", d.speed);
-    r.textCentered(cx, cy + R * 0.32f, b, txtScale(R), {1, 1, 1});
-    r.textCentered(cx, cy + R * 0.32f + 9.0f * txtScale(R), d.unit, 1, {0.55f, 0.55f, 0.6f});
+    r.textCentered(cx, cy + R * 0.42f, b, txtScale(R), {1, 1, 1});   // "0" olcek yazisinin altinda
+    r.textCentered(cx, cy + R * 0.42f + 9.0f * txtScale(R), d.unit, 1, {0.55f, 0.55f, 0.6f});
     needle(r, cx, cy, R, d.speed / full, {1.0f, 0.35f, 0.15f});
 }
 

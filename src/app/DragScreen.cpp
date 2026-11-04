@@ -254,7 +254,7 @@ void DragScreen::update(double dt) {
                     run_.push_back(402.336f);
                     g.d = run_; g.et = sl.quarter;
                     app_.saveGhosts();
-                    ticker_.push_back(ghostEt_ > 0 ? "YENI EN IYI KOSU: HAYALET GUNCELLENDI" : "HAYALET KAYDEDILDI: SONRAKI YARISTA KENDINLE YARIS");
+                    ticker_.push_back(ghostEt_ > 0 ? "YENI REKOR: HAYALET GUNCELLENDI" : "HAYALET KAYDEDILDI: KENDINLE YARIS");
                     tickerT_ = 3.0;
                 }
             }
