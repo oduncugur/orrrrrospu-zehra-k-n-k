@@ -1196,7 +1196,7 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     if (oldPrice > 0) {                                                       // sokulen parca satilir
         const long back = (long)oldPrice * 35 / 100 / 10 * 10;
         money += back;
-        oc.paidParts = std::max(0, oc.paidParts - oldPrice);
+        oc.paidParts = std::max(0, oc.paidParts - usedPrice(oldPrice));   // ikinci el alinmis olabilir: alt sinir (%55), deger fazla dusmesin
         if (refund) *refund = back;
     }
     setPartLevel(oc.tune, c, level, v);

@@ -151,7 +151,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     P.stability = true;                                                 // duz yol dengesi (oyuncu)
     P.esp = app_.settings.esp;
     adasMode_ = 0; adasLevel_ = adasLevel(*findVehicle(carId_), tune_);
-    if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::atoi(a); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
+    if (const char* a = std::getenv("ZK_ADAS")) { adasLevel_ = 4; adasMode_ = std::clamp(std::atoi(a), 0, 3); ccSpeed_ = 80.0 / 3.6; }   // test: surus yardimi acik baslar
     if (std::getenv("ZK_AT_POI") && ses_ && !ses_->pois().empty()) ses_->player().recoverAt(ses_->pois()[0].s - std::max(10.0, std::atof(std::getenv("ZK_AT_POI"))), ses_->rightLane(ses_->pois()[0].s));   // test: ilk noktanin N m gerisinde
     if (std::getenv("ZK_AT_STATION") && ses_ && !ses_->stations().empty()) ses_->player().recoverAt(ses_->stations()[0] - 70.0, ses_->rightLane(ses_->stations()[0]));   // test: ilk benzinligin onunde
     // Vites kolu sanziman tipinden: H-desen (oyuncu ya da otomatik debriyaj), otomatik P-N-D, sirali +/-
@@ -399,6 +399,7 @@ void RoadScreen::update(double dt) {
     if (RoadCar* rv = ses_->rival()) spawnSmoke(*rv, dt);
     for (Puff& p : smoke_) { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz *= 0.98; p.life -= dt; p.size += dt * 1.6; }
     smoke_.erase(std::remove_if(smoke_.begin(), smoke_.end(), [](const Puff& p) { return p.life <= 0; }), smoke_.end());
+    if (P.takeStalled() && P.manual && !app_.settings.autoClutch && !autoDrive_) flash("MOTOR STOP: DEBRIYAJA BAS", 2.0);
     if (P.grinding()) {
         // Debriyajsiz vites girmedi: kol gercek vitese geri seker (kol ile gercek vites hic ayrismasin; eskiden kol
         // 5'te kalip arac alt viteste gidiyor, debriyaja basinca 5 aniden giriyordu)

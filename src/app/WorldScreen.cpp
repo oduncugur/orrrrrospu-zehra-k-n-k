@@ -315,7 +315,7 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     else if (box == Gearbox::TorqueConverter || box == Gearbox::DCT) { M.cockpit.configure(Cockpit::Lever::Automatic, gears, false); M.car->manual = false; }
     else { M.cockpit.configure(Cockpit::Lever::Sequential, gears, false); M.car->manual = true; }
     M.cockpit.setPortrait(!land_);
-    M.cockpit.setKnobGear(1);
+    M.cockpit.setKnobGear(box == Gearbox::HPattern && !app.settings.autoClutch ? 0 : 1);   // oyuncu debriyajinda bosta baslar (1. viteste stop etmis doguyordu)
     M.adasLevel = adasLevel(*findVehicle(M.carId), M.tune);
     if (land_) { M.mapBtn = {470, 2, 576, 34}; M.autoBtn = {362, 2, 466, 34}; M.jobBtn = {580, 2, 636, 34}; }
     else { M.mapBtn = {252, 4, 356, 26}; M.autoBtn = {252, 30, 356, 52}; M.jobBtn = {252, 56, 356, 78}; }
@@ -426,7 +426,7 @@ void WorldScreen::update(double dt) {
                 P.recoverAt(ss, cp.laneOffset(ss, false, 0)); M.stuckT = 0; M.flash("OTONOM: YOLA ALINDI", 1.2);
             }
             if (c.brake > 0) c.throttle = 0;
-            P.manual = false; c.gear = pt.gear() <= 0 ? 1 : -1; c.shift = 0;   // bosta / geride kaldiysa 1'e al (yoksa otonom hic kalkmiyordu) c.clutch = -1.0; c.neutral = false; c.reverse = false;
+            P.manual = false; c.gear = pt.gear() <= 0 ? 1 : -1; c.shift = 0; c.clutch = -1.0; c.neutral = false; c.reverse = false;   // bosta ise 1. vites (otonom hic kalkmiyordu)
             if (c.autoMode >= 0) c.autoMode = 0;
             M.cockpit.setKnobGear(pt.gear());
             if (M.hasWp && M.routeIdx + 1 >= M.route.size() && toWp < 16.0 && v < 1.0) { M.autoDrive = false; M.hasWp = false; M.route.clear(); M.flash("HEDEFE VARILDI", 2.0); }
@@ -544,7 +544,7 @@ void WorldScreen::update(double dt) {
                 app.career.money -= fine;
                 std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d) CEZA -%s  REKOR %d", kmh, lim, money(fine).c_str(), app.career.camBest[k]);
             } else std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d)  REKOR %d", kmh, lim, app.career.camBest[k]);
-            app.toast(b); app.saveCareer();
+            app.toast(b); M.flash(b, 3.0); app.saveCareer();   // ceza gozden kacmasin
         }
     }
     // Toplanabilirler: nadir parca (yanindan gec) / ahir bulgusu (yaninda dur)
@@ -760,6 +760,7 @@ void WorldScreen::update(double dt) {
     M.camPsi += std::remainder(sim.heading() - M.camPsi, kTau) * std::min(1.0, dt * 4.0);
     M.shakeT = std::max(0.0, M.shakeT - dt);
     if (P.grinding()) { M.cockpit.setKnobGear(pt.gear()); M.flash("DEBRIYAJ!", 0.6); }
+    if (P.takeStalled() && M.car->manual && !app.settings.autoClutch) M.flash("MOTOR STOP: DEBRIYAJA BAS", 2.0);
     for (auto& m : sim.drainFailEvents()) M.flash(m, 3.0);
     if (sim.fuelLiters() < 0.05 && v < 1.0) M.flash("YAKIT BITTI! BENZINLIGE ITTIR / HARITADAN EN YAKIN", 2.0);
     app.voice(0, pt.rpm(), pt.throttleEffective(), pt.limiterHit(), pt.gear() > 0, 1.0f);
