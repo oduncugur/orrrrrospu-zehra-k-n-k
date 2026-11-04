@@ -282,6 +282,10 @@ RoadControls RoadCar::aiControls(double laneOffset, double pace, double speedCap
     c.throttle = std::clamp((vMax - v) * 0.4 + 0.2, 0.0, 1.0);                // yumusak gaz (ac-kapa degil)
     c.throttle *= std::clamp(1.0 - (std::fabs(sim_->bodySlipAngle()) - 0.04) * 12.0, 0.0, 1.0);   // kayarsa gazi kes
     c.brake = v > vMax + 1.5 ? std::clamp((v - vMax) / 4.0, 0.2, 1.0) : 0.0;
+    if (c.brake > 0.0 && v > 3.0) {   // surucu ABS'i: teker kilitlenmeye gidince pedali gevset (ABS'siz arac donuyordu)
+        double wMin = 1e9; for (int i = 0; i < 4; ++i) wMin = std::min(wMin, sim_->wheel(i).omega() * sim_->wheel(i).rEff());
+        if (wMin < 0.85 * v) c.brake *= 0.45;
+    }
     return c;
 }
 

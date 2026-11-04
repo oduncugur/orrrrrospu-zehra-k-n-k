@@ -1189,7 +1189,8 @@ bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* re
     const int p = used ? usedPrice(shopPrice(c, level)) : shopPrice(c, level);   // haftalik pazar fiyati
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
     const int old = partLevel(oc.tune, c, v);
-    const int oldPrice = old > 0 && old != customOption(c) ? partPrice(c, old, v) : 0;
+    // Haritada bulunan parca bedava takilir: sokulunce iade yok (iki motor arasi takas sonsuz para veriyordu)
+    const int oldPrice = old > 0 && old != customOption(c) && mapOnlyPart(c, old) < 0 ? partPrice(c, old, v) : 0;
     money -= p;
     oc.paidParts += p;
     if (oldPrice > 0) {                                                       // sokulen parca satilir

@@ -168,7 +168,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
         P.manual = true;
     }
     cockpit_.setPortrait(!land_);
-    cockpit_.setKnobGear(1);
+    cockpit_.setKnobGear(box == Gearbox::HPattern && !app_.settings.autoClutch ? 0 : 1);   // oyuncu debriyajinda bosta baslar (1. viteste dogup stop ediyordu)
     menu_ = false; rewarded_ = false; record_ = false; prize_ = 0; finT_ = 0;
     if (m == RoadSession::Mode::Chase) app_.hint(HintChase, hintTexts()[HintChase]);
     if (night_ || rain_) msgNote_ = std::string(night_ ? "GECE" : "") + (night_ && rain_ ? " + " : "") + (rain_ ? "YAGMUR: TUTUS DUSUK" : "");
