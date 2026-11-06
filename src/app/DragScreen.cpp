@@ -292,7 +292,9 @@ void DragScreen::update(double dt) {
     }
     for (auto& e : race_->drainEvents()) {
         const bool mine = e.rfind("SEN:", 0) == 0;
-        if (e == "YESIL!") { flash_ = "YESIL!"; flashColor_ = {0.2f, 1.0f, 0.3f}; flashT_ = 0.9; continue; }
+        if (e == "YESIL!") {                                             // eski "PRE-STAGE" yazisi yesilden sonra kalmasin
+            ticker_.erase(std::remove_if(ticker_.begin(), ticker_.end(), [](const std::string& s) { return s.find("PRE-STAGE") != std::string::npos; }), ticker_.end());
+            flash_ = "YESIL!"; flashColor_ = {0.2f, 1.0f, 0.3f}; flashT_ = 0.9; continue; }
         if (e == "KAZANDIN!" || e == "KAYBETTIN") { flash_ = e; flashColor_ = e == "KAZANDIN!" ? Color{0.2f, 1.0f, 0.3f} : Color{1.0f, 0.25f, 0.2f}; flashT_ = 1.4; continue; }
         if (mine && e.find("KIRMIZI") != std::string::npos) { flash_ = "KIRMIZI ISIK!"; flashColor_ = {1.0f, 0.15f, 0.1f}; flashT_ = 1.6; }
         if (mine && e.find("CITIRTISI") != std::string::npos) { flash_ = "DEBRIYAJ!"; flashColor_ = {1.0f, 0.6f, 0.1f}; flashT_ = 0.6; }
