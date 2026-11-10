@@ -151,6 +151,7 @@ struct WorldScreen::Impl {
     WorldLeg leg{0, false};
     std::unique_ptr<RoadCar> car;
     Cockpit cockpit;
+    ClutchCoach coach; bool coachOn = false;
     double steer = 0, tiltF = 0, camPsi = 0, envT = 0, spin = 0, shakeT = 0;
     bool kL = false, kR = false;
     std::string msg; double msgT = 0;
@@ -316,6 +317,7 @@ WorldScreen::WorldScreen(App& app) : m_(std::make_unique<Impl>(app)) {
     else { M.cockpit.configure(Cockpit::Lever::Sequential, gears, false); M.car->manual = true; }
     M.cockpit.setPortrait(!land_);
     M.cockpit.setKnobGear(box == Gearbox::HPattern && !app.settings.autoClutch ? 0 : 1);   // oyuncu debriyajinda bosta baslar (1. viteste stop etmis doguyordu)
+    M.coachOn = box == Gearbox::HPattern && !app.settings.autoClutch && !app.settings.coachDone;
     M.adasLevel = adasLevel(*findVehicle(M.carId), M.tune);
     if (land_) { M.mapBtn = {470, 2, 576, 34}; M.autoBtn = {362, 2, 466, 34}; M.jobBtn = {580, 2, 636, 34}; }
     else { M.mapBtn = {252, 4, 356, 26}; M.autoBtn = {252, 30, 356, 52}; M.jobBtn = {252, 56, 356, 78}; }
@@ -761,6 +763,10 @@ void WorldScreen::update(double dt) {
     M.shakeT = std::max(0.0, M.shakeT - dt);
     if (P.grinding()) { M.cockpit.setKnobGear(pt.gear()); M.flash("DEBRIYAJ!", 0.6); }
     if (P.takeStalled() && M.car->manual && !app.settings.autoClutch) M.flash("MOTOR STOP: DEBRIYAJA BAS", 2.0);
+    if (M.coachOn && !M.autoDrive) {
+        M.coach.update(dt, M.cockpit.clutch(), pt.gear(), sim.speed());
+        if (M.coach.justDone) { M.coachOn = false; app.settings.coachDone = true; app.saveSettings(); }
+    }
     for (auto& m : sim.drainFailEvents()) M.flash(m, 3.0);
     if (sim.fuelLiters() < 0.05 && v < 1.0) M.flash("YAKIT BITTI! BENZINLIGE ITTIR / HARITADAN EN YAKIN", 2.0);
     app.voice(0, pt.rpm(), pt.throttleEffective(), pt.limiterHit(), pt.gear() > 0, 1.0f);
@@ -1519,6 +1525,12 @@ void WorldScreen::render(Renderer& r) {
         r.textCentered(cxh, cyh + 42, "ALKIS! ALKIS! ALKIS!", 2, {1.0f, 0.85f, 0.2f, k});
     }
     if (M.msgT > 0) { r.rect(0, H * 0.3f, W, H * 0.3f + 26, {0.02f, 0.02f, 0.04f, 0.75f}); r.textCentered(W / 2.0f, H * 0.3f + 7, M.msg, 2, kUiGold); }
+    if (M.coachOn && !M.mapOpen && !M.jobsOpen) {                     // manuel vites ogretimi
+        const float cy0 = H * 0.3f + 30;
+        r.rect(W / 2.0f - 178, cy0, W / 2.0f + 178, cy0 + 20, {0.02f, 0.10f, 0.05f, 0.85f});
+        r.rect(W / 2.0f - 178, cy0, W / 2.0f + 178, cy0 + 2, {0.3f, 1.0f, 0.45f});
+        r.textCentered(W / 2.0f, cy0 + 7, M.coach.text(), 1, {0.75f, 1.0f, 0.8f});
+    }
     M.cockpit.render(r, g, P.grinding());
     if (M.jobsOpen) {                                                     // is teklifleri
         r.rect(0, 0, W, H, {0.05f, 0.06f, 0.08f, 0.95f});

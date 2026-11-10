@@ -73,6 +73,7 @@ std::string Settings::serialize() const {
     o << "manual_gears=" << (manualGears ? 1 : 0) << "\n";
     o << "auto_clutch=" << (autoClutch ? 1 : 0) << "      # H-desen: 0 oyuncu debriyaji, 1 otomatik (odul %75)\n";
     o << "mph=" << (mph ? 1 : 0) << "\n";
+    o << "clutch_coach=" << (coachDone ? 1 : 0) << "\n";
     return o.str();
 }
 
@@ -118,6 +119,7 @@ Settings Settings::parse(const std::string& text) {
         else if (k == "manual_gears") s.manualGears = v != 0;
         else if (k == "auto_clutch") s.autoClutch = v != 0;
         else if (k == "mph") s.mph = v != 0;
+        else if (k == "clutch_coach") s.coachDone = v != 0;
     }
     return s;
 }

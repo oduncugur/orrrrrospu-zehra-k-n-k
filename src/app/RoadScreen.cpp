@@ -169,6 +169,7 @@ void RoadScreen::start(RoadSession::Mode m, RoadSession::Kind kind) {
     }
     cockpit_.setPortrait(!land_);
     cockpit_.setKnobGear(box == Gearbox::HPattern && !app_.settings.autoClutch ? 0 : 1);   // oyuncu debriyajinda bosta baslar (1. viteste dogup stop ediyordu)
+    coachOn_ = box == Gearbox::HPattern && !app_.settings.autoClutch && !app_.settings.coachDone;
     menu_ = false; rewarded_ = false; record_ = false; prize_ = 0; finT_ = 0;
     if (m == RoadSession::Mode::Chase) app_.hint(HintChase, hintTexts()[HintChase]);
     if (night_ || rain_) msgNote_ = std::string(night_ ? "GECE" : "") + (night_ && rain_ ? " + " : "") + (rain_ ? "YAGMUR: TUTUS DUSUK" : "");
@@ -399,6 +400,10 @@ void RoadScreen::update(double dt) {
     if (RoadCar* rv = ses_->rival()) spawnSmoke(*rv, dt);
     for (Puff& p : smoke_) { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz *= 0.98; p.life -= dt; p.size += dt * 1.6; }
     smoke_.erase(std::remove_if(smoke_.begin(), smoke_.end(), [](const Puff& p) { return p.life <= 0; }), smoke_.end());
+    if (coachOn_) {
+        coach_.update(dt, cockpit_.clutch(), pt.gear(), P.sim().speed());
+        if (coach_.justDone) { coachOn_ = false; app_.settings.coachDone = true; app_.saveSettings(); }
+    }
     if (P.takeStalled() && P.manual && !app_.settings.autoClutch && !autoDrive_) flash("MOTOR STOP: DEBRIYAJA BAS", 2.0);
     if (P.grinding()) {
         // Debriyajsiz vites girmedi: kol gercek vitese geri seker (kol ile gercek vites hic ayrismasin; eskiden kol
@@ -1592,6 +1597,12 @@ void RoadScreen::drawHud(Renderer& r) {
         }
         if (sim.engineBlown()) r.textCentered(W / 2.0f, land_ ? 90 : 96, "MOTOR PATLADI", 2, {1.0f, 0.25f, 0.2f});
         else if (sim.gearboxBroken()) r.textCentered(W / 2.0f, land_ ? 90 : 96, "SANZIMAN KIRIK", 2, {1.0f, 0.25f, 0.2f});
+    }
+    if (coachOn_ && !menu_) {                                           // manuel vites ogretimi: adim adim
+        const float cy0 = land_ ? 150 : 172;
+        r.rect(W / 2.0f - 178, cy0, W / 2.0f + 178, cy0 + 20, {0.02f, 0.10f, 0.05f, 0.85f});
+        r.rect(W / 2.0f - 178, cy0, W / 2.0f + 178, cy0 + 2, {0.3f, 1.0f, 0.45f});
+        r.textCentered(W / 2.0f, cy0 + 7, coach_.text(), 1, {0.75f, 1.0f, 0.8f});
     }
     if (msgT_ > 0) {
         const float w = r.textWidth(msg_, 2) + 16;

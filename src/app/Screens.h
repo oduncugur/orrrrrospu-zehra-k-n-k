@@ -1,6 +1,7 @@
 ﻿// ZEHRA KINIK - Ekranlar
 #pragma once
 #include "app/App.h"
+#include "app/ClutchCoach.h"
 #include "app/Cockpit.h"
 #include "app/Ui.h"
 #include "game/DragRace.h"
@@ -494,6 +495,7 @@ private:
     Tune tune_;
     std::unique_ptr<RoadSession> ses_;
     Cockpit cockpit_;
+    ClutchCoach coach_; bool coachOn_ = false;
     bool land_ = true;
     int W = 640, H = 360;
     Rect free_{}, flow_{}, race_{}, touge_{}, karma_{}, chase_{}, marathon_{}, assistBtn_{}, tiltBtn_{}, adasBtn_{};
