@@ -186,7 +186,7 @@ void BodyShopScreen::apply() {
     if (c <= 0) return;
     Career& k = app_.career;
     if (k.money < c) { msg_ = "PARA YETMIYOR"; msgT_ = 1.6; return; }
-    k.money -= c;
+    k.moneyWhy = "BOYA"; k.money -= c;
     OwnedCar& oc = k.cars[k.current];
     oc.paint = paint_; oc.finish = finish_; oc.stripe = stripe_; oc.stripeCol = stripeCol_; oc.rimCol = rimCol_;
     app_.saveCareer();

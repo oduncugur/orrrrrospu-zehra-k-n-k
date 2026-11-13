@@ -252,7 +252,7 @@ void RoadScreen::finishRace() {
         prize_ = 0;
         if (!ses_->playerWon()) {
             const long fine = std::min(app_.career.money, 500L + app_.career.money / 20);
-            app_.career.money -= fine; prize_ = -fine;
+            app_.career.moneyWhy = "POLIS CEZASI"; app_.career.money -= fine; prize_ = -fine;
             app_.eventNote = "POLIS CEZASI -" + money(fine);
         } else app_.eventNote = "POLISTEN KACTIN";
         app_.saveCareer();
@@ -278,7 +278,7 @@ void RoadScreen::finishRace() {
     // Otomatik debriyaj (H-desen) odul cezasi: kazanilan paranin %25'i geri alinir
     if (autoClutchPenalty() && prize_ > 0) {
         const long cut = prize_ - (long)(prize_ * Settings::kAutoClutchPrize);
-        app_.career.money -= cut; app_.career.earnings -= cut; prize_ -= cut;
+        app_.career.moneyWhy = "YARIS (OTO. DEBRIYAJ)"; app_.career.money -= cut; app_.career.earnings -= cut; prize_ -= cut;
     }
     const VehicleSim& ps = ses_->player().sim();
     app_.career.recordDamage(false, ps.failure().bearingDamage(), ps.failure().bearingSpun(), ps.gearboxBroken(), ps.engineStress(), ps.tireWearGained());

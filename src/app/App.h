@@ -164,6 +164,12 @@ public:
     void goSettings();
     Career career;
     void saveCareer();
+    // Para gunlugu: son 10 para hareketi (neden, tutar, bakiye); kayit yuvasinin yaninda <kayit>.gunluk
+    struct LedgerRow { std::string why; long delta = 0, after = 0; };
+    std::vector<LedgerRow> ledger;
+    void ledgerLoad();
+    void ledgerNote();
+    long ledgerMoney_ = 0;
     // Kayit yuvalari: 1..3 ayri kariyer. switchSlot: mevcut kaydedilir, secilen yuva yuklenir (bossa yeni oyun).
     // newGameSlot: secili yuvada yeni oyun (eski kayit .yedek olarak saklanir)
     void switchSlot(int slot);

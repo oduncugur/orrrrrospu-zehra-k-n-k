@@ -484,7 +484,7 @@ bool Career::meetPinkAvailable(std::string* why) const {
     if (garageFull()) return no("PINK SLIP: GARAJ DOLU");
     return true;
 }
-bool Career::meetStart(std::string* why) {
+bool Career::meetStart(std::string* why) { moneyWhy = "BULUSMA BAHSI";
     if (meetPink) {
         if (meetDone == meetSlot()) { if (why) *why = "BU GECE YARISTIN"; return false; }
         if (!car().raceable()) { if (why) *why = "ARAC HASARLI"; return false; }
@@ -496,7 +496,7 @@ bool Career::meetStart(std::string* why) {
     money -= meetStake(); meetDone = meetSlot();
     return true;
 }
-long Career::recordMeet(bool won, long* fine) {
+long Career::recordMeet(bool won, long* fine) { moneyWhy = "SOKAK BULUSMASI";
     const long stake = meetStake();
     ++races;
     long net = 0;
@@ -528,7 +528,7 @@ long Career::recordMeet(bool won, long* fine) {
 
 // ------------------------------------------------------------------ tefeci
 long Career::loanLimit() const { return 4000L + 6000L * leagueUnlocked() * (1 + leagueUnlocked()) / 2; }
-bool Career::borrow(long amount, std::string* why) {
+bool Career::borrow(long amount, std::string* why) { moneyWhy = "BORC ALMA";
     amount = std::max(0L, amount) / 10 * 10;
     if (amount <= 0) return false;
     if (loan + amount > loanLimit()) { if (why) *why = "TEFECI: LIMIT DOLU"; return false; }
@@ -536,13 +536,13 @@ bool Career::borrow(long amount, std::string* why) {
     loan += amount; money += amount;
     return true;
 }
-long Career::repay(long amount) {
+long Career::repay(long amount) { moneyWhy = "BORC ODEME";
     const long p = std::min({std::max(0L, amount), loan, money});
     loan -= p; money -= p;
     if (loan == 0) loanRaces = 0;
     return p;
 }
-void Career::loanRace() {
+void Career::loanRace() { moneyWhy = "BORC YARISI";
     if (loan <= 0) return;
     loan = (long)std::ceil(loan * 1.05 / 10.0) * 10;                   // yaris basina %5
     if (++loanRaces < 12) return;
@@ -598,7 +598,7 @@ bool Career::showAvailable(std::string* why) const {
     if (money < dynoEntryFee()) return no("GIRIS UCRETI YETMIYOR");
     return true;
 }
-bool Career::showEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) {
+bool Career::showEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) { moneyWhy = "ARAC SOVU";
     if (!showAvailable(why)) return false;
     const long fee = dynoEntryFee();
     money -= fee; showWeek = todayIndex() / 7;
@@ -638,7 +638,7 @@ bool Career::dynoAvailable(std::string* why) const {
     if (money < dynoEntryFee()) return no("GIRISE PARA YETMIYOR");
     return true;
 }
-bool Career::dynoEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) {
+bool Career::dynoEnter(int* place, long* prize, std::vector<DynoEntry>* board, std::string* why) { moneyWhy = "DYNO YARISMASI";
     if (!dynoAvailable(why)) return false;
     const long fee = dynoEntryFee();
     money -= fee; dynoWeek = todayIndex() / 7;
@@ -684,7 +684,7 @@ bool Career::acceptJob(int k, std::string* why) {
     ++jobSeq[k];                                                        // o slota yeni teklif
     return true;
 }
-bool Career::deliverJob(long* paid, std::string* why) {
+bool Career::deliverJob(long* paid, std::string* why) { moneyWhy = "MUSTERI ISI";
     OwnedCar& oc = cars[current];
     if (oc.jobHp <= 0) { if (why) *why = "MUSTERI ARACI DEGIL"; return false; }
     const double hp = peakHpOf(*findVehicle(oc.carId), oc.tune);
@@ -704,7 +704,7 @@ bool Career::cancelJob() {
 }
 
 int gaugeStylePrice(int style) { static const int p[4] = {0, 400, 650, 950}; return p[std::clamp(style, 0, 3)]; }
-bool Career::selectGauge(int style, std::string* why) {
+bool Career::selectGauge(int style, std::string* why) { moneyWhy = "KADRAN";
     if (style < 0 || style > 3) return false;
     OwnedCar& oc = car();
     if (style > 0 && !((oc.gaugeOwned >> style) & 1)) {
@@ -715,7 +715,7 @@ bool Career::selectGauge(int style, std::string* why) {
     oc.gauge = style;
     return true;
 }
-bool Career::toggleBoostGauge(std::string* why) {
+bool Career::toggleBoostGauge(std::string* why) { moneyWhy = "KADRAN";
     OwnedCar& oc = car();
     if (!((oc.gaugeOwned >> 8) & 1)) {
         if (money < kBoostGaugePrice) { if (why) *why = "PARA YETMIYOR"; return false; }
@@ -726,7 +726,7 @@ bool Career::toggleBoostGauge(std::string* why) {
     return true;
 }
 
-long Career::recordRun(int position, int count, double realKm) {
+long Career::recordRun(int position, int count, double realKm) { moneyWhy = "YOL YARISI";
     ++races;
     const double base = 30.0 * realKm * (1 + leagueUnlocked() * 0.5);
     const double k = position == 1 ? 1.0 : position == 2 ? 0.6 : position == 3 ? 0.38 : std::max(0.04, 0.2 * (1.0 - (double)position / std::max(2, count)));
@@ -737,7 +737,7 @@ long Career::recordRun(int position, int count, double realKm) {
     return p;
 }
 
-long Career::recordRunTime(bool finished, double avgKmh, double realKm) {
+long Career::recordRunTime(bool finished, double avgKmh, double realKm) { moneyWhy = "YOL YARISI";
     ++races;
     if (!finished) return 0;
     const double base = 30.0 * realKm * (1 + leagueUnlocked() * 0.5);
@@ -768,7 +768,7 @@ bool Career::canTravel(int to, std::string* why) const {
     if (cityLeague(to) > leagueUnlocked()) return no("KILITLI: ONCEKI PATRONU YEN");
     return true;
 }
-bool Career::fastTravel(int to, std::string* why) {
+bool Career::fastTravel(int to, std::string* why) { moneyWhy = "YOLCULUK";
     if (!canTravel(to, why)) return false;
     const long p = fastTravelPrice(to);
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
@@ -802,13 +802,13 @@ bool Career::tourAvailable(std::string* why) const {
     if (tourRound == 0 && money < tourEntry()) return no("GIRIS UCRETI YETMIYOR");
     return true;
 }
-bool Career::tourStart(std::string* why) {
+bool Career::tourStart(std::string* why) { moneyWhy = "TURNUVA GIRISI";
     tourRefresh();
     if (!tourAvailable(why)) return false;
     if (tourRound == 0) money -= tourEntry();
     return true;
 }
-long Career::recordTour(bool won) {
+long Career::recordTour(bool won) { moneyWhy = "TURNUVA";
     ++races;
     if (!won) { tourOut = true; form = std::max(-3, form - 1); loanRace(); return 0; }
     ++wins; form = std::min(3, form + 1);
@@ -894,7 +894,7 @@ long Career::slotPrice() const {
     for (int i = kStartSlots; i < garageSlots; ++i) p *= 1.6;
     return (long)(p / 100.0) * 100;
 }
-bool Career::buySlot(std::string* why) {
+bool Career::buySlot(std::string* why) { moneyWhy = "GARAJ YERI";
     if (garageSlots >= kMaxSlots) { if (why) *why = "GARAJ EN BUYUK HALINDE"; return false; }
     const long p = slotPrice();
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
@@ -903,7 +903,7 @@ bool Career::buySlot(std::string* why) {
     return true;
 }
 
-bool Career::buyCar(int carId, std::string* why) {
+bool Career::buyCar(int carId, std::string* why) { moneyWhy = "ARAC ALIMI";
     const VehicleDef* v = findVehicle(carId);
     if (!v) { if (why) *why = "ARAC YOK"; return false; }
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
@@ -968,7 +968,7 @@ bool Career::claimWreck(int seed, std::string* why, int* carOut) {
     return true;
 }
 
-bool Career::buyUsed(const UsedListing& l, std::string* why) {
+bool Career::buyUsed(const UsedListing& l, std::string* why) { moneyWhy = "IKINCI EL ARAC";
     if (!findVehicle(l.carId)) { if (why) *why = "ARAC YOK"; return false; }
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
     if (money < l.price) { if (why) *why = "PARA YETMIYOR"; return false; }
@@ -978,7 +978,7 @@ bool Career::buyUsed(const UsedListing& l, std::string* why) {
     return true;
 }
 
-bool Career::sellCurrent(std::string* why) {
+bool Career::sellCurrent(std::string* why) { moneyWhy = "ARAC SATISI";
     if (cars[current].jobHp > 0) { if (why) *why = "MUSTERI ARACI SATILAMAZ"; return false; }
     if (cars.size() <= 1) { if (why) *why = "SON ARACINI SATAMAZSIN"; return false; }
     money += sellPrice(cars[current]);
@@ -994,7 +994,7 @@ int ecuSwPrice(int sw, int level, const VehicleDef& v) {
     return (int)(std::round((base > 0 ? base : ecuSwDef(sw).price[0]) * scale / 10.0) * 10.0);
 }
 
-bool Career::buyEcuSoftware(int sw, std::string* why) {
+bool Career::buyEcuSoftware(int sw, std::string* why) { moneyWhy = "ECU YAZILIMI";
     OwnedCar& oc = car();
     const VehicleDef& v = *findVehicle(oc.carId);
     Tune& t = oc.tune;
@@ -1166,7 +1166,7 @@ int Career::nosRefillPrice() const {
     if (oc.tune.nitrous <= 0 || oc.nosFill >= 0.999) return 0;
     return std::max(10, (int)std::round(partPrice(PartCat::Nitrous, oc.tune.nitrous, *findVehicle(oc.carId)) * 0.12 * (1.0 - oc.nosFill) / 10.0) * 10);
 }
-bool Career::refillNos(std::string* why) {
+bool Career::refillNos(std::string* why) { moneyWhy = "NOS DOLUMU";
     const int p = nosRefillPrice();
     if (p <= 0) { if (why) *why = "TUP DOLU"; return false; }
     if (money < p) { if (why) *why = "PARA YETMIYOR"; return false; }
@@ -1177,7 +1177,7 @@ bool Career::refillNos(std::string* why) {
 void Career::saveProfile(int k) { if (k >= 0 && k < 3) car().profile[k] = setupString(car().tune); }
 bool Career::loadProfile(int k) { return k >= 0 && k < 3 && !car().profile[k].empty() && applySetupString(car().profile[k], car().tune); }
 
-bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* refund) {
+bool Career::buyPart(PartCat c, int level, std::string* why, bool used, long* refund) { moneyWhy = "PARCA";
     OwnedCar& oc = car();
     const VehicleDef& v = *findVehicle(oc.carId);
     if (refund) *refund = 0;
@@ -1279,7 +1279,7 @@ bool Career::signSponsor(int s) {
     return true;
 }
 
-void Career::sponsorRace(bool won) {
+void Career::sponsorRace(bool won) { moneyWhy = "SPONSOR YARISI";
     if (sponsor < 0) return;
     const SponsorDef& d = sponsors()[sponsor];
     ++spRaces;
@@ -1310,7 +1310,7 @@ long Career::wagerFor(int idx, int step) const {
     return std::min(w, money);                                         // parandan fazlasina oynanmaz
 }
 
-long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut) {
+long Career::recordEvent(int idx, bool won, double et, long flowScore, int* pinkOut) { moneyWhy = "YARIS";
     if (pinkOut) *pinkOut = 0;
     const auto& ev = leagueEvents();
     if (idx < 0 || idx >= (int)ev.size()) return 0;
@@ -1372,7 +1372,7 @@ void Career::dailyRefresh() {
     for (long& p : dailyProg) p = 0;
 }
 
-long Career::dailyAdd(TaskType t, long amount) {
+long Career::dailyAdd(TaskType t, long amount) { moneyWhy = "GUNLUK GOREV";
     dailyRefresh();
     const auto tasks = dailyTasks(dailyDay, cars.empty() ? 15.0 : estimatedEt(*findVehicle(car().carId), car().tune));
     long paid = 0;
@@ -1387,7 +1387,7 @@ long Career::dailyAdd(TaskType t, long amount) {
     return paid;
 }
 
-void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut, double prizeScale) {
+void Career::recordRace(const VehicleDef& opponent, bool won, double et, long* prizeOut, double prizeScale) { moneyWhy = "DRAG YARISI";
     // Ayni rakibe ust uste galibiyet: odul %25 azalir (en az %25)
     if (opponent.id != lastOppId) { lastOppId = opponent.id; sameOppWins = 0; }
     const double decay = won ? std::max(0.25, 1.0 - 0.25 * sameOppWins) : 1.0;
@@ -1501,7 +1501,7 @@ void Career::recordDamage(bool axleBroke, double bearingDamage, bool bearingSpun
                  : std::clamp(c.engineWear + std::max(0.0, bearingDamage) + 0.5 * std::max(0.0, engineStress), 0.0, 1.0);
 }
 
-long Career::recordChase(bool escaped, int collisions) {
+long Career::recordChase(bool escaped, int collisions) { moneyWhy = "POLIS KACISI";
     if (escaped) {
         const long prize = collisions == 0 ? 1500 : 1000;
         money += prize; earnings += prize; ++chaseEscapes;
@@ -1513,7 +1513,7 @@ long Career::recordChase(bool escaped, int collisions) {
     return -fine;
 }
 
-long Career::recordFlow(long score, bool* newRecord) {
+long Career::recordFlow(long score, bool* newRecord) { moneyWhy = "OTOBAN AKISI";
     score = std::max(0L, score);
     const bool rec = score > bestFlow && score > 0;
     long prize = std::min(score / 20, kFlowPrizeCap);
@@ -1583,7 +1583,7 @@ std::vector<JunkCar> junkyardOffers(uint32_t seed) {
     return out;
 }
 
-bool Career::buyJunk(const JunkCar& j, std::string* why) {
+bool Career::buyJunk(const JunkCar& j, std::string* why) { moneyWhy = "HURDA ARAC";
     if (garageFull()) { if (why) *why = "GARAJ DOLU"; return false; }
     if (money < j.price) { if (why) *why = "PARA YETMIYOR"; return false; }
     money -= j.price;
@@ -1632,7 +1632,7 @@ long restoreStepCost(const OwnedCar& c, int comp) {
     }
 }
 
-bool Career::restoreStep(int comp, std::string* why) {
+bool Career::restoreStep(int comp, std::string* why) { moneyWhy = "RESTORASYON";
     OwnedCar& c = car();
     const long cost = restoreStepCost(c, comp);
     if (cost <= 0) { if (why) *why = "SAGLAM"; return false; }
@@ -1652,7 +1652,7 @@ bool Career::restoreStep(int comp, std::string* why) {
     return true;
 }
 
-bool Career::repairCurrent(std::string* why) {
+bool Career::repairCurrent(std::string* why) { moneyWhy = "TAMIR";
     const long cost = repairCost();
     if (cost <= 0) { if (why) *why = "HASAR YOK"; return false; }
     if (money < cost) { if (why) *why = "PARA YETMIYOR"; return false; }

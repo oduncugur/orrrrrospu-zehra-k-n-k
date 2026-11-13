@@ -543,7 +543,7 @@ void WorldScreen::update(double dt) {
             if (kmh > app.career.camBest[k]) app.career.camBest[k] = kmh;
             if (kmh > lim + 10) {
                 const long fine = std::min(app.career.money, 300L + 20L * (kmh - lim));
-                app.career.money -= fine;
+                app.career.moneyWhy = "RADAR CEZASI"; app.career.money -= fine;
                 std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d) CEZA -%s  REKOR %d", kmh, lim, money(fine).c_str(), app.career.camBest[k]);
             } else std::snprintf(b, sizeof b, "RADAR %d KM/H (SINIR %d)  REKOR %d", kmh, lim, app.career.camBest[k]);
             app.toast(b); M.flash(b, 3.0); app.saveCareer();   // ceza gozden kacmasin
@@ -557,7 +557,7 @@ void WorldScreen::update(double dt) {
             app.career.setCollect(cl.idx);
             static const char* const kPart[6] = {"TURBO SALYANGOZU", "DOVME PISTON", "YARIS KAM MILI", "TITANYUM EGZOZ", "KARBON KAPUT", "YARIS DEBRIYAJI"};
             const long prize = 750 + 250 * (cl.idx % 7);
-            app.career.money += prize;
+            app.career.moneyWhy = "NADIR PARCA"; app.career.money += prize;
             const int n = app.career.collectedCount();
             char b[96]; std::snprintf(b, sizeof b, "NADIR PARCA: %s +%s (%d/%d)", kPart[cl.idx % 6], money(prize).c_str(), n, (int)M.w.collect.size());
             app.toast(b); app.saveCareer();
@@ -601,7 +601,7 @@ void WorldScreen::update(double dt) {
         if (M.job.deadline <= 0) { M.hasJob = false; M.hasWp = false; M.route.clear(); app.toast("IS BASARISIZ: SURE BITTI"); }
         else if (std::hypot(M.job.tx - sim.posX(), M.job.ty - sim.posY()) < 25.0 && v < 2.5) {
             if (M.job.type == 1 && M.job.phase == 0) { M.job.phase = 1; M.job.tx = M.job.dx; M.job.ty = M.job.dy; M.startJobTarget(M.job.tx, M.job.ty); app.toast("YOLCU BINDI: HEDEFE GOTUR"); }
-            else { app.career.money += (long)M.job.reward; app.toast("IS TAMAM +" + money((long)M.job.reward)); app.saveCareer(); M.hasJob = false; M.hasWp = false; M.route.clear(); }
+            else { app.career.moneyWhy = M.job.type == 1 ? "TAKSI ISI" : "KURYE ISI"; app.career.money += (long)M.job.reward; app.toast("IS TAMAM +" + money((long)M.job.reward)); app.saveCareer(); M.hasJob = false; M.hasWp = false; M.route.clear(); }
         }
     }
     // Kesicide 5 s: yanindaki modifiyeli arac (serseri / bulusma / trafik) kapismaya gelir
@@ -1639,7 +1639,7 @@ void WorldScreen::pointerDown(int id, float x, float y) {
     }
     if (M.buyBtn.x1 > 0 && M.buyBtn.hit(x, y)) {
         if (app.career.money < 1500) { M.flash("PARA YETMIYOR", 1.4); return; }
-        app.career.money -= 1500; app.career.radarDetector = true; app.saveCareer();
+        app.career.moneyWhy = "RADAR DEDEKTORU"; app.career.money -= 1500; app.career.radarDetector = true; app.saveCareer();
         M.flash("RADAR DEDEKTORU TAKILDI: KAMERALARI 450 M ONCEDEN UYARIR", 2.4);
         return;
     }
@@ -1667,7 +1667,7 @@ void WorldScreen::pointerDown(int id, float x, float y) {
             const double price = M.fuelPrice();
             L = std::min(L, app.career.money / price);
             if (L < 0.5) { M.flash(app.career.money < price ? "PARA YETMIYOR" : "DEPO DOLU", 1.5); return; }
-            sim.addFuel(L); app.career.money -= (long)std::lround(L * price);
+            sim.addFuel(L); app.career.moneyWhy = "YAKIT"; app.career.money -= (long)std::lround(L * price);
             app.career.car().fuelL = sim.fuelLiters(); app.saveCareer();
             char b[64]; std::snprintf(b, sizeof b, "%.1f L ALINDI: %s", L, money((long)std::lround(L * price)).c_str());
             M.flash(b, 2.0);

@@ -221,6 +221,27 @@ void GarageScreen::render(Renderer& r) {
         button(r, kLDlgYes, "SAT", kUiRed, 2);
         button(r, kLDlgNo, "VAZGEC", kUiBtn, 2);
     } else if (selling_) drawSaleDialog(r, c.car());
+    if (ledgerOpen_) {                                                  // para gunlugu: son 10 hareket (yeni ustte)
+        const float H = land ? 360.0f : 640.0f, x0 = W / 2 - 170, y0 = land ? 40.0f : 150.0f;
+        r.rect(0, 0, W, H, {0, 0, 0, 0.6f});
+        r.rect(x0, y0, x0 + 340, y0 + 250, {0.10f, 0.11f, 0.16f});
+        r.rect(x0, y0, x0 + 340, y0 + 4, kUiGold);
+        r.text(x0 + 12, y0 + 14, "PARA GUNLUGU", 2, kUiGold);
+        r.text(x0 + 12, y0 + 36, "SON 10 HAREKET", 1, kUiDim);
+        const auto& L = app_.ledger;
+        if (L.empty()) r.textCentered(W / 2, y0 + 120, "HENUZ HAREKET YOK", 1, kUiDim);
+        for (size_t i = 0; i < L.size(); ++i) {
+            const auto& e = L[L.size() - 1 - i];
+            const float y = y0 + 54 + i * 18.0f;
+            if (i % 2 == 0) r.rect(x0 + 6, y - 4, x0 + 334, y + 12, {1, 1, 1, 0.04f});
+            r.textFit(x0 + 12, y, e.why, 1, 150, kUiText);
+            const std::string d = (e.delta > 0 ? "+" : "-") + money(e.delta > 0 ? e.delta : -e.delta);
+            r.text(x0 + 240 - r.textWidth(d, 1), y, d, 1, e.delta > 0 ? Color{0.4f, 1.0f, 0.5f} : Color{1.0f, 0.4f, 0.35f});
+            const std::string a = money(e.after);
+            r.text(x0 + 328 - r.textWidth(a, 1), y, a, 1, kUiDim);
+        }
+        r.textCentered(W / 2, y0 + 236, "DOKUN: KAPAT", 1, kUiDim);
+    }
 }
 
 void GarageScreen::sellConfirmed() {
@@ -235,17 +256,19 @@ void GarageScreen::sellConfirmed() {
 
 void GarageScreen::pointerDown(int id, float x, float y) {
     layout(landscape());
+    if (ledgerOpen_) { ledgerOpen_ = false; return; }
     if (selling_) {                                              // modal onay
         if ((gLand ? kLDlgYes : kDlgYes).hit(x, y)) sellConfirmed();
         else if ((gLand ? kLDlgNo : kDlgNo).hit(x, y)) selling_ = false;
         return;
     }
     Career& c = app_.career;
+    if (y < 28 && x > (landscape() ? 640.0f : 360.0f) - 120) { ledgerOpen_ = true; return; }   // paraya dokun: para gunlugu
     if (c.cars.size() > 1 && c.car().jobHp == 0 && kSellG.hit(x, y)) { selling_ = true; return; }
     if (kSettingsG.hit(x, y)) { app_.goSettings(); return; }
     if (worn() && kRestoreG.hit(x, y)) { app_.goRestore(); return; }
     if (cheat() && kCashG.hit(x, y)) {                           // gelistirici: para
-        c.money += 10000;
+        c.moneyWhy = "TEST PARASI"; c.money += 10000;
         app_.saveCareer();
         msg_ = "TEST: +$10,000"; msgT_ = 1.2;
         return;
@@ -304,6 +327,7 @@ void GarageScreen::pointerUp(int id) { if (id == throttlePtr_) throttlePtr_ = -1
 void GarageScreen::key(Key k, bool down) {
     if (k == Key::Throttle) throttleKey_ = down;
     if (!down) return;
+    if (ledgerOpen_) { ledgerOpen_ = false; return; }
     if (selling_) { if (k == Key::Enter) sellConfirmed(); else if (k == Key::Back) selling_ = false; return; }
     if (k == Key::Left) select(app_.career.current - 1);
     else if (k == Key::Right) select(app_.career.current + 1);

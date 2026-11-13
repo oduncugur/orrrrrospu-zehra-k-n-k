@@ -155,6 +155,7 @@ long restoreStepCost(const OwnedCar& c, int comp);       // bir adim (0: saglam)
 struct Career {
     static constexpr int kVersion = 1;
     long money = 0;
+    std::string moneyWhy;      // son para degisiminin nedeni (kaydedilmez; App para gunlugu okur)
     long wager = 0;            // siradaki lig yarisinin bahsi (kaydedilmez): kazanirsa + bahis, kaybederse - bahis
     std::vector<OwnedCar> cars;
     int  current = 0;

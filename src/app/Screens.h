@@ -19,7 +19,7 @@ class GarageScreen : public Screen {
 public:
     explicit GarageScreen(App& app);
     bool landscape() const override { return app_.settings.menuLandscape; }
-    bool modal() const { return selling_; }      // onay penceresi acik (Android geri tusu kapatir)
+    bool modal() const { return selling_ || ledgerOpen_; }      // onay penceresi acik (Android geri tusu kapatir)
     void update(double dt) override;
     void render(Renderer& r) override;
     void pointerDown(int id, float x, float y) override;
@@ -39,6 +39,7 @@ private:
     bool cancelArm_ = false;                     // musteri isi iptali: ikinci basis onaylar
     std::string msg_; double msgT_ = 0;
     bool selling_ = false;                       // satis onay penceresi acik
+    bool ledgerOpen_ = false;                    // para gunlugu (son 10 hareket) acik
     float throttle_ = 0; int throttlePtr_ = -1; bool throttleKey_ = false;
     float spin_ = 0; double acc_ = 0; double hapT_ = 0;
 };

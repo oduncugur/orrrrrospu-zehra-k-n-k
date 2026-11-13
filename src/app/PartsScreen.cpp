@@ -793,7 +793,7 @@ void FabricateScreen::make() {
     const int p = price();
     Career& c = app_.career;
     if (c.money < p) { msg_ = "PARA YETMIYOR"; msgT_ = 1.8; confirm_ = false; return; }
-    c.money -= p;
+    c.moneyWhy = "OZEL PARCA"; c.money -= p;
     c.car().paidParts += p;
     c.car().tune = built();
     app_.saveCareer();

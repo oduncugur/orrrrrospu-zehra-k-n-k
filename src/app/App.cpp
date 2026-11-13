@@ -31,6 +31,7 @@ App::App(const std::string& saveDir) {
     } else {
         career = Career::newGame();
     }
+    ledgerLoad();
     treePro = career.treePro;
     selectedCar = career.car().carId;
     loadGhosts();
@@ -72,10 +73,39 @@ void App::saveGhosts() const {
     std::rename((ghostPath_ + ".tmp").c_str(), ghostPath_.c_str());
 }
 
+void App::ledgerLoad() {
+    ledger.clear(); ledgerMoney_ = career.money; career.moneyWhy.clear();
+    if (savePath_.empty()) return;
+    std::ifstream in(savePath_ + ".gunluk");
+    std::string line;
+    while (std::getline(in, line)) {
+        const size_t a = line.find('|'), b = line.find('|', a == std::string::npos ? 0 : a + 1);
+        if (a == std::string::npos || b == std::string::npos) continue;
+        LedgerRow r; r.delta = std::atol(line.c_str()); r.after = std::atol(line.c_str() + a + 1); r.why = line.substr(b + 1);
+        if (!r.why.empty() && r.why.back() == '\r') r.why.pop_back();
+        ledger.push_back(r);
+    }
+    if (ledger.size() > 10) ledger.erase(ledger.begin(), ledger.end() - 10);
+}
+void App::ledgerNote() {
+    const long d = career.money - ledgerMoney_;
+    if (d != 0) {
+        ledger.push_back({career.moneyWhy.empty() ? (d > 0 ? "GELIR" : "GIDER") : career.moneyWhy, d, career.money});
+        if (ledger.size() > 10) ledger.erase(ledger.begin());
+        if (!savePath_.empty()) {
+            std::ofstream o(savePath_ + ".gunluk", std::ios::trunc);
+            for (const auto& r : ledger) o << r.delta << '|' << r.after << '|' << r.why << '\n';
+        }
+    }
+    ledgerMoney_ = career.money; career.moneyWhy.clear();
+}
 void App::saveCareer() {
     career.treePro = treePro;
-    for (int i : career.checkAchievements())
+    ledgerNote();
+    for (int i : career.checkAchievements()) {
         toast("BASARIM: " + std::string(achievements()[i].name) + "  +" + money(achievements()[i].reward));
+        career.moneyWhy = "BASARIM"; ledgerNote();
+    }
     if (!savePath_.empty()) career.save(savePath_);
 }
 void App::switchSlot(int slot) {
@@ -85,6 +115,7 @@ void App::switchSlot(int slot) {
     settings.saveSlot = slot; saveSettings();
     savePath_ = slotPath(slot);
     career = Career::loadOrNew(savePath_);
+    ledgerLoad();
     saveCareer();
     treePro = career.treePro; selectedCar = career.car().carId;
     toast("KAYIT YUVASI " + std::to_string(slot));
@@ -92,6 +123,7 @@ void App::switchSlot(int slot) {
 void App::newGameSlot() {
     if (!saveDir_.empty()) { std::remove((savePath_ + ".yedek").c_str()); std::rename(savePath_.c_str(), (savePath_ + ".yedek").c_str()); }
     career = Career::newGame();
+    ledger.clear(); ledgerMoney_ = career.money; std::remove((savePath_ + ".gunluk").c_str());
     saveCareer();
     treePro = career.treePro; selectedCar = career.car().carId;
     toast("YENI OYUN (ESKI KAYIT YEDEKLENDI)");
