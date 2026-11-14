@@ -2,6 +2,8 @@
 #include "app/Hints.h"
 
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <unordered_map>
 #include <vector>
 
@@ -105,6 +107,27 @@ const Entry kEnPhrases[] = {
     {"4/4  DEVIR YUKSELINCE: DEBRIYAJ + 2. VITES", "4/4  WHEN THE REVS RISE: CLUTCH + 2ND GEAR"},
     {"TAMAM! HER VITES BOYLE: DEBRIYAJ + KOL", "DONE! EVERY SHIFT WORKS LIKE THIS: CLUTCH + LEVER"},
     {"YAGMUR BASLADI: TUTUS DUSUK, ERKEN FRENLE", "RAIN STARTED: LESS GRIP, BRAKE EARLY"},
+    // Kelime kelime bozuk cikan menu metinleri (ZK_LANG_LOG taramasi, 2026-11)
+    {"ACIK DAVET DRAG", "OPEN INVITE DRAG"}, {"ACIK DUNYA", "OPEN WORLD"}, {"ALMAN OKULU", "GERMAN SCHOOL"}, {"ANA SES", "MASTER VOLUME"},
+    {"ANA YATAK DESTEGI", "MAIN BEARING GIRDLE"}, {"ANALOG KADRAN", "ANALOG DIAL"}, {"ARAC SEC", "PICK A CAR"},
+    {"ARKA VIRAJ DEMIRI", "REAR ANTI-ROLL BAR"}, {"ON VIRAJ DEMIRI", "FRONT ANTI-ROLL BAR"}, {"ABS/TC YOK", "NO ABS/TC"},
+    {"ATMOSFERIK MOTORDA GORUNMEZ", "HIDDEN ON NA ENGINES"}, {"BU GECENIN RAKIBI", "TONIGHT'S RIVAL"},
+    {"BULUSMA, DYNO, ARAC SOVU, MUSTERI, TEFECI", "MEETUP, DYNO, CAR SHOW, CUSTOMERS, LOAN SHARK"}, {"BULUSMAYA GIT >", "GO TO MEETUP >"},
+    {"DAG YOLLA.", "MTN ROADS"}, {"DEGISIKLIK YOK", "NO CHANGE"}, {"DIKEY ESITLEME", "VSYNC"}, {"DIL / LANGUAGE", "LANGUAGE"},
+    {"DRAG BOS", "NO DRAG SETUP"}, {"PIST BOS", "NO TRACK SETUP"}, {"YOL BOS", "NO ROAD SETUP"},
+    {"DRAG KAYDET", "SAVE DRAG"}, {"PIST KAYDET", "SAVE TRACK"}, {"YOL KAYDET", "SAVE ROAD"},
+    {"FABRIKA RENGI", "FACTORY COLOR"}, {"JANT RENGI", "RIM COLOR"}, {"FPS GOSTERGESI", "SHOW FPS"},
+    {"GAZDAN AYAK KALKMADAN VITES", "SHIFT WITHOUT LIFTING"}, {"ISTANBUL'A HOS GELDIN", "WELCOME TO ISTANBUL"},
+    {"ISTANBUL: SEHIRDE DOLAS", "ISTANBUL: CRUISE THE CITY"}, {"JDM UCLUSU", "JDM TRIO"}, {"KAM MILI", "CAMSHAFT"},
+    {"KONUM: ISTANBUL", "LOCATION: ISTANBUL"}, {"LASTIK BASINCI", "TIRE PRESSURE"}, {"LASTIK SESI", "TIRE VOLUME"},
+    {"MOTOR SESI", "ENGINE VOLUME"}, {"LISTEDEN BIR ETKINLIK SEC", "PICK AN EVENT FROM THE LIST"}, {"LISTEDEN BIR", "PICK ONE"},
+    {"LSD ON YUKU", "LSD PRELOAD"}, {"MOTOR GUCLER VE LIMITLER", "ENGINE POWER AND LIMITS"},
+    {"NOS KITI YOK", "NO NOS KIT"}, {"OKUL YOLU KARMA", "SCHOOL ROAD MIXED"}, {"PATRON: MAHALLENIN KRALI", "BOSS: KING OF THE BLOCK"},
+    {"PLAKALI LSD GEREKLI", "CLUTCH-TYPE LSD REQUIRED"}, {"SUPAP + YAY", "VALVES + SPRINGS"}, {"SUPER YILDIZLAR", "SUPERSTARS"},
+    {"TURBO ERKEN DOLAR (SPOOL)", "TURBO SPOOLS EARLY"}, {"UST SERITTE HIZ / DEVIR", "SPEED / RPM IN TOP BAR"},
+    {"YARISA HAZIR", "READY TO RACE"}, {"YERLI GURURU", "LOCAL PRIDE"}, {"KAS VE CELIK", "MUSCLE AND STEEL"},
+    {"YOL YARISI  KOMSU OGLU EMRE", "ROAD RACE  EMRE, THE NEIGHBOR'S KID"}, {"KARMA  OKUL CIKISI BURAK", "MIXED  BURAK AFTER SCHOOL"},
+    {"SOKAK >", "STREET >"}, {"DRAG AGACI", "DRAG TREE"}, {"GUC HP", "POWER HP"}, {"TORK NM", "TORQUE NM"},
     {"PARA GUNLUGU", "MONEY LOG"}, {"SON 10 HAREKET", "LAST 10 TRANSACTIONS"}, {"HENUZ HAREKET YOK", "NO TRANSACTIONS YET"}, {"DOKUN: KAPAT", "TAP: CLOSE"},
     {"RADAR CEZASI", "SPEED CAMERA FINE"}, {"POLIS CEZASI", "POLICE FINE"}, {"YAKIT", "FUEL"}, {"NADIR PARCA", "RARE PART"}, {"KURYE ISI", "COURIER JOB"}, {"TAKSI ISI", "TAXI JOB"},
     {"RADAR DEDEKTORU", "RADAR DETECTOR"}, {"ARAC ALIMI", "CAR PURCHASE"}, {"ARAC SATISI", "CAR SALE"}, {"IKINCI EL ARAC", "USED CAR"}, {"HURDA ARAC", "JUNKYARD CAR"},
@@ -122,6 +145,11 @@ const Entry kEnPhrases[] = {
 
 // Kelimeler (Turkce -> Ingilizce); "" = kelime atlanir (ek / bag)
 const Entry kEnWords[] = {
+    {"SAYAC", "ODO"}, {"BENZIN", "PETROL"}, {"GUVENLI", "SAFE"}, {"HASSAS", "FINE"}, {"KOLEKSIYON", "COLLECTION"},
+    {"ISTENEN", "REQUIRED"}, {"GEREKEN", "REQUIRED"}, {"BAHIS", "BET"}, {"KAZANIRSAN", "WIN"}, {"PUAN", "POINTS"},
+    {"RISKI", "RISK"}, {"BAHSIN", "BET"}, {"UN", "REP"}, {"RENGI", "COLOR"}, {"DUNYA", "WORLD"}, {"YILDIZLAR", "STARS"},
+    {"GUCLER", "POWER"}, {"LIMITLER", "LIMITS"}, {"AKISINDA", "FLOW"}, {"SEHIRDE", "IN THE CITY"}, {"DOLAS", "CRUISE"},
+    {"OKULU", "SCHOOL"}, {"LISTEDEN", "FROM THE LIST"}, {"UCLUSU", "TRIO"}, {"GURURU", "PRIDE"}, {"YERLI", "LOCAL"},
     {"ABS", "ABS"}, {"ACI", "ANGLE"}, {"ACIK", "ON"}, {"ADAPTIF", "ADAPTIVE"}, {"ADIMI", "STEP"}, {"AERO", "AERO"}, {"AGACI", "TREE"},
     {"AGIR", "HEAVY"}, {"AGIRLIK", "WEIGHT"}, {"AKICI", "SMOOTH"}, {"AKIS", "FLOW"}, {"AKISI", "FLOW"}, {"AKS", "AXLE"},
     {"AKTARMA", "DRIVETRAIN"}, {"AKUMULATOR", "ACCUMULATOR"}, {"AL", "BUY"}, {"ALINDI", "BOUGHT"}, {"ALT", "LOWER"}, {"ALU", "ALU"},
@@ -507,6 +535,8 @@ const std::string& translate(Lang l, const std::string& s) {
     if (c.size() > 6000) c.clear();                              // dinamik metinler (sayilar) onbellegi sisirmesin
     auto p = t->phrases.find(s);
     std::string r = p != t->phrases.end() ? p->second : translateWords(*t, s);
+    if (p == t->phrases.end() && l == Lang::EN && std::getenv("ZK_LANG_LOG") && s.find(' ') != std::string::npos)
+        std::fprintf(stderr, "LANG|%s|%s\n", s.c_str(), r.c_str());   // test: kelime kelime cevrilen cumleler
     if (l == Lang::ZH || l == Lang::JA) {                        // Cince / Japonca: iki genis karakter arasindaki bosluk atilir
         auto wide = [&](size_t k, bool back) {                       // k: bosluktan onceki / sonraki baytin UTF-8 baslangici
             if (back) { while (k > 0 && ((unsigned char)r[k] & 0xC0) == 0x80) --k; }
