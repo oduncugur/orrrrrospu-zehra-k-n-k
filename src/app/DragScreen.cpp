@@ -477,15 +477,24 @@ void DragScreen::drawWorld(Renderer& r) {
                 if (h < 0.35f) continue;
                 const Color cc = h > 0.85f ? Color{0.9f, 0.2f, 0.2f} : h > 0.7f ? Color{0.2f, 0.4f, 0.9f} : h > 0.55f ? Color{0.95f, 0.85f, 0.3f} : Color{0.85f, 0.85f, 0.85f};
                 const float x = i * period - off + (row % 2) * 4;
-                r.rect(x, kHorizon + row * 7, x + 3, kHorizon + row * 7 + 4, cc);
+                const float jump = race_->phase() == RacePhase::Run && hash01((base + i) * 7 + row) > 0.5f ? 2.0f * std::fabs(std::sin((float)t_ * 9.0f + i + row)) : 0.0f;   // yarista seyirci ziplar
+                r.rect(x, kHorizon + row * 7 - jump, x + 3, kHorizon + row * 7 + 4 - jump, cc);
+                r.rect(x + 0.5f, kHorizon + row * 7 - 2 - jump, x + 2.5f, kHorizon + row * 7 - jump, {0.85f, 0.65f, 0.5f});   // bas
             }
         }
+        // Tribun catisi + ayaklari (0.55)
+        r.rect(0, kHorizon - 14, 640, kHorizon - 9, {0.55f, 0.56f, 0.6f});
+        r.rect(0, kHorizon - 9, 640, kHorizon - 7, {0.18f, 0.18f, 0.2f});
+        for (int i = -1; i < 12; ++i) { const float x = i * 64.0f - std::fmod(cam * f * kPx, 64.0f); r.rect(x, kHorizon - 9, x + 2, kHorizon + 30, {0.4f, 0.4f, 0.44f}); }
         const float pf = 0.55f, pp = 60.0f * kPx * pf;
         const float poff = std::fmod(cam * pf * kPx, pp);
         for (int i = -1; i < 4; ++i) {
             const float x = i * pp - poff + 100;
             r.rect(x, 60, x + 3, kWall0, {0.35f, 0.35f, 0.38f});
             r.rect(x - 10, 56, x + 13, 62, {0.95f, 0.95f, 0.8f});
+            r.tri(x - 10, 62, x + 13, 62, x + 40, kWall0, {1.0f, 0.95f, 0.75f, 0.06f});   // isik konisi
+            r.tri(x - 10, 62, x + 13, 62, x - 37, kWall0, {1.0f, 0.95f, 0.75f, 0.06f});
+            r.circle(x + 1.5f, 59, 14, 12, {1.0f, 0.95f, 0.8f, 0.10f});
         }
     }
     // Duvar + reklam panolari (1.0)
@@ -529,6 +538,23 @@ void DragScreen::drawWorld(Renderer& r) {
         r.rect(x - 1, kWall0 - 34, x + 1, kWall0, {0.3f, 0.3f, 0.3f});
         r.rect(x - 34, kWall0 - 46, x + 34, kWall0 - 32, {0.1f, 0.1f, 0.1f});
         r.textCentered(x, kWall0 - 43, finish ? "BITIS" : mk.label, 1, {1.0f, 0.85f, 0.2f});
+    }
+    // Bitis zaman tabelasi (iki serit: ET + hiz); bitiren aracin sonucu yanar
+    {
+        const float x = fin + 40;
+        if (x > -120 && x < 760) {
+            r.rect(x - 2, kHorizon - 40, x + 2, kWall0, {0.3f, 0.3f, 0.32f});
+            r.rect(x + 88, kHorizon - 40, x + 92, kWall0, {0.3f, 0.3f, 0.32f});
+            r.rect(x - 6, kHorizon - 74, x + 96, kHorizon - 34, {0.05f, 0.05f, 0.06f});
+            r.rect(x - 6, kHorizon - 74, x + 96, kHorizon - 72, {0.9f, 0.75f, 0.2f});
+            for (int l = 0; l < 2; ++l) {
+                const TimeSlip& s = race_->lane(l).slip;
+                char b[24];
+                if (s.finished && s.quarter > 0) std::snprintf(b, sizeof b, "%6.3f %3.0f", s.quarter, s.trapKmh); else std::snprintf(b, sizeof b, "--.--- ---");
+                r.text(x - 2, kHorizon - 66 + l * 15, l ? "R" : "S", 1, {0.6f, 0.6f, 0.65f});
+                r.text(x + 8, kHorizon - 66 + l * 15, b, 1, s.finished ? Color{1.0f, 0.3f, 0.2f} : Color{0.35f, 0.15f, 0.12f});
+            }
+        }
     }
     // Pist agaci (baslangicta, bariyer uzerinde)
     {
