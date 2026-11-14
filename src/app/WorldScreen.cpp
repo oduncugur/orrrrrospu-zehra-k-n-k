@@ -189,6 +189,7 @@ struct WorldScreen::Impl {
     bool hasWp = false; double wpX = 0, wpY = 0;
     std::vector<WorldLeg> route; size_t routeIdx = 0;
     bool autoDrive = false; double ccI = 0, stuckT = 0;
+    bool rain = false;
     int adasLevel = 0;
     float dragX = -1, dragY = -1; int dragId = -1;
     Rect mapBtn, autoBtn, poiBtn{0, 0, 0, 0}, mPlus, mMinus, mClose, mClear;
@@ -354,6 +355,12 @@ void WorldScreen::update(double dt) {
     Impl& M = *m_;
     App& app = M.app;
     M.msgT -= dt; M.envT += dt;
+    {   // Hava: 4 dk.lik dilimlerde %25 yagmur (ZK_RAIN / ZK_DAY test); yagmurda tutus %86
+        const bool r0 = M.rain;
+        M.rain = std::getenv("ZK_RAIN") ? true : std::getenv("ZK_DAY") ? false : hashW((int)(M.envT / 240.0) * 7 + 3) < 0.25f;
+        M.car->gripMul = M.rain ? 0.86 : 1.0;
+        if (M.rain != r0) { app.rainSound(M.rain); if (M.rain) M.flash("YAGMUR BASLADI: TUTUS DUSUK, ERKEN FRENLE", 2.2); }
+    }
     RoadCar& P = *M.car;
     VehicleSim& sim = P.sim();
     const double v = sim.speed();
@@ -801,7 +808,7 @@ void WorldScreen::render(Renderer& r) {
     // Gun / gece dongusu: oyun saati 14:00'ten baslar, 1 gercek dakika = 1 oyun saati (24 dk'lik gun)
     const double hour = M.clock();
     const double el = std::sin((hour - 6.0) / 12.0 * 3.14159265);         // gunes yuksekligi (-1..1)
-    const float dayL = (float)(0.22 + 0.78 * std::clamp((el + 0.12) / 0.4, 0.0, 1.0));   // 0.22 gece .. 1 gunduz
+    const float dayL = (float)(0.22 + 0.78 * std::clamp((el + 0.12) / 0.4, 0.0, 1.0)) * (M.rain ? 0.72f : 1.0f);   // yagmur: kapali hava   // 0.22 gece .. 1 gunduz
     const float dusk = (float)std::clamp(1.0 - std::fabs(el) / 0.25, 0.0, 1.0);          // gun dogumu / batimi kizilligi
     const bool nightW = dayL < 0.5f;
     auto lit = [&](Color c) {                                             // isik + gece mavisi + alacakaranlik turuncusu
@@ -1405,6 +1412,15 @@ void WorldScreen::render(Renderer& r) {
         r.setCarLook(L);
         const Mat4 pm = matMul(matTranslate((float)X, (float)M.curbH, (float)-Y), matRotY((float)sim.heading()));
         r.drawCar(M.carId, 0, 0, W, H, proj, view, pm, (float)M.spin, (float)M.steer);
+    }
+    if (M.rain) {                                                      // yagmur: egik damla cizgileri
+        const float slant = 0.15f + (float)std::min(0.6, M.car->sim().speed() / 60.0);
+        for (int k = 0; k < 140; ++k) {
+            const float x0 = std::fmod(hashW(k * 5) * (W + 80) + (float)M.envT * 240.0f * slant, (float)W + 80) - 40;
+            const float y0 = std::fmod(hashW(k * 9 + 2) * H + (float)M.envT * (520.0f + 200.0f * hashW(k)), (float)H);
+            const float len = 10.0f + 10.0f * hashW(k * 13);
+            r.tri(x0, y0, x0 + 0.9f, y0, x0 - slant * len + 0.9f, y0 + len, {0.75f, 0.8f, 0.9f, 0.35f});
+        }
     }
     r.endWorldDepth();
     // ---- HUD ----
